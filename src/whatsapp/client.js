@@ -196,4 +196,7 @@ module.exports = {
   startWhatsAppBot,
   sendWhatsAppMessage,
   getTargetJid,
+  isWhatsAppConnected: () => Boolean(currentSock && currentSock.user),
+  getWhatsAppUser: () => currentSock?.user || null,
 };
+

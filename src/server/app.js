@@ -7,6 +7,10 @@ const billService = require('../services/billService');
 const appointmentService = require('../services/appointmentService');
 const userService = require('../services/userService');
 const pixService = require('../services/pixService');
+const config = require('../config');
+const aiService = require('../services/aiService');
+const calendarService = require('../services/calendarService');
+const whatsappClient = require('../whatsapp/client');
 
 const app = express();
 
@@ -73,6 +77,55 @@ function authMiddleware(req, res, next) {
     error: 'Acesso não autorizado. Solicite o link exclusivo do seu painel no WhatsApp.',
   });
 }
+
+// ==========================================
+// SYSTEM HEALTH CHECK & DIAGNOSTICS ENDPOINT
+// ==========================================
+app.get('/api/health', async (req, res) => {
+  let geminiWorking = false;
+  let geminiDetails = null;
+
+  if (config.geminiApiKey) {
+    try {
+      const test = await aiService.processTextMessage('Padaria 10');
+      if (test && test.intent) {
+        geminiWorking = true;
+        geminiDetails = 'IA Gemini ativa, autenticada e respondendo normalmente.';
+      } else {
+        geminiWorking = false;
+        geminiDetails = 'Resposta inesperada da IA.';
+      }
+    } catch (e) {
+      geminiWorking = false;
+      geminiDetails = `Erro ao testar Gemini: ${e.message}`;
+    }
+  } else {
+    geminiDetails = 'GEMINI_API_KEY não encontrada nas variáveis de ambiente.';
+  }
+
+  const isConnected = whatsappClient.isWhatsAppConnected ? whatsappClient.isWhatsAppConnected() : false;
+  const waUser = whatsappClient.getWhatsAppUser ? whatsappClient.getWhatsAppUser() : null;
+
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    gemini: {
+      configured: Boolean(config.geminiApiKey),
+      keyLength: config.geminiApiKey ? config.geminiApiKey.length : 0,
+      keyPrefix: config.geminiApiKey ? config.geminiApiKey.substring(0, 6) + '...' : null,
+      working: geminiWorking,
+      details: geminiDetails,
+    },
+    whatsapp: {
+      connected: isConnected,
+      phone: waUser?.id ? waUser.id.split(':')[0] : null,
+    },
+    calendar: {
+      connected: calendarService.isCalendarConnected(),
+      calendarId: config.googleCalendarId,
+    },
+  });
+});
 
 // ==========================================
 // 1-CLICK PASSWORDLESS MAGIC LINK ENDPOINT
