@@ -1,0 +1,34 @@
+{
+  "name": "assistente-zap",
+  "version": "1.0.0",
+  "description": "Assistente Pessoal do WhatsApp para Controle Financeiro e Google Calendar",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "tunnel": ".\\cloudflared.exe tunnel --url http://localhost:3333",
+    "auth-calendar": "node src/scripts/authCalendar.js",
+    "test-finance": "node -e \"console.log(require('./src/services/financeService').getRecentExpenses())\""
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "baileys",
+    "financas",
+    "google-calendar",
+    "gemini"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@whiskeysockets/baileys": "^7.0.0-rc.14",
+    "cors": "^2.8.6",
+    "date-fns": "^4.1.0",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "googleapis": "^171.0.0",
+    "pino": "^10.3.1",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

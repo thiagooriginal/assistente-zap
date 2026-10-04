@@ -1,0 +1,2777 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Financeiro | Vibrant Fintech</title>
+  <!-- Tailwind CSS CDN with dark mode config -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              dark: '#080C15',
+              surface: '#0F1626',
+              card: '#131B2E',
+              border: '#1E293B',
+              borderHover: '#2E3D5B',
+              purple: '#8B5CF6',
+              cyan: '#06B6D4',
+              emerald: '#10B981',
+              pink: '#EC4899',
+              amber: '#F59E0B',
+            }
+          },
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts: Plus Jakarta Sans & Bebas Neue -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #080C15;
+      color: #E2E8F0;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .font-display {
+      font-family: 'Bebas Neue', Impact, sans-serif;
+    }
+    /* Estilo Papel Rasgado & Texturas */
+    .masking-tape {
+      position: absolute;
+      width: 90px;
+      height: 26px;
+      background: rgba(245, 245, 240, 0.72);
+      backdrop-filter: blur(2px);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25), inset 0 0 4px rgba(255,255,255,0.6);
+      border-left: 2px dashed rgba(220, 220, 210, 0.8);
+      border-right: 2px dashed rgba(220, 220, 210, 0.8);
+      z-index: 20;
+      pointer-events: none;
+    }
+    .torn-bottom {
+      clip-path: polygon(
+        0% 0%, 100% 0%, 100% calc(100% - 6px),
+        96% 100%, 92% calc(100% - 5px), 88% calc(100% - 1px), 84% 100%,
+        80% calc(100% - 6px), 76% calc(100% - 2px), 72% calc(100% - 5px), 68% 100%,
+        64% calc(100% - 6px), 60% calc(100% - 1px), 56% calc(100% - 5px), 52% 100%,
+        48% calc(100% - 6px), 44% calc(100% - 2px), 40% calc(100% - 5px), 36% 100%,
+        32% calc(100% - 6px), 28% calc(100% - 1px), 24% calc(100% - 5px), 20% 100%,
+        16% calc(100% - 6px), 12% calc(100% - 2px), 8% calc(100% - 5px), 5% 100%,
+        2% calc(100% - 4px), 0% calc(100% - 6px)
+      );
+    }
+    .torn-paper-card {
+      position: relative;
+      background: #fcfcfd;
+      color: #0f172a;
+      box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .torn-paper-card:hover {
+      transform: translateY(-4px) scale(1.01);
+      box-shadow: 0 24px 48px -12px rgba(0, 240, 255, 0.25), 0 12px 24px rgba(139, 92, 246, 0.2);
+    }
+    .stamp-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px dashed currentColor;
+      text-transform: uppercase;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    /* Glow Effects */
+    .glow-purple {
+      box-shadow: 0 0 25px -5px rgba(139, 92, 246, 0.25);
+    }
+    .glow-cyan {
+      box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.25);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25);
+    }
+    .glow-amber {
+      box-shadow: 0 0 25px -5px rgba(245, 158, 11, 0.25);
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0F1626;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #25334E;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #3B4D72;
+    }
+    .neon-border-card {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .neon-border-card:hover {
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#080C15] text-slate-100 flex flex-col selection:bg-purple-600 selection:text-white">
+
+  <!-- TOP NAVIGATION BAR -->
+  <header class="sticky top-0 z-40 bg-[#0B101D]/90 backdrop-blur-xl border-b border-[#1E293B]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 py-3 flex items-center justify-between">
+      
+      <!-- Brand & Status -->
+      <div class="flex items-center space-x-4">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-cyan-400 p-[1px] shadow-lg shadow-purple-900/30">
+          <div class="w-full h-full bg-[#0E1526] rounded-[15px] flex items-center justify-center text-cyan-400">
+            <i data-lucide="zap" class="w-6 h-6 fill-cyan-400/20 text-cyan-400"></i>
+          </div>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-lg font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+              Assistente Financeiro
+            </h1>
+            <span id="userPlanBadge" class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
+              PRO
+            </span>
+          </div>
+          <div class="flex items-center gap-2 mt-0.5">
+            <span class="relative flex h-2 w-2">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span class="text-xs text-slate-400 flex items-center gap-1">
+              <span id="userPhoneDisplay">WhatsApp Conectado</span> <span class="text-slate-600">•</span> Auto-Sync
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <!-- Export CSV Button -->
+        <a id="exportCsvBtn" href="/api/export/csv" class="inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-300 bg-[#131B2E] border border-[#22304C] rounded-xl hover:bg-[#1A253D] hover:text-white transition shadow-sm">
+          <i data-lucide="download" class="w-4 h-4 text-cyan-400"></i>
+          <span class="hidden sm:inline">Exportar</span> CSV
+        </a>
+
+        <!-- Add Bill Button -->
+        <button onclick="openBillModal()" class="inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold text-amber-300 bg-amber-500/10 border border-amber-500/25 rounded-xl hover:bg-amber-500/20 transition shadow-sm">
+          <i data-lucide="calendar-plus" class="w-4 h-4 text-amber-400"></i>
+          <span class="hidden md:inline">Agendar</span> Parcela
+        </button>
+
+        <!-- Add Appointment Button -->
+        <button onclick="openAppointmentModal()" class="inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-semibold text-cyan-300 bg-cyan-500/10 border border-cyan-500/25 rounded-xl hover:bg-cyan-500/20 transition shadow-sm">
+          <i data-lucide="calendar" class="w-4 h-4 text-cyan-400"></i>
+          <span class="hidden md:inline">Novo</span> Compromisso
+        </button>
+
+        <!-- Descubra ON Showcase Link -->
+        <a href="/descubra" class="inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-extrabold text-cyan-300 bg-cyan-500/10 border border-cyan-500/30 rounded-xl hover:bg-cyan-500/20 shadow-sm transition">
+          <i data-lucide="sparkles" class="w-4 h-4 text-cyan-400"></i>
+          <span>Descubra ON</span>
+        </a>
+
+        <!-- Direct Admin Button in Header (Shown if role === 'ADMIN') -->
+        <button id="navAdminBtn" onclick="switchTab('admin'); document.getElementById('tabContentAdmin')?.scrollIntoView({ behavior: 'smooth' });" class="hidden inline-flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-bold text-white bg-purple-600/25 border border-purple-500/40 rounded-xl hover:bg-purple-600/40 shadow-sm transition">
+          <i data-lucide="shield-check" class="w-4 h-4 text-purple-400"></i>
+          <span>Gestão SaaS</span>
+        </button>
+
+        <!-- Upgrade PRO Pix Button (Shown if FREE_TRIAL) -->
+        <button id="navUpgradeBtn" onclick="openPixModal()" class="hidden inline-flex items-center gap-1.5 px-3.5 py-2 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 rounded-xl shadow-lg shadow-emerald-500/25 active:scale-95 transition">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+          <span>Assinar PRO</span>
+        </button>
+
+        <!-- New Expense Button -->
+        <button onclick="openExpenseModal()" class="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-purple-600 via-indigo-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 rounded-xl shadow-lg shadow-purple-600/25 active:scale-95 transition">
+          <i data-lucide="plus" class="w-4 h-4 stroke-[3]"></i>
+          <span>Novo Gasto</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    
+    <!-- GREETING & STATUS BANNER -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <h2 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-2.5">
+          Painel de Controle Financeiro
+        </h2>
+        <p class="text-sm text-slate-400 mt-1 flex items-center gap-2">
+          <i data-lucide="calendar" class="w-4 h-4 text-purple-400"></i>
+          <span id="headerCurrentDate">Carregando data...</span>
+          <span class="text-slate-600">•</span>
+          <span class="text-emerald-400 font-medium flex items-center gap-1">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Inteligência Artificial Ativa
+          </span>
+        </p>
+      </div>
+
+      <!-- Live Sync Info Pill -->
+      <div class="inline-flex items-center gap-3 px-4 py-2 bg-[#101828]/80 border border-[#1E293B] rounded-2xl shadow-inner">
+        <div class="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+          <i data-lucide="message-square" class="w-4 h-4"></i>
+        </div>
+        <div class="text-left">
+          <p class="text-[11px] font-bold uppercase tracking-wider text-slate-400">WhatsApp Bot</p>
+          <p class="text-xs font-semibold text-emerald-400 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            Pronto para áudio, fotos e texto
+          </p>
+        </div>
+        <button onclick="loadAll()" title="Atualizar agora" class="ml-2 p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition">
+          <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- TRIAL UPGRADE BANNER (Shown for FREE_TRIAL users) -->
+    <div id="trialBanner" class="hidden bg-gradient-to-r from-purple-950/60 via-indigo-950/40 to-[#111726] border border-purple-500/40 rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
+      <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+        <div class="flex items-start gap-4">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-500 to-amber-400 p-[1px] shrink-0 shadow-lg shadow-purple-900/40">
+            <div class="w-full h-full bg-[#0D1424] rounded-[15px] flex items-center justify-center text-amber-400">
+              <i data-lucide="crown" class="w-6 h-6"></i>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                Período de Testes
+              </span>
+              <span id="trialDaysText" class="text-xs text-slate-300 font-semibold">7 dias restantes</span>
+            </div>
+            <h3 class="text-base sm:text-lg font-extrabold text-white mt-1">Aproveite todo o poder do Assistente com Inteligência Artificial!</h3>
+            <p class="text-xs sm:text-sm text-slate-400 mt-0.5">Garanta acesso vitalício contínuo, lembretes pontuais e controle financeiro automático por apenas <b class="text-emerald-400 font-bold">R$ 29,00/mês</b>.</p>
+          </div>
+        </div>
+        <button onclick="openPixModal()" class="inline-flex items-center justify-center gap-2 px-6 py-3 font-extrabold text-sm text-white bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 rounded-xl shadow-lg shadow-emerald-500/30 active:scale-95 transition shrink-0">
+          <i data-lucide="zap" class="w-4 h-4 fill-white"></i>
+          <span>Assinar Plano PRO (R$ 29,00)</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 4 VIBRANT KPI CARDS (Neon Glow) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      
+      <!-- CARD 1: GASTOS DO MÊS (Purple Neon) -->
+      <div class="neon-border-card bg-[#111726]/90 border border-purple-500/30 rounded-2xl p-5 hover:border-purple-500/60 hover:glow-purple relative overflow-hidden transition group">
+        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-purple-600/10 rounded-full blur-2xl group-hover:bg-purple-600/20 transition"></div>
+        <div class="flex items-center justify-between">
+          <p class="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="calendar-days" class="w-3.5 h-3.5"></i> Gastos do Mês
+          </p>
+          <div class="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400">
+            <i data-lucide="credit-card" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <h3 id="cardTotalMonth" class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">R$ 0,00</h3>
+          <p id="cardCountMonth" class="text-xs text-purple-300/70 mt-1 font-medium">0 transações</p>
+        </div>
+        <!-- Target indicator / mini bar -->
+        <div class="mt-4 pt-3 border-t border-purple-500/15 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Meta: R$ 8.000</span>
+          <span id="budgetPercent" class="text-purple-400 font-bold">0%</span>
+        </div>
+        <div class="w-full bg-[#18233C] h-1.5 rounded-full mt-1.5 overflow-hidden">
+          <div id="budgetBar" class="bg-gradient-to-r from-purple-500 to-indigo-400 h-full rounded-full transition-all duration-500" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- CARD 2: GASTOS HOJE (Cyan Neon) -->
+      <div class="neon-border-card bg-[#111726]/90 border border-cyan-500/30 rounded-2xl p-5 hover:border-cyan-500/60 hover:glow-cyan relative overflow-hidden transition group">
+        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-cyan-600/10 rounded-full blur-2xl group-hover:bg-cyan-600/20 transition"></div>
+        <div class="flex items-center justify-between">
+          <p class="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i> Gastos Hoje
+          </p>
+          <div class="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+            <i data-lucide="trending-up" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <h3 id="cardTotalToday" class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">R$ 0,00</h3>
+          <p id="cardCountToday" class="text-xs text-cyan-300/70 mt-1 font-medium">0 lançamentos hoje</p>
+        </div>
+        <div class="mt-4 pt-3 border-t border-cyan-500/15 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Ritmo do dia</span>
+          <span class="text-cyan-400 font-bold flex items-center gap-1">
+            <i data-lucide="activity" class="w-3 h-3"></i> Atualizado
+          </span>
+        </div>
+      </div>
+
+      <!-- CARD 3: CONTAS E PARCELAS PENDENTES (Amber/Orange Neon) -->
+      <div class="neon-border-card bg-[#111726]/90 border border-amber-500/30 rounded-2xl p-5 hover:border-amber-500/60 hover:glow-amber relative overflow-hidden transition group">
+        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-amber-600/10 rounded-full blur-2xl group-hover:bg-amber-600/20 transition"></div>
+        <div class="flex items-center justify-between">
+          <p class="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="receipt" class="w-3.5 h-3.5"></i> Boletos & Parcelas
+          </p>
+          <div class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <i data-lucide="alert-circle" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <h3 id="cardPendingBills" class="text-2xl sm:text-3xl font-extrabold text-amber-400 tracking-tight">R$ 0,00</h3>
+          <p id="cardCountBills" class="text-xs text-amber-300/70 mt-1 font-medium">0 pendências</p>
+        </div>
+        <div class="mt-4 pt-3 border-t border-amber-500/15 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Próximo vencimento</span>
+          <span id="cardNextBillDate" class="text-amber-300 font-bold">Nenhum</span>
+        </div>
+      </div>
+
+      <!-- CARD 4: GASOLINA / 15 DIAS (Emerald Neon) -->
+      <div class="neon-border-card bg-[#111726]/90 border border-emerald-500/30 rounded-2xl p-5 hover:border-emerald-500/60 hover:glow-emerald relative overflow-hidden transition group">
+        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-600/10 rounded-full blur-2xl group-hover:bg-emerald-600/20 transition"></div>
+        <div class="flex items-center justify-between">
+          <p class="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="fuel" class="w-3.5 h-3.5"></i> Gasolina (15 dias)
+          </p>
+          <div class="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <i data-lucide="gauge" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <h3 id="cardGasoline15Days" class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">R$ 0,00</h3>
+          <p id="cardCountGasoline" class="text-xs text-emerald-300/70 mt-1 font-medium">0 abastecimentos</p>
+        </div>
+        <div class="mt-4 pt-3 border-t border-emerald-500/15 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Consumo de combustível</span>
+          <span class="text-emerald-400 font-bold">Últimos 15d</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CHARTS ROW (VIBRANT FINTECH CHARTS) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      
+      <!-- DOUGHNUT CHART: CATEGORIAS (4 Cols) -->
+      <div class="lg:col-span-4 bg-[#111726]/90 border border-[#1E293B] rounded-2xl p-6 flex flex-col justify-between shadow-xl">
+        <div>
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="font-bold text-white flex items-center gap-2 text-base">
+              <span class="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-sm shadow-purple-500/50"></span>
+              Gastos por Categoria
+            </h3>
+            <span class="text-[11px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2.5 py-0.5 rounded-full">
+              Distribuição
+            </span>
+          </div>
+
+          <div class="relative h-64 flex items-center justify-center">
+            <canvas id="categoryChart"></canvas>
+            <div id="noCategoryData" class="hidden absolute inset-0 flex flex-col items-center justify-center text-sm text-slate-500">
+              <i data-lucide="pie-chart" class="w-8 h-8 mb-1 opacity-30"></i>
+              Nenhum gasto registrado ainda
+            </div>
+          </div>
+        </div>
+
+        <!-- Category Legends with custom neon pill indicators -->
+        <div id="categoryLegend" class="mt-4 space-y-2 max-h-40 overflow-y-auto pr-1"></div>
+      </div>
+
+      <!-- LINE/BAR CHART: EVOLUÇÃO DIÁRIA (8 Cols) -->
+      <div class="lg:col-span-8 bg-[#111726]/90 border border-[#1E293B] rounded-2xl p-6 flex flex-col justify-between shadow-xl">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="font-bold text-white flex items-center gap-2 text-base">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-sm shadow-cyan-400/50"></span>
+              Evolução Diária de Gastos
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">Histórico dos últimos 14 dias com curva suave</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-mono text-cyan-400 font-bold bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-1 rounded-lg">
+              Em R$
+            </span>
+          </div>
+        </div>
+
+        <div class="h-72 w-full">
+          <canvas id="dailyChart"></canvas>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TABS SECTION: GASTOS REALIZADOS & CONTAS A PAGAR -->
+    <div class="bg-[#111726]/90 border border-[#1E293B] rounded-2xl shadow-xl overflow-hidden">
+      
+      <!-- Modern Dark Tabs Header -->
+      <div class="border-b border-[#1E293B] px-6 pt-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0E1524]">
+        
+        <div class="flex space-x-2 sm:space-x-4 overflow-x-auto scrollbar-none pb-2 sm:pb-0">
+          <!-- Tab 1: Gastos Realizados -->
+          <button onclick="switchTab('expenses')" id="tabBtnExpenses" class="pb-3 px-3 text-sm font-bold border-b-2 border-purple-500 text-purple-400 flex items-center gap-2 transition duration-200 whitespace-nowrap shrink-0">
+            <i data-lucide="receipt" class="w-4 h-4"></i>
+            Gastos Realizados
+            <span id="badgeExpensesCount" class="ml-1 px-2 py-0.5 text-xs font-mono bg-purple-500/20 text-purple-300 rounded-full border border-purple-500/30">0</span>
+          </button>
+
+          <!-- Tab 2: Contas a Pagar & Parcelas -->
+          <button onclick="switchTab('bills')" id="tabBtnBills" class="pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200 whitespace-nowrap shrink-0">
+            <i data-lucide="calendar-clock" class="w-4 h-4"></i>
+            Contas a Pagar & Parcelas
+            <span id="badgePendingBills" class="ml-1 px-2 py-0.5 text-xs font-mono bg-amber-500/20 text-amber-300 rounded-full border border-amber-500/30">0</span>
+          </button>
+
+          <!-- Tab 3: Agenda & Compromissos -->
+          <button onclick="switchTab('appointments')" id="tabBtnAppointments" class="pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200 whitespace-nowrap shrink-0">
+            <i data-lucide="calendar" class="w-4 h-4"></i>
+            Agenda & Lembretes
+            <span id="badgeAppointmentsCount" class="ml-1 px-2 py-0.5 text-xs font-mono bg-cyan-500/20 text-cyan-300 rounded-full border border-cyan-500/30">0</span>
+          </button>
+
+          <!-- Tab 4: Admin Clientes SaaS (Aparece se for ADMIN) -->
+          <button onclick="switchTab('admin')" id="tabBtnAdmin" class="hidden pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200 whitespace-nowrap shrink-0">
+            <i data-lucide="users" class="w-4 h-4 text-purple-400"></i>
+            Gestão de Clientes
+            <span class="ml-1 px-2 py-0.5 text-[10px] font-mono bg-purple-500/20 text-purple-300 rounded-full border border-purple-500/30 uppercase">SaaS</span>
+          </button>
+
+          <!-- Tab 5: Descubra ON & Rolês (Estilo Papel Rasgado) -->
+          <button onclick="switchTab('descubra')" id="tabBtnDescubra" class="pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200 whitespace-nowrap shrink-0">
+            <i data-lucide="sparkles" class="w-4 h-4 text-cyan-400"></i>
+            Descubra ON & Rolês
+            <span class="ml-1 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-cyan-400 text-black rounded shadow-sm">NOVO</span>
+          </button>
+
+        </div>
+
+        <div class="pb-3 sm:pb-0 flex items-center gap-2">
+          <span class="text-xs text-slate-500 hidden md:inline">Auto-refresh a cada 8s</span>
+          <button onclick="loadAll()" title="Atualizar dados" class="p-2 text-slate-400 hover:text-cyan-400 hover:bg-[#1A253D] rounded-xl transition">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- TAB 1: GASTOS REALIZADOS -->
+      <div id="tabContentExpenses">
+        
+        <!-- Filter Toolbar -->
+        <div class="p-5 border-b border-[#1E293B] flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#0D1322]">
+          <div class="relative w-full sm:w-80">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
+            <input type="text" id="searchInput" oninput="debounceLoad()" placeholder="Buscar por descrição, posto, mercado..." class="w-full pl-10 pr-3.5 py-2 text-sm bg-[#131B2E] border border-[#22304C] rounded-xl focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 text-white placeholder-slate-500 transition">
+          </div>
+
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <select id="categoryFilter" onchange="loadExpenses()" class="w-full sm:w-auto py-2 px-3 text-sm bg-[#131B2E] border border-[#22304C] rounded-xl focus:outline-none focus:border-purple-500 text-slate-200 font-medium">
+              <option value="Todas">Todas as categorias</option>
+              <option value="Gasolina">Gasolina / Combustível</option>
+              <option value="Alimentação">Alimentação</option>
+              <option value="Mercado">Mercado</option>
+              <option value="Saúde / Farmácia">Saúde / Farmácia</option>
+              <option value="Transporte">Transporte</option>
+              <option value="Lazer / Diversão">Lazer / Diversão</option>
+              <option value="Moradia / Contas">Moradia / Contas</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="bg-[#0A0F1D] text-xs uppercase font-bold text-slate-400 border-b border-[#1E293B]">
+              <tr>
+                <th class="px-5 py-3.5">Data / Hora</th>
+                <th class="px-5 py-3.5">Descrição</th>
+                <th class="px-5 py-3.5">Categoria</th>
+                <th class="px-5 py-3.5">Forma</th>
+                <th class="px-5 py-3.5">Origem</th>
+                <th class="px-5 py-3.5 text-right">Valor</th>
+                <th class="px-5 py-3.5 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="expensesTableBody" class="divide-y divide-[#18233C]">
+              <tr>
+                <td colspan="7" class="text-center py-12 text-slate-500">
+                  <div class="inline-block animate-spin mr-2">◷</div> Carregando despesas...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 2: CONTAS A PAGAR & PARCELAS -->
+      <div id="tabContentBills" class="hidden">
+        
+        <!-- Bills Header Bar -->
+        <div class="p-5 border-b border-[#1E293B] flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#0D1322]">
+          <div>
+            <h4 class="font-bold text-white text-base flex items-center gap-2">
+              <i data-lucide="layers" class="w-4 h-4 text-amber-400"></i>
+              Agenda de Pagamentos & Compras Parceladas
+            </h4>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Avisos automáticos no WhatsApp 1 dia antes e no dia do vencimento
+            </p>
+          </div>
+
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <select id="billStatusFilter" onchange="loadBills()" class="py-2 px-3 text-sm bg-[#131B2E] border border-[#22304C] rounded-xl text-slate-200 font-medium focus:outline-none focus:border-amber-500">
+              <option value="PENDING">Apenas Pendentes</option>
+              <option value="PAID">Já Pagas</option>
+              <option value="ALL">Todas as Contas</option>
+            </select>
+
+            <button onclick="openBillModal()" class="px-3.5 py-2 text-sm font-semibold text-amber-300 bg-amber-500/15 border border-amber-500/30 rounded-xl hover:bg-amber-500/25 transition">
+              + Nova Conta
+            </button>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="bg-[#0A0F1D] text-xs uppercase font-bold text-slate-400 border-b border-[#1E293B]">
+              <tr>
+                <th class="px-5 py-3.5">Vencimento</th>
+                <th class="px-5 py-3.5">Título / Parcela</th>
+                <th class="px-5 py-3.5">Categoria</th>
+                <th class="px-5 py-3.5">Status</th>
+                <th class="px-5 py-3.5 text-right">Valor</th>
+                <th class="px-5 py-3.5 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="billsTableBody" class="divide-y divide-[#18233C]">
+              <tr>
+                <td colspan="6" class="text-center py-12 text-slate-500">
+                  <div class="inline-block animate-spin mr-2">◷</div> Carregando contas agendadas...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+
+      <!-- TAB 3: AGENDA & COMPROMISSOS -->
+      <div id="tabContentAppointments" class="hidden">
+        
+        <!-- Appointments Header Bar -->
+        <div class="p-5 border-b border-[#1E293B] flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#0D1322]">
+          <div>
+            <h4 class="font-bold text-white text-base flex items-center gap-2">
+              <i data-lucide="calendar" class="w-4 h-4 text-cyan-400"></i>
+              Compromissos Agendados & Lembretes
+            </h4>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Notificações automáticas no seu WhatsApp: 24h antes, 3h antes e 1h antes do início
+            </p>
+          </div>
+
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <select id="appointmentStatusFilter" onchange="loadAppointments()" class="py-2 px-3 text-sm bg-[#131B2E] border border-[#22304C] rounded-xl text-slate-200 font-medium focus:outline-none focus:border-cyan-500">
+              <option value="SCHEDULED">Apenas Agendados</option>
+              <option value="ALL">Histórico Completo</option>
+            </select>
+
+            <button onclick="openAppointmentModal()" class="px-3.5 py-2 text-sm font-semibold text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 rounded-xl hover:bg-cyan-500/25 transition">
+              + Novo Compromisso
+            </button>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="bg-[#0A0F1D] text-xs uppercase font-bold text-slate-400 border-b border-[#1E293B]">
+              <tr>
+                <th class="px-5 py-3.5">Data & Horário</th>
+                <th class="px-5 py-3.5">Compromisso</th>
+                <th class="px-5 py-3.5">Local</th>
+                <th class="px-5 py-3.5">Avisos WhatsApp</th>
+                <th class="px-5 py-3.5">Origem</th>
+                <th class="px-5 py-3.5 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="appointmentsTableBody" class="divide-y divide-[#18233C]">
+              <tr>
+                <td colspan="6" class="text-center py-12 text-slate-500">
+                  <div class="inline-block animate-spin mr-2">◷</div> Carregando agenda...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 4: GESTÃO DE CLIENTES SAAS (ADMIN ONLY) -->
+      <div id="tabContentAdmin" class="hidden space-y-6 p-6">
+        
+        <!-- ADMIN OVERVIEW HEADER & BUSINESS METRICS -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h3 class="text-xl font-extrabold text-white flex items-center gap-2">
+              <i data-lucide="shield-check" class="w-6 h-6 text-purple-400"></i>
+              Painel do Administrador & Faturamento SaaS
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">Visão consolidada de clientes, faturamento recorrente e conversões</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold px-3 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20">
+              💎 Plano PRO: <b>R$ 29,00 / mês</b> por cliente
+            </span>
+          </div>
+        </div>
+
+        <!-- 4 SAAS KPI CARDS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- CARD 1: FATURAMENTO MENSAL (MRR) -->
+          <div class="bg-[#111726]/90 border border-emerald-500/30 rounded-2xl p-5 hover:border-emerald-500/60 transition group relative overflow-hidden shadow-lg shadow-emerald-950/20">
+            <div class="flex items-center justify-between">
+              <p class="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                <i data-lucide="dollar-sign" class="w-3.5 h-3.5"></i> Faturamento Mensal (MRR)
+              </p>
+              <div class="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                <i data-lucide="trending-up" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div class="mt-3">
+              <h3 id="adminMrrTotal" class="text-2xl font-extrabold text-white tracking-tight">R$ 0,00</h3>
+              <p id="adminMrrSub" class="text-xs text-emerald-300/70 mt-1 font-medium">0 clientes pagantes</p>
+            </div>
+          </div>
+
+          <!-- CARD 2: ASSINANTES PRO -->
+          <div class="bg-[#111726]/90 border border-purple-500/30 rounded-2xl p-5 hover:border-purple-500/60 transition group relative overflow-hidden shadow-lg shadow-purple-950/20">
+            <div class="flex items-center justify-between">
+              <p class="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
+                <i data-lucide="crown" class="w-3.5 h-3.5 text-amber-400"></i> Assinantes PRO
+              </p>
+              <div class="w-8 h-8 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400">
+                <i data-lucide="sparkles" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div class="mt-3">
+              <h3 id="adminProCount" class="text-2xl font-extrabold text-white tracking-tight">0</h3>
+              <p class="text-xs text-purple-300/70 mt-1 font-medium">Assinaturas ativas (R$ 29/mês)</p>
+            </div>
+          </div>
+
+          <!-- CARD 3: EM TESTE GRÁTIS -->
+          <div class="bg-[#111726]/90 border border-amber-500/30 rounded-2xl p-5 hover:border-amber-500/60 transition group relative overflow-hidden shadow-lg shadow-amber-950/20">
+            <div class="flex items-center justify-between">
+              <p class="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
+                <i data-lucide="clock" class="w-3.5 h-3.5"></i> Em Teste Grátis
+              </p>
+              <div class="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <i data-lucide="user-check" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div class="mt-3">
+              <h3 id="adminTrialCount" class="text-2xl font-extrabold text-amber-300 tracking-tight">0</h3>
+              <p class="text-xs text-amber-300/70 mt-1 font-medium">Período de teste de 7 dias</p>
+            </div>
+          </div>
+
+          <!-- CARD 4: CONVITES / CÓDIGOS -->
+          <div class="bg-[#111726]/90 border border-cyan-500/30 rounded-2xl p-5 hover:border-cyan-500/60 transition group relative overflow-hidden shadow-lg shadow-cyan-950/20">
+            <div class="flex items-center justify-between">
+              <p class="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+                <i data-lucide="ticket" class="w-3.5 h-3.5"></i> Convites Pendentes
+              </p>
+              <div class="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                <i data-lucide="mail-plus" class="w-4 h-4"></i>
+              </div>
+            </div>
+            <div class="mt-3">
+              <h3 id="adminPendingInvitesCount" class="text-2xl font-extrabold text-cyan-400 tracking-tight">0</h3>
+              <p class="text-xs text-cyan-300/70 mt-1 font-medium">Códigos aguardando uso</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- SECTION 1: CÓDIGOS DE CONVITE E ATIVAÇÃO -->
+        <div class="bg-[#0D1322] border border-purple-500/30 rounded-2xl overflow-hidden shadow-xl">
+          <div class="p-5 border-b border-[#1E293B] flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#0A0F1D]">
+            <div>
+              <h4 class="font-bold text-white text-base flex items-center gap-2">
+                <i data-lucide="ticket" class="w-4 h-4 text-purple-400"></i>
+                Códigos de Ativação / Convites para Clientes
+              </h4>
+              <p class="text-xs text-slate-400 mt-0.5">
+                Novos clientes só começam o teste de 7 dias após enviar um código gerado por você
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="createInviteCodeAdmin()" class="px-4 py-2 text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-xl shadow-lg shadow-purple-600/30 transition flex items-center gap-2">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                Gerar Novo Código
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-300">
+              <thead class="bg-[#0A0F1D] text-xs uppercase font-bold text-slate-400 border-b border-[#1E293B]">
+                <tr>
+                  <th class="px-5 py-3">Código</th>
+                  <th class="px-5 py-3">Status</th>
+                  <th class="px-5 py-3">Duração</th>
+                  <th class="px-5 py-3">Cliente Ativado</th>
+                  <th class="px-5 py-3">Criado em</th>
+                  <th class="px-5 py-3 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="adminInvitesTableBody" class="divide-y divide-[#18233C]">
+                <tr>
+                  <td colspan="6" class="text-center py-6 text-slate-500">
+                    Carregando códigos...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- SECTION 2: CLIENTES REGISTRADOS -->
+        <div class="bg-[#0D1322] border border-[#1E293B] rounded-2xl overflow-hidden shadow-xl">
+          <div class="p-5 border-b border-[#1E293B] flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#0A0F1D]">
+            <div>
+              <h4 class="font-bold text-white text-base flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4 text-cyan-400"></i>
+                Clientes Registrados no Sistema
+              </h4>
+              <p class="text-xs text-slate-400 mt-0.5">
+                Usuários ativos e período de teste
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button onclick="cleanTestUsersAdmin()" class="px-3 py-1.5 text-xs font-semibold text-rose-300 bg-rose-500/10 border border-rose-500/25 rounded-xl hover:bg-rose-500/20 transition">
+                Limpar Testes
+              </button>
+              <button onclick="loadAdminUsers()" class="px-3.5 py-1.5 text-xs font-semibold text-purple-300 bg-purple-500/15 border border-purple-500/30 rounded-xl hover:bg-purple-500/25 transition flex items-center gap-1.5">
+                <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i> Atualizar
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-slate-300">
+              <thead class="bg-[#0A0F1D] text-xs uppercase font-bold text-slate-400 border-b border-[#1E293B]">
+                <tr>
+                  <th class="px-5 py-3.5">ID</th>
+                  <th class="px-5 py-3.5">WhatsApp / Telefone</th>
+                  <th class="px-5 py-3.5">Plano Atual</th>
+                  <th class="px-5 py-3.5">Data Cadastro</th>
+                  <th class="px-5 py-3.5 text-center">Gastos</th>
+                  <th class="px-5 py-3.5 text-center">Contas</th>
+                  <th class="px-5 py-3.5 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="adminUsersTableBody" class="divide-y divide-[#18233C]">
+                <tr>
+                  <td colspan="7" class="text-center py-12 text-slate-500">
+                    <div class="inline-block animate-spin mr-2">◷</div> Carregando clientes...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- TAB 5: DESCUBRA ON & ROLÊS (ESTILO PAPEL RASGADO & CURADORIA) -->
+      <div id="tabContentDescubra" class="hidden space-y-8 p-6 sm:p-8">
+        
+        <!-- HEADER SHOWCASE IN TAB -->
+        <div class="relative rounded-3xl p-6 sm:p-8 overflow-hidden bg-gradient-to-r from-purple-950 via-[#101728] to-[#0a0f1d] border border-purple-500/30 shadow-2xl">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+            <div>
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-400/10 border border-cyan-400/30 text-cyan-300 text-xs font-bold uppercase tracking-wider mb-2">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-cyan-400"></i>
+                <span>Estilo Papel Rasgado & Curadoria com IA</span>
+              </div>
+              <h2 class="font-display text-3xl sm:text-4xl font-black uppercase text-white tracking-tight leading-tight">
+                A Revolução de Como Você Encontra Lugares para se Divertir
+              </h2>
+              <p class="text-sm text-slate-300 mt-1 max-w-2xl">
+                O assistente cruza seu estilo, seu orçamento livre da semana e sua agenda para te entregar os melhores rolês e bares sem dor de cabeça.
+              </p>
+            </div>
+
+            <div class="flex items-center gap-3 shrink-0">
+              <a href="/descubra" target="_blank" class="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-black uppercase tracking-wider bg-cyan-400 hover:bg-cyan-300 text-black rounded-xl shadow-lg shadow-cyan-400/25 transition">
+                <i data-lucide="external-link" class="w-4 h-4"></i>
+                <span>Abrir em Tela Cheia</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- Search In Tab -->
+          <div class="mt-6 relative max-w-md">
+            <i data-lucide="search" class="w-4 h-4 text-cyan-400 absolute left-3.5 top-3"></i>
+            <input 
+              type="text" 
+              id="searchTabDescubraInput" 
+              oninput="filterTabArticles()" 
+              placeholder="Buscar por bar, benefício, rolê ou tema..." 
+              class="w-full pl-10 pr-4 py-2 text-xs sm:text-sm bg-[#080d1a]/90 border border-purple-500/40 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400 transition"
+            >
+          </div>
+        </div>
+
+        <!-- FILTER CHIPS -->
+        <div class="flex items-center gap-2 overflow-x-auto scrollbar-none pb-2 text-xs font-bold">
+          <button onclick="setTabFilter('all')" id="tabFilterBtn_all" class="tab-filter-btn px-3.5 py-2 rounded-xl transition whitespace-nowrap bg-cyan-400 text-black font-extrabold shadow-md">
+            🔥 Todos
+          </button>
+          <button onclick="setTabFilter('revolucao')" id="tabFilterBtn_revolucao" class="tab-filter-btn px-3.5 py-2 rounded-xl transition whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white border border-slate-800">
+            🎯 A Revolução dos Rolês
+          </button>
+          <button onclick="setTabFilter('plataforma')" id="tabFilterBtn_plataforma" class="tab-filter-btn px-3.5 py-2 rounded-xl transition whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white border border-slate-800">
+            ⚡ O Que a Plataforma Traz
+          </button>
+          <button onclick="setTabFilter('beneficios')" id="tabFilterBtn_beneficios" class="tab-filter-btn px-3.5 py-2 rounded-xl transition whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white border border-slate-800">
+            💎 Benefícios aos Usuários
+          </button>
+          <button onclick="setTabFilter('gastronomia')" id="tabFilterBtn_gastronomia" class="tab-filter-btn px-3.5 py-2 rounded-xl transition whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white border border-slate-800">
+            🍸 Gastronomia & Bares
+          </button>
+          <button onclick="setTabFilter('baladas')" id="tabFilterBtn_baladas" class="tab-filter-btn px-3.5 py-2 rounded-xl transition whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white border border-slate-800">
+            🎶 Noite & Diversão
+          </button>
+          <button onclick="setTabFilter('smartbudget')" id="tabFilterBtn_smartbudget" class="tab-filter-btn px-3.5 py-2 rounded-xl transition whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white border border-slate-800">
+            💰 Lazer Sem Culpa
+          </button>
+        </div>
+
+        <!-- GRID OF TORN PAPER CARDS -->
+        <div id="tabArticlesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          
+          <!-- CARD 1 -->
+          <article data-category="revolucao" class="tab-article-item torn-paper-card rounded-2xl torn-bottom p-6 pt-8 flex flex-col justify-between cursor-pointer group" onclick="openDescubraModal('revolucao')">
+            <div class="masking-tape -top-3.5 right-6 rotate-[7deg]"></div>
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <span class="px-2 py-0.5 text-[11px] font-black uppercase bg-cyan-400 text-black rounded rotate-[-2deg]">
+                  ON: REVOLUÇÃO
+                </span>
+                <span class="stamp-badge text-[10px] text-purple-700">IA EXCLUSIVA</span>
+              </div>
+              <h3 class="font-display text-2xl font-black uppercase text-slate-900 leading-tight group-hover:text-purple-700 transition">
+                Pesquisar Onde Sair Nunca Mais Será uma Dor de Cabeça
+              </h3>
+              <p class="text-slate-600 text-xs mt-2.5 leading-relaxed">
+                Esqueça o roteiro de abrir 4 apps diferentes. Veja como a IA cruza seu estilo, seu orçamento livre e sua agenda para te entregar a noite perfeita em segundos.
+              </p>
+              <div class="mt-3 p-3 bg-purple-50 border-l-4 border-purple-600 rounded-r-lg text-xs font-medium text-purple-950">
+                💬 <i>"Zap, queremos um rooftop aconchegante até R$ 120 por pessoa..."</i>
+              </div>
+            </div>
+            <div class="mt-5 pt-3 border-t border-slate-200 flex items-center justify-between text-xs font-bold">
+              <span class="text-slate-500 uppercase tracking-wider">3 min de leitura</span>
+              <span class="text-purple-700 group-hover:translate-x-1 transition flex items-center gap-1">Ler Artigo →</span>
+            </div>
+          </article>
+
+          <!-- CARD 2 -->
+          <article data-category="plataforma" class="tab-article-item torn-paper-card rounded-2xl torn-bottom p-6 pt-8 flex flex-col justify-between cursor-pointer group" onclick="openDescubraModal('plataforma')">
+            <div class="masking-tape -top-3.5 left-6 -rotate-[6deg]"></div>
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <span class="px-2 py-0.5 text-[11px] font-black uppercase bg-fuchsia-500 text-white rounded rotate-[1deg]">
+                  ON: TEMA & VISÃO
+                </span>
+                <span class="stamp-badge text-[10px] text-cyan-700">SEM APLICATIVOS</span>
+              </div>
+              <h3 class="font-display text-2xl font-black uppercase text-slate-900 leading-tight group-hover:text-fuchsia-600 transition">
+                O Que a Plataforma Traz: Seu Copiloto no WhatsApp
+              </h3>
+              <p class="text-slate-600 text-xs mt-2.5 leading-relaxed">
+                Por que criamos um assistente que mora no seu WhatsApp em vez de mais um aplicativo esquecido na tela do celular? A inteligência artificial sem atrito.
+              </p>
+              <div class="mt-3 space-y-1 text-xs font-semibold text-slate-700">
+                <div>✓ Áudio e transcrição em 2 segundos</div>
+                <div>✓ Visão computacional para comprovantes</div>
+                <div>✓ Sincronização em tempo real com painel</div>
+              </div>
+            </div>
+            <div class="mt-5 pt-3 border-t border-slate-200 flex items-center justify-between text-xs font-bold">
+              <span class="text-slate-500 uppercase tracking-wider">Tecnologia</span>
+              <span class="text-fuchsia-600 group-hover:translate-x-1 transition flex items-center gap-1">Explorar Tema →</span>
+            </div>
+          </article>
+
+          <!-- CARD 3 -->
+          <article data-category="beneficios" class="tab-article-item torn-paper-card rounded-2xl torn-bottom p-6 pt-8 flex flex-col justify-between cursor-pointer group" onclick="openDescubraModal('beneficios')">
+            <div class="masking-tape -top-3.5 left-1/3 rotate-[4deg]"></div>
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <span class="px-2 py-0.5 text-[11px] font-black uppercase bg-emerald-400 text-slate-950 rounded rotate-[-1deg]">
+                  ON: BENEFÍCIOS
+                </span>
+                <span class="stamp-badge text-[10px] text-emerald-800">100% PRÁTICO</span>
+              </div>
+              <h3 class="font-display text-2xl font-black uppercase text-slate-900 leading-tight group-hover:text-emerald-700 transition">
+                Benefícios Que Transformam a Sua Rotina Diária
+              </h3>
+              <p class="text-slate-600 text-xs mt-2.5 leading-relaxed">
+                Menos tempo preenchendo planilhas, zero juros de contas atrasadas e controle absoluto do seu dinheiro sem estresse mental.
+              </p>
+              <div class="mt-3 grid grid-cols-2 gap-2 text-center text-xs">
+                <div class="p-2 bg-slate-100 rounded-lg font-bold text-slate-900">ZERO JUROS</div>
+                <div class="p-2 bg-slate-100 rounded-lg font-bold text-purple-700">3X AVISOS</div>
+              </div>
+            </div>
+            <div class="mt-5 pt-3 border-t border-slate-200 flex items-center justify-between text-xs font-bold">
+              <span class="text-slate-500 uppercase tracking-wider">Impacto Real</span>
+              <span class="text-emerald-700 group-hover:translate-x-1 transition flex items-center gap-1">Ver Benefícios →</span>
+            </div>
+          </article>
+
+          <!-- CARD 4 -->
+          <article data-category="gastronomia" class="tab-article-item torn-paper-card rounded-2xl torn-bottom p-6 pt-8 flex flex-col justify-between cursor-pointer group" onclick="openDescubraModal('gastronomia')">
+            <div class="masking-tape -top-3.5 right-8 -rotate-[8deg]"></div>
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <span class="px-2 py-0.5 text-[11px] font-black uppercase bg-amber-400 text-black rounded rotate-[2deg]">
+                  ON: GASTRONOMIA
+                </span>
+                <span class="stamp-badge text-[10px] text-amber-700">ROOFTOPS</span>
+              </div>
+              <h3 class="font-display text-2xl font-black uppercase text-slate-900 leading-tight group-hover:text-amber-700 transition">
+                Bares Secretos, Bistrôs & Rooftops
+              </h3>
+              <p class="text-slate-600 text-xs mt-2.5 leading-relaxed">
+                De botecos autorais a speakeasies escondidos atrás de portas secretas. Descubra como a IA recomenda lugares que combinam com o clima da noite.
+              </p>
+              <div class="mt-3 flex items-center gap-1.5 flex-wrap">
+                <span class="px-2 py-0.5 bg-amber-100 text-amber-900 rounded text-[10px] font-bold">🍸 Speakeasy</span>
+                <span class="px-2 py-0.5 bg-amber-100 text-amber-900 rounded text-[10px] font-bold">🌆 Vista Sunset</span>
+              </div>
+            </div>
+            <div class="mt-5 pt-3 border-t border-slate-200 flex items-center justify-between text-xs font-bold">
+              <span class="text-slate-500 uppercase tracking-wider">Curadoria</span>
+              <span class="text-amber-700 group-hover:translate-x-1 transition flex items-center gap-1">Conhecer →</span>
+            </div>
+          </article>
+
+          <!-- CARD 5 -->
+          <article data-category="baladas" class="tab-article-item torn-paper-card rounded-2xl torn-bottom p-6 pt-8 flex flex-col justify-between cursor-pointer group" onclick="openDescubraModal('baladas')">
+            <div class="masking-tape -top-3.5 left-8 rotate-[6deg]"></div>
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <span class="px-2 py-0.5 text-[11px] font-black uppercase bg-violet-600 text-white rounded rotate-[-2deg]">
+                  ON: NIGHTLIFE
+                </span>
+                <span class="stamp-badge text-[10px] text-violet-800">VIBE & SOM</span>
+              </div>
+              <h3 class="font-display text-2xl font-black uppercase text-slate-900 leading-tight group-hover:text-violet-700 transition">
+                Música, Pista & Qual é o Seu Estilo de Rolê?
+              </h3>
+              <p class="text-slate-600 text-xs mt-2.5 leading-relaxed">
+                Do jazz clássico nas noites de quinta à música eletrônica imersiva nos armazéns reformados. Encontre noites onde a energia bate com você.
+              </p>
+              <div class="mt-3 p-2.5 bg-violet-50 rounded-lg text-xs font-bold text-violet-900">
+                #TurmaON: A gente entende a sua vibe!
+              </div>
+            </div>
+            <div class="mt-5 pt-3 border-t border-slate-200 flex items-center justify-between text-xs font-bold">
+              <span class="text-slate-500 uppercase tracking-wider">Eventos</span>
+              <span class="text-violet-700 group-hover:translate-x-1 transition flex items-center gap-1">Ver Roteiro →</span>
+            </div>
+          </article>
+
+          <!-- CARD 6 -->
+          <article data-category="smartbudget" class="tab-article-item torn-paper-card rounded-2xl torn-bottom p-6 pt-8 flex flex-col justify-between cursor-pointer group" onclick="openDescubraModal('smartbudget')">
+            <div class="masking-tape -top-3.5 left-1/4 -rotate-[4deg]"></div>
+            <div>
+              <div class="flex items-center justify-between mb-3">
+                <span class="px-2 py-0.5 text-[11px] font-black uppercase bg-rose-500 text-white rounded rotate-[2deg]">
+                  ON: SMART BUDGET
+                </span>
+                <span class="stamp-badge text-[10px] text-rose-800">EQUILÍBRIO</span>
+              </div>
+              <h3 class="font-display text-2xl font-black uppercase text-slate-900 leading-tight group-hover:text-rose-600 transition">
+                Lazer Sem Culpa: Curtir Todo Fim de Semana
+              </h3>
+              <p class="text-slate-600 text-xs mt-2.5 leading-relaxed">
+                Economizar não significa se trancar em casa. Descubra o método do "Envelope de Diversão" gerenciado automaticamente com o assistente.
+              </p>
+              <div class="mt-3 p-2.5 bg-rose-50 rounded-lg text-xs font-medium text-rose-950">
+                💡 O segredo é saber quanto pode gastar antes de sair de casa!
+              </div>
+            </div>
+            <div class="mt-5 pt-3 border-t border-slate-200 flex items-center justify-between text-xs font-bold">
+              <span class="text-slate-500 uppercase tracking-wider">Gestão</span>
+              <span class="text-rose-600 group-hover:translate-x-1 transition flex items-center gap-1">Dicas de Ouro →</span>
+            </div>
+          </article>
+
+        </div>
+
+      </div>
+
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-[#1E293B] py-6 mt-12 bg-[#060A12] text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <p class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        Assistente WhatsApp IA com SQLite & Google Calendar
+      </p>
+      <p class="text-slate-600 font-mono">
+        Dashboard Vibrant Fintech v2.0
+      </p>
+    </div>
+  </footer>
+
+  <!-- MODAL DE LEITURA EDITORIAL: DESCUBRA ON (ESTILO PAPEL RASGADO) -->
+  <div id="descubraModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 transition-all duration-300">
+    <div class="relative w-full max-w-3xl my-8 torn-paper-card rounded-2xl torn-bottom p-6 sm:p-10 shadow-2xl">
+      <div class="masking-tape -top-3.5 left-1/2 -translate-x-1/2 -rotate-1"></div>
+      <button onclick="closeDescubraModal()" class="absolute top-5 right-5 w-9 h-9 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center justify-center transition shadow-sm">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="pr-10">
+        <div id="descubraModalBadge" class="flex items-center gap-2 mb-3"></div>
+        <h2 id="descubraModalTitle" class="font-display text-3xl sm:text-5xl font-extrabold uppercase text-slate-900 leading-[1.05] tracking-tight"></h2>
+        <p id="descubraModalSubtitle" class="text-xs sm:text-sm font-bold text-purple-700 uppercase tracking-wider mt-2"></p>
+      </div>
+
+      <div id="descubraModalBody" class="mt-6 text-slate-700 text-sm sm:text-base leading-relaxed space-y-4 border-t border-slate-200 pt-6"></div>
+
+      <div class="mt-8 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-2 text-xs text-slate-500 font-semibold">
+          <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+          <span>Artigo Oficial Plataforma ON</span>
+        </div>
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <button onclick="closeDescubraModal()" class="flex-1 sm:flex-none px-5 py-2.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+            Fechar
+          </button>
+          <a href="https://wa.me/5511966619866" target="_blank" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-extrabold text-black bg-cyan-400 hover:bg-cyan-300 rounded-xl shadow-md transition">
+            <i data-lucide="message-circle" class="w-4 h-4"></i>
+            <span>Testar no Zap</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVO / EDITAR GASTO -->
+  <div id="expenseModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-[#111726] rounded-2xl border border-purple-500/30 w-full max-w-md overflow-hidden shadow-2xl shadow-purple-950/60">
+      
+      <div class="px-6 py-4 border-b border-[#1E293B] flex items-center justify-between bg-[#0E1524]">
+        <h3 id="modalTitle" class="font-bold text-white text-lg flex items-center gap-2">
+          <i data-lucide="plus-circle" class="w-5 h-5 text-purple-400"></i>
+          Novo Gasto
+        </h3>
+        <button onclick="closeExpenseModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="expenseForm" onsubmit="handleExpenseSubmit(event)" class="p-6 space-y-4">
+        <input type="hidden" id="expenseId">
+
+        <div>
+          <label class="block text-xs font-bold text-purple-300 uppercase tracking-wider mb-1.5">Valor (R$)*</label>
+          <div class="relative">
+            <span class="absolute left-3.5 top-3 text-lg font-bold text-slate-400">R$</span>
+            <input type="number" step="0.01" id="formAmount" required placeholder="0,00" class="w-full pl-11 pr-3.5 py-2.5 text-xl font-extrabold text-white bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-purple-300 uppercase tracking-wider mb-1.5">Categoria*</label>
+          <select id="formCategory" required class="w-full px-3.5 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-purple-500 text-white font-medium text-sm">
+            <option value="Gasolina">Gasolina / Combustível</option>
+            <option value="Alimentação">Alimentação</option>
+            <option value="Mercado">Mercado</option>
+            <option value="Saúde / Farmácia">Saúde / Farmácia</option>
+            <option value="Transporte">Transporte (Uber, táxi, passagem)</option>
+            <option value="Lazer / Diversão">Lazer / Diversão</option>
+            <option value="Moradia / Contas">Moradia / Contas</option>
+            <option value="Outros">Outros</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-purple-300 uppercase tracking-wider mb-1.5">Descrição / Estabelecimento</label>
+          <input type="text" id="formDescription" placeholder="Ex: Posto Ipiranga, Mercado Municipal" class="w-full px-3.5 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-purple-500 text-white placeholder-slate-500 text-sm">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-purple-300 uppercase tracking-wider mb-1.5">Pagamento</label>
+            <select id="formPaymentMethod" class="w-full px-3.5 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-purple-500 text-white text-sm">
+              <option value="Cartão de Crédito">Cartão de Crédito</option>
+              <option value="Cartão de Débito">Cartão de Débito</option>
+              <option value="Pix">Pix</option>
+              <option value="Dinheiro">Dinheiro</option>
+              <option value="Não informado">Não informado</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-purple-300 uppercase tracking-wider mb-1.5">Data / Hora</label>
+            <input type="datetime-local" id="formDate" class="w-full px-3 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-purple-500 text-white text-sm">
+          </div>
+        </div>
+
+        <div class="pt-4 flex items-center justify-end space-x-3">
+          <button type="button" onclick="closeExpenseModal()" class="px-4 py-2 text-sm font-semibold text-slate-400 hover:text-white rounded-xl transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-xl shadow-lg shadow-purple-600/30 transition">
+            Salvar Gasto
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: AGENDAR CONTA OU PARCELA -->
+  <div id="billModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-[#111726] rounded-2xl border border-amber-500/30 w-full max-w-md overflow-hidden shadow-2xl shadow-amber-950/60">
+      
+      <div class="px-6 py-4 border-b border-[#1E293B] flex items-center justify-between bg-[#0E1524]">
+        <h3 class="font-bold text-white text-lg flex items-center gap-2">
+          <i data-lucide="calendar-plus" class="w-5 h-5 text-amber-400"></i>
+          Agendar Conta ou Parcela
+        </h3>
+        <button onclick="closeBillModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="billForm" onsubmit="handleBillSubmit(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-amber-300 uppercase tracking-wider mb-1.5">Título da Conta / Compra*</label>
+          <input type="text" id="billTitle" required placeholder="Ex: Conta de telefone, Tênis, Condomínio" class="w-full px-3.5 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-amber-500 text-white placeholder-slate-500 text-sm">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-amber-300 uppercase tracking-wider mb-1.5">Valor Total (R$)*</label>
+            <input type="number" step="0.01" id="billTotalAmount" required placeholder="Ex: 900,00" class="w-full px-3.5 py-2.5 text-lg font-bold text-white bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-amber-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-amber-300 uppercase tracking-wider mb-1.5">Nº de Parcelas*</label>
+            <input type="number" min="1" max="60" id="billInstallments" value="1" required class="w-full px-3.5 py-2.5 text-lg font-bold text-white bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-amber-500">
+            <span class="text-[11px] text-slate-400">1 para conta única</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-amber-300 uppercase tracking-wider mb-1.5">1º Vencimento*</label>
+            <input type="date" id="billFirstDueDate" required class="w-full px-3 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-amber-500 text-white text-sm">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-amber-300 uppercase tracking-wider mb-1.5">Categoria</label>
+            <select id="billCategory" class="w-full px-3 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-amber-500 text-white text-sm font-medium">
+              <option value="Moradia / Contas">Moradia / Contas</option>
+              <option value="Consumo / Lazer">Consumo / Lazer</option>
+              <option value="Saúde / Farmácia">Saúde / Farmácia</option>
+              <option value="Educação">Educação</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- WhatsApp Alert Info Box -->
+        <div class="p-3.5 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs text-amber-200/90 space-y-1">
+          <p class="font-bold flex items-center gap-1.5 text-amber-300">
+            <i data-lucide="bell-ring" class="w-3.5 h-3.5"></i>
+            Lembretes Automáticos no WhatsApp:
+          </p>
+          <p>• Notificação 24h antes e no próprio dia do vencimento.</p>
+          <p>• Compras parceladas geram as parcelas mensais automaticamente.</p>
+        </div>
+
+        <div class="pt-4 flex items-center justify-end space-x-3">
+          <button type="button" onclick="closeBillModal()" class="px-4 py-2 text-sm font-semibold text-slate-400 hover:text-white rounded-xl transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 text-sm font-bold text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 rounded-xl shadow-lg shadow-amber-600/30 transition">
+            Salvar e Agendar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVO COMPROMISSO -->
+  <div id="appointmentModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-[#111726] rounded-2xl border border-cyan-500/30 w-full max-w-md overflow-hidden shadow-2xl shadow-cyan-950/60">
+      <div class="px-6 py-4 border-b border-[#1E293B] flex items-center justify-between bg-[#0E1524]">
+        <h3 class="font-bold text-white text-lg flex items-center gap-2">
+          <i data-lucide="calendar-plus" class="w-5 h-5 text-cyan-400"></i>
+          Novo Compromisso
+        </h3>
+        <button onclick="closeAppointmentModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="appointmentForm" onsubmit="handleAppointmentSubmit(event)" class="p-6 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-cyan-300 uppercase tracking-wider mb-1.5">Título do Compromisso*</label>
+          <input type="text" id="appointmentTitle" required placeholder="Ex: Dentista, Reunião com Cliente, Alinhamento" class="w-full px-3.5 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-cyan-500 text-white text-sm">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-cyan-300 uppercase tracking-wider mb-1.5">Data e Horário de Início*</label>
+          <input type="datetime-local" id="appointmentStart" required class="w-full px-3.5 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-cyan-500 text-white text-sm">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-cyan-300 uppercase tracking-wider mb-1.5">Local (Opcional)</label>
+          <input type="text" id="appointmentLocation" placeholder="Ex: Consultório, Google Meet, Escritório" class="w-full px-3.5 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-cyan-500 text-white text-sm">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-cyan-300 uppercase tracking-wider mb-1.5">Descrição / Notas</label>
+          <textarea id="appointmentDesc" rows="2" placeholder="Ex: Levar documentos..." class="w-full px-3.5 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-cyan-500 text-white text-sm"></textarea>
+        </div>
+
+        <!-- WhatsApp Alert Info Box -->
+        <div class="p-3.5 bg-cyan-500/10 border border-cyan-500/25 rounded-xl text-xs text-cyan-200/90 space-y-1">
+          <p class="font-bold flex items-center gap-1.5 text-cyan-300">
+            <i data-lucide="bell" class="w-3.5 h-3.5"></i>
+            Lembretes Automáticos no WhatsApp:
+          </p>
+          <p>• Notificação 24h antes, 3 horas antes e 1 hora antes do início.</p>
+        </div>
+
+        <div class="pt-4 flex items-center justify-end space-x-3">
+          <button type="button" onclick="closeAppointmentModal()" class="px-4 py-2 text-sm font-semibold text-slate-400 hover:text-white rounded-xl transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 text-sm font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 rounded-xl shadow-lg shadow-cyan-600/30 transition">
+            Salvar e Agendar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ASSINATURA PLANO PRO (PIX R$ 29,00) -->
+  <div id="pixModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-[#111726] rounded-3xl border border-emerald-500/40 w-full max-w-md overflow-hidden shadow-2xl shadow-emerald-950/70 relative">
+      
+      <!-- Modal Header with gradient -->
+      <div class="px-6 py-5 border-b border-[#1E293B] flex items-center justify-between bg-gradient-to-r from-emerald-950/40 via-[#0E1524] to-[#111726]">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <i data-lucide="crown" class="w-5 h-5 text-amber-400"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-white text-lg flex items-center gap-2">
+              Plano PRO • R$ 29,00
+            </h3>
+            <p class="text-xs text-emerald-400 font-medium">Acesso Ilimitado & Contínuo</p>
+          </div>
+        </div>
+        <button onclick="closePixModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 space-y-5 text-center">
+        <!-- QR Code Display Area -->
+        <div class="bg-[#090D17] border border-[#1E293B] rounded-2xl p-4 flex flex-col items-center justify-center relative">
+          <div id="pixLoadingSpinner" class="flex flex-col items-center justify-center py-10 space-y-2">
+            <div class="w-8 h-8 border-4 border-emerald-400 border-t-transparent rounded-full animate-spin"></div>
+            <p class="text-xs text-slate-400">Gerando QR Code oficial...</p>
+          </div>
+          <img id="pixQrImg" src="" alt="QR Code Pix" class="hidden w-52 h-52 rounded-xl bg-white p-2.5 shadow-2xl border border-slate-700 mx-auto" />
+          <p class="text-xs text-slate-400 mt-2 font-medium">Abra o app do seu banco e escaneie o QR Code</p>
+        </div>
+
+        <!-- Pix Copia e Cola Area -->
+        <div class="text-left space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+              <i data-lucide="copy" class="w-3.5 h-3.5 text-cyan-400"></i>
+              Pix Copia e Cola
+            </label>
+            <span id="pixCopyFeedback" class="text-xs font-bold text-emerald-400 opacity-0 transition-opacity">Copiado! ✓</span>
+          </div>
+          <div class="flex gap-2">
+            <input type="text" id="pixPayloadInput" readonly class="flex-1 px-3.5 py-2.5 bg-[#090D17] border border-[#233150] rounded-xl text-xs font-mono text-slate-300 select-all focus:outline-none">
+            <button onclick="copyPixPayload()" class="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs rounded-xl shadow-md shadow-emerald-600/30 flex items-center gap-1.5 shrink-0 transition active:scale-95">
+              <i data-lucide="copy" class="w-4 h-4"></i>
+              <span>Copiar</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Instructions / Benefits -->
+        <div class="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-left space-y-2 text-xs text-slate-300">
+          <div class="font-bold text-emerald-300 flex items-center gap-1.5 text-sm">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            Como ativar sua assinatura:
+          </div>
+          <p>1. Copie o código acima e pague <b>R$ 29,00</b> no app do seu banco.</p>
+          <p>2. Envie o <b>comprovante (foto ou PDF)</b> na conversa do WhatsApp com o Assistente.</p>
+          <p>3. Sua conta será promovida para <b>PRO</b> automaticamente em segundos!</p>
+        </div>
+
+        <div class="pt-2">
+          <button onclick="closePixModal()" class="w-full py-2.5 text-sm font-semibold text-slate-400 hover:text-white bg-[#172138] hover:bg-[#202C48] rounded-xl transition">
+            Fechar
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC & CHARTS -->
+  <script>
+    // Intercept Magic Token from URL and store in localStorage
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlToken = urlParams.get('token');
+    if (urlToken) {
+      localStorage.setItem('auth_token', urlToken);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    let currentUser = null;
+    let categoryChartInstance = null;
+    let dailyChartInstance = null;
+    let debounceTimer = null;
+    let currentTab = 'expenses';
+
+    async function authFetch(url, options = {}) {
+      const token = localStorage.getItem('auth_token');
+      const headers = { ...(options.headers || {}) };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      try {
+        const res = await fetch(url, { ...options, credentials: 'include', headers });
+        if (res.status === 401) {
+          showUnauthorizedScreen();
+          throw new Error('Acesso não autorizado');
+        }
+        return res;
+      } catch (err) {
+        if (err.message === 'Acesso não autorizado') throw err;
+        throw err;
+      }
+    }
+
+    function showUnauthorizedScreen() {
+      document.body.innerHTML = `
+        <div class="min-h-screen bg-[#080C15] text-slate-100 flex items-center justify-center p-4 text-center font-sans">
+          <div class="max-w-md bg-[#131B2E] p-8 rounded-2xl border border-purple-500/30 shadow-2xl">
+            <div class="w-16 h-16 mx-auto mb-4 bg-purple-500/10 rounded-full flex items-center justify-center text-purple-400 text-3xl">
+              🔒
+            </div>
+            <h2 class="text-2xl font-bold mb-2">Acesso Exclusivo por WhatsApp</h2>
+            <p class="text-slate-400 mb-6 text-sm">Para acessar seu painel financeiro isolado e seguro, solicite seu Magic Link de 1 clique.</p>
+            <div class="text-sm text-slate-300 bg-[#0F1626] p-4 rounded-xl border border-slate-800 text-left">
+              👉 Abra o <b>WhatsApp do Assistente</b> e envie a palavra:
+              <div class="mt-2 text-center text-lg font-extrabold text-cyan-400 font-mono tracking-widest bg-[#18233C] py-2 rounded-lg border border-cyan-500/30">
+                painel
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function formatPhone(phone) {
+      if (!phone) return '';
+      const p = phone.replace(/\D/g, '');
+      if (p.length === 13) {
+        return `+${p.slice(0, 2)} (${p.slice(2, 4)}) ${p.slice(4, 9)}-${p.slice(9)}`;
+      }
+      if (p.length === 11) {
+        return `(${p.slice(0, 2)}) ${p.slice(2, 7)}-${p.slice(7)}`;
+      }
+      return phone;
+    }
+
+    async function loadMe() {
+      try {
+        const res = await authFetch('/api/me');
+        const json = await res.json();
+        if (json.success && json.user) {
+          currentUser = json.user;
+
+          const phoneEl = document.getElementById('userPhoneDisplay');
+          if (phoneEl) {
+            phoneEl.innerText = currentUser.phoneNumber ? formatPhone(currentUser.phoneNumber) : 'WhatsApp Conectado';
+          }
+
+          const badgeEl = document.getElementById('userPlanBadge');
+          if (badgeEl) {
+            if (currentUser.role === 'ADMIN') {
+              badgeEl.innerText = 'ADMIN / PRO';
+              badgeEl.className = 'text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40';
+            } else if (currentUser.plan === 'PRO') {
+              badgeEl.innerText = 'PRO';
+              badgeEl.className = 'text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+            } else if (currentUser.plan === 'FREE_TRIAL') {
+              const days = currentUser.status?.daysRemaining || 7;
+              badgeEl.innerText = `TESTE GRÁTIS (${days}d)`;
+              badgeEl.className = 'text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40';
+            }
+          }
+
+          const banner = document.getElementById('trialBanner');
+          const navUpgrade = document.getElementById('navUpgradeBtn');
+          if (currentUser.plan === 'FREE_TRIAL') {
+            const days = currentUser.status?.daysRemaining || 7;
+            if (banner) {
+              banner.classList.remove('hidden');
+              const daysText = document.getElementById('trialDaysText');
+              if (daysText) daysText.innerText = `${days} dia(s) restante(s)`;
+            }
+            if (navUpgrade) navUpgrade.classList.remove('hidden');
+          } else {
+            if (banner) banner.classList.add('hidden');
+            if (navUpgrade) navUpgrade.classList.add('hidden');
+          }
+
+          if (currentUser.role === 'ADMIN') {
+            const adminTabBtn = document.getElementById('tabBtnAdmin');
+            if (adminTabBtn) adminTabBtn.classList.remove('hidden');
+            const navAdminBtn = document.getElementById('navAdminBtn');
+            if (navAdminBtn) navAdminBtn.classList.remove('hidden');
+            loadAdminUsers();
+            loadAdminInvites();
+          }
+
+          // Update Export CSV link with token if present
+          const exportBtn = document.getElementById('exportCsvBtn');
+          if (exportBtn) {
+            const token = localStorage.getItem('auth_token');
+            exportBtn.href = '/api/export/csv' + (token ? `?token=${encodeURIComponent(token)}` : '');
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao verificar perfil do usuário:', err);
+      }
+    }
+
+    async function openPixModal() {
+      const modal = document.getElementById('pixModal');
+      const spinner = document.getElementById('pixLoadingSpinner');
+      const qrImg = document.getElementById('pixQrImg');
+      const input = document.getElementById('pixPayloadInput');
+      
+      modal.classList.remove('hidden');
+      spinner.classList.remove('hidden');
+      qrImg.classList.add('hidden');
+      input.value = 'Carregando código Pix...';
+
+      try {
+        const res = await authFetch('/api/pix');
+        const json = await res.json();
+        if (json.success && json.data) {
+          qrImg.src = json.data.qrDataUrl;
+          input.value = json.data.payload;
+          spinner.classList.add('hidden');
+          qrImg.classList.remove('hidden');
+        } else {
+          alert('Erro ao carregar Pix: ' + (json.error || 'Erro desconhecido'));
+        }
+      } catch (err) {
+        alert('Erro ao conectar ao servidor: ' + err.message);
+      }
+      lucide.createIcons();
+    }
+
+    function closePixModal() {
+      document.getElementById('pixModal').classList.add('hidden');
+    }
+
+    function copyPixPayload() {
+      const input = document.getElementById('pixPayloadInput');
+      input.select();
+      navigator.clipboard.writeText(input.value).then(() => {
+        const feedback = document.getElementById('pixCopyFeedback');
+        if (feedback) {
+          feedback.classList.remove('opacity-0');
+          setTimeout(() => feedback.classList.add('opacity-0'), 2500);
+        }
+      }).catch(() => {
+        document.execCommand('copy');
+      });
+    }
+
+    async function loadAdminUsers() {
+      try {
+        const res = await authFetch('/api/admin/users');
+        const json = await res.json();
+        const tbody = document.getElementById('adminUsersTableBody');
+        if (!tbody) return;
+
+        const allUsers = json.data || [];
+        const clients = allUsers.filter(u => u.id !== 1);
+        const proClients = clients.filter(u => u.plan === 'PRO');
+        const trialClients = clients.filter(u => u.plan === 'FREE_TRIAL');
+        const mrr = proClients.length * 29.00;
+
+        const mrrEl = document.getElementById('adminMrrTotal');
+        if (mrrEl) mrrEl.innerText = formatCurrency(mrr);
+        const mrrSubEl = document.getElementById('adminMrrSub');
+        if (mrrSubEl) mrrSubEl.innerText = `${proClients.length} ${proClients.length === 1 ? 'cliente pagante' : 'clientes pagantes'}`;
+
+        const proCountEl = document.getElementById('adminProCount');
+        if (proCountEl) proCountEl.innerText = proClients.length;
+
+        const trialCountEl = document.getElementById('adminTrialCount');
+        if (trialCountEl) trialCountEl.innerText = trialClients.length;
+
+        if (!json.data || json.data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-500">Nenhum cliente cadastrado ainda.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = json.data.map(u => `
+          <tr class="hover:bg-[#151F36]/80 transition">
+            <td class="px-5 py-4 font-mono text-xs text-purple-400 font-bold">#${u.id}</td>
+            <td class="px-5 py-4 font-semibold text-white">${formatPhone(u.phone_number)}</td>
+            <td class="px-5 py-4">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold ${u.plan === 'PRO' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'}">
+                ${u.plan}
+              </span>
+            </td>
+            <td class="px-5 py-4 text-xs text-slate-400 font-mono">${u.created_at ? new Date(u.created_at).toLocaleDateString('pt-BR') : '-'}</td>
+            <td class="px-5 py-4 text-center font-bold text-white text-xs">${u.total_expenses || 0}</td>
+            <td class="px-5 py-4 text-center font-bold text-amber-400 text-xs">${u.total_bills || 0}</td>
+            <td class="px-5 py-4 text-center">
+              <div class="inline-flex items-center gap-2">
+                <select onchange="updateUserPlan(${u.id}, this.value)" class="text-xs bg-[#0F1626] border border-[#22304C] rounded-lg px-2 py-1 text-slate-200 focus:outline-none focus:border-purple-500 font-medium cursor-pointer">
+                  <option value="FREE_TRIAL" ${u.plan === 'FREE_TRIAL' ? 'selected' : ''}>Teste Grátis</option>
+                  <option value="PRO" ${u.plan === 'PRO' ? 'selected' : ''}>Plano PRO</option>
+                </select>
+                ${u.id !== 1 ? `
+                  <button onclick="deleteUserItem(${u.id})" title="Remover usuário de teste" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                ` : ''}
+              </div>
+            </td>
+          </tr>
+        `).join('');
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Erro ao carregar lista admin:', err);
+      }
+    }
+
+    async function updateUserPlan(userId, plan) {
+      try {
+        const res = await authFetch(`/api/admin/users/${userId}/plan`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan })
+        });
+        const json = await res.json();
+        if (json.success) {
+          loadAdminUsers();
+        } else {
+          alert('Erro ao alterar plano: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    }
+
+    async function deleteUserItem(userId) {
+      if (!confirm(`Deseja realmente remover o usuário #${userId}? Todos os dados de teste desse número serão excluídos.`)) return;
+      try {
+        const res = await authFetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
+        const json = await res.json();
+        if (json.success) {
+          loadAdminUsers();
+        } else {
+          alert('Erro ao remover: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    }
+
+    async function loadAdminInvites() {
+      try {
+        const res = await authFetch('/api/admin/invites');
+        const json = await res.json();
+        const tbody = document.getElementById('adminInvitesTableBody');
+        if (!tbody) return;
+
+        const allInvites = json.data || [];
+        const pending = allInvites.filter(inv => inv.status === 'PENDING');
+        const pendingEl = document.getElementById('adminPendingInvitesCount');
+        if (pendingEl) pendingEl.innerText = pending.length;
+
+        if (!json.data || json.data.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-500">Nenhum código de convite gerado ainda. Clique em "Gerar Novo Código".</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = json.data.map(inv => {
+          const isPending = inv.status === 'PENDING';
+          const statusBadge = isPending 
+            ? '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">🟡 PENDENTE</span>'
+            : '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">🟢 ATIVADO</span>';
+
+          const clientPhone = inv.used_by_phone ? formatPhone(inv.used_by_phone) : '-';
+
+          return `
+            <tr class="hover:bg-[#151F36]/80 transition">
+              <td class="px-5 py-3 font-mono font-extrabold text-cyan-400 text-sm tracking-wider cursor-pointer hover:text-cyan-300 hover:underline" onclick="copyOnlyCode('${inv.code}')" title="Clique para copiar apenas este código">
+                ${inv.code} <i data-lucide="copy" class="w-3 h-3 inline opacity-60 ml-1"></i>
+              </td>
+              <td class="px-5 py-3">${statusBadge}</td>
+              <td class="px-5 py-3 text-xs text-slate-300">${inv.trial_days || 7} dias grátis</td>
+              <td class="px-5 py-3 text-xs text-white font-medium">${clientPhone}</td>
+              <td class="px-5 py-3 text-xs text-slate-400 font-mono">${inv.created_at ? new Date(inv.created_at).toLocaleDateString('pt-BR') : '-'}</td>
+              <td class="px-5 py-3 text-center">
+                <div class="inline-flex items-center gap-1.5 mx-auto">
+                  <button onclick="copyOnlyCode('${inv.code}')" class="px-2 py-1 text-xs font-semibold text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 rounded-lg hover:bg-cyan-500/25 transition flex items-center gap-1" title="Copiar apenas o código">
+                    <i data-lucide="copy" class="w-3 h-3"></i> Código
+                  </button>
+                  <button onclick="copyInviteMessage('${inv.code}')" class="px-2 py-1 text-xs font-semibold text-purple-300 bg-purple-500/15 border border-purple-500/30 rounded-lg hover:bg-purple-500/25 transition flex items-center gap-1" title="Copiar mensagem completa">
+                    <i data-lucide="share-2" class="w-3 h-3"></i> Mensagem
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Erro ao carregar convites:', err);
+      }
+    }
+
+    async function createInviteCodeAdmin() {
+      try {
+        const res = await authFetch('/api/admin/invites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trialDays: 7 })
+        });
+        const json = await res.json();
+        if (json.success) {
+          loadAdminInvites();
+          copyInviteMessage(json.data.code);
+          alert(`Código ${json.data.code} criado com sucesso!\n\nA mensagem pronta para enviar ao seu cliente foi copiada para sua área de transferência.`);
+        } else {
+          alert('Erro ao criar código: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    }
+
+    function copyOnlyCode(code) {
+      navigator.clipboard.writeText(code).then(() => {
+        alert(`Código ${code} copiado com sucesso!`);
+      }).catch(() => {});
+    }
+
+    function copyInviteMessage(code) {
+      const botPhone = '5511966619866';
+      const formatted = '(11) 96661-9866';
+      const link = `https://wa.me/${botPhone}?text=${encodeURIComponent(code)}`;
+      const msg = `Olá! Aqui está o seu acesso exclusivo ao Assistente Pessoal com Inteligência Artificial 🚀\n\n👉 *Toque no link abaixo para começar* (o código já vai preenchido, é só apertar enviar):\n${link}\n\n📱 *WhatsApp do Assistente*: ${formatted}\n🎟️ *Código de Ativação*: ${code} (7 dias grátis)`;
+      navigator.clipboard.writeText(msg).then(() => {
+        alert(`Mensagem com o código ${code} copiada com sucesso!`);
+      }).catch(() => {});
+    }
+
+    async function cleanTestUsersAdmin() {
+      if (!confirm('Deseja realmente limpar todos os clientes de teste?\n\nIsso apagará os dados dos testes antigos para que qualquer número precise de um código de convite novo para entrar.')) return;
+      try {
+        const res = await authFetch('/api/admin/users');
+        const json = await res.json();
+        if (json.success && json.data) {
+          const testUsers = json.data.filter(u => u.id !== 1);
+          for (const u of testUsers) {
+            await authFetch(`/api/admin/users/${u.id}`, { method: 'DELETE' });
+          }
+          loadAdminUsers();
+          alert('Usuários de teste limpos com sucesso!');
+        }
+      } catch (err) {
+        alert('Erro ao limpar testes: ' + err.message);
+      }
+    }
+
+    // Vibrant Neon Palette for Categories
+    const categoryColors = {
+      'Gasolina': {
+        border: 'border-amber-500/40',
+        bg: 'bg-amber-500/15 text-amber-300',
+        hex: '#F59E0B'
+      },
+      'Alimentação': {
+        border: 'border-orange-500/40',
+        bg: 'bg-orange-500/15 text-orange-300',
+        hex: '#F97316'
+      },
+      'Mercado': {
+        border: 'border-emerald-500/40',
+        bg: 'bg-emerald-500/15 text-emerald-300',
+        hex: '#10B981'
+      },
+      'Saúde / Farmácia': {
+        border: 'border-rose-500/40',
+        bg: 'bg-rose-500/15 text-rose-300',
+        hex: '#F43F5E'
+      },
+      'Transporte': {
+        border: 'border-blue-500/40',
+        bg: 'bg-blue-500/15 text-blue-300',
+        hex: '#3B82F6'
+      },
+      'Lazer / Diversão': {
+        border: 'border-purple-500/40',
+        bg: 'bg-purple-500/15 text-purple-300',
+        hex: '#A855F7'
+      },
+      'Moradia / Contas': {
+        border: 'border-cyan-500/40',
+        bg: 'bg-cyan-500/15 text-cyan-300',
+        hex: '#06B6D4'
+      },
+      'Outros': {
+        border: 'border-slate-500/40',
+        bg: 'bg-slate-500/15 text-slate-300',
+        hex: '#94A3B8'
+      },
+    };
+
+    function formatCurrency(val) {
+      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
+    }
+
+    function formatDate(isoStr) {
+      if (!isoStr) return '-';
+      const d = new Date(isoStr);
+      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function formatDateSimple(isoStr) {
+      if (!isoStr) return '-';
+      const [y, m, d] = isoStr.split('-');
+      return `${d}/${m}/${y}`;
+    }
+
+    function getSourceBadge(source) {
+      switch(source) {
+        case 'audio':
+          return '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30"><i data-lucide="mic" class="w-3 h-3 text-purple-400"></i> Áudio</span>';
+        case 'image':
+          return '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"><i data-lucide="camera" class="w-3 h-3 text-cyan-400"></i> Recibo</span>';
+        case 'dashboard':
+          return '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-700/50 text-slate-300 border border-slate-600/50"><i data-lucide="laptop" class="w-3 h-3"></i> Manual</span>';
+        case 'document':
+          return '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30"><i data-lucide="file-text" class="w-3 h-3 text-rose-400"></i> PDF</span>';
+        case 'scheduled':
+          return '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30"><i data-lucide="calendar-check" class="w-3 h-3 text-amber-400"></i> Conta Baixada</span>';
+        default:
+          return '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"><i data-lucide="message-square" class="w-3 h-3 text-emerald-400"></i> WhatsApp</span>';
+      }
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      const tabExpenses = document.getElementById('tabContentExpenses');
+      const tabBills = document.getElementById('tabContentBills');
+      const tabAppointments = document.getElementById('tabContentAppointments');
+      const tabAdmin = document.getElementById('tabContentAdmin');
+      const tabDescubra = document.getElementById('tabContentDescubra');
+      const btnExpenses = document.getElementById('tabBtnExpenses');
+      const btnBills = document.getElementById('tabBtnBills');
+      const btnAppointments = document.getElementById('tabBtnAppointments');
+      const btnAdmin = document.getElementById('tabBtnAdmin');
+      const btnDescubra = document.getElementById('tabBtnDescubra');
+
+      tabExpenses.classList.add('hidden');
+      tabBills.classList.add('hidden');
+      if (tabAppointments) tabAppointments.classList.add('hidden');
+      if (tabAdmin) tabAdmin.classList.add('hidden');
+      if (tabDescubra) tabDescubra.classList.add('hidden');
+
+      btnExpenses.className = 'pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200';
+      btnBills.className = 'pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200';
+      if (btnAppointments) btnAppointments.className = 'pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200';
+      if (btnAdmin) btnAdmin.className = 'pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200';
+      if (btnDescubra) btnDescubra.className = 'pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200';
+
+      if (tab === 'expenses') {
+        tabExpenses.classList.remove('hidden');
+        btnExpenses.className = 'pb-3 px-3 text-sm font-bold border-b-2 border-purple-500 text-purple-400 flex items-center gap-2 transition duration-200';
+      } else if (tab === 'bills') {
+        tabBills.classList.remove('hidden');
+        btnBills.className = 'pb-3 px-3 text-sm font-bold border-b-2 border-amber-500 text-amber-400 flex items-center gap-2 transition duration-200';
+      } else if (tab === 'appointments') {
+        if (tabAppointments) tabAppointments.classList.remove('hidden');
+        if (btnAppointments) btnAppointments.className = 'pb-3 px-3 text-sm font-bold border-b-2 border-cyan-500 text-cyan-400 flex items-center gap-2 transition duration-200';
+        loadAppointments();
+      } else if (tab === 'admin') {
+        if (tabAdmin) tabAdmin.classList.remove('hidden');
+        if (btnAdmin) btnAdmin.className = 'pb-3 px-3 text-sm font-bold border-b-2 border-purple-500 text-purple-400 flex items-center gap-2 transition duration-200';
+        loadAdminUsers();
+        loadAdminInvites();
+      } else if (tab === 'descubra') {
+        if (tabDescubra) tabDescubra.classList.remove('hidden');
+        if (btnDescubra) btnDescubra.className = 'pb-3 px-3 text-sm font-bold border-b-2 border-cyan-400 text-cyan-400 flex items-center gap-2 transition duration-200';
+      }
+      lucide.createIcons();
+    }
+
+    // ==========================================
+    // DESCUBRA ON & ROLÊS: DATA & INTERACTIVITY
+    // ==========================================
+    const tabArticlesData = {
+      revolucao: {
+        badge: '<span class="px-2.5 py-0.5 text-xs font-black uppercase bg-cyan-400 text-black rounded rotate-[-2deg]">ON: REVOLUÇÃO</span><span class="stamp-badge text-[11px] text-purple-700">PESQUISA INTELIGENTE</span>',
+        title: 'A Revolução na Forma de Pesquisar Lugares para se Divertir',
+        subtitle: 'Como a IA e a curadoria personalizada acabaram com o dilema do "Para onde vamos hoje?"',
+        content: `
+          <p class="font-semibold text-slate-900 text-lg">
+            Todo final de semana a mesma história se repete: você e seus amigos ou parceiro(a) querem sair, mas ninguém sabe para onde ir.
+          </p>
+          <p>
+            O processo tradicional é cansativo:
+          </p>
+          <ul class="list-disc pl-5 space-y-2 text-slate-800">
+            <li><b>O Instagram</b> mostra lugares lindos, mas não revela os preços reais, se a fila está quilométrica ou se precisa de reserva com 2 semanas de antecedência.</li>
+            <li><b>O Google Maps</b> tem avaliações genéricas de turistas ou de anos atrás que já não representam a vibe atual do lugar.</li>
+            <li><b>O medo do bolso:</b> você sai de casa sem saber se aquele jantar vai custar R$ 80 ou R$ 300, gerando ansiedade ao receber a conta.</li>
+          </ul>
+
+          <div class="my-5 p-5 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-2xl">
+            <h4 class="font-display text-2xl font-black text-purple-900 uppercase">A Virada de Chave da Plataforma ON</h4>
+            <p class="text-sm text-purple-950 mt-1">
+              Nossa Inteligência Artificial não é um buscador frio. Ela conhece o seu <b>estilo de vida</b>, sua <b>disponibilidade na agenda</b> e, fundamentalmente, <b>quanto você tem reservado para lazer</b> naquela semana.
+            </p>
+          </div>
+
+          <p>
+            Ao mandar uma simples mensagem de voz: <i>"Zap, me recomenda um barzinho com música boa e chopp artesanal na Vila Madalena para hoje à noite até 100 reais"</i>, o assistente:
+          </p>
+          <ol class="list-decimal pl-5 space-y-2 text-slate-800">
+            <li>Cruza as melhores opções curadas com a vibe solicitada;</li>
+            <li>Informa o ticket médio real e se há promoções ou happy hour no dia;</li>
+            <li>Já sugere agendar na sua agenda pessoal e cria os lembretes para você não se atrasar!</li>
+          </ol>
+        `
+      },
+      plataforma: {
+        badge: '<span class="px-2.5 py-0.5 text-xs font-black uppercase bg-fuchsia-500 text-white rounded rotate-[1deg]">ON: TEMA & VISÃO</span><span class="stamp-badge text-[11px] text-cyan-700">SEM APLICATIVOS PESADOS</span>',
+        title: 'O Tema da Plataforma: Inteligência Sem Atrito no Seu Dia a Dia',
+        subtitle: 'Tecnologia invisível que trabalha para você onde você já passa a maior parte do seu dia: o WhatsApp.',
+        content: `
+          <p class="font-semibold text-slate-900 text-lg">
+            Ninguém mais tem paciência para baixar aplicativos que ocupam memória, exigem login com senha que você sempre esquece e cobram assinaturas sem entregar praticidade real.
+          </p>
+          <p>
+            O grande propósito da <b>Plataforma ON</b> é a eliminação total de atrito:
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-4">
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <h5 class="font-bold text-slate-900 text-base">🎙️ Áudio Natural</h5>
+              <p class="text-xs text-slate-600 mt-1">Fale como se estivesse conversando com um amigo no WhatsApp. O assistente entende gírias, valores falados ("50 conto no almoço") e categoriza tudo.</p>
+            </div>
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <h5 class="font-bold text-slate-900 text-base">📸 Visão Computacional</h5>
+              <p class="text-xs text-slate-600 mt-1">Fotografe uma nota fiscal, comprovante de Pix ou PDF de boleto. A IA extrai o valor, a data de vencimento e o estabelecimento na hora.</p>
+            </div>
+          </div>
+          <p>
+            Enquanto o WhatsApp cuida da entrada rápida de dados no seu dia a dia, o <b>Painel Web Exclusivo</b> oferece relatórios vibrantes, gráficos diários, visualização de despesas e calendário completo acessível a qualquer momento com apenas 1 clique ou comando.
+          </p>
+        `
+      },
+      beneficios: {
+        badge: '<span class="px-2.5 py-0.5 text-xs font-black uppercase bg-emerald-400 text-slate-950 rounded rotate-[-1deg]">ON: BENEFÍCIOS</span><span class="stamp-badge text-[11px] text-emerald-800">LIBERDADE FINANCEIRA</span>',
+        title: 'Benefícios Reais: O Que Muda na Prática Para os Usuários',
+        subtitle: 'Tranquilidade mental, pontualidade e economia de tempo e dinheiro.',
+        content: `
+          <p class="font-semibold text-slate-900 text-lg">
+            A maioria das pessoas não tem falta de dinheiro; tem falta de visibilidade em tempo real sobre onde o dinheiro está indo.
+          </p>
+          <div class="space-y-4 my-4">
+            <div class="p-4 bg-emerald-50 border-l-4 border-emerald-500 rounded-r-xl">
+              <h5 class="font-bold text-emerald-950 text-base">1. Fim dos Juros por Esquecimento</h5>
+              <p class="text-xs text-emerald-900 mt-1">
+                Você nunca mais vai pagar R$ 15, R$ 30 ou R$ 50 de juros porque esqueceu um boleto que venceu na sexta-feira. O assistente te avisa com antecedência e ajuda você a dar baixa com um simples "Paguei o boleto".
+              </p>
+            </div>
+            <div class="p-4 bg-purple-50 border-l-4 border-purple-500 rounded-r-xl">
+              <h5 class="font-bold text-purple-950 text-base">2. Agenda com Avisos em Cascata</h5>
+              <p class="text-xs text-purple-900 mt-1">
+                Lembretes automáticos 24h antes para você se planejar, 3h antes para se arrumar e 1h antes para sair com folga. Nunca mais chegue atrasado em compromissos importantes.
+              </p>
+            </div>
+            <div class="p-4 bg-cyan-50 border-l-4 border-cyan-500 rounded-r-xl">
+              <h5 class="font-bold text-cyan-950 text-base">3. Decisões Financeiras Sem Culpa</h5>
+              <p class="text-xs text-cyan-900 mt-1">
+                Ao consultar seu saldo disponível para a semana, você sai para jantar ou viajar sabendo que todas as suas contas fixas já estão mapeadas e protegidas.
+              </p>
+            </div>
+          </div>
+        `
+      },
+      gastronomia: {
+        badge: '<span class="px-2.5 py-0.5 text-xs font-black uppercase bg-amber-400 text-black rounded rotate-[2deg]">ON: GASTRONOMIA</span><span class="stamp-badge text-[11px] text-amber-700">EXPERIÊNCIAS ÚNICAS</span>',
+        title: 'Bares Secretos, Bistrôs & Rooftops: O Guia Urbano Definitivo',
+        subtitle: 'Uma curadoria refinada de lugares com atmosfera marcante e excelente custo-benefício.',
+        content: `
+          <p class="font-semibold text-slate-900 text-lg">
+            Sair para comer não é apenas saciar a fome; é viver uma experiência que renova a semana.
+          </p>
+          <div class="space-y-4 my-5">
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <h5 class="font-bold text-slate-900">🍸 Rooftops com Vista Panorâmica</h5>
+              <p class="text-xs text-slate-600 mt-1">Ambientes a céu aberto para curtir o fim de tarde com drinks autorais, iluminação intimista e trilha sonora em deep house e bossa moderna.</p>
+            </div>
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <h5 class="font-bold text-slate-900">🕯️ Bares Speakeasy (Secretos)</h5>
+              <p class="text-xs text-slate-600 mt-1">Entradas camufladas atrás de cabines telefônicas, barbearias ou cozinhas. Coquetelaria clássica de alto padrão e clima cinematográfico.</p>
+            </div>
+          </div>
+        `
+      },
+      baladas: {
+        badge: '<span class="px-2.5 py-0.5 text-xs font-black uppercase bg-violet-600 text-white rounded rotate-[-2deg]">ON: NIGHTLIFE</span><span class="stamp-badge text-[11px] text-violet-800">SOM & COMUNIDADE</span>',
+        title: 'Música, Pista & Experiências: Qual é o Seu Estilo de Rolê?',
+        subtitle: 'Descubra eventos e noites onde a energia bate perfeitamente com quem você é.',
+        content: `
+          <p class="font-semibold text-slate-900 text-lg">
+            Nada é mais frustrante do que pagar entrada cara em uma festa e descobrir que a vibe não tem nada a ver com você.
+          </p>
+          <ul class="list-disc pl-5 space-y-2 text-slate-800 my-4">
+            <li><b>Underground & Eletrônico:</b> Galpões industriais com alta qualidade acústica.</li>
+            <li><b>Festas Retrô & Pop:</b> Energia leve e nostálgica para dançar com amigos.</li>
+            <li><b>Shows ao Vivo:</b> Jam sessions de jazz, blues e MPB autoral.</li>
+          </ul>
+        `
+      },
+      smartbudget: {
+        badge: '<span class="px-2.5 py-0.5 text-xs font-black uppercase bg-rose-500 text-white rounded rotate-[2deg]">ON: SMART BUDGET</span><span class="stamp-badge text-[11px] text-rose-800">EQUILÍBRIO TOTAL</span>',
+        title: 'Lazer Sem Culpa: Como Curtir Todo Fim de Semana Sem Estourar',
+        subtitle: 'A metodologia do "Envelope de Diversão" gerenciado automaticamente com inteligência artificial.',
+        content: `
+          <p class="font-semibold text-slate-900 text-lg">
+            O segredo da tranquilidade financeira não é deixar de sair, é sair com inteligência e planejamento prévio.
+          </p>
+          <ol class="list-decimal pl-5 space-y-3 text-slate-800 my-4">
+            <li><b>Cotas semanais seguras:</b> O assistente calcula quanto do seu orçamento está livre para entretenimento.</li>
+            <li><b>Lançamento rápido por voz:</b> Gastou no bar? Mande um áudio de 2 segundos. O assistente computa na hora e já te diz quanto ainda sobra para o fim de semana.</li>
+          </ol>
+        `
+      }
+    };
+
+    let currentTabFilter = 'all';
+
+    function setTabFilter(cat) {
+      currentTabFilter = cat;
+      document.querySelectorAll('.tab-filter-btn').forEach(b => {
+        b.className = 'tab-filter-btn px-3.5 py-2 rounded-xl transition whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white border border-slate-800';
+      });
+      const activeBtn = document.getElementById(`tabFilterBtn_${cat}`);
+      if (activeBtn) {
+        activeBtn.className = 'tab-filter-btn px-3.5 py-2 rounded-xl transition whitespace-nowrap bg-cyan-400 text-black font-extrabold shadow-md';
+      }
+      filterTabArticles();
+    }
+
+    function filterTabArticles() {
+      const search = (document.getElementById('searchTabDescubraInput')?.value || '').toLowerCase().trim();
+      const items = document.querySelectorAll('.tab-article-item');
+      items.forEach(el => {
+        const cat = el.getAttribute('data-category');
+        const text = el.innerText.toLowerCase();
+        const matchesCat = (currentTabFilter === 'all' || cat === currentTabFilter);
+        const matchesSearch = (!search || text.includes(search));
+        if (matchesCat && matchesSearch) {
+          el.classList.remove('hidden');
+        } else {
+          el.classList.add('hidden');
+        }
+      });
+    }
+
+    function openDescubraModal(id) {
+      const data = tabArticlesData[id];
+      if (!data) return;
+      document.getElementById('descubraModalBadge').innerHTML = data.badge;
+      document.getElementById('descubraModalTitle').innerText = data.title;
+      document.getElementById('descubraModalSubtitle').innerText = data.subtitle;
+      document.getElementById('descubraModalBody').innerHTML = data.content;
+      document.getElementById('descubraModal').classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      lucide.createIcons();
+    }
+
+    function closeDescubraModal() {
+      document.getElementById('descubraModal').classList.add('hidden');
+      document.body.style.overflow = 'auto';
+    }
+
+    document.getElementById('descubraModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'descubraModal') closeDescubraModal();
+    });
+
+    }
+
+    // Set today's date in header
+    function updateHeaderDate() {
+      const now = new Date();
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      const dateFormatted = now.toLocaleDateString('pt-BR', options);
+      const cap = dateFormatted.charAt(0).toUpperCase() + dateFormatted.slice(1);
+      document.getElementById('headerCurrentDate').innerText = cap;
+    }
+
+    async function loadStats() {
+      try {
+        const res = await authFetch('/api/stats');
+        const json = await res.json();
+        if (!json.success) return;
+
+        const data = json.data;
+        document.getElementById('cardTotalMonth').innerText = formatCurrency(data.totalMonth);
+        document.getElementById('cardCountMonth').innerText = `${data.countMonth} transações no mês`;
+
+        document.getElementById('cardTotalToday').innerText = formatCurrency(data.totalToday);
+        document.getElementById('cardCountToday').innerText = `${data.countToday} lançamentos hoje`;
+
+        document.getElementById('cardGasoline15Days').innerText = formatCurrency(data.totalGasoline15Days);
+        document.getElementById('cardCountGasoline').innerText = `${data.countGasoline15Days} abastecimentos (15d)`;
+
+        // Monthly budget calculation (Default benchmark: R$ 8.000)
+        const budgetTarget = 8000;
+        const pct = Math.min(100, Math.round((data.totalMonth / budgetTarget) * 100));
+        document.getElementById('budgetPercent').innerText = `${pct}%`;
+        document.getElementById('budgetBar').style.width = `${pct}%`;
+
+        renderCategoryChart(data.categories);
+        renderDailyChart(data.daily);
+      } catch (err) {
+        console.error('Erro ao carregar estatísticas:', err);
+      }
+    }
+
+    async function loadBills() {
+      const status = document.getElementById('billStatusFilter').value;
+      try {
+        const res = await authFetch(`/api/bills?status=${status}`);
+        const json = await res.json();
+        const tbody = document.getElementById('billsTableBody');
+
+        // Update pending card KPI
+        const allRes = await authFetch('/api/bills?status=PENDING');
+        const allJson = await allRes.json();
+        const pendingBills = allJson.data || [];
+        const pendingTotal = pendingBills.reduce((acc, x) => acc + Number(x.amount), 0);
+
+        document.getElementById('cardPendingBills').innerText = formatCurrency(pendingTotal);
+        document.getElementById('cardCountBills').innerText = `${pendingBills.length} pendentes`;
+        document.getElementById('badgePendingBills').innerText = pendingBills.length;
+
+        // Next upcoming bill date
+        if (pendingBills.length > 0) {
+          const firstDue = pendingBills[0].due_date;
+          document.getElementById('cardNextBillDate').innerText = formatDateSimple(firstDue);
+        } else {
+          document.getElementById('cardNextBillDate').innerText = 'Tudo em dia! 🎉';
+        }
+
+        if (!json.data || json.data.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="6" class="text-center py-12 text-slate-500">
+                <i data-lucide="check-circle-2" class="w-9 h-9 mx-auto mb-2 text-emerald-400 opacity-60"></i>
+                Nenhuma conta encontrada com o filtro selecionado.
+              </td>
+            </tr>
+          `;
+          lucide.createIcons();
+          return;
+        }
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+
+        tbody.innerHTML = json.data.map(b => {
+          const isPending = b.status === 'PENDING';
+          const isOverdue = isPending && b.due_date < todayStr;
+          const isDueToday = isPending && b.due_date === todayStr;
+
+          // Installment Progress Bar Calculation
+          const isInstallment = b.installment_total && b.installment_total > 1;
+          const progressPercent = isInstallment 
+            ? Math.round((b.installment_current / b.installment_total) * 100) 
+            : 100;
+
+          let statusBadge = '';
+          if (!isPending) {
+            statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"><i data-lucide="check" class="w-3 h-3"></i> Pago</span>';
+          } else if (isOverdue) {
+            statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30"><i data-lucide="alert-triangle" class="w-3 h-3"></i> Vencido</span>';
+          } else if (isDueToday) {
+            statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse"><i data-lucide="clock" class="w-3 h-3"></i> Vence Hoje!</span>';
+          } else {
+            statusBadge = '<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30"><i data-lucide="calendar" class="w-3 h-3"></i> Pendente</span>';
+          }
+
+          return `
+            <tr class="hover:bg-[#151F36]/80 transition group">
+              <td class="px-5 py-4 whitespace-nowrap font-mono text-xs font-bold text-slate-300">
+                ${formatDateSimple(b.due_date)}
+              </td>
+              <td class="px-5 py-4">
+                <div class="font-semibold text-white">${b.title}</div>
+                ${isInstallment ? `
+                  <div class="mt-1.5 flex items-center gap-2">
+                    <div class="w-24 bg-[#1E293B] h-1.5 rounded-full overflow-hidden">
+                      <div class="bg-gradient-to-r from-purple-500 to-cyan-400 h-full rounded-full" style="width: ${progressPercent}%"></div>
+                    </div>
+                    <span class="text-[11px] font-mono text-purple-400 font-semibold">${progressPercent}%</span>
+                  </div>
+                ` : ''}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap text-xs text-slate-400">
+                ${b.category || 'Contas'}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap">
+                ${statusBadge}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap text-right font-extrabold text-white text-base">
+                ${formatCurrency(b.amount)}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap text-center">
+                <div class="inline-flex items-center gap-2">
+                  ${isPending ? `
+                    <button onclick="payBill(${b.id})" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 rounded-lg shadow-md shadow-emerald-500/20 active:scale-95 transition">
+                      <i data-lucide="check" class="w-3.5 h-3.5 stroke-[2.5]"></i> Pagar
+                    </button>
+                  ` : ''}
+                  <button onclick="deleteBillItem(${b.id})" title="Excluir" class="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Erro ao carregar contas:', err);
+      }
+    }
+
+    async function payBill(id) {
+      if (!confirm('Deseja marcar esta conta como PAGA? O valor será automaticamente inserido no seu controle de gastos.')) return;
+
+      try {
+        const res = await authFetch(`/api/bills/${id}/pay`, { method: 'PUT' });
+        const json = await res.json();
+        if (json.success) {
+          loadAll();
+        } else {
+          alert('Erro ao dar baixa: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    }
+
+    async function deleteBillItem(id) {
+      if (!confirm('Deseja excluir este agendamento de conta?')) return;
+      try {
+        const res = await authFetch(`/api/bills/${id}`, { method: 'DELETE' });
+        const json = await res.json();
+        if (json.success) {
+          loadBills();
+        }
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    }
+
+    function renderCategoryChart(categories) {
+      const ctx = document.getElementById('categoryChart').getContext('2d');
+      const noDataEl = document.getElementById('noCategoryData');
+      const legendEl = document.getElementById('categoryLegend');
+
+      if (!categories || categories.length === 0) {
+        noDataEl.classList.remove('hidden');
+        if (categoryChartInstance) categoryChartInstance.destroy();
+        legendEl.innerHTML = '';
+        return;
+      }
+      noDataEl.classList.add('hidden');
+
+      const labels = categories.map(c => c.category);
+      const values = categories.map(c => c.total);
+      const colors = categories.map(c => (categoryColors[c.category] || categoryColors['Outros']).hex);
+
+      if (categoryChartInstance) categoryChartInstance.destroy();
+
+      categoryChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            backgroundColor: colors,
+            borderWidth: 2,
+            borderColor: '#0F1626',
+            hoverOffset: 6,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0E1526',
+              titleColor: '#FFFFFF',
+              bodyColor: '#A855F7',
+              borderColor: '#233150',
+              borderWidth: 1,
+              padding: 10,
+              boxPadding: 6,
+              callbacks: {
+                label: function(item) {
+                  return ` ${item.label}: ${formatCurrency(item.raw)}`;
+                }
+              }
+            }
+          },
+          cutout: '72%',
+        }
+      });
+
+      legendEl.innerHTML = categories.map(c => {
+        const color = (categoryColors[c.category] || categoryColors['Outros']).hex;
+        return `
+          <div class="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg hover:bg-[#172138] transition">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full shadow-sm" style="background-color: ${color}; box-shadow: 0 0 8px ${color}80;"></span>
+              <span class="font-medium text-slate-200">${c.category}</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-slate-400 font-mono text-[11px]">${c.percentage}%</span>
+              <span class="font-bold text-white">${formatCurrency(c.total)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderDailyChart(daily) {
+      const ctx = document.getElementById('dailyChart').getContext('2d');
+      const labels = daily.map(d => d.displayDate);
+      const values = daily.map(d => d.total);
+
+      if (dailyChartInstance) dailyChartInstance.destroy();
+
+      // Create gradient fill for line chart
+      const gradient = ctx.createLinearGradient(0, 0, 0, 280);
+      gradient.addColorStop(0, 'rgba(139, 92, 246, 0.45)');
+      gradient.addColorStop(0.7, 'rgba(6, 182, 212, 0.1)');
+      gradient.addColorStop(1, 'rgba(6, 182, 212, 0)');
+
+      dailyChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Total Gasto (R$)',
+            data: values,
+            borderColor: '#8B5CF6',
+            borderWidth: 3,
+            backgroundColor: gradient,
+            fill: true,
+            tension: 0.38,
+            pointBackgroundColor: '#06B6D4',
+            pointBorderColor: '#0E1526',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            pointHoverBackgroundColor: '#FFFFFF',
+            pointHoverBorderColor: '#8B5CF6',
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0E1526',
+              titleColor: '#FFFFFF',
+              bodyColor: '#06B6D4',
+              borderColor: '#233150',
+              borderWidth: 1,
+              padding: 10,
+              callbacks: {
+                label: (item) => ` Gasto: ${formatCurrency(item.raw)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.04)' },
+              ticks: { color: '#64748B', font: { family: 'Plus Jakarta Sans', size: 11 } }
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(255, 255, 255, 0.04)' },
+              ticks: {
+                color: '#64748B',
+                font: { family: 'Plus Jakarta Sans', size: 11 },
+                callback: (val) => 'R$ ' + val
+              }
+            }
+          }
+        }
+      });
+    }
+
+    async function loadExpenses() {
+      const search = document.getElementById('searchInput').value;
+      const category = document.getElementById('categoryFilter').value;
+
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (category && category !== 'Todas') params.append('category', category);
+
+      try {
+        const res = await authFetch(`/api/expenses?${params.toString()}`);
+        const json = await res.json();
+        const tbody = document.getElementById('expensesTableBody');
+
+        document.getElementById('badgeExpensesCount').innerText = json.data ? json.data.length : 0;
+
+        if (!json.data || json.data.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" class="text-center py-12 text-slate-500">
+                <i data-lucide="receipt" class="w-9 h-9 mx-auto mb-2 opacity-40"></i>
+                Nenhum gasto encontrado com os filtros selecionados.
+              </td>
+            </tr>
+          `;
+          lucide.createIcons();
+          return;
+        }
+
+        tbody.innerHTML = json.data.map(r => {
+          const style = categoryColors[r.category] || categoryColors['Outros'];
+          return `
+            <tr class="hover:bg-[#151F36]/80 transition group">
+              <td class="px-5 py-4 whitespace-nowrap text-slate-400 font-mono text-xs">
+                ${formatDate(r.date)}
+              </td>
+              <td class="px-5 py-4 font-semibold text-white">
+                ${r.description || r.category}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style.border} ${style.bg}">
+                  ${r.category}
+                </span>
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap text-slate-300 text-xs">
+                ${r.payment_method || 'Não informado'}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap">
+                ${getSourceBadge(r.source_type)}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap text-right font-extrabold text-white text-base">
+                ${formatCurrency(r.amount)}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap text-center">
+                <div class="inline-flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition">
+                  <button onclick="editExpense(${r.id})" title="Editar" class="p-1.5 text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition">
+                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                  </button>
+                  <button onclick="deleteExpense(${r.id})" title="Excluir" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Erro ao carregar despesas:', err);
+      }
+    }
+
+    function debounceLoad() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(loadExpenses, 300);
+    }
+
+    // Modal Expense handlers
+    function openExpenseModal(data = null) {
+      const modal = document.getElementById('expenseModal');
+      const title = document.getElementById('modalTitle');
+      const form = document.getElementById('expenseForm');
+
+      if (data) {
+        title.innerHTML = '<i data-lucide="pencil" class="w-5 h-5 text-purple-400"></i> Editar Gasto';
+        document.getElementById('expenseId').value = data.id;
+        document.getElementById('formAmount').value = data.amount;
+        document.getElementById('formCategory').value = data.category;
+        document.getElementById('formDescription').value = data.description;
+        document.getElementById('formPaymentMethod').value = data.payment_method;
+        if (data.date) {
+          const d = new Date(data.date);
+          d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+          document.getElementById('formDate').value = d.toISOString().slice(0, 16);
+        }
+      } else {
+        title.innerHTML = '<i data-lucide="plus-circle" class="w-5 h-5 text-purple-400"></i> Novo Gasto';
+        form.reset();
+        document.getElementById('expenseId').value = '';
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('formDate').value = now.toISOString().slice(0, 16);
+      }
+      modal.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeExpenseModal() {
+      document.getElementById('expenseModal').classList.add('hidden');
+    }
+
+    async function handleExpenseSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('expenseId').value;
+      const payload = {
+        amount: document.getElementById('formAmount').value,
+        category: document.getElementById('formCategory').value,
+        description: document.getElementById('formDescription').value,
+        paymentMethod: document.getElementById('formPaymentMethod').value,
+        date: document.getElementById('formDate').value ? new Date(document.getElementById('formDate').value).toISOString() : new Date().toISOString()
+      };
+
+      try {
+        const url = id ? `/api/expenses/${id}` : '/api/expenses';
+        const method = id ? 'PUT' : 'POST';
+        const res = await authFetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (json.success) {
+          closeExpenseModal();
+          loadAll();
+        } else {
+          alert('Erro: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro ao conectar ao servidor: ' + err.message);
+      }
+    }
+
+    async function editExpense(id) {
+      try {
+        const res = await authFetch(`/api/expenses`);
+        const json = await res.json();
+        const item = json.data.find(x => x.id === id);
+        if (item) openExpenseModal(item);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function deleteExpense(id) {
+      if (!confirm('Tem certeza que deseja excluir este gasto?')) return;
+      try {
+        const res = await authFetch(`/api/expenses/${id}`, { method: 'DELETE' });
+        const json = await res.json();
+        if (json.success) {
+          loadAll();
+        } else {
+          alert('Erro: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    }
+
+    // Modal Bill handlers
+    function openBillModal() {
+      const modal = document.getElementById('billModal');
+      document.getElementById('billForm').reset();
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      document.getElementById('billFirstDueDate').value = tomorrow.toISOString().slice(0, 10);
+      modal.classList.remove('hidden');
+    }
+
+    function closeBillModal() {
+      document.getElementById('billModal').classList.add('hidden');
+    }
+
+    async function handleBillSubmit(e) {
+      e.preventDefault();
+      const payload = {
+        title: document.getElementById('billTitle').value,
+        totalAmount: document.getElementById('billTotalAmount').value,
+        installments: document.getElementById('billInstallments').value,
+        firstDueDate: document.getElementById('billFirstDueDate').value,
+        category: document.getElementById('billCategory').value,
+      };
+
+      try {
+        const res = await authFetch('/api/bills', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (json.success) {
+          closeBillModal();
+          switchTab('bills');
+          loadBills();
+        } else {
+          alert('Erro ao agendar conta: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro ao agendar conta: ' + err.message);
+      }
+    }
+
+    // Modal Appointment handlers & Table loader
+    async function loadAppointments() {
+      try {
+        const filter = document.getElementById('appointmentStatusFilter')?.value || 'SCHEDULED';
+        const res = await authFetch(`/api/appointments?status=${filter}`);
+        const json = await res.json();
+        const tbody = document.getElementById('appointmentsTableBody');
+        const badge = document.getElementById('badgeAppointmentsCount');
+
+        if (badge) {
+          badge.innerText = json.count || 0;
+        }
+
+        if (!tbody) return;
+
+        if (!json.data || json.data.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="6" class="text-center py-12 text-slate-500">
+                <i data-lucide="calendar-check" class="w-9 h-9 mx-auto mb-2 opacity-40"></i>
+                Nenhum compromisso agendado no momento.
+              </td>
+            </tr>
+          `;
+          lucide.createIcons();
+          return;
+        }
+
+        tbody.innerHTML = json.data.map(apt => {
+          const startDate = new Date(apt.start_datetime);
+          const dateStr = startDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          const timeStr = startDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+          const notif24 = apt.notified_24h 
+            ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">24h ✓</span>'
+            : '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] text-slate-400 bg-slate-800 border border-slate-700">24h</span>';
+          
+          const notif3 = apt.notified_3h 
+            ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">3h ✓</span>'
+            : '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] text-slate-400 bg-slate-800 border border-slate-700">3h</span>';
+          
+          const notif1 = apt.notified_1h 
+            ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">1h ✓</span>'
+            : '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] text-slate-400 bg-slate-800 border border-slate-700">1h</span>';
+
+          const statusBadge = apt.status === 'CANCELLED' 
+            ? '<span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">Cancelado</span>'
+            : '';
+
+          return `
+            <tr class="hover:bg-[#151F36]/80 transition group">
+              <td class="px-5 py-4 whitespace-nowrap text-slate-300 font-mono text-xs">
+                <div class="font-bold text-cyan-400 text-sm">${timeStr}</div>
+                <div class="text-slate-400 text-xs">${dateStr}</div>
+              </td>
+              <td class="px-5 py-4">
+                <div class="font-bold text-white text-sm flex items-center">
+                  ${apt.title} ${statusBadge}
+                </div>
+                ${apt.description ? `<div class="text-xs text-slate-400 mt-0.5">${apt.description}</div>` : ''}
+              </td>
+              <td class="px-5 py-4 text-xs text-slate-300 whitespace-nowrap">
+                ${apt.location ? `<span class="inline-flex items-center gap-1"><i data-lucide="map-pin" class="w-3.5 h-3.5 text-cyan-400"></i> ${apt.location}</span>` : '<span class="text-slate-500">-</span>'}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap">
+                <div class="flex items-center gap-1.5">
+                  ${notif24} ${notif3} ${notif1}
+                </div>
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap">
+                ${getSourceBadge(apt.source_type || 'whatsapp')}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap text-center">
+                ${apt.status !== 'CANCELLED' ? `
+                  <button onclick="deleteAppointmentItem(${apt.id})" title="Desmarcar / Cancelar" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                ` : '<span class="text-slate-600 text-xs">-</span>'}
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Erro ao carregar compromissos:', err);
+      }
+    }
+
+    function openAppointmentModal() {
+      const modal = document.getElementById('appointmentModal');
+      document.getElementById('appointmentForm').reset();
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(10, 0, 0, 0);
+      const isoLocal = new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      document.getElementById('appointmentStart').value = isoLocal;
+      modal.classList.remove('hidden');
+    }
+
+    function closeAppointmentModal() {
+      document.getElementById('appointmentModal').classList.add('hidden');
+    }
+
+    async function handleAppointmentSubmit(e) {
+      e.preventDefault();
+      const title = document.getElementById('appointmentTitle').value;
+      const startDateTime = document.getElementById('appointmentStart').value;
+      const location = document.getElementById('appointmentLocation').value;
+      const description = document.getElementById('appointmentDesc').value;
+
+      try {
+        const res = await authFetch('/api/appointments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title,
+            startDateTime: new Date(startDateTime).toISOString(),
+            location,
+            description,
+          })
+        });
+        const json = await res.json();
+        if (json.success) {
+          closeAppointmentModal();
+          switchTab('appointments');
+          loadAppointments();
+        } else {
+          alert('Erro ao agendar compromisso: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro ao agendar compromisso: ' + err.message);
+      }
+    }
+
+    async function deleteAppointmentItem(id) {
+      if (!confirm('Deseja desmarcar este compromisso?')) return;
+      try {
+        const res = await authFetch(`/api/appointments/${id}`, { method: 'DELETE' });
+        const json = await res.json();
+        if (json.success) {
+          loadAppointments();
+        } else {
+          alert('Erro ao desmarcar: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    }
+
+    function loadAll() {
+      loadMe();
+      loadStats();
+      loadExpenses();
+      loadBills();
+      loadAppointments();
+      if (currentTab === 'admin') {
+        loadAdminUsers();
+        loadAdminInvites();
+      }
+    }
+
+    // Initialize Page
+    updateHeaderDate();
+    loadAll();
+    lucide.createIcons();
+
+    const urlTab = urlParams.get('tab');
+    if (urlTab === 'admin') {
+      setTimeout(() => switchTab('admin'), 200);
+    }
+
+    // Auto-refresh every 8 seconds
+    setInterval(loadAll, 8000);
+  </script>
+</body>
+</html>

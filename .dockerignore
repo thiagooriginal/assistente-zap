@@ -1,0 +1,6 @@
+node_modules
+.git
+cloudflared.exe
+*.log
+.system_generated
+npm-debug.log*

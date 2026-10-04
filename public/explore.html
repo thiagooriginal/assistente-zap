@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Descubra ON | A Revolução dos Rolês & Seu Assistente Pessoal</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              cyan: '#00f0ff',
+              purple: '#8b5cf6',
+              deepPurple: '#5b21b6',
+              pink: '#ff007a',
+              dark: '#080c15',
+              surface: '#0f172a',
+              paper: '#f8fafc',
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            display: ['"Bebas Neue"', '"Cabinet Grotesk"', 'Impact', 'sans-serif'],
+            stencil: ['"Space Grotesk"', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts: Plus Jakarta Sans & Bebas Neue & Space Grotesk -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Estilo Papel Rasgado & Texturas Urbanas */
+    body {
+      background-color: #070a12;
+      background-image: 
+        radial-gradient(circle at 15% 20%, rgba(139, 92, 246, 0.18) 0%, transparent 40%),
+        radial-gradient(circle at 85% 65%, rgba(0, 240, 255, 0.15) 0%, transparent 45%),
+        radial-gradient(circle at 50% 90%, rgba(255, 0, 122, 0.12) 0%, transparent 40%),
+        url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.035'/%3E%3C/svg%3E");
+    }
+
+    /* Fita Adesiva / Durex Translúcido Texturizado */
+    .masking-tape {
+      position: absolute;
+      width: 100px;
+      height: 28px;
+      background: rgba(245, 245, 240, 0.68);
+      backdrop-filter: blur(2px);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25), inset 0 0 4px rgba(255,255,255,0.6);
+      border-left: 2px dashed rgba(220, 220, 210, 0.8);
+      border-right: 2px dashed rgba(220, 220, 210, 0.8);
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    /* Borda Rasgada SVG Superior e Inferior */
+    .torn-top {
+      clip-path: polygon(
+        0% 0%, 2% 4px, 5% 0px, 8% 6px, 12% 1px, 16% 5px, 20% 0px, 
+        24% 4px, 28% 1px, 32% 6px, 36% 2px, 40% 5px, 44% 0px, 
+        48% 6px, 52% 2px, 56% 5px, 60% 0px, 64% 5px, 68% 1px, 
+        72% 6px, 76% 2px, 80% 5px, 84% 0px, 88% 5px, 92% 1px, 
+        96% 6px, 100% 0px, 100% 100%, 0% 100%
+      );
+    }
+
+    .torn-bottom {
+      clip-path: polygon(
+        0% 0%, 100% 0%, 100% calc(100% - 6px),
+        96% 100%, 92% calc(100% - 5px), 88% calc(100% - 1px), 84% 100%,
+        80% calc(100% - 6px), 76% calc(100% - 2px), 72% calc(100% - 5px), 68% 100%,
+        64% calc(100% - 6px), 60% calc(100% - 1px), 56% calc(100% - 5px), 52% 100%,
+        48% calc(100% - 6px), 44% calc(100% - 2px), 40% calc(100% - 5px), 36% 100%,
+        32% calc(100% - 6px), 28% calc(100% - 1px), 24% calc(100% - 5px), 20% 100%,
+        16% calc(100% - 6px), 12% calc(100% - 2px), 8% calc(100% - 5px), 5% 100%,
+        2% calc(100% - 4px), 0% calc(100% - 6px)
+      );
+    }
+
+    .torn-paper-card {
+      position: relative;
+      background: #fbfbfc;
+      color: #0f172a;
+      box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .torn-paper-card:hover {
+      transform: translateY(-4px) scale(1.01);
+      box-shadow: 0 24px 48px -12px rgba(0, 240, 255, 0.25), 0 12px 24px rgba(139, 92, 246, 0.2);
+    }
+
+    /* Estilo de Selo / Carimbo */
+    .stamp-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px dashed currentColor;
+      text-transform: uppercase;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #090e1a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1e293b;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #334155;
+    }
+  </style>
+</head>
+<body class="text-slate-100 font-sans min-h-screen flex flex-col selection:bg-cyan-400 selection:text-black">
+
+  <!-- TOP BRAND HEADER -->
+  <header class="sticky top-0 z-40 bg-[#070A12]/90 backdrop-blur-xl border-b border-purple-500/20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+      
+      <!-- Brand "ON: DESCUBRA" -->
+      <div class="flex items-center gap-3">
+        <a href="/" class="flex items-center gap-3 group">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-fuchsia-500 to-cyan-400 p-[1.5px] shadow-lg shadow-purple-900/40 group-hover:scale-105 transition">
+            <div class="w-full h-full bg-[#0a0f1d] rounded-[14px] flex items-center justify-center">
+              <span class="font-display text-2xl tracking-wider text-cyan-400 font-black">ON</span>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-white uppercase">
+                Descubra <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-fuchsia-400">ON</span>
+              </span>
+              <span class="hidden sm:inline-block px-2 py-0.5 text-[10px] font-black uppercase tracking-wider bg-cyan-400 text-black rounded rotate-[-2deg] shadow-sm">
+                NOVO
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 -mt-1 hidden sm:block">A Revolução dos Rolês & Seu Assistente Pessoal</p>
+          </div>
+        </a>
+      </div>
+
+      <!-- Action Navigation -->
+      <div class="flex items-center gap-3">
+        <a href="/" class="inline-flex items-center gap-2 px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-300 bg-[#121829] hover:bg-[#1a233b] hover:text-white border border-[#22304c] rounded-xl transition shadow-sm">
+          <i data-lucide="layout-dashboard" class="w-4 h-4 text-purple-400"></i>
+          <span>Painel Financeiro</span>
+        </a>
+
+        <a href="https://wa.me/5511966619866" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 text-xs sm:text-sm font-extrabold text-black bg-cyan-400 hover:bg-cyan-300 rounded-xl shadow-lg shadow-cyan-400/25 active:scale-95 transition">
+          <i data-lucide="message-circle" class="w-4 h-4"></i>
+          <span>Falar no Zap</span>
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- HERO SECTION: ESTILO PAPEL RASGADO & VIBE URBANA -->
+  <section class="relative pt-10 pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+    
+    <div class="relative rounded-3xl p-6 sm:p-12 overflow-hidden bg-gradient-to-br from-[#120d24] via-[#0f172a] to-[#080d1a] border border-purple-500/30 shadow-2xl">
+      <!-- Glow ambient lights -->
+      <div class="absolute -top-24 -left-24 w-80 h-80 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-24 -right-24 w-80 h-80 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div class="relative z-10 max-w-3xl">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-300 text-xs font-bold uppercase tracking-wider mb-4">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Curadoria com Inteligência Artificial</span>
+        </div>
+
+        <h1 class="text-4xl sm:text-6xl font-display font-black tracking-tight text-white uppercase leading-[1.05]">
+          Próxima Parada <span class="text-cyan-400 underline decoration-fuchsia-500 decoration-wavy decoration-2">ON</span>:<br>
+          A Revolução de Como Você Encontra Lugares para se Divertir.
+        </h1>
+
+        <p class="mt-4 text-base sm:text-lg text-slate-300 leading-relaxed font-normal">
+          Chega de perder horas em grupos do WhatsApp, avaliações desatualizadas ou estourar o limite do cartão sem perceber. 
+          Conheça a plataforma que une <b class="text-white">inteligência de rotina</b>, <b class="text-cyan-400">curadoria de rolês</b> e <b class="text-fuchsia-400">controle financeiro instantâneo</b>.
+        </p>
+
+        <!-- Search Bar Live -->
+        <div class="mt-8 flex flex-col sm:flex-row items-center gap-3">
+          <div class="relative w-full">
+            <i data-lucide="search" class="w-5 h-5 text-cyan-400 absolute left-4 top-3.5"></i>
+            <input 
+              type="text" 
+              id="searchShowcaseInput" 
+              oninput="filterArticles()"
+              placeholder="Pesquisar por tema, benefício, bar, rooftop, restaurante ou dica..." 
+              class="w-full pl-12 pr-4 py-3.5 bg-[#0a0f1d]/90 border border-purple-500/40 rounded-2xl text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/30 transition text-sm shadow-inner"
+            >
+          </div>
+          <button onclick="clearSearch()" class="hidden sm:inline-flex px-5 py-3.5 text-xs font-bold text-slate-400 hover:text-white bg-[#151c2e] border border-slate-700 rounded-2xl transition whitespace-nowrap">
+            Limpar Filtro
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+  </section>
+
+  <!-- INTERACTIVE FILTER BAR (TAGS / PILLS) -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full pb-6">
+    <div class="flex items-center justify-between gap-4 pb-2 border-b border-purple-500/20">
+      
+      <!-- Filter Chips -->
+      <div class="flex items-center gap-2 overflow-x-auto scrollbar-none py-1 text-xs sm:text-sm font-bold">
+        <button onclick="setFilter('all')" id="filterBtn_all" class="filter-btn px-4 py-2 rounded-xl transition duration-200 whitespace-nowrap bg-cyan-400 text-black shadow-lg shadow-cyan-400/20 active:scale-95">
+          🔥 Todos os Temas
+        </button>
+        <button onclick="setFilter('revolucao')" id="filterBtn_revolucao" class="filter-btn px-4 py-2 rounded-xl transition duration-200 whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white hover:bg-[#1c243c] border border-slate-800">
+          🎯 A Revolução dos Rolês
+        </button>
+        <button onclick="setFilter('plataforma')" id="filterBtn_plataforma" class="filter-btn px-4 py-2 rounded-xl transition duration-200 whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white hover:bg-[#1c243c] border border-slate-800">
+          ⚡ O Que a Plataforma Traz
+        </button>
+        <button onclick="setFilter('beneficios')" id="filterBtn_beneficios" class="filter-btn px-4 py-2 rounded-xl transition duration-200 whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white hover:bg-[#1c243c] border border-slate-800">
+          💎 Benefícios aos Usuários
+        </button>
+        <button onclick="setFilter('gastronomia')" id="filterBtn_gastronomia" class="filter-btn px-4 py-2 rounded-xl transition duration-200 whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white hover:bg-[#1c243c] border border-slate-800">
+          🍸 Gastronomia & Bares
+        </button>
+        <button onclick="setFilter('baladas')" id="filterBtn_baladas" class="filter-btn px-4 py-2 rounded-xl transition duration-200 whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white hover:bg-[#1c243c] border border-slate-800">
+          🎶 Noite & Diversão
+        </button>
+        <button onclick="setFilter('smartbudget')" id="filterBtn_smartbudget" class="filter-btn px-4 py-2 rounded-xl transition duration-200 whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white hover:bg-[#1c243c] border border-slate-800">
+          💰 Lazer Sem Culpa
+        </button>
+      </div>
+
+      <div class="hidden md:flex items-center text-xs text-slate-400 font-mono whitespace-nowrap">
+        <span id="activeCountText">6 artigos & guias</span>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- GRID DE CARDS COM ESTILO PAPEL RASGADO & FITAS ADESIVAS -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 w-full flex-1 pb-16">
+    <div id="articlesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 sm:gap-10">
+      
+      <!-- CARD 1: A REVOLUÇÃO NA FORMA DE PESQUISAR LUGARES -->
+      <article data-category="revolucao" class="article-item torn-paper-card rounded-2xl torn-bottom p-6 pt-8 flex flex-col justify-between cursor-pointer group" onclick="openArticleModal('revolucao')">
+        <!-- Masking Tape Effect on Top Right -->
+        <div class="masking-tape -top-3.5 right-8 rotate-[8deg]"></div>
+
+        <div>
+          <!-- Header Tags / Stickers -->
+          <div class="flex items-center justify-between mb-4">
+            <span class="inline-block px-2.5 py-0.5 text-xs font-black uppercase tracking-wider bg-cyan-400 text-black rounded rotate-[-2deg] shadow-sm">
+              ON: REVOLUÇÃO
+            </span>
+            <span class="stamp-badge text-[11px] text-purple-700 rotate-[4deg]">
+              IA EXCLUSIVA
+            </span>
+          </div>
+
+          <h2 class="font-display text-3xl font-extrabold uppercase text-slate-900 leading-[1.1] tracking-tight group-hover:text-purple-700 transition">
+            Pesquisar Onde Sair Nunca Mais Será uma Dor de Cabeça
+          </h2>
+
+          <p class="text-slate-600 text-sm mt-3 leading-relaxed">
+            Esqueça o roteiro tradicional de abrir 4 aplicativos diferentes e se frustrar. Veja como nossa IA cruza seu estilo, seu orçamento livre e sua agenda para te entregar a noite perfeita em segundos.
+          </p>
+
+          <!-- Visual Quote Inset with Torn Look -->
+          <div class="mt-4 p-3.5 bg-purple-50 border-l-4 border-purple-600 rounded-r-lg text-xs font-medium text-purple-950">
+            💬 <i>"Zap, queremos um rooftop aconchegante com drinks autorais para ir hoje sem gastar mais de 120 reais por pessoa..."</i>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="clock" class="w-3.5 h-3.5 text-purple-600"></i> Leitura de 3 min
+          </span>
+          <span class="inline-flex items-center gap-1 text-xs font-extrabold text-purple-700 group-hover:translate-x-1 transition">
+            Ler Artigo Completo <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </span>
+        </div>
+      </article>
+
+      <!-- CARD 2: O TEMA DA PLATAFORMA (WHATSAPP + IA + ZERO ATRITO) -->
+      <article data-category="plataforma" class="article-item torn-paper-card rounded-2xl torn-bottom p-6 pt-8 flex flex-col justify-between cursor-pointer group" onclick="openArticleModal('plataforma')">
+        <!-- Masking Tape Effect on Top Left -->
+        <div class="masking-tape -top-3.5 left-8 -rotate-[6deg]"></div>
+
+        <div>
+          <!-- Header Tags / Stickers -->
+          <div class="flex items-center justify-between mb-4">
+            <span class="inline-block px-2.5 py-0.5 text-xs font-black uppercase tracking-wider bg-fuchsia-500 text-white rounded rotate-[1deg] shadow-sm">
+              ON: TEMA & VISÃO
+            </span>
+            <span class="stamp-badge text-[11px] text-cyan-700 -rotate-[3deg]">
+              SEM INSTALAÇÃO
+            </span>
+          </div>
+
+          <h2 class="font-display text-3xl font-extrabold uppercase text-slate-900 leading-[1.1] tracking-tight group-hover:text-fuchsia-600 transition">
+            O Que a Plataforma Traz: Seu Copiloto de Vida no Zap
+          </h2>
+
+          <p class="text-slate-600 text-sm mt-3 leading-relaxed">
+            Por que criamos um assistente que mora no seu WhatsApp em vez de mais um aplicativo esquecido na tela do seu celular? Entenda a revolução da IA sem atrito.
+          </p>
+
+          <!-- Checklist Pills -->
+          <div class="mt-4 space-y-1.5 text-xs font-semibold text-slate-700">
+            <div class="flex items-center gap-2">
+              <span class="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">✓</span>
+              <span>Áudios transcritos e interpretados em 2s</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">✓</span>
+              <span>Leitura de comprovantes e fotos por visão computacional</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">✓</span>
+              <span>Painel Web interativo com sincronização instantânea</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="zap" class="w-3.5 h-3.5 text-fuchsia-600"></i> Tecnologia & Design
+          </span>
+          <span class="inline-flex items-center gap-1 text-xs font-extrabold text-fuchsia-600 group-hover:translate-x-1 transition">
+            Explorar Tema <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </span>
+        </div>
+      </article>
+
+      <!-- CARD 3: OS BENEFÍCIOS REAIS AOS USUÁRIOS -->
+      <article data-category="beneficios" class="article-item torn-paper-card rounded-2xl torn-bottom p-6 pt-8 flex flex-col justify-between cursor-pointer group" onclick="openArticleModal('beneficios')">
+        <!-- Masking Tape Effect on Center Top -->
+        <div class="masking-tape -top-3.5 left-1/3 rotate-[3deg]"></div>
+
+        <div>
+          <!-- Header Tags / Stickers -->
+          <div class="flex items-center justify-between mb-4">
+            <span class="inline-block px-2.5 py-0.5 text-xs font-black uppercase tracking-wider bg-emerald-400 text-slate-950 rounded rotate-[-1deg] shadow-sm">
+              ON: BENEFÍCIOS
+            </span>
+            <span class="stamp-badge text-[11px] text-emerald-800 rotate-[2deg]">
+              100% PRÁTICO
+            </span>
+          </div>
+
+          <h2 class="font-display text-3xl font-extrabold uppercase text-slate-900 leading-[1.1] tracking-tight group-hover:text-emerald-700 transition">
+            Benefícios Que Transformam a Sua Rotina Diária
+          </h2>
+
+          <p class="text-slate-600 text-sm mt-3 leading-relaxed">
+            Menos tempo preenchendo planilhas, zero juros de contas atrasadas e controle absoluto do seu dinheiro sem esforço mental. Veja o que muda na sua rotina.
+          </p>
+
+          <div class="mt-4 grid grid-cols-2 gap-2 text-center">
+            <div class="p-2.5 bg-slate-100 rounded-xl">
+              <span class="block font-display text-2xl font-black text-slate-900 leading-tight">ZERO</span>
+              <span class="text-[11px] font-bold text-slate-500 uppercase">Juros & Multas</span>
+            </div>
+            <div class="p-2.5 bg-slate-100 rounded-xl">
+              <span class="block font-display text-2xl font-black text-purple-700 leading-tight">3X</span>
+              <span class="text-[11px] font-bold text-slate-500 uppercase">Lembretes Antes</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-600"></i> Impacto na Vida
+          </span>
+          <span class="inline-flex items-center gap-1 text-xs font-extrabold text-emerald-700 group-hover:translate-x-1 transition">
+            Ver Benefícios <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </span>
+        </div>
+      </article>
+
+      <!-- CARD 4: GASTRONOMIA & CURADORIA DE LUGARES -->
+      <article data-category="gastronomia" class="article-item torn-paper-card rounded-2xl torn-bottom p-6 pt-8 flex flex-col justify-between cursor-pointer group" onclick="openArticleModal('gastronomia')">
+        <!-- Masking Tape Effect on Top Right -->
+        <div class="masking-tape -top-3.5 right-10 -rotate-[10deg]"></div>
+
+        <div>
+          <!-- Header Tags / Stickers -->
+          <div class="flex items-center justify-between mb-4">
+            <span class="inline-block px-2.5 py-0.5 text-xs font-black uppercase tracking-wider bg-amber-400 text-black rounded rotate-[2deg] shadow-sm">
+              ON: GASTRONOMIA
+            </span>
+            <span class="stamp-badge text-[11px] text-amber-700 -rotate-[2deg]">
+              ROOFTOP & BARES
+            </span>
+          </div>
+
+          <h2 class="font-display text-3xl font-extrabold uppercase text-slate-900 leading-[1.1] tracking-tight group-hover:text-amber-700 transition">
+            Bares Secretos, Bistrôs & Rooftops: A Curadoria Que Ninguém Mostra
+          </h2>
+
+          <p class="text-slate-600 text-sm mt-3 leading-relaxed">
+            De botecos autorais com petiscos premiados a speakeasies escondidos atrás de portas secretas. Descubra como a IA recomenda lugares que combinam com o clima da noite.
+          </p>
+
+          <div class="mt-4 flex items-center gap-2">
+            <span class="px-2 py-1 bg-amber-100 text-amber-900 rounded-md text-[11px] font-bold">🍸 Speakeasy</span>
+            <span class="px-2 py-1 bg-amber-100 text-amber-900 rounded-md text-[11px] font-bold">🍕 Forno a Lenha</span>
+            <span class="px-2 py-1 bg-amber-100 text-amber-900 rounded-md text-[11px] font-bold">🌆 Vista Panorâmica</span>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-amber-600"></i> Curadoria Urbana
+          </span>
+          <span class="inline-flex items-center gap-1 text-xs font-extrabold text-amber-700 group-hover:translate-x-1 transition">
+            Conhecer Lugares <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </span>
+        </div>
+      </article>
+
+      <!-- CARD 5: VIDA NOTURNA & BALADAS -->
+      <article data-category="baladas" class="article-item torn-paper-card rounded-2xl torn-bottom p-6 pt-8 flex flex-col justify-between cursor-pointer group" onclick="openArticleModal('baladas')">
+        <!-- Masking Tape Effect on Top Left -->
+        <div class="masking-tape -top-3.5 left-10 rotate-[7deg]"></div>
+
+        <div>
+          <!-- Header Tags / Stickers -->
+          <div class="flex items-center justify-between mb-4">
+            <span class="inline-block px-2.5 py-0.5 text-xs font-black uppercase tracking-wider bg-violet-600 text-white rounded rotate-[-2deg] shadow-sm">
+              ON: NIGHTLIFE
+            </span>
+            <span class="stamp-badge text-[11px] text-violet-800 rotate-[4deg]">
+              VIBE & SOM
+            </span>
+          </div>
+
+          <h2 class="font-display text-3xl font-extrabold uppercase text-slate-900 leading-[1.1] tracking-tight group-hover:text-violet-700 transition">
+            Música, Pista & Experiências: Qual é o Seu Estilo de Rolê?
+          </h2>
+
+          <p class="text-slate-600 text-sm mt-3 leading-relaxed">
+            Do jazz clássico nas noites de quinta à música eletrônica imersiva nos armazéns reformados. Como encontrar festas onde a vibe bate exatamente com a sua turma.
+          </p>
+
+          <div class="mt-4 p-3 bg-violet-50 rounded-xl border border-violet-100 flex items-center justify-between text-xs">
+            <span class="font-bold text-violet-900">#TurmaON: A gente entende a sua vibe!</span>
+            <span class="text-violet-600 font-extrabold">100% Match</span>
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="music" class="w-3.5 h-3.5 text-violet-600"></i> Eventos & Festas
+          </span>
+          <span class="inline-flex items-center gap-1 text-xs font-extrabold text-violet-700 group-hover:translate-x-1 transition">
+            Ver Roteiro <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </span>
+        </div>
+      </article>
+
+      <!-- CARD 6: LAZER SEM CULPA & SMART BUDGET -->
+      <article data-category="smartbudget" class="article-item torn-paper-card rounded-2xl torn-bottom p-6 pt-8 flex flex-col justify-between cursor-pointer group" onclick="openArticleModal('smartbudget')">
+        <!-- Masking Tape Effect on Top Center -->
+        <div class="masking-tape -top-3.5 left-1/4 -rotate-[4deg]"></div>
+
+        <div>
+          <!-- Header Tags / Stickers -->
+          <div class="flex items-center justify-between mb-4">
+            <span class="inline-block px-2.5 py-0.5 text-xs font-black uppercase tracking-wider bg-rose-500 text-white rounded rotate-[2deg] shadow-sm">
+              ON: SMART BUDGET
+            </span>
+            <span class="stamp-badge text-[11px] text-rose-800 -rotate-[3deg]">
+              EQUILÍBRIO
+            </span>
+          </div>
+
+          <h2 class="font-display text-3xl font-extrabold uppercase text-slate-900 leading-[1.1] tracking-tight group-hover:text-rose-600 transition">
+            Lazer Sem Culpa: Como Curtir Todo Fim de Semana Sem Estourar a Conta
+          </h2>
+
+          <p class="text-slate-600 text-sm mt-3 leading-relaxed">
+            Economizar não significa se trancar em casa. Descubra o método do "Envelope de Diversão" gerenciado automaticamente pelo assistente para você viver o melhor da vida com tranquilidade.
+          </p>
+
+          <div class="mt-4 p-3 bg-rose-50 rounded-xl border border-rose-100 text-xs text-rose-950 font-medium">
+            💡 O segredo é saber quanto pode gastar antes de sair de casa, e não levar um susto na fatura depois.
+          </div>
+        </div>
+
+        <div class="mt-6 pt-4 border-t border-slate-200 flex items-center justify-between">
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="pie-chart" class="w-3.5 h-3.5 text-rose-600"></i> Gestão de Lazer
+          </span>
+          <span class="inline-flex items-center gap-1 text-xs font-extrabold text-rose-600 group-hover:translate-x-1 transition">
+            Ler Dicas de Ouro <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </span>
+        </div>
+      </article>
+
+    </div>
+
+    <!-- Empty State for Search / Filter -->
+    <div id="noResultsBox" class="hidden text-center py-16 px-4 bg-[#0e1424] rounded-3xl border border-purple-500/20 max-w-lg mx-auto">
+      <div class="w-16 h-16 mx-auto mb-4 bg-purple-500/10 rounded-2xl flex items-center justify-center text-cyan-400 text-2xl">
+        🔍
+      </div>
+      <h3 class="text-xl font-bold text-white">Nenhum artigo encontrado</h3>
+      <p class="text-sm text-slate-400 mt-1">Tente pesquisar com outras palavras como "rolê", "gastronomia", "benefícios" ou "plataforma".</p>
+      <button onclick="clearSearch()" class="mt-5 px-5 py-2.5 bg-cyan-400 text-black font-extrabold rounded-xl text-xs uppercase tracking-wider hover:bg-cyan-300 transition">
+        Ver Todos os Artigos
+      </button>
+    </div>
+
+    <!-- CALL TO ACTION BANNER (VIBE AGENCY ON) -->
+    <div class="mt-16 relative rounded-3xl p-8 sm:p-12 overflow-hidden bg-gradient-to-r from-purple-900 via-indigo-950 to-[#0c1120] border-2 border-purple-500/40 shadow-2xl">
+      <!-- Tape in Corner -->
+      <div class="masking-tape -top-3.5 right-12 rotate-[12deg]"></div>
+      
+      <div class="flex flex-col lg:flex-row items-center justify-between gap-8 relative z-10">
+        <div>
+          <span class="px-3 py-1 bg-cyan-400 text-black font-black uppercase text-xs rounded rotate-[-2deg] inline-block mb-3 shadow-md">
+            COMECE AGORA MESMO
+          </span>
+          <h2 class="font-display text-3xl sm:text-5xl font-black uppercase text-white tracking-tight leading-tight">
+            Pronto Para Fazer Parte da Turma <span class="text-cyan-400">ON</span>?
+          </h2>
+          <p class="text-slate-300 text-sm sm:text-base mt-2 max-w-2xl">
+            Ative seu teste gratuito de 7 dias ou fale diretamente com o Assistente no WhatsApp. Envie áudios, tire dúvidas e descubra o que a inteligência artificial pode fazer pelo seu estilo de vida.
+          </p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center gap-4 shrink-0 w-full sm:w-auto">
+          <a href="https://wa.me/5511966619866?text=Olá!%20Quero%20conhecer%20a%20plataforma%20ON" target="_blank" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 font-black uppercase tracking-wider text-black bg-cyan-400 hover:bg-cyan-300 rounded-2xl shadow-xl shadow-cyan-400/30 active:scale-95 transition text-sm">
+            <i data-lucide="message-circle" class="w-5 h-5"></i>
+            <span>Iniciar no WhatsApp</span>
+          </a>
+          <a href="/" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 font-bold text-slate-300 hover:text-white bg-[#151c2e] hover:bg-[#1f2942] border border-purple-500/40 rounded-2xl transition text-sm">
+            <span>Acessar Painel Web</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL DE LEITURA COMPLETA DO ARTIGO (ESTILO PAPEL RASGADO & EDITORIAL) -->
+  <div id="articleModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 transition-all duration-300">
+    <div class="relative w-full max-w-3xl my-8 torn-paper-card rounded-2xl torn-bottom p-6 sm:p-10 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      
+      <!-- Masking Tape Header -->
+      <div class="masking-tape -top-3.5 left-1/2 -translate-x-1/2 -rotate-1"></div>
+
+      <!-- Close Button -->
+      <button onclick="closeArticleModal()" class="absolute top-5 right-5 w-9 h-9 rounded-full bg-slate-200 hover:bg-slate-300 text-slate-700 flex items-center justify-center transition shadow-sm">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <!-- Modal Article Header -->
+      <div class="pr-10">
+        <div id="modalBadgeContainer" class="flex items-center gap-2 mb-3"></div>
+        <h2 id="modalArticleTitle" class="font-display text-3xl sm:text-5xl font-extrabold uppercase text-slate-900 leading-[1.05] tracking-tight"></h2>
+        <p id="modalArticleSubtitle" class="text-xs sm:text-sm font-bold text-purple-700 uppercase tracking-wider mt-2"></p>
+      </div>
+
+      <!-- Article Body with Rich Content -->
+      <div id="modalArticleBody" class="mt-6 text-slate-700 text-sm sm:text-base leading-relaxed space-y-4 border-t border-slate-200 pt-6"></div>
+
+      <!-- Modal Footer -->
+      <div class="mt-8 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-2 text-xs text-slate-500 font-semibold">
+          <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+          <span>Artigo Oficial da Plataforma ON</span>
+        </div>
+
+        <div class="flex items-center gap-3 w-full sm:w-auto">
+          <button onclick="closeArticleModal()" class="flex-1 sm:flex-none px-5 py-2.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
+            Fechar
+          </button>
+          <a id="modalCtaBtn" href="https://wa.me/5511966619866" target="_blank" class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-2.5 text-xs font-extrabold text-black bg-cyan-400 hover:bg-cyan-300 rounded-xl shadow-md transition">
+            <i data-lucide="message-circle" class="w-4 h-4"></i>
+            <span>Testar no Zap</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT: DATA & INTERACTIVITY -->
+  <script>
+    // Artigos completos para o Modal Editorial
+    const articlesData = {
+      revolucao: {
+        badge: '<span class="px-2.5 py-0.5 text-xs font-black uppercase bg-cyan-400 text-black rounded rotate-[-2deg]">ON: REVOLUÇÃO</span><span class="stamp-badge text-[11px] text-purple-700">PESQUISA INTELIGENTE</span>',
+        title: 'A Revolução na Forma de Pesquisar Lugares para se Divertir',
+        subtitle: 'Como a IA e a curadoria personalizada acabaram com o dilema do "Para onde vamos hoje?"',
+        content: `
+          <p class="font-semibold text-slate-900 text-lg">
+            Todo final de semana a mesma história se repete: você e seus amigos ou parceiro(a) querem sair, mas ninguém sabe para onde ir.
+          </p>
+          <p>
+            O processo tradicional é cansativo:
+          </p>
+          <ul class="list-disc pl-5 space-y-2 text-slate-800">
+            <li><b>O Instagram</b> mostra lugares lindos, mas não revela os preços reais, se a fila está quilométrica ou se precisa de reserva com 2 semanas de antecedência.</li>
+            <li><b>O Google Maps</b> tem avaliações genéricas de turistas ou de anos atrás que já não representam a vibe atual do lugar.</li>
+            <li><b>O medo do bolso:</b> você sai de casa sem saber se aquele jantar vai custar R$ 80 ou R$ 300, gerando ansiedade ao receber a conta.</li>
+          </ul>
+
+          <div class="my-5 p-5 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-2xl">
+            <h4 class="font-display text-2xl font-black text-purple-900 uppercase">A Virada de Chave da Plataforma ON</h4>
+            <p class="text-sm text-purple-950 mt-1">
+              Nossa Inteligência Artificial não é um buscador frio. Ela conhece o seu <b>estilo de vida</b>, sua <b>disponibilidade na agenda</b> e, fundamentalmente, <b>quanto você tem reservado para lazer</b> naquela semana.
+            </p>
+          </div>
+
+          <p>
+            Ao mandar uma simples mensagem de voz: <i>"Zap, me recomenda um barzinho com música boa e chopp artesanal na Vila Madalena para hoje à noite até 100 reais"</i>, o assistente:
+          </p>
+          <ol class="list-decimal pl-5 space-y-2 text-slate-800">
+            <li>Cruza as melhores opções curadas com a vibe solicitada;</li>
+            <li>Informa o ticket médio real e se há promoções ou happy hour no dia;</li>
+            <li>Já sugere agendar na sua agenda pessoal e cria os lembretes para você não se atrasar!</li>
+          </ol>
+
+          <p class="font-bold text-slate-900 pt-2">
+            Isso é ter um concierge e produtor de eventos de bolso 24 horas por dia, direto no seu WhatsApp!
+          </p>
+        `
+      },
+
+      plataforma: {
+        badge: '<span class="px-2.5 py-0.5 text-xs font-black uppercase bg-fuchsia-500 text-white rounded rotate-[1deg]">ON: TEMA & VISÃO</span><span class="stamp-badge text-[11px] text-cyan-700">SEM APLICATIVOS PESADOS</span>',
+        title: 'O Tema da Plataforma: Inteligência Sem Atrito no Seu Dia a Dia',
+        subtitle: 'Tecnologia invisível que trabalha para você onde você já passa a maior parte do seu dia: o WhatsApp.',
+        content: `
+          <p class="font-semibold text-slate-900 text-lg">
+            Ninguém mais tem paciência para baixar aplicativos que ocupam memória, exigem login com senha que você sempre esquece e cobram assinaturas sem entregar praticidade real.
+          </p>
+          <p>
+            O grande propósito da <b>Plataforma ON</b> é a eliminação total de atrito:
+          </p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-4">
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <h5 class="font-bold text-slate-900 text-base">🎙️ Áudio Natural</h5>
+              <p class="text-xs text-slate-600 mt-1">Fale como se estivesse conversando com um amigo no WhatsApp. O assistente entende gírias, valores falados ("50 conto no almoço") e categoriza tudo.</p>
+            </div>
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <h5 class="font-bold text-slate-900 text-base">📸 Visão Computacional</h5>
+              <p class="text-xs text-slate-600 mt-1">Fotografe uma nota fiscal, comprovante de Pix ou PDF de boleto. A IA extrai o valor, a data de vencimento e o estabelecimento na hora.</p>
+            </div>
+          </div>
+          <p>
+            Enquanto o WhatsApp cuida da entrada rápida de dados no seu dia a dia, o <b>Painel Web Exclusivo</b> oferece relatórios vibrantes, gráficos diários, visualização de despesas e calendário completo acessível a qualquer momento com apenas 1 clique ou comando.
+          </p>
+        `
+      },
+
+      beneficios: {
+        badge: '<span class="px-2.5 py-0.5 text-xs font-black uppercase bg-emerald-400 text-slate-950 rounded rotate-[-1deg]">ON: BENEFÍCIOS</span><span class="stamp-badge text-[11px] text-emerald-800">LIBERDADE FINANCEIRA</span>',
+        title: 'Benefícios Reais: O Que Muda na Prática Para os Usuários',
+        subtitle: 'Tranquilidade mental, pontualidade e economia de tempo e dinheiro.',
+        content: `
+          <p class="font-semibold text-slate-900 text-lg">
+            A maioria das pessoas não tem falta de dinheiro; tem falta de visibilidade em tempo real sobre onde o dinheiro está indo.
+          </p>
+          <div class="space-y-4 my-4">
+            <div class="p-4 bg-emerald-50 border-l-4 border-emerald-500 rounded-r-xl">
+              <h5 class="font-bold text-emerald-950 text-base">1. Fim dos Juros por Esquecimento</h5>
+              <p class="text-xs text-emerald-900 mt-1">
+                Você nunca mais vai pagar R$ 15, R$ 30 ou R$ 50 de juros porque esqueceu um boleto que venceu na sexta-feira. O assistente te avisa com antecedência e ajuda você a dar baixa com um simples "Paguei o boleto".
+              </p>
+            </div>
+            <div class="p-4 bg-purple-50 border-l-4 border-purple-500 rounded-r-xl">
+              <h5 class="font-bold text-purple-950 text-base">2. Agenda com Avisos em Cascata</h5>
+              <p class="text-xs text-purple-900 mt-1">
+                Lembretes automáticos 24h antes para você se planejar, 3h antes para se arrumar e 1h antes para sair com folga. Nunca mais chegue atrasado em compromissos importantes.
+              </p>
+            </div>
+            <div class="p-4 bg-cyan-50 border-l-4 border-cyan-500 rounded-r-xl">
+              <h5 class="font-bold text-cyan-950 text-base">3. Decisões Financeiras Sem Culpa</h5>
+              <p class="text-xs text-cyan-900 mt-1">
+                Ao consultar seu saldo disponível para a semana, você sai para jantar ou viajar sabendo que todas as suas contas fixas já estão mapeadas e protegidas.
+              </p>
+            </div>
+          </div>
+        `
+      },
+
+      gastronomia: {
+        badge: '<span class="px-2.5 py-0.5 text-xs font-black uppercase bg-amber-400 text-black rounded rotate-[2deg]">ON: GASTRONOMIA</span><span class="stamp-badge text-[11px] text-amber-700">EXPERIÊNCIAS ÚNICAS</span>',
+        title: 'Bares Secretos, Bistrôs & Rooftops: O Guia Urbano Definitivo',
+        subtitle: 'Uma curadoria refinada de lugares com atmosfera marcante e excelente custo-benefício.',
+        content: `
+          <p class="font-semibold text-slate-900 text-lg">
+            Sair para comer não é apenas saciar a fome; é viver uma experiência que renova a semana.
+          </p>
+          <div class="space-y-4 my-5">
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <div class="flex items-center justify-between">
+                <h5 class="font-bold text-slate-900">🍸 Rooftops com Vista Panorâmica</h5>
+                <span class="text-xs font-extrabold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">Vibe Sunset</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-1">Ambientes a céu aberto para curtir o fim de tarde com drinks autorais, iluminação intimista e trilha sonora em deep house e bossa moderna.</p>
+            </div>
+
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <div class="flex items-center justify-between">
+                <h5 class="font-bold text-slate-900">🕯️ Bares Speakeasy (Secretos)</h5>
+                <span class="text-xs font-extrabold text-purple-600 bg-purple-50 px-2 py-0.5 rounded">Intimista & Exclusivo</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-1">Entradas camufladas atrás de cabines telefônicas, barbearias ou cozinhas. Coquetelaria clássica de alto padrão e clima cinematográfico.</p>
+            </div>
+
+            <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <div class="flex items-center justify-between">
+                <h5 class="font-bold text-slate-900">🍝 Bistrôs Casuais & Confort Food</h5>
+                <span class="text-xs font-extrabold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">Encontros & Amigos</span>
+              </div>
+              <p class="text-xs text-slate-600 mt-1">Pratos feitos com ingredientes frescos, carta de vinhos descomplicada e mesas compartilhadas para boas conversas sem pressa.</p>
+            </div>
+          </div>
+          <p class="text-slate-800 text-sm">
+            💡 <i>Peça ao Assistente ON no WhatsApp para filtrar restaurantes pelo seu bairro e faixa de preço desejada!</i>
+          </p>
+        `
+      },
+
+      baladas: {
+        badge: '<span class="px-2.5 py-0.5 text-xs font-black uppercase bg-violet-600 text-white rounded rotate-[-2deg]">ON: NIGHTLIFE</span><span class="stamp-badge text-[11px] text-violet-800">SOM & COMUNIDADE</span>',
+        title: 'Música, Pista & Experiências: Qual é o Seu Estilo de Rolê?',
+        subtitle: 'Descubra eventos e noites onde a energia bate perfeitamente com quem você é.',
+        content: `
+          <p class="font-semibold text-slate-900 text-lg">
+            Nada é mais frustrante do que pagar entrada cara em uma festa e descobrir que o público, a música ou a vibe não têm nada a ver com você.
+          </p>
+          <p>
+            A <b>curadoria ON</b> analisa eventos por atmosferas culturais:
+          </p>
+          <ul class="list-disc pl-5 space-y-2 text-slate-800 my-4">
+            <li><b>Underground & Eletrônico:</b> Espaços industriais com sistemas de som de alta precisão, foco no set dos DJs e iluminação cênica imersiva.</li>
+            <li><b>Festas Retrô & Pop:</b> Energia leve, nostalgia dos anos 90/2000, pista animada para dançar sem julgamentos com a turma.</li>
+            <li><b>Shows ao Vivo & Jam Sessions:</b> Espaços com acústica acolhedora onde músicos locais e nacionais improvisam no jazz, blues, samba e MPB.</li>
+          </ul>
+          <div class="p-4 bg-violet-50 border-l-4 border-violet-600 rounded-r-xl text-xs text-violet-950 font-medium">
+            🔥 Mande no WhatsApp: <i>"Zap, o que tem de festa boa rolando no sábado à noite?"</i> e receba a programação atualizada com links de lista VIP!
+          </div>
+        `
+      },
+
+      smartbudget: {
+        badge: '<span class="px-2.5 py-0.5 text-xs font-black uppercase bg-rose-500 text-white rounded rotate-[2deg]">ON: SMART BUDGET</span><span class="stamp-badge text-[11px] text-rose-800">EQUILÍBRIO TOTAL</span>',
+        title: 'Lazer Sem Culpa: Como Curtir Todo Fim de Semana Sem Estourar',
+        subtitle: 'A metodologia do "Envelope de Diversão" gerenciado automaticamente com inteligência artificial.',
+        content: `
+          <p class="font-semibold text-slate-900 text-lg">
+            Muitas consultorias financeiras antigas pregam cortar o cafezinho e parar de sair aos finais de semana. Nós acreditamos no oposto: <b>o lazer planejado é o que mantém você produtivo e motivado.</b>
+          </p>
+          <p class="my-3">
+            Com o Assistente ON, você aplica o conceito do <b>Smart Budget de Lazer</b>:
+          </p>
+          <ol class="list-decimal pl-5 space-y-3 text-slate-800">
+            <li><b>Proteja seus custos fixos:</b> Aluguel, contas essenciais e investimentos mensais são travados no painel.</li>
+            <li><b>Cálculo do Saldo Livre:</b> O sistema divide o saldo restante em cotas semanais seguras para você gastar com o que ama.</li>
+            <li><b>Registro por voz sem atrito:</b> Ao tomar uma cerveja ou pedir um Uber, mande um áudio de 2 segundos: <i>"35 de uber"</i>. O assistente computa na hora e te avisa: <i>"Ainda restam R$ 140 para o final de semana!"</i>.</li>
+          </ol>
+          <p class="font-bold text-slate-900 pt-2">
+            Resultado: você se diverte sem a sombra da culpa na segunda-feira!
+          </p>
+        `
+      }
+    };
+
+    // Filter Logic
+    let currentFilter = 'all';
+
+    function setFilter(category) {
+      currentFilter = category;
+      
+      // Update Button Styles
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.className = 'filter-btn px-4 py-2 rounded-xl transition duration-200 whitespace-nowrap bg-[#121829] text-slate-300 hover:text-white hover:bg-[#1c243c] border border-slate-800';
+      });
+
+      const activeBtn = document.getElementById(`filterBtn_${category}`);
+      if (activeBtn) {
+        activeBtn.className = 'filter-btn px-4 py-2 rounded-xl transition duration-200 whitespace-nowrap bg-cyan-400 text-black font-extrabold shadow-lg shadow-cyan-400/20 active:scale-95';
+      }
+
+      filterArticles();
+    }
+
+    function filterArticles() {
+      const searchTerm = (document.getElementById('searchShowcaseInput')?.value || '').toLowerCase().trim();
+      const articles = document.querySelectorAll('.article-item');
+      let visibleCount = 0;
+
+      articles.forEach(article => {
+        const cat = article.getAttribute('data-category');
+        const text = article.innerText.toLowerCase();
+
+        const matchesCat = (currentFilter === 'all' || cat === currentFilter);
+        const matchesSearch = (!searchTerm || text.includes(searchTerm));
+
+        if (matchesCat && matchesSearch) {
+          article.classList.remove('hidden');
+          visibleCount++;
+        } else {
+          article.classList.add('hidden');
+        }
+      });
+
+      // Update counter and empty state
+      const countEl = document.getElementById('activeCountText');
+      if (countEl) {
+        countEl.innerText = `${visibleCount} ${visibleCount === 1 ? 'artigo' : 'artigos & guias'}`;
+      }
+
+      const emptyBox = document.getElementById('noResultsBox');
+      if (emptyBox) {
+        if (visibleCount === 0) {
+          emptyBox.classList.remove('hidden');
+        } else {
+          emptyBox.classList.add('hidden');
+        }
+      }
+    }
+
+    function clearSearch() {
+      const input = document.getElementById('searchShowcaseInput');
+      if (input) input.value = '';
+      setFilter('all');
+    }
+
+    // Modal Article Reader
+    function openArticleModal(id) {
+      const data = articlesData[id];
+      if (!data) return;
+
+      document.getElementById('modalBadgeContainer').innerHTML = data.badge;
+      document.getElementById('modalArticleTitle').innerText = data.title;
+      document.getElementById('modalArticleSubtitle').innerText = data.subtitle;
+      document.getElementById('modalArticleBody').innerHTML = data.content;
+
+      const modal = document.getElementById('articleModal');
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+      lucide.createIcons();
+    }
+
+    function closeArticleModal() {
+      const modal = document.getElementById('articleModal');
+      modal.classList.add('hidden');
+      document.body.style.overflow = 'auto';
+    }
+
+    // Close on Escape or click outside
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeArticleModal();
+    });
+
+    document.getElementById('articleModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'articleModal') closeArticleModal();
+    });
+
+    // Initialize Lucide Icons
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+    });
+  </script>
+
+</body>
+</html>

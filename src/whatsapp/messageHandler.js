@@ -1,0 +1,1656 @@
+const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+const fs = require('fs');
+const path = require('path');
+const aiService = require('../services/aiService');
+const financeService = require('../services/financeService');
+const calendarService = require('../services/calendarService');
+const billService = require('../services/billService');
+const userService = require('../services/userService');
+const appointmentService = require('../services/appointmentService');
+const pixService = require('../services/pixService');
+const dailyBroadcastService = require('../services/dailyBroadcastService');
+const config = require('../config');
+
+// Helper to clean JID to plain phone number (with LID reverse mapping resolution)
+function getCleanNumber(jid) {
+  if (!jid) return '';
+  const clean = jid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+  if (jid.includes('@lid')) {
+    try {
+      const mappingPath = path.resolve(config.authDir, `lid-mapping-${clean}_reverse.json`);
+      if (fs.existsSync(mappingPath)) {
+        const raw = fs.readFileSync(mappingPath, 'utf8');
+        const phone = JSON.parse(raw);
+        if (phone) return String(phone).replace(/[^0-9]/g, '');
+      }
+    } catch (e) {}
+  }
+  return clean;
+}
+
+function isAdminInviteRequest(text) {
+  if (!text) return false;
+  const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  
+  // Exact single words
+  if (/^(codigo|convite|token|novo convite|gerar codigo|novo codigo)$/i.test(norm)) return true;
+  
+  // Natural requests for codes/invites
+  if (/(gerar|gera|cria|criar|manda|mandar|passa|passar|preciso|novo|mais|outro|solicitar|quero|me da|da)\s+.*(codigo|convite|acesso)/i.test(norm)) {
+    return true;
+  }
+  if (/codigo\s+(de\s+)?(ativacao|convite|acesso|teste|cliente)/i.test(norm)) {
+    return true;
+  }
+  if (/(novo|novos)\s+clientes?/i.test(norm)) {
+    return true;
+  }
+  return false;
+}
+
+function parseExpenseDelete(text) {
+  if (!text) return null;
+  const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  // Pattern A: apagar último gasto, cancela o último, tira o anterior
+  if (/^(apaga|apagar|apague|cancela|cancelar|cancele|tira|tirar|tire|remove|remover|remova|exclui|excluir|exclua|deleta|deletar)\s+(o\s+)?(ultimo|anterior|recente)\s*(gasto|registro|despesa)?$/i.test(norm)) {
+    return { target: 'last' };
+  }
+
+  const deleteVerbs = '(?:tira|tirar|tire|apaga|apagar|apague|remove|remover|remova|exclui|excluir|exclua|cancela|cancelar|cancele|deleta|deletar)';
+
+  // Pattern B: Verb + amount + [de/do/da] + description: 'tira os 6 do gato', 'apaga 13 da padaria', 'remove 4 do cafe'
+  const m1 = norm.match(new RegExp('^' + deleteVerbs + '\\s+(?:o|os|a|as|do|da)?\\s*(?:gasto|despesa|valor)?\\s*(?:de\\s+)?(?:r\\$\\s*)?(\\d+(?:[.,]\\d+)?)\\s*(?:reais)?\\s*(?:d[oe]s?|referente\\s+a[os]?|da|de)?\\s*(.+)$', 'i'));
+  if (m1) {
+    const val = parseFloat(m1[1].replace(',', '.'));
+    const desc = m1[2].replace(/^(reais|real)\s*/, '').trim();
+    return { target: 'specific', amount: val, description: desc || null };
+  }
+
+  // Pattern C: Verb + description + [de] + amount: 'tira o gato de 6', 'apaga o cafe de 4 reais'
+  const m2 = norm.match(new RegExp('^' + deleteVerbs + '\\s+(?:o|os|a|as|do|da)?\\s*(?:gasto|despesa)?\\s*(.+?)\\s+(?:de\\s+)?(?:r\\$\\s*)?(\\d+(?:[.,]\\d+)?)\\s*(?:reais)?$', 'i'));
+  if (m2) {
+    const desc = m2[1].trim();
+    const val = parseFloat(m2[2].replace(',', '.'));
+    return { target: 'specific', amount: val, description: desc || null };
+  }
+
+  // Pattern D: Verb + amount only: 'tira os 6', 'apaga os 13 reais', 'remove 4,00'
+  const m3 = norm.match(new RegExp('^' + deleteVerbs + '\\s+(?:o|os|a|as|do|da)?\\s*(?:gasto|despesa|valor)?\\s*(?:de\\s+)?(?:r\\$\\s*)?(\\d+(?:[.,]\\d+)?)\\s*(?:reais)?$', 'i'));
+  if (m3) {
+    const val = parseFloat(m3[1].replace(',', '.'));
+    return { target: 'specific', amount: val, description: null };
+  }
+
+  // Pattern E: Verb + description only: 'tira a padaria', 'apaga o cafe', 'cancela o sache de gato'
+  const m4 = norm.match(new RegExp('^' + deleteVerbs + '\\s+(?:o|os|a|as|do|da)?\\s*(?:gasto|despesa)?\\s*(?:d[oe]s?|da|de)?\\s*(.+)$', 'i'));
+  if (m4) {
+    const desc = m4[1].trim();
+    if (desc && desc.length >= 2 && !['isso', 'tudo', 'aqui'].includes(desc)) {
+      return { target: 'specific', amount: null, description: desc };
+    }
+  }
+
+  return null;
+}
+
+function parseExpenseCorrection(text, quotedText = null) {
+  if (!text) return null;
+  const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  // Pattern A: "o valor dito no audio era 50,00 e nao 150,00", "era 50 e nao 150", "o valor era 50 e nao 150"
+  const m1 = norm.match(/(?:o\s+)?(?:valor\s+)?(?:dito\s+)?(?:no\s+audio\s+)?(?:era|e|foi)\s+(?:r\$\s*)?(\d+(?:[.,]\d+)?)\s*(?:reais)?\s+e\s+nao\s+(?:r\$\s*)?(\d+(?:[.,]\d+)?)/i);
+  if (m1) {
+    const newAmt = parseFloat(m1[1].replace(',', '.'));
+    const oldAmt = parseFloat(m1[2].replace(',', '.'));
+    return { newAmount: newAmt, oldAmount: oldAmt };
+  }
+
+  // Pattern B: "corrige para 50 reais", "muda o valor para 50", "troca para 50", "errei o valor, foi 50"
+  const m2 = norm.match(/(?:corrige|corrigir|muda|mudar|troca|trocar|altera|alterar)\s+(?:o\s+)?(?:valor\s+)?(?:para|pra)\s+(?:r\$\s*)?(\d+(?:[.,]\d+)?)/i);
+  if (m2) {
+    const newAmt = parseFloat(m2[1].replace(',', '.'));
+    return { newAmount: newAmt };
+  }
+
+  // Pattern C: If replying/quoting a "Gasto Registrado com Sucesso!" message
+  if (quotedText && (/gasto registrado/i.test(quotedText) || /valor:\s*r\$/i.test(quotedText))) {
+    const m3 = norm.match(/(?:nao\s*,?\s*)?(?:o\s+valor\s+)?(?:era|foi|sao|e)?\s*(?:de\s+)?(?:r\$\s*)?(\d+(?:[.,]\d+)?)\s*(?:reais)?/i);
+    if (m3) {
+      const newAmt = parseFloat(m3[1].replace(',', '.'));
+      return { newAmount: newAmt };
+    }
+  }
+
+  return null;
+}
+
+async function sendAdminInviteCode(sock, targetJid, userId) {
+  const invite = userService.createInviteCode({ createdBy: userId, trialDays: 7 });
+  const botPhone = sock.user?.id ? getCleanNumber(sock.user.id) : '5511966619866';
+  const botFormatted = '+55 (11) 96661-9866';
+  const botLink = `https://wa.me/${botPhone}?text=${encodeURIComponent(invite.code)}`;
+
+  // Mensagem 1: Pronta para encaminhar diretamente para o cliente com link wa.me
+  await sock.sendMessage(targetJid, {
+    text: `Olá! Aqui está o seu acesso exclusivo ao Assistente Pessoal com Inteligência Artificial 🚀\n\n` +
+          `👉 *Toque no link abaixo para começar* (o código já vai preenchido, é só apertar enviar):\n${botLink}\n\n` +
+          `📱 *WhatsApp do Assistente*: ${botFormatted}\n` +
+          `🎟️ *Código de Ativação*: *${invite.code}* (7 dias grátis)`,
+  });
+
+  // Mensagem 2: Apenas o código solto (para copiar com 1 toque)
+  await sock.sendMessage(targetJid, {
+    text: `${invite.code}`,
+  });
+}
+
+const pendingDisambiguations = new Map();
+
+async function tryResolveDisambiguation(senderCleanNumber, inputText, sock, targetJid) {
+  if (!pendingDisambiguations.has(senderCleanNumber) || !inputText) {
+    return false;
+  }
+
+  const pending = pendingDisambiguations.get(senderCleanNumber);
+  const lowerText = inputText.trim().toLowerCase();
+
+  // Option: As duas / todas / ambas
+  if (
+    lowerText.includes('as duas') ||
+    lowerText.includes('as 2') ||
+    lowerText.includes('ambas') ||
+    lowerText.includes('todas') ||
+    lowerText.includes('os dois') ||
+    lowerText.includes('todos') ||
+    lowerText.includes('tudo') ||
+    lowerText.includes('paguei as duas') ||
+    lowerText.includes('paguei as 2') ||
+    lowerText.includes('baixa nas duas') ||
+    lowerText.includes('as duas atrasadas')
+  ) {
+    const paidResults = billService.markMultipleAsPaid(pending.bills.map((b) => b.id), pending.userId);
+    const totalPaid = paidResults.reduce((acc, r) => acc + r.bill.amount, 0);
+    pendingDisambiguations.delete(senderCleanNumber);
+
+    await sock.sendMessage(targetJid, {
+      text: `✅ *Pagamentos Baixados com Sucesso!*\n\n` +
+            `Marquei *todas as ${paidResults.length} contas* como pagas (Total: *${financeService.formatCurrency(totalPaid)}*).\n` +
+            `🎉 Os valores já foram adicionados aos seus gastos e atualizados no Dashboard!`,
+    });
+    return true;
+  }
+
+  // Option: A mais antiga / mais atrasada / 1
+  if (
+    lowerText.includes('mais antiga') ||
+    lowerText.includes('antiga') ||
+    lowerText.includes('mais atrasada') ||
+    lowerText.includes('atrasada') ||
+    lowerText.includes('primeira') ||
+    lowerText === '1' ||
+    lowerText === 'a 1' ||
+    lowerText === 'opcao 1' ||
+    lowerText === 'opção 1' ||
+    lowerText.includes('so a antiga') ||
+    lowerText.includes('só a antiga') ||
+    lowerText.includes('so a mais antiga') ||
+    lowerText.includes('só a mais antiga') ||
+    lowerText.includes('apenas a mais antiga') ||
+    lowerText.includes('apenas a antiga')
+  ) {
+    const oldest = pending.bills[0];
+    const result = billService.markAsPaid(oldest.id, pending.userId);
+    pendingDisambiguations.delete(senderCleanNumber);
+
+    const [ano, mes, dia] = result.bill.due_date.split('-');
+    await sock.sendMessage(targetJid, {
+      text: `✅ *Pagamento Baixado!*\n\n` +
+            `Marquei como paga a conta mais antiga:\n` +
+            `📝 *${result.bill.title}* - *${financeService.formatCurrency(result.bill.amount)}* (Vencimento: ${dia}/${mes}/${ano}).\n\n` +
+            `📌 As demais contas continuam agendadas como pendentes no seu painel!`,
+    });
+    return true;
+  }
+
+  // Option: A segunda / 2
+  if (
+    lowerText.includes('segunda') ||
+    lowerText.includes('mais nova') ||
+    lowerText.includes('mais recente') ||
+    lowerText === '2' ||
+    lowerText === 'a 2' ||
+    lowerText === 'opcao 2' ||
+    lowerText === 'opção 2'
+  ) {
+    const targetBill = pending.bills[1] || pending.bills[0];
+    const result = billService.markAsPaid(targetBill.id, pending.userId);
+    pendingDisambiguations.delete(senderCleanNumber);
+
+    const [ano, mes, dia] = result.bill.due_date.split('-');
+    await sock.sendMessage(targetJid, {
+      text: `✅ *Pagamento Baixado!*\n\n` +
+            `Marquei como paga a conta:\n` +
+            `📝 *${result.bill.title}* - *${financeService.formatCurrency(result.bill.amount)}* (Vencimento: ${dia}/${mes}/${ano})!\n\n` +
+            `📊 Já sincronizado no histórico de gastos e no Dashboard!`,
+    });
+    return true;
+  }
+
+  // Option: Digitando um número de 1 a N
+  const matchNum = lowerText.match(/^([1-9][0-9]?)$/);
+  if (matchNum) {
+    const idx = parseInt(matchNum[1], 10) - 1;
+    if (idx >= 0 && idx < pending.bills.length) {
+      const selected = pending.bills[idx];
+      const result = billService.markAsPaid(selected.id, pending.userId);
+      pendingDisambiguations.delete(senderCleanNumber);
+
+      const [ano, mes, dia] = result.bill.due_date.split('-');
+      await sock.sendMessage(targetJid, {
+        text: `✅ *Pagamento Baixado!*\n\n` +
+              `Marquei como paga a conta:\n` +
+              `📝 *${result.bill.title}* - *${financeService.formatCurrency(result.bill.amount)}* (Vencimento: ${dia}/${mes}/${ano})!`,
+      });
+      return true;
+    }
+  }
+
+  // Option: Cancelar
+  if (
+    lowerText.includes('nenhuma') ||
+    lowerText.includes('cancela') ||
+    lowerText.includes('esquece') ||
+    lowerText === 'não' ||
+    lowerText === 'nao'
+  ) {
+    pendingDisambiguations.delete(senderCleanNumber);
+    await sock.sendMessage(targetJid, {
+      text: `Tudo bem! Nenhuma conta foi alterada.`,
+    });
+    return true;
+  }
+
+  return false;
+}
+
+function isAuthorized(senderJid) {
+  if (!config.authorizedPhone) {
+    return true; // No restriction set yet
+  }
+  const cleanSender = getCleanNumber(senderJid);
+  if (!cleanSender) return false;
+
+  const authorizedList = config.authorizedPhone
+    .split(',')
+    .map((num) => num.trim().replace(/[^0-9]/g, ''))
+    .filter(Boolean);
+
+  return authorizedList.some((auth) => {
+    if (cleanSender === auth || cleanSender.endsWith(auth) || auth.endsWith(cleanSender)) {
+      return true;
+    }
+    const auth8 = auth.slice(-8);
+    const sender8 = cleanSender.slice(-8);
+    const authDDD = auth.length >= 10 ? auth.slice(-10, -8) : '';
+    const senderDDD = cleanSender.length >= 10 ? cleanSender.slice(-10, -8) : '';
+    if (auth8.length === 8 && auth8 === sender8 && authDDD && authDDD === senderDDD) {
+      return true;
+    }
+    return false;
+  });
+}
+
+async function handleIncomingMessage(sock, msg) {
+  // Ignore status broadcasts or messages without remoteJid
+  if (!msg.message || !msg.key?.remoteJid) return;
+
+  const senderJid = msg.key.remoteJid;
+  const isFromMe = Boolean(msg.key.fromMe);
+
+  // Hard security filter: strictly ignore groups (@g.us), channels (@newsletter), or status broadcast (@broadcast)
+  if (
+    senderJid.endsWith('@g.us') ||
+    senderJid.includes('@newsletter') ||
+    senderJid.includes('@broadcast')
+  ) {
+    return;
+  }
+
+  // Must be either a standard user chat (@s.whatsapp.net) or WhatsApp LID chat (@lid)
+  if (!senderJid.includes('@s.whatsapp.net') && !senderJid.includes('@lid')) {
+    return;
+  }
+
+  // Get my own JID / clean number and sender clean number
+  const myCleanNumber = sock.user?.id ? getCleanNumber(sock.user.id) : '';
+  const senderCleanNumber = getCleanNumber(senderJid);
+
+  console.log(`[WhatsApp Event] Mensagem recebida de: ${senderJid} (clean: ${senderCleanNumber}) | fromMe: ${isFromMe}`);
+
+  // If the message is from me:
+  // ONLY process if it's sent to myself (self-chat / "Conversar com você mesmo")
+  if (isFromMe) {
+    const isSelfChat = myCleanNumber && senderCleanNumber && senderCleanNumber === myCleanNumber;
+    if (!isSelfChat) {
+      // User is chatting with a third party, do not interfere!
+      return;
+    }
+  }
+
+  const effectivePhone = isFromMe ? myCleanNumber : senderCleanNumber;
+  if (!effectivePhone) return;
+
+  // Canonical reply JID
+  const targetJid = effectivePhone
+    ? `${effectivePhone}@s.whatsapp.net`
+    : (senderJid.split(':')[0] + '@s.whatsapp.net');
+
+  // Unwrap ephemeral, viewOnce, or documentWithCaption wrappers if present
+  let messageContent = msg.message;
+  while (
+    messageContent?.ephemeralMessage?.message ||
+    messageContent?.viewOnceMessage?.message ||
+    messageContent?.viewOnceMessageV2?.message ||
+    messageContent?.documentWithCaptionMessage?.message
+  ) {
+    messageContent =
+      messageContent.ephemeralMessage?.message ||
+      messageContent.viewOnceMessage?.message ||
+      messageContent.viewOnceMessageV2?.message ||
+      messageContent.documentWithCaptionMessage?.message;
+  }
+  let text = '';
+  let audioBuffer = null;
+  let imageBuffer = null;
+  let documentBuffer = null;
+  let fileName = '';
+  let mimeType = '';
+  let caption = '';
+
+  let quotedText = '';
+  if (messageContent.conversation) {
+    text = messageContent.conversation;
+  } else if (messageContent.extendedTextMessage?.text) {
+    text = messageContent.extendedTextMessage.text;
+    const contextInfo = messageContent.extendedTextMessage.contextInfo;
+    if (contextInfo?.quotedMessage) {
+      const qm = contextInfo.quotedMessage;
+      quotedText = qm.conversation || qm.extendedTextMessage?.text || '';
+    }
+  } else if (messageContent.audioMessage) {
+    mimeType = messageContent.audioMessage.mimetype || 'audio/ogg; codecs=opus';
+    try {
+      audioBuffer = await downloadMediaMessage(msg, 'buffer', {});
+    } catch (err) {
+      console.error('Erro ao baixar áudio:', err);
+    }
+  } else if (messageContent.imageMessage) {
+    mimeType = messageContent.imageMessage.mimetype || 'image/jpeg';
+    caption = messageContent.imageMessage.caption || '';
+    try {
+      imageBuffer = await downloadMediaMessage(msg, 'buffer', {});
+    } catch (err) {
+      console.error('Erro ao baixar imagem:', err);
+    }
+  } else if (messageContent.documentMessage) {
+    mimeType = messageContent.documentMessage.mimetype || 'application/pdf';
+    caption = messageContent.documentMessage.caption || '';
+    fileName = messageContent.documentMessage.fileName || '';
+    try {
+      documentBuffer = await downloadMediaMessage(msg, 'buffer', {});
+    } catch (err) {
+      console.error('Erro ao baixar documento PDF:', err);
+    }
+  }
+
+  // If no supported content
+  if (!text && !audioBuffer && !imageBuffer && !documentBuffer) {
+    return;
+  }
+
+  // Multi-Tenant Access Gate via Activation / Invite Code
+  let user = userService.getUserByPhone(effectivePhone);
+
+  // CASE 1: UNKNOWN NUMBER (NOT REGISTERED YET)
+  if (!user) {
+    const rawText = text || caption || '';
+    const pendingInvite = userService.findPendingInviteInText(rawText);
+
+    // If sender provided a valid pending invite code
+    if (pendingInvite) {
+      const { user: newUser } = userService.redeemInviteCode({
+        code: pendingInvite.code,
+        phoneNumber: effectivePhone,
+      });
+      user = newUser;
+
+      console.log(`[Acesso Liberado] Número ${effectivePhone} ativou o código ${pendingInvite.code}`);
+
+      // Send Welcome Message to client
+      await sock.sendMessage(targetJid, {
+        text: `🎉 *Acesso Liberado com Sucesso!*\n\n` +
+              `Olá! Seu código de convite *${pendingInvite.code}* foi ativado e seu teste de *${pendingInvite.trial_days || 7} dias grátis* começou agora! 🚀\n\n` +
+              `💡 *Veja como posso te ajudar no dia a dia:*\n\n` +
+              `💰 *Controle de Gastos*: Me mande áudios, textos ou fotos de comprovantes (ex: _"Gastei 45 no almoço"_, _"120 de gasolina no débito"_).\n` +
+              `⏰ *Agenda & Lembretes*: Diga seus compromissos (ex: _"Reunião amanhã às 15h"_) e eu te lembro aqui no WhatsApp 24h, 3h e 1h antes!\n` +
+              `💳 *Contas & Boletos*: Agende pagamentos (ex: _"Conta de luz de 150 vence dia 10"_) e me avise quando pagar.\n` +
+              `📊 *Seu Painel Exclusivo*: Digite a palavra *painel* a qualquer momento para abrir seus relatórios no celular!\n\n` +
+              `_Como posso te ajudar agora? Mande um áudio ou mensagem para começar!_`,
+      });
+
+      // Notify Admin (11 951364159) on WhatsApp
+      const adminJid = '5511951364159@s.whatsapp.net';
+      try {
+        await sock.sendMessage(adminJid, {
+          text: `🔔 *Novo Cliente Ativou o Acesso!*\n\n` +
+                `📱 *WhatsApp*: ${userService.formatPhone(effectivePhone)}\n` +
+                `🎟️ *Código*: *${pendingInvite.code}*\n` +
+                `⏳ *Período*: ${pendingInvite.trial_days || 7} dias de teste grátis iniciados agora.`,
+        });
+      } catch (err) {
+        console.error('Erro ao alertar admin sobre novo cliente:', err);
+      }
+
+      return;
+    }
+
+    // IF NO VALID INVITE CODE -> COMPLETE SILENCE (DO NOT REPLY)
+    console.log(`[Acesso Restrito] Mensagem de número desconhecido (${effectivePhone}) ignorada: nenhum código de ativação informado.`);
+    return;
+  }
+
+  // CASE 2: REGISTERED USER
+  // Subscription / Trial Status Check
+  const activeStatus = userService.isUserActive(user);
+  if (!activeStatus.active) {
+    // If the expired user sent a receipt (photo or document), allow it through to receipt checking!
+    const isSendingReceipt = Boolean(imageBuffer || documentBuffer);
+    if (!isSendingReceipt) {
+      console.log(`[Multi-Tenant Bloqueio] Usuário #${user.id} (${effectivePhone}) inativo/expirado. Enviando dados Pix.`);
+      try {
+        const pixDetails = await pixService.getPixPaymentDetails(user.id);
+        const qrBuffer = await pixService.generatePixQRCodeBuffer({ amount: 29.00, txid: `PRO${user.id}` });
+        await sock.sendMessage(targetJid, {
+          image: qrBuffer,
+          caption: `🔒 *Período de Teste Encerrado*\n\n` +
+                   `Seu teste gratuito de 7 dias chegou ao fim.\n\n` +
+                   `Para continuar aproveitando o Assistente com IA (registro de gastos por áudio/foto, controle de contas e seu painel exclusivo), assine o *Plano PRO* por apenas *R$ 29,00/mês*!\n\n` +
+                   `📱 *Pague via Pix:*\n` +
+                   `Escaneie o QR Code acima no app do seu banco ou use o código Pix Copia e Cola abaixo 👇`,
+        });
+        await sock.sendMessage(targetJid, { text: pixDetails.payload });
+        await sock.sendMessage(targetJid, {
+          text: `💡 *Após o pagamento*, envie o comprovante (foto ou PDF) aqui nesta conversa. Sua conta será reativada imediatamente! 🚀`,
+        });
+      } catch (errPix) {
+        console.error('Erro ao enviar cobrança Pix:', errPix);
+      }
+      return;
+    }
+  }
+
+  console.log(`[WhatsApp Event] Processando mensagem de ${senderJid} (User #${user.id}): ${text ? `"${text}"` : (audioBuffer ? '[ÁUDIO]' : '[IMAGEM]')}`);
+
+  // Pix / Assinatura PRO Trigger (for active or trial users)
+  if (text) {
+    const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    const pixWords = [
+      'pix', 'assinar', 'plano', 'pagar', 'virar pro', 'quero o pro',
+      'renovar', 'assinatura', 'assinar pro', 'plano pro', 'quero assinar',
+      'pagamento', 'pagar pro', 'ativar pro', 'comprar pro', 'comprar',
+      'chave pix', 'dados pix', 'qrcode pix', 'qr code pix', 'pix copia e cola'
+    ];
+    if (pixWords.includes(norm) || norm === 'quero assinar o pro' || norm === 'como assinar' || norm === 'qual o pix' || norm === 'me manda o pix') {
+      try {
+        const pixDetails = await pixService.getPixPaymentDetails(user.id);
+        const qrBuffer = await pixService.generatePixQRCodeBuffer({ amount: 29.00, txid: `PRO${user.id}` });
+
+        await sock.sendMessage(targetJid, {
+          image: qrBuffer,
+          caption: `💎 *Plano PRO - Assistente Pessoal com IA*\n\n` +
+                   `Valor: *R$ 29,00 / mês*\n\n` +
+                   `✨ *O que você terá no Plano PRO:*\n` +
+                   `• Acesso contínuo sem limite de tempo\n` +
+                   `• Registro rápido de gastos por áudio, fotos e PDFs\n` +
+                   `• Gestão completa de contas a pagar e parcelas\n` +
+                   `• Lembretes automáticos no WhatsApp\n` +
+                   `• Painel web completo e seguro no celular\n\n` +
+                   `📱 Escaneie o QR Code acima no app do seu banco ou use o código Pix Copia e Cola enviado a seguir 👇`,
+        });
+
+        await sock.sendMessage(targetJid, { text: pixDetails.payload });
+
+        await sock.sendMessage(targetJid, {
+          text: `💡 *Após o pagamento*, envie o comprovante (foto ou PDF) aqui nesta conversa. Sua conta será ativada instantaneamente no Plano PRO! 🚀`,
+        });
+        return;
+      } catch (errPix) {
+        console.error('Erro ao enviar dados Pix:', errPix);
+      }
+    }
+  }
+
+  // Admin Commands (Only for Admin 5511951364159)
+  if (user.role === 'ADMIN' && text) {
+    const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+    // 1. Generate Invite Code via WhatsApp ("gerar um codigo", "me gera um codigo", "criar convite", etc.)
+    if (isAdminInviteRequest(text)) {
+      await sendAdminInviteCode(sock, targetJid, user.id);
+      return;
+    }
+
+    // 2. Who is Admin / Confirmation of Admin Role
+    if (/(quem\s+(e|sou)\s+(o\s+)?admin|sou\s+(o\s+)?admin|lembr(e|ar).*admin)/i.test(norm)) {
+      await sock.sendMessage(targetJid, {
+        text: `👑 *Você é o único Administrador e Dono do Assistente!*\n\n` +
+              `Seu número (${userService.formatPhone(effectivePhone)}) possui permissão mestre total para:\n` +
+              `• 🎟️ Gerar novos códigos de convite para clientes (basta enviar _"gerar um código"_)\n` +
+              `• 🌅 Mensagens Matinais às 9h: Seg-Sex (Motivacional) e Sáb-Dom (Leveza/Descanso). Teste com _"testar motivacional"_ ou _"testar fim de semana"_!\n` +
+              `• 📊 Ver métricas de faturamento e clientes no Painel SaaS\n` +
+              `• 💰 Registrar gastos pessoais por áudio/foto e gerenciar sua agenda com IA.`,
+      });
+      return;
+    }
+
+    // 3. SaaS Business Metrics Query via WhatsApp
+    if (/(quantos\s+clientes|metricas\s+saas|faturamento\s+saas|quantos\s+assinantes|relatorio\s+de\s+clientes)/i.test(norm)) {
+      const allUsers = userService.getAllUsers();
+      const allInvites = userService.getAllInvites();
+      const proUsers = allUsers.filter(u => u.plan === 'PRO').length;
+      const trialUsers = allUsers.filter(u => u.plan === 'FREE_TRIAL').length;
+      const pendingInvites = allInvites.filter(i => i.status === 'PENDING').length;
+      const mrr = proUsers * 29.00;
+
+      await sock.sendMessage(targetJid, {
+        text: `👑 *Visão Geral SaaS do Administrador:*\n\n` +
+              `👥 *Total de Clientes*: ${allUsers.length}\n` +
+              `💎 *Assinantes PRO*: ${proUsers} (Faturamento: ${financeService.formatCurrency(mrr)}/mês)\n` +
+              `⏳ *Em Teste Grátis (7d)*: ${trialUsers}\n` +
+              `🎟️ *Convites Pendentes*: ${pendingInvites}\n\n` +
+              `_Para gerar um novo convite, basta enviar: "gerar um código"!_`,
+      });
+      return;
+    }
+
+    // 4. Reset Test Users (clean non-admin users so they can test code flow again)
+    if (['resetar testes', 'limpar testes', 'limpar clientes teste'].includes(norm)) {
+      const all = userService.getAllUsers().filter((u) => u.id !== 1);
+      for (const u of all) {
+        userService.deleteUser(u.id);
+      }
+      await sock.sendMessage(targetJid, {
+        text: `🧹 *Ambiente de Testes Limpo!*\n\n${all.length} usuário(s) de teste foram removidos da base.\nAgora, qualquer mensagem enviada por números não-admin será ignorada até que enviem um código de convite válido!`,
+      });
+      return;
+    }
+
+    // 5. Preview Weekday Motivational Message ("testar motivacional", "ver motivacional", "exemplo motivacional")
+    if (/(testar|ver|exemplo|como e|mostrar).*(motivacional|frase motivacional)/i.test(norm) || norm === 'motivacional') {
+      const preview = await dailyBroadcastService.getPreviewMessage({ user, type: 'weekday', dayOfWeek: 1 });
+      await sock.sendMessage(targetJid, {
+        text: `📢 *Prévia da Mensagem Motivacional (Segunda a Sexta às 9h):*\n\n` +
+              `_Esta é uma prévia de como os usuários ativos receberão a mensagem matinal nos dias úteis:_\n\n` +
+              preview,
+      });
+      return;
+    }
+
+    // 6. Preview Weekend Message ("testar fim de semana", "ver fim de semana", "exemplo fim de semana")
+    if (/(testar|ver|exemplo|como e|mostrar).*(fim de semana|final de semana|sabado|domingo)/i.test(norm) || norm === 'fim de semana') {
+      const preview = await dailyBroadcastService.getPreviewMessage({ user, type: 'weekend', dayOfWeek: 6 });
+      await sock.sendMessage(targetJid, {
+        text: `📢 *Prévia da Mensagem de Fim de Semana (Sábado e Domingo às 9h):*\n\n` +
+              `_Esta é uma prévia da mensagem mais leve e acolhedora de fim de semana:_\n\n` +
+              preview,
+      });
+      return;
+    }
+
+    // 7. Force Send Daily Broadcast Now to All Active Users ("disparar motivacional agora", "enviar mensagem diaria agora")
+    if (/(disparar|enviar).*(mensagem diaria|motivacional agora|broadcast agora)/i.test(norm)) {
+      const sendWhatsApp = async (jid, txt) => {
+        await sock.sendMessage(jid, { text: txt });
+      };
+      await sock.sendMessage(targetJid, {
+        text: `⏳ *Disparando mensagem diária para todos os clientes ativos agora...*`,
+      });
+      const result = await dailyBroadcastService.forceSendDailyBroadcast(sendWhatsApp);
+      const successCount = result.results.filter((r) => r.success).length;
+      await sock.sendMessage(targetJid, {
+        text: `✅ *Disparo Concluído com Sucesso!*\n\n` +
+              `📊 *Tipo de Mensagem*: ${result.messageType === 'WEEKEND_LIGHT' ? '🌿 Fim de Semana (Leve)' : '☀️ Dia Útil (Motivacional)'}\n` +
+              `👥 *Destinatários Ativos*: ${result.total}\n` +
+              `🚀 *Enviados com Sucesso*: ${successCount}/${result.total}\n\n` +
+              `_Todos os dias às 9h da manhã o disparo ocorre de forma 100% automática!_`,
+      });
+      return;
+    }
+  }
+
+  // Instant Magic Link Trigger: "painel", "dashboard", "link", "acesso"
+  if (text) {
+    const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    if (['painel', 'dashboard', 'link', 'acesso', 'meu painel', 'entrar', 'ver painel', 'link do painel', 'link do dashboard'].includes(norm)) {
+      const baseUrl = config.baseUrl || 'https://assistente-zap-bot.cla6w1.easypanel.host';
+      const magic = userService.generateMagicToken(user.id, baseUrl);
+
+      await sock.sendMessage(targetJid, {
+        text: `📊 *Seu Link de Acesso Exclusivo ao Painel:*\n\n` +
+              `👉 ${magic.url}\n\n` +
+              `🔒 *Acesso 100% Seguro & Direto* (sem precisar de senha!).\n` +
+              `_Este link é exclusivo para o seu número (${user.phone_number}) e tem acesso permanente! Salve nos seus favoritos._`,
+      });
+      return;
+    }
+  }
+
+  // Check if user is answering a pending disambiguation question (text reply)
+  if (text && (await tryResolveDisambiguation(effectivePhone, text, sock, targetJid))) {
+    return;
+  }
+
+  // Fast Reminder Silence / Acknowledgment Trigger: "compromisso tal, ok", "dentista ok", "jogo do brasil ok", "compromissos ok"
+  if (text) {
+    const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+    // Direct phrases like "compromisso ok", "compromissos ok", "lembrete ok", "lembretes ok"
+    if (['compromisso ok', 'compromissos ok', 'lembrete ok', 'lembretes ok', 'meus compromissos ok'].includes(norm)) {
+      const upcoming = appointmentService.getUpcomingAppointments(user.id, 5);
+      if (upcoming.length > 0) {
+        for (const apt of upcoming) {
+          appointmentService.silenceAppointment({ userId: user.id, searchTerm: apt.title });
+        }
+        await sock.sendMessage(targetJid, {
+          text: `👍 *Perfeito!* Desativei os alertas dos seus compromissos agendados de hoje. Tenha um excelente dia!`,
+        });
+        return;
+      }
+    }
+
+    // Pattern: "(compromisso [termo], ok)", "([termo] ok)"
+    const matchOk = norm.match(/^(?:o\s+)?(?:compromisso\s+)?(.+?)\s*,?\s*(?:\b(?:ja|ta)\b\s*)*ok$/i);
+    if (matchOk) {
+      const targetTerm = matchOk[1].trim();
+      if (targetTerm && targetTerm.length >= 2 && !['ta', 'ja', 'tudo', 'isso', 'aqui', 'valeu', 'obrigado'].includes(targetTerm)) {
+        // 1. Try silencing appointment reminder
+        const silencedApt = appointmentService.silenceAppointment({ userId: user.id, searchTerm: targetTerm });
+        if (silencedApt) {
+          await sock.sendMessage(targetJid, {
+            text: `👍 *Perfeito!* Desativei os lembretes para o compromisso *"${silencedApt.title}"* de hoje.\nTenha um ótimo compromisso!`,
+          });
+          return;
+        }
+
+        // 2. Try marking bill as paid or silencing bill
+        const billRes = billService.markAsPaidSmart({ userId: user.id, searchTerm: targetTerm });
+        if (billRes && (billRes.status === 'PAID' || billRes.status === 'MULTIPLE_BILLS')) {
+          if (billRes.status === 'PAID') {
+            await sock.sendMessage(targetJid, {
+              text: `✅ *Pagamento Confirmado!*\n\n` +
+                    `Baixei a conta *${billRes.bill.title}* (${financeService.formatCurrency(billRes.bill.amount)}) e parei os alertas para ela!\n` +
+                    `📊 O valor já foi adicionado aos seus gastos realizados.`,
+            });
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  // Fast Deterministic Expense Delete Trigger: "tira os 6 do gato", "apaga a padaria", "cancela o cafe", "apagar ultimo gasto"
+  if (text) {
+    const expenseDeleteReq = parseExpenseDelete(text);
+    if (expenseDeleteReq) {
+      const deleted = financeService.deleteExpense({
+        userId: user.id,
+        amount: expenseDeleteReq.amount,
+        description: expenseDeleteReq.description,
+        target: expenseDeleteReq.target,
+      });
+
+      if (!deleted) {
+        let notFoundMsg = '🔍 Não encontrei nenhum gasto recente correspondente no seu histórico para remover.';
+        if (expenseDeleteReq.description || expenseDeleteReq.amount) {
+          const detail = [
+            expenseDeleteReq.amount ? financeService.formatCurrency(expenseDeleteReq.amount) : '',
+            expenseDeleteReq.description ? `"${expenseDeleteReq.description}"` : '',
+          ].filter(Boolean).join(' de ');
+          notFoundMsg = `🔍 Não encontrei nenhum gasto de *${detail}* no seu histórico para remover.\n\nVocê pode consultar seus gastos dizendo *"Consultar"* ou *"Últimos gastos"*.`;
+        }
+        await sock.sendMessage(targetJid, { text: notFoundMsg });
+      } else {
+        await sock.sendMessage(targetJid, {
+          text: `🗑️ *Gasto Removido com Sucesso!*\n\n` +
+                `Excluí o seguinte registro do seu histórico:\n` +
+                `• *${financeService.formatCurrency(deleted.amount)}* - ${deleted.description} (${deleted.category})\n\n` +
+                `📊 Seus totais e Dashboard já foram atualizados!`,
+        });
+      }
+      return;
+    }
+  }
+
+  // Fast Deterministic Expense Correction Trigger: "o valor era 50 e nao 150", "corrige para 50"
+  if (text) {
+    const expenseCorr = parseExpenseCorrection(text, quotedText);
+    if (expenseCorr) {
+      try {
+        const result = financeService.updateExpense({
+          userId: user.id,
+          oldAmount: expenseCorr.oldAmount,
+          newAmount: expenseCorr.newAmount,
+        });
+
+        const prevAmt = financeService.formatCurrency(result.previous.amount);
+        const newAmt = financeService.formatCurrency(result.updated.amount);
+
+        const responseText = `✏️ *Gasto Corrigido com Sucesso!*\n\n` +
+                             `📝 *Descrição*: ${result.updated.description}\n` +
+                             `💰 *Novo Valor*: *${newAmt}*${result.previous.amount !== result.updated.amount ? ` _(anterior: ${prevAmt})_` : ''}\n` +
+                             `📁 *Categoria*: ${result.updated.category}\n` +
+                             `📅 *Data*: ${financeService.formatDateBR(result.updated.date)}\n\n` +
+                             `📊 _Total corrigido no Dashboard e nos seus relatórios!_`;
+
+        await sock.sendMessage(targetJid, { text: responseText });
+        return;
+      } catch (err) {
+        console.warn('Fast text expense correction error:', err.message);
+      }
+    }
+  }
+
+  // Send typing indicator
+  try {
+    await sock.sendPresenceUpdate('composing', targetJid);
+  } catch (e) {}
+
+  try {
+    // Check if Gemini API Key is configured
+    if (!config.geminiApiKey) {
+      await sock.sendMessage(targetJid, {
+        text: '⚠️ *Chave do Google Gemini não configurada!*\nPor favor, insira sua `GEMINI_API_KEY` no arquivo `.env` para ativar o assistente.',
+      });
+      return;
+    }
+
+    let aiResult = null;
+
+    const userContext = { role: user.role, name: user.name, id: user.id };
+
+    if (documentBuffer) {
+      aiResult = await aiService.processDocumentMessage(documentBuffer, mimeType, fileName, caption || text, userContext, quotedText);
+    } else if (text) {
+      const fullText = quotedText
+        ? `[Contexto da mensagem respondida: "${quotedText}"]\nMensagem do usuário: "${text}"`
+        : text;
+      aiResult = await aiService.processTextMessage(fullText, userContext);
+    } else if (audioBuffer) {
+      aiResult = await aiService.processAudioMessage(audioBuffer, mimeType, userContext, quotedText);
+    } else if (imageBuffer) {
+      aiResult = await aiService.processImageMessage(imageBuffer, mimeType, caption, userContext, quotedText);
+    }
+
+    if (!aiResult) {
+      await sock.sendMessage(targetJid, {
+        text: 'Não consegui compreender a mensagem. Pode tentar novamente por texto ou áudio?',
+      });
+      return;
+    }
+
+    const {
+      intent,
+      expense,
+      expenseQuery,
+      expenseUpdate,
+      calendarEvent,
+      calendarUpdate,
+      calendarDelete,
+      scheduledPayment,
+      updateBill,
+      paymentPaid,
+      transcription,
+      replyMessage,
+    } = aiResult;
+
+    const finalReplyMessage = replyMessage || aiResult.reply_message || aiResult.response || aiResult.reply || null;
+
+    console.log(`[AI Interpretation] Intent: ${intent} | Transcription: "${transcription || ''}"`);
+    console.log('[AI Result Data]:', JSON.stringify(aiResult, null, 2));
+
+    // Admin Audio or AI-classified invite command
+    if (user.role === 'ADMIN' && (intent === 'ADMIN_GENERATE_INVITE' || (transcription && isAdminInviteRequest(transcription)))) {
+      await sendAdminInviteCode(sock, targetJid, user.id);
+      return;
+    }
+
+    // Admin Audio or AI-classified stats command
+    if (user.role === 'ADMIN' && intent === 'ADMIN_STATS') {
+      const allUsers = userService.getAllUsers();
+      const allInvites = userService.getAllInvites();
+      const proUsers = allUsers.filter(u => u.plan === 'PRO').length;
+      const trialUsers = allUsers.filter(u => u.plan === 'FREE_TRIAL').length;
+      const pendingInvites = allInvites.filter(i => i.status === 'PENDING').length;
+      const mrr = proUsers * 29.00;
+
+      await sock.sendMessage(targetJid, {
+        text: `👑 *Visão Geral SaaS do Administrador:*\n\n` +
+              `👥 *Total de Clientes*: ${allUsers.length}\n` +
+              `💎 *Assinantes PRO*: ${proUsers} (Faturamento: ${financeService.formatCurrency(mrr)}/mês)\n` +
+              `⏳ *Em Teste Grátis (7d)*: ${trialUsers}\n` +
+              `🎟️ *Convites Pendentes*: ${pendingInvites}\n\n` +
+              `_Para gerar um novo convite, basta enviar: "gerar um código"!_`,
+      });
+      return;
+    }
+
+    // If user answered via audio during a pending disambiguation
+    if (transcription && (await tryResolveDisambiguation(effectivePhone, transcription, sock, targetJid))) {
+      return;
+    }
+
+    // Fast Audio Expense Correction: "o valor dito no audio era 50 e nao 150", "corrige para 50"
+    if (transcription) {
+      const expenseCorr = parseExpenseCorrection(transcription, quotedText);
+      if (expenseCorr) {
+        try {
+          const result = financeService.updateExpense({
+            userId: user.id,
+            oldAmount: expenseCorr.oldAmount,
+            newAmount: expenseCorr.newAmount,
+          });
+
+          const prevAmt = financeService.formatCurrency(result.previous.amount);
+          const newAmt = financeService.formatCurrency(result.updated.amount);
+
+          const responseText = `✏️ *Gasto Corrigido com Sucesso!*\n\n` +
+                               `📝 *Descrição*: ${result.updated.description}\n` +
+                               `💰 *Novo Valor*: *${newAmt}*${result.previous.amount !== result.updated.amount ? ` _(anterior: ${prevAmt})_` : ''}\n` +
+                               `📁 *Categoria*: ${result.updated.category}\n` +
+                               `📅 *Data*: ${financeService.formatDateBR(result.updated.date)}\n\n` +
+                               `🎙️ _Áudio detectado: "${transcription}"_\n` +
+                               `📊 _Total corrigido no Dashboard e nos seus relatórios!_`;
+
+          await sock.sendMessage(targetJid, { text: responseText });
+          return;
+        } catch (err) {
+          console.warn('Fast audio expense correction error:', err.message);
+        }
+      }
+    }
+
+    const intents = aiResult.intents || (intent ? [intent] : []);
+    const hasExpenseQuery = intents.includes('EXPENSE_QUERY') || Boolean(aiResult.hasExpenseQuery);
+    const hasCalendarQuery = intents.includes('CALENDAR_QUERY') || Boolean(aiResult.hasCalendarQuery);
+
+    const hasBillsQuery = intents.includes('QUERY_SCHEDULED_PAYMENTS') || Boolean(aiResult.hasBillsQuery);
+
+    // ========================================================
+    // COMPOUND QUERY: Both expenses AND calendar or bills queried together
+    // ========================================================
+    if ((hasExpenseQuery && hasCalendarQuery) || (hasExpenseQuery && hasBillsQuery) || (hasCalendarQuery && hasBillsQuery)) {
+      const parts = [];
+
+      // 1. GASTOS NO PERÍODO
+      if (hasExpenseQuery) {
+        const category = expenseQuery?.category || null;
+        const days = expenseQuery?.days || null;
+        const startDate = expenseQuery?.startDate || null;
+        const endDate = expenseQuery?.endDate || null;
+
+        let result;
+        if (days) {
+          result = financeService.queryExpensesLastDays(category, days, user.id);
+        } else {
+          result = financeService.queryExpenses({ userId: user.id, category, startDate, endDate });
+        }
+
+        const categoryName = category ? `de *${financeService.normalizeCategory(category)}* ` : '';
+        const periodName = days ? `nos últimos *${days} dias*` : 'no período consultado';
+
+        if (result.count === 0) {
+          parts.push(`📊 *Gastos Realizados:*\nVocê não teve nenhum gasto registrado ${categoryName}${periodName}.`);
+        } else {
+          let expPart = `📊 *Gastos Realizados (${periodName}):*\nVocê teve um total de *${result.formattedTotal}* ${categoryName}(${result.count} ${result.count === 1 ? 'registro' : 'registros'}).\n\n*Detalhes:*`;
+          const previewRows = result.rows.slice(0, 5);
+          for (const row of previewRows) {
+            expPart += `\n• ${financeService.formatDateBR(row.date).slice(0, 5)}: *${financeService.formatCurrency(row.amount)}* - ${row.description} (${row.category})`;
+          }
+          if (result.count > 5) {
+            expPart += `\n_... e mais ${result.count - 5} transações._`;
+          }
+          parts.push(expPart);
+        }
+      }
+
+      // 2. COMPROMISSOS DA AGENDA
+      if (hasCalendarQuery) {
+        const appointments = appointmentService.getUpcomingAppointments(user.id, 5);
+        let events = [];
+        if (user.role === 'ADMIN' && calendarService.isCalendarConnected()) {
+          try {
+            events = await calendarService.listUpcomingEvents({ maxResults: 5 });
+          } catch (e) {}
+        }
+
+        if (appointments.length === 0 && events.length === 0) {
+          parts.push(`📅 *Seus Compromissos:*\nVocê não tem nenhum compromisso agendado nos próximos dias.`);
+        } else {
+          let calPart = `📅 *Seus Próximos Compromissos:*\n`;
+          for (const apt of appointments) {
+            const startObj = new Date(apt.start_datetime);
+            const dStr = startObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            const tStr = startObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            calPart += `\n• *${apt.title}*\n  🗓️ ${dStr} às ${tStr}${apt.location ? ` (📍 ${apt.location})` : ''}`;
+          }
+          if (user.role === 'ADMIN') {
+            for (const ev of events) {
+              const isAlreadyShown = appointments.some(a => a.title.toLowerCase() === (ev.summary || '').toLowerCase());
+              if (!isAlreadyShown) {
+                const startRaw = ev.start?.dateTime || ev.start?.date;
+                const startObj = new Date(startRaw);
+                const dStr = startObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+                const tStr = startObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                calPart += `\n• *${ev.summary || 'Sem título'}* (Google Calendar)\n  🗓️ ${dStr} às ${tStr}`;
+              }
+            }
+          }
+          parts.push(calPart);
+        }
+      }
+
+      // 3. CONTAS E BOLETOS PENDENTES
+      if (hasBillsQuery) {
+        const pending = billService.getPendingBills(user.id);
+        if (pending.length === 0) {
+          parts.push(`💳 *Contas & Boletos:*\nVocê não tem contas ou boletos pendentes.`);
+        } else {
+          let billPart = `💳 *Contas & Boletos a Pagar:*\n`;
+          for (const b of pending.slice(0, 5)) {
+            const [ano, mes, dia] = b.due_date.split('-');
+            billPart += `\n• *${b.title}*: ${financeService.formatCurrency(b.amount)} (Vence ${dia}/${mes})`;
+          }
+          parts.push(billPart);
+        }
+      }
+
+      const combinedResponse = parts.join('\n\n' + '─'.repeat(25) + '\n\n');
+      await sock.sendMessage(targetJid, { text: combinedResponse });
+      return;
+    }
+
+    // ========================================================
+    // PIX PRO SUBSCRIPTION PAYMENT DETECTION (R$ 29,00)
+    // ========================================================
+    const detectedAmount = Number(expense?.amount || paymentPaid?.amount || scheduledPayment?.totalAmount || 0);
+    const isAround29 = detectedAmount >= 28.5 && detectedAmount <= 29.5;
+    const rawCaption = (caption || text || '').toLowerCase();
+    const rawTranscription = (transcription || '').toLowerCase();
+    const isPixContext =
+      rawCaption.includes('pix') ||
+      rawCaption.includes('pro') ||
+      rawCaption.includes('plano') ||
+      rawCaption.includes('assin') ||
+      rawTranscription.includes('pix') ||
+      rawTranscription.includes('assistente') ||
+      rawTranscription.includes('951364159') ||
+      rawTranscription.includes('transferencia') ||
+      rawTranscription.includes('transferência') ||
+      rawTranscription.includes('comprovante') ||
+      rawTranscription.includes('pagamento');
+
+    if ((imageBuffer || documentBuffer) && isAround29 && (user.plan !== 'PRO' || isPixContext)) {
+      console.log(`[Pix PRO Ativação] Identificado pagamento de R$ 29,00 do usuário #${user.id} (${effectivePhone})`);
+
+      // 1. Upgrade user to PRO in database
+      userService.updateUser(user.id, {
+        plan: 'PRO',
+        trial_ends_at: null,
+      });
+
+      // 2. Also register in expenses so client sees in their dashboard
+      financeService.addExpense({
+        userId: user.id,
+        amount: 29.00,
+        category: 'Moradia / Contas',
+        description: 'Assinatura Assistente Zap PRO',
+        paymentMethod: 'Pix',
+        date: new Date().toISOString(),
+        sourceType: documentBuffer ? 'document' : 'image',
+      });
+
+      // 3. Send celebratory message to customer
+      await sock.sendMessage(targetJid, {
+        text: `🎉 *PARABÉNS! SEU PLANO PRO FOI ATIVADO!* 💎\n\n` +
+              `Confirmamos o seu comprovante Pix no valor de *R$ 29,00* com sucesso!\n\n` +
+              `🚀 *Seu acesso agora é ILIMITADO:*\n` +
+              `• Sem prazo de validade (acesso contínuo)\n` +
+              `• Registros ilimitados por áudio, foto e PDF\n` +
+              `• Controle total de boletos e compras parceladas\n` +
+              `• Lembretes automáticos no WhatsApp\n` +
+              `• Painel Web com relatórios atualizados\n\n` +
+              `Muito obrigado por assinar o Assistente Zap! Estou sempre aqui para te ajudar. Digite *painel* a qualquer momento para ver seus relatórios! 📊`,
+      });
+
+      // 4. Alert Admin (11 951364159)
+      const adminJid = '5511951364159@s.whatsapp.net';
+      try {
+        await sock.sendMessage(adminJid, {
+          text: `💰 *NOVA ASSINATURA PRO CONFIRMADA!*\n\n` +
+                `📱 *Cliente*: ${userService.formatPhone(effectivePhone)} (User #${user.id})\n` +
+                `💵 *Valor*: R$ 29,00 (Pix)\n` +
+                `📄 *Comprovante*: ${documentBuffer ? 'PDF' : 'Imagem'}\n` +
+                `💎 *Status*: Plano PRO ativado automaticamente no banco de dados!`,
+        });
+      } catch (errAdmin) {
+        console.error('Erro ao alertar admin sobre Pix recebido:', errAdmin);
+      }
+
+      return;
+    }
+
+    // If an expired user sent an image/document that was NOT recognized as R$ 29,00 subscription
+    if (!activeStatus.active) {
+      await sock.sendMessage(targetJid, {
+        text: `⚠️ *Comprovante Não Identificado*\n\n` +
+              `Não identificamos um pagamento Pix de *R$ 29,00* neste arquivo.\n` +
+              `Por favor, envie a foto ou PDF legível do comprovante Pix da assinatura, ou digite *assinar* para gerar um novo Pix.`,
+      });
+      return;
+    }
+
+    // 1. REGISTRO DE GASTO
+    if (intent === 'EXPENSE_REGISTER' && expense && expense.amount > 0) {
+      const sourceType = audioBuffer ? 'audio' : imageBuffer ? 'image' : documentBuffer ? 'document' : 'text';
+      const saved = financeService.addExpense({
+        userId: user.id,
+        amount: expense.amount,
+        category: expense.category,
+        description: expense.description,
+        paymentMethod: expense.paymentMethod,
+        date: expense.date,
+        sourceType,
+      });
+
+      let responseText = `✅ *Gasto Registrado com Sucesso!*\n\n` +
+                         `💰 *Valor*: ${financeService.formatCurrency(saved.amount)}\n` +
+                         `📁 *Categoria*: ${saved.category}\n` +
+                         `📝 *Descrição*: ${saved.description}\n` +
+                         `💳 *Pagamento*: ${saved.paymentMethod}\n` +
+                         `📅 *Data*: ${financeService.formatDateBR(saved.date)}`;
+
+      if (transcription) {
+        responseText += `\n\n🔍 _${audioBuffer ? '🎙️ Áudio detectado' : imageBuffer ? '📸 Recibo identificado' : documentBuffer ? '📄 Documento PDF analisado' : 'Mensagem'}: "${transcription}"_`;
+      }
+
+      await sock.sendMessage(targetJid, { text: responseText });
+      return;
+    }
+
+    // 2. CONSULTA DE GASTOS
+    if (intent === 'EXPENSE_QUERY') {
+      const category = expenseQuery?.category || null;
+      const days = expenseQuery?.days || null;
+      const startDate = expenseQuery?.startDate || null;
+      const endDate = expenseQuery?.endDate || null;
+
+      let result;
+      if (days) {
+        result = financeService.queryExpensesLastDays(category, days, user.id);
+      } else {
+        result = financeService.queryExpenses({ userId: user.id, category, startDate, endDate });
+      }
+
+      const categoryName = category ? `de *${financeService.normalizeCategory(category)}* ` : '';
+      const periodName = days ? `nos últimos *${days} dias*` : 'no período consultado';
+
+      if (result.count === 0) {
+        await sock.sendMessage(targetJid, {
+          text: `📊 Você não teve nenhum gasto registrado ${categoryName}${periodName}.`,
+        });
+        return;
+      }
+
+      let responseText = `📊 Você teve um gasto de *${result.formattedTotal}* ${categoryName}${periodName} (${result.count} ${result.count === 1 ? 'registro' : 'registros'}).\n\n*Detalhes recentes:*`;
+
+      const previewRows = result.rows.slice(0, 5);
+      for (const row of previewRows) {
+        responseText += `\n• ${financeService.formatDateBR(row.date).slice(0, 5)}: *${financeService.formatCurrency(row.amount)}* - ${row.description} (${row.category})`;
+      }
+
+      if (result.count > 5) {
+        responseText += `\n_... e mais ${result.count - 5} transações._`;
+      }
+
+      await sock.sendMessage(targetJid, { text: responseText });
+      return;
+    }
+
+    // 3. APAGAR / EXCLUIR GASTO (ÚLTIMO OU ESPECÍFICO)
+    if (intent === 'DELETE_LAST_EXPENSE' || intent === 'EXPENSE_DELETE') {
+      const delData = aiResult.expenseDelete || {};
+      const deleted = financeService.deleteExpense({
+        userId: user.id,
+        amount: delData.amount,
+        description: delData.description,
+        target: intent === 'DELETE_LAST_EXPENSE' ? 'last' : (delData.target || 'specific'),
+      });
+
+      if (!deleted) {
+        let notFoundMsg = '🔍 Não encontrei nenhum gasto correspondente no seu histórico para remover.';
+        if (delData.description || delData.amount) {
+          const detail = [
+            delData.amount ? financeService.formatCurrency(delData.amount) : '',
+            delData.description ? `"${delData.description}"` : '',
+          ].filter(Boolean).join(' de ');
+          notFoundMsg = `🔍 Não encontrei nenhum gasto de *${detail}* no seu histórico para remover.\n\nVocê pode consultar seus gastos dizendo *"Consultar"* ou *"Últimos gastos"*.`;
+        }
+        await sock.sendMessage(targetJid, { text: notFoundMsg });
+      } else {
+        await sock.sendMessage(targetJid, {
+          text: `🗑️ *Gasto Removido com Sucesso!*\n\n` +
+                `Excluí o seguinte registro do seu histórico:\n` +
+                `• *${financeService.formatCurrency(deleted.amount)}* - ${deleted.description} (${deleted.category})\n\n` +
+                `📊 Seus totais e Dashboard já foram atualizados!`,
+        });
+      }
+      return;
+    }
+
+    // 3.1 CORRIGIR / ATUALIZAR GASTO EXISTENTE
+    if (intent === 'EXPENSE_UPDATE') {
+      const updData = expenseUpdate || aiResult.expenseUpdate || {};
+      try {
+        const result = financeService.updateExpense({
+          userId: user.id,
+          searchTerm: updData.searchTerm,
+          oldAmount: updData.oldAmount,
+          newAmount: updData.newAmount,
+          newCategory: updData.newCategory,
+          newDescription: updData.newDescription,
+        });
+
+        const prevAmt = financeService.formatCurrency(result.previous.amount);
+        const newAmt = financeService.formatCurrency(result.updated.amount);
+
+        let responseText = `✏️ *Gasto Corrigido com Sucesso!*\n\n` +
+                           `📝 *Descrição*: ${result.updated.description}\n` +
+                           `💰 *Novo Valor*: *${newAmt}*${result.previous.amount !== result.updated.amount ? ` _(anterior: ${prevAmt})_` : ''}\n` +
+                           `📁 *Categoria*: ${result.updated.category}\n` +
+                           `📅 *Data*: ${financeService.formatDateBR(result.updated.date)}`;
+
+        if (transcription) {
+          responseText += `\n\n🎙️ _Áudio detectado: "${transcription}"_`;
+        }
+
+        responseText += `\n\n📊 _Total corrigido no Dashboard e nos seus relatórios!_`;
+
+        await sock.sendMessage(targetJid, { text: responseText });
+        return;
+      } catch (err) {
+        console.warn('Erro ao atualizar gasto via EXPENSE_UPDATE:', err.message);
+        await sock.sendMessage(targetJid, {
+          text: `⚠️ Não consegui localizar o gasto para corrigir (${err.message}). Você pode consultar seus gastos dizendo *"Últimos gastos"*.`,
+        });
+        return;
+      }
+    }
+
+    // 4. CRIAR COMPROMISSO / EVENTO DE AGENDA
+    if (intent === 'CALENDAR_CREATE' && calendarEvent) {
+      try {
+        // Save in internal SQLite appointments database (100% tenant-isolated)
+        const createdApt = appointmentService.createAppointment({
+          userId: user.id,
+          title: calendarEvent.summary,
+          description: calendarEvent.description,
+          startDateTime: calendarEvent.startDateTime,
+          endDateTime: calendarEvent.endDateTime,
+          location: calendarEvent.location,
+          sourceType: audioBuffer ? 'audio' : 'text',
+        });
+
+        // If User 1 (Admin/Owner) and Google Calendar is connected, also mirror to personal Google Calendar
+        if (user.role === 'ADMIN' && calendarService.isCalendarConnected()) {
+          try {
+            await calendarService.createCalendarEvent(calendarEvent);
+          } catch (calErr) {
+            console.warn('Erro ao espelhar evento no Google Calendar do Admin:', calErr.message);
+          }
+        }
+
+        const start = new Date(calendarEvent.startDateTime);
+        const dateStr = start.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const timeStr = start.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        const responseText = `🗓️ *Compromisso Agendado com Sucesso!*\n\n` +
+                             `📌 *Título*: ${createdApt.title}\n` +
+                             `📅 *Data*: ${dateStr}\n` +
+                             `⏰ *Horário*: ${timeStr}\n` +
+                             `${createdApt.location ? `📍 *Local*: ${createdApt.location}\n` : ''}` +
+                             `\n🔔 *Lembretes Automáticos no WhatsApp Ativados:*\n` +
+                             `• 1 dia antes (24h)\n` +
+                             `• 3 horas antes\n` +
+                             `• 1 hora antes\n\n` +
+                             `_Eu vou te avisar aqui no WhatsApp antes do compromisso começar!_`;
+
+        await sock.sendMessage(targetJid, { text: responseText });
+      } catch (err) {
+        console.error('Erro ao agendar compromisso:', err);
+        await sock.sendMessage(targetJid, {
+          text: `❌ Não consegui agendar este compromisso: ${err.message}`,
+        });
+      }
+      return;
+    }
+
+    // 5. ALTERAR/REMARCAR COMPROMISSO
+    if (intent === 'CALENDAR_UPDATE' && calendarUpdate) {
+      try {
+        const targetApt = appointmentService.findAppointmentToModify(user.id, calendarUpdate.targetSummary);
+
+        let finalStartDateTime = calendarUpdate.newStartDateTime;
+        let finalEndDateTime = calendarUpdate.newEndDateTime;
+
+        if (finalStartDateTime && targetApt?.start_datetime) {
+          const origDate = targetApt.start_datetime.slice(0, 10);
+          const aiDatePart = finalStartDateTime.slice(0, 10);
+          const todayStr = new Date().toISOString().slice(0, 10);
+
+          if (aiDatePart === todayStr && origDate !== todayStr && !transcription?.toLowerCase().includes('hoje')) {
+            finalStartDateTime = `${origDate}T${finalStartDateTime.slice(11)}`;
+            if (finalEndDateTime) {
+              finalEndDateTime = `${origDate}T${finalEndDateTime.slice(11)}`;
+            }
+          }
+        }
+
+        let updatedSummary = calendarUpdate.newSummary;
+        let updatedLoc = calendarUpdate.newLocation;
+
+        if (targetApt) {
+          const updated = appointmentService.updateAppointment(targetApt.id, user.id, {
+            title: calendarUpdate.newSummary,
+            startDateTime: finalStartDateTime,
+            endDateTime: finalEndDateTime,
+            location: calendarUpdate.newLocation,
+          });
+          updatedSummary = updated.title;
+          updatedLoc = updated.location;
+        }
+
+        // If User 1 (Admin/Owner) and Google Calendar is connected, also update in Google Calendar
+        if (user.role === 'ADMIN' && calendarService.isCalendarConnected()) {
+          try {
+            const targetEvent = await calendarService.findEventToModify(calendarUpdate.targetSummary);
+            if (targetEvent) {
+              await calendarService.updateCalendarEvent(targetEvent.id, {
+                summary: calendarUpdate.newSummary,
+                startDateTime: finalStartDateTime,
+                endDateTime: finalEndDateTime,
+                location: calendarUpdate.newLocation,
+              });
+            }
+          } catch (calErr) {
+            console.warn('Erro ao atualizar no Google Calendar do Admin:', calErr.message);
+          }
+        }
+
+        if (!targetApt && (!calendarService.isCalendarConnected() || user.role !== 'ADMIN')) {
+          await sock.sendMessage(targetJid, {
+            text: `🤔 Não encontrei nenhum compromisso agendado correspondente a "${calendarUpdate.targetSummary || 'último compromisso'}".\n\nVocê pode consultar seus compromissos dizendo: "Quais meus compromissos?"`,
+          });
+          return;
+        }
+
+        const newStart = new Date(finalStartDateTime || targetApt?.start_datetime);
+        const dateStr = newStart.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        const timeStr = newStart.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        const responseText = `✏️ *Compromisso Alterado com Sucesso!*\n\n` +
+                             `📌 *Compromisso*: ${updatedSummary || targetApt?.title || 'Compromisso'}\n` +
+                             `📅 *Nova Data*: ${dateStr}\n` +
+                             `⏰ *Novo Horário*: ${timeStr}\n` +
+                             `${updatedLoc ? `📍 *Local*: ${updatedLoc}\n` : ''}` +
+                             `\n🔔 *Lembretes Proativos Atualizados Automaticamente!*`;
+
+        await sock.sendMessage(targetJid, { text: responseText });
+      } catch (err) {
+        console.error('Erro ao atualizar compromisso:', err);
+        await sock.sendMessage(targetJid, {
+          text: `❌ Não consegui alterar o compromisso: ${err.message}`,
+        });
+      }
+      return;
+    }
+
+    // 6. CANCELAR/DESMARCAR COMPROMISSO
+    if (intent === 'CALENDAR_DELETE' && calendarDelete) {
+      try {
+        const targetApt = appointmentService.findAppointmentToModify(user.id, calendarDelete.targetSummary);
+
+        if (targetApt) {
+          appointmentService.deleteAppointment(targetApt.id, user.id);
+        }
+
+        // If User 1 (Admin/Owner) and Google Calendar is connected, also delete in Google Calendar
+        if (user.role === 'ADMIN' && calendarService.isCalendarConnected()) {
+          try {
+            const targetEvent = await calendarService.findEventToModify(calendarDelete.targetSummary);
+            if (targetEvent) {
+              await calendarService.deleteCalendarEvent(targetEvent.id);
+            }
+          } catch (calErr) {
+            console.warn('Erro ao deletar no Google Calendar do Admin:', calErr.message);
+          }
+        }
+
+        if (!targetApt && (!calendarService.isCalendarConnected() || user.role !== 'ADMIN')) {
+          await sock.sendMessage(targetJid, {
+            text: `🤔 Não encontrei nenhum compromisso agendado para cancelar com o termo "${calendarDelete.targetSummary}".`,
+          });
+          return;
+        }
+
+        await sock.sendMessage(targetJid, {
+          text: `🗑️ *Compromisso Desmarcado!*\n\nRemovi dos seus lembretes e da sua agenda:\n📌 *${targetApt ? targetApt.title : calendarDelete.targetSummary}*`,
+        });
+      } catch (err) {
+        console.error('Erro ao desmarcar compromisso:', err);
+        await sock.sendMessage(targetJid, {
+          text: `❌ Não consegui desmarcar o compromisso: ${err.message}`,
+        });
+      }
+      return;
+    }
+
+    // 7. CONSULTAR COMPROMISSOS / AGENDA
+    if (intent === 'CALENDAR_QUERY') {
+      const appointments = appointmentService.getUpcomingAppointments(user.id, 5);
+
+      let events = [];
+      if (user.role === 'ADMIN' && calendarService.isCalendarConnected()) {
+        try {
+          events = await calendarService.listUpcomingEvents({ maxResults: 5 });
+        } catch (e) {}
+      }
+
+      if (appointments.length === 0 && events.length === 0) {
+        await sock.sendMessage(targetJid, {
+          text: '📅 Você não tem compromissos agendados nos próximos dias.',
+        });
+        return;
+      }
+
+      let responseText = `📅 *Seus Próximos Compromissos:*\n`;
+
+      for (const apt of appointments) {
+        const startObj = new Date(apt.start_datetime);
+        const dStr = startObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        const tStr = startObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+        responseText += `\n• *${apt.title}*\n  🗓️ ${dStr} às ${tStr}${apt.location ? ` (📍 ${apt.location})` : ''}`;
+      }
+
+      if (user.role === 'ADMIN') {
+        for (const ev of events) {
+          const isAlreadyShown = appointments.some(a => a.title.toLowerCase() === (ev.summary || '').toLowerCase());
+          if (!isAlreadyShown) {
+            const startRaw = ev.start?.dateTime || ev.start?.date;
+            const startObj = new Date(startRaw);
+            const dStr = startObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+            const tStr = startObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+            responseText += `\n• *${ev.summary || 'Sem título'}* (Google Calendar)\n  🗓️ ${dStr} às ${tStr}`;
+          }
+        }
+      }
+
+      await sock.sendMessage(targetJid, { text: responseText });
+      return;
+    }
+
+    // 6. AGENDAMENTO DE PAGAMENTO / COMPRA PARCELADA
+    if (intent === 'SCHEDULE_PAYMENT' && scheduledPayment) {
+      try {
+        const sourceType = audioBuffer ? 'audio' : imageBuffer ? 'image' : 'text';
+        const rawContent = text || transcription || caption || '';
+        const created = await billService.addScheduledPayment({
+          userId: user.id,
+          title: scheduledPayment.title || scheduledPayment.description || 'Conta Agendada',
+          totalAmount: scheduledPayment.totalAmount || scheduledPayment.amount || scheduledPayment.total || scheduledPayment.value || scheduledPayment.valor || expense?.amount,
+          installmentAmount: scheduledPayment.installmentAmount || scheduledPayment.installment_amount || scheduledPayment.valorParcela,
+          installments: scheduledPayment.installments || 1,
+          firstDueDate: scheduledPayment.firstDueDate || scheduledPayment.dueDate || scheduledPayment.date,
+          category: scheduledPayment.category,
+          sourceType,
+          rawText: rawContent,
+        });
+
+        if (created.length === 1) {
+          const b = created[0];
+          const [ano, mes, dia] = b.dueDate.split('-');
+          const dataFmt = `${dia}/${mes}/${ano}`;
+
+          await sock.sendMessage(targetJid, {
+            text: `📌 *Pagamento Agendado com Sucesso!*\n\n` +
+                  `📝 *Título*: ${b.title}\n` +
+                  `💰 *Valor*: ${financeService.formatCurrency(b.amount)}\n` +
+                  `📅 *Vencimento*: ${dataFmt}\n` +
+                  `📁 *Categoria*: ${b.category}\n\n` +
+                  `🔔 *Avisos Automáticos Ativados:*\n` +
+                  `• 1 dia antes do vencimento\n` +
+                  `• No dia do vencimento às 09h\n` +
+                  `_Quando pagar, é só me mandar: "Paguei o ${b.title}"_`,
+          });
+        } else {
+          // Parcelado
+          const count = created.length;
+          const totalVal = created.reduce((acc, x) => acc + x.amount, 0);
+
+          let msg = `📌 *Compra Parcelada Agendada!*\n\n` +
+                    `📝 *Título*: ${scheduledPayment.title}\n` +
+                    `💰 *Total*: ${financeService.formatCurrency(totalVal)} em *${count}x de ${financeService.formatCurrency(created[0].amount)}*\n` +
+                    `📁 *Categoria*: ${scheduledPayment.category || 'Contas'}\n\n` +
+                    `🗓️ *Vencimento das Parcelas:*\n`;
+
+          for (const b of created) {
+            const [ano, mes, dia] = b.dueDate.split('-');
+            msg += `• Parcela ${b.installmentCurrent}/${b.installmentTotal}: *${dia}/${mes}/${ano}* - ${financeService.formatCurrency(b.amount)}\n`;
+          }
+
+          msg += `\n🔔 _Avisarei você um dia antes e no dia de cada parcela!_`;
+          await sock.sendMessage(targetJid, { text: msg });
+        }
+      } catch (err) {
+        console.error('Erro ao agendar pagamento:', err);
+        await sock.sendMessage(targetJid, {
+          text: `❌ Não consegui agendar este pagamento: ${err.message}`,
+        });
+      }
+      return;
+    }
+
+    // 7. ATUALIZAÇÃO / CORREÇÃO DE CONTA OU PARCELA
+    if (intent === 'UPDATE_BILL' && updateBill) {
+      try {
+        const updated = billService.updateBillSmart({
+          userId: user.id,
+          searchTerm: updateBill.targetTitle,
+          newTitle: updateBill.newTitle,
+          newAmount: updateBill.newAmount,
+          newDueDate: updateBill.newDueDate,
+          newCategory: updateBill.newCategory,
+        });
+
+        let responseMsg = '';
+        if (updated.isInstallment) {
+          responseMsg = `✏️ *Compra Parcelada Atualizada!*\n\n` +
+                        `📝 *Título*: ${updated.baseTitle} (*${updated.installmentCount} parcelas*)\n` +
+                        `💰 *Valor*: ${financeService.formatCurrency(updated.amount)} por parcela\n` +
+                        `📁 *Categoria*: ${updated.category}\n\n` +
+                        `_Todas as ${updated.installmentCount} parcelas foram atualizadas no Dashboard e nos seus lembretes!_`;
+        } else {
+          const [ano, mes, dia] = updated.due_date.split('-');
+          responseMsg = `✏️ *Conta Atualizada com Sucesso!*\n\n` +
+                        `📝 *Título*: ${updated.title}\n` +
+                        `💰 *Valor*: ${financeService.formatCurrency(updated.amount)}\n` +
+                        `📅 *Vencimento*: ${dia}/${mes}/${ano}\n` +
+                        `📁 *Categoria*: ${updated.category}\n\n` +
+                        `_Alteração sincronizada com o Dashboard e com seus lembretes!_`;
+        }
+
+        await sock.sendMessage(targetJid, { text: responseMsg });
+      } catch (err) {
+        console.error('Erro ao atualizar conta:', err);
+        await sock.sendMessage(targetJid, {
+          text: `❌ Não foi possível atualizar a conta: ${err.message}`,
+        });
+      }
+      return;
+    }
+
+    // 8. DAR BAIXA EM CONTA / CONFIRMAÇÃO DE PAGAMENTO
+    if (intent === 'PAYMENT_PAID') {
+      const match = billService.markAsPaidSmart({
+        userId: user.id,
+        searchTerm: paymentPaid?.title,
+        month: paymentPaid?.month,
+        amount: paymentPaid?.amount,
+      });
+
+      if (match.status === 'NOT_FOUND') {
+        await sock.sendMessage(targetJid, {
+          text: `Não encontrei nenhuma conta pendente correspondente para dar baixa.\nVocê pode conferir suas contas dizendo: "Quais contas tenho pra pagar?"`,
+        });
+        return;
+      }
+
+      if (match.status === 'MULTIPLE_BILLS') {
+        pendingDisambiguations.set(effectivePhone, {
+          type: 'PAYMENT_CONFIRMATION',
+          bills: match.bills,
+          userId: user.id,
+        });
+
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const overdueBills = match.bills.filter((b) => b.due_date < todayStr);
+        const allOverdue = overdueBills.length === match.bills.length;
+        const hasOverdue = overdueBills.length > 0;
+
+        let msg = '';
+        if (match.bills.length === 2) {
+          const b1 = match.bills[0];
+          const b2 = match.bills[1];
+          const [y1, m1, d1] = b1.due_date.split('-');
+          const [y2, m2, d2] = b2.due_date.split('-');
+          const b1Late = b1.due_date < todayStr;
+          const b2Late = b2.due_date < todayStr;
+
+          const header = (b1Late && b2Late)
+            ? '🤔 *Encontrei 2 contas atrasadas:*'
+            : (b1Late || b2Late)
+            ? '🤔 *Encontrei 2 contas (uma delas atrasada):*'
+            : '🤔 *Encontrei 2 contas pendentes:*';
+
+          const question = (b1Late && b2Late)
+            ? '❓ *Você pagou as duas atrasadas ou apenas a mais antiga?*'
+            : '❓ *Você pagou as duas ou apenas a mais antiga?*';
+
+          msg = `${header}\n\n` +
+                `1️⃣ *${b1.title}* - ${financeService.formatCurrency(b1.amount)} (Vencimento: *${d1}/${m1}/${y1}*${b1Late ? ' ⚠️ *Atrasada*' : ''})\n` +
+                `2️⃣ *${b2.title}* - ${financeService.formatCurrency(b2.amount)} (Vencimento: *${d2}/${m2}/${y2}*${b2Late ? ' ⚠️ *Atrasada*' : ''})\n\n` +
+                `${question}\n\n` +
+                `👉 *Responda:* "As duas", "A mais antiga" ou digite o número (*1* ou *2*).`;
+        } else {
+          const header = allOverdue
+            ? `🤔 *Encontrei ${match.bills.length} contas atrasadas:*`
+            : `🤔 *Encontrei ${match.bills.length} contas pendentes correspondentes:*`;
+
+          msg = `${header}\n\n`;
+          match.bills.forEach((b, idx) => {
+            const [y, m, d] = b.due_date.split('-');
+            const late = b.due_date < todayStr;
+            msg += `${idx + 1}️⃣ *${b.title}* - ${financeService.formatCurrency(b.amount)} (Vencimento: *${d}/${m}/${y}*${late ? ' ⚠️ *Atrasada*' : ''})\n`;
+          });
+
+          const question = hasOverdue
+            ? '❓ *Você pagou todas ou apenas a mais antiga?*'
+            : '❓ *Você pagou todas ou apenas a mais próxima?*';
+
+          msg += `\n${question}\n\n` +
+                 `👉 *Responda:* "Todas", "A mais antiga" ou o número da conta (1 a ${match.bills.length}).`;
+        }
+
+        await sock.sendMessage(targetJid, { text: msg });
+        return;
+      }
+
+      if (match.status === 'PAID_SINGLE') {
+        const [ano, mes, dia] = match.bill.due_date.split('-');
+        await sock.sendMessage(targetJid, {
+          text: `✅ *Pagamento Baixado e Registrado nas Finanças!*\n\n` +
+                `📝 *Conta*: ${match.bill.title}\n` +
+                `💰 *Valor*: ${financeService.formatCurrency(match.bill.amount)}\n` +
+                `📅 *Vencimento*: ${dia}/${mes}/${ano}\n` +
+                `🎉 *Status*: Pago!\n\n` +
+                `📊 O valor de *${financeService.formatCurrency(match.bill.amount)}* já foi inserido automaticamente no seu histórico de gastos e no Dashboard!`,
+        });
+        return;
+      }
+      return;
+    }
+
+    // 8. CONSULTAR CONTAS A PAGAR
+    if (intent === 'QUERY_SCHEDULED_PAYMENTS') {
+      const pendingBills = billService.getBills({ userId: user.id, status: 'PENDING', limit: 10 });
+      if (pendingBills.length === 0) {
+        await sock.sendMessage(targetJid, {
+          text: `🎉 *Tudo em dia!* Você não tem nenhuma conta ou boleto pendente cadastrado no momento.`,
+        });
+        return;
+      }
+
+      const totalPending = pendingBills.reduce((acc, x) => acc + Number(x.amount), 0);
+      let msg = `💳 *Contas e Boletos Pendentes (${pendingBills.length}):*\n`;
+      for (const b of pendingBills) {
+        const [ano, mes, dia] = b.due_date.split('-');
+        msg += `\n• *${b.title}*\n  💰 ${financeService.formatCurrency(b.amount)} | Vence em: *${dia}/${mes}/${ano}*`;
+      }
+      msg += `\n\n💵 *Total a pagar*: ${financeService.formatCurrency(totalPending)}`;
+      msg += `\n_Para dar baixa, mande: "Paguei o [nome da conta]"_`;
+
+      await sock.sendMessage(targetJid, { text: msg });
+      return;
+    }
+
+    // 9. CHAT GERAL / MENSAGENS FORA DO ESCOPO
+    if (finalReplyMessage) {
+      await sock.sendMessage(targetJid, { text: finalReplyMessage });
+      return;
+    }
+
+    // Default Fallback caso nenhum texto tenha sido retornado
+    await sock.sendMessage(targetJid, {
+      text: `Olá! Estou por aqui para te ajudar no que precisar! 😊\n\n` +
+            `Meu papel principal é ser o seu assistente de *Finanças & Rotina*:\n` +
+            `• 💰 Me conte seus gastos por voz, texto ou foto (ex: _"Gastei 45 no almoço"_).\n` +
+            `• 💳 Agende contas para não esquecer de pagar (ex: _"Boleto de 120 vence dia 10"_).\n` +
+            `• ⏰ Marque compromissos na sua agenda (ex: _"Dentista amanhã às 14h"_).\n` +
+            `• 📊 Digite *painel* para abrir seus relatórios no celular!\n\n` +
+            `Como posso te ajudar agora? ✨`,
+    });
+  } catch (error) {
+    console.error('Erro ao processar mensagem:', error);
+    try {
+      await sock.sendMessage(targetJid, {
+        text: `⚠️ Ocorreu um erro ao processar sua solicitação: ${error.message}`,
+      });
+    } catch (sendErr) {
+      console.error('Falha ao enviar mensagem de erro:', sendErr.message);
+    }
+  }
+}
+
+module.exports = {
+  handleIncomingMessage,
+};
