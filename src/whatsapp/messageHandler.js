@@ -657,16 +657,14 @@ async function handleIncomingMessage(sock, msg) {
 
     // Direct phrases like "compromisso ok", "compromissos ok", "lembrete ok", "lembretes ok"
     if (['compromisso ok', 'compromissos ok', 'lembrete ok', 'lembretes ok', 'meus compromissos ok'].includes(norm)) {
-      const upcoming = appointmentService.getUpcomingAppointments(user.id, 5);
-      if (upcoming.length > 0) {
-        for (const apt of upcoming) {
-          appointmentService.silenceAppointment({ userId: user.id, searchTerm: apt.title });
-        }
-        await sock.sendMessage(targetJid, {
-          text: `👍 *Perfeito!* Desativei os alertas dos seus compromissos agendados de hoje. Tenha um excelente dia!`,
-        });
-        return;
+      const upcoming = appointmentService.getUpcomingAppointments(user.id, 10);
+      for (const apt of upcoming) {
+        appointmentService.silenceAppointment({ userId: user.id, searchTerm: apt.title });
       }
+      await sock.sendMessage(targetJid, {
+        text: `👍 *Perfeito!* Desativei os alertas dos seus compromissos agendados de hoje. Tenha um excelente dia!`,
+      });
+      return;
     }
 
     // Pattern: "(compromisso [termo], ok)", "([termo] ok)"
@@ -1367,40 +1365,56 @@ async function handleIncomingMessage(sock, msg) {
 
     // 7. CONSULTAR COMPROMISSOS / AGENDA
     if (intent === 'CALENDAR_QUERY') {
-      const appointments = appointmentService.getUpcomingAppointments(user.id, 5);
+      const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+      const queryText = (text || transcription || '').toLowerCase();
+      const isAskingToday = /hoje|dia de hoje|para hoje|pra hoje/i.test(queryText);
 
+      let appointments = appointmentService.getUpcomingAppointments(user.id, 15);
       let events = [];
       if (user.role === 'ADMIN' && calendarService.isCalendarConnected()) {
         try {
-          events = await calendarService.listUpcomingEvents({ maxResults: 5 });
+          events = await calendarService.listUpcomingEvents({ maxResults: 15 });
         } catch (e) {}
+      }
+
+      if (isAskingToday) {
+        appointments = appointments.filter((a) => a.start_datetime.startsWith(todayStr));
+        events = events.filter((ev) => {
+          const startRaw = ev.start?.dateTime || ev.start?.date || '';
+          return startRaw.startsWith(todayStr);
+        });
+      } else {
+        appointments = appointments.slice(0, 5);
+        events = events.slice(0, 5);
       }
 
       if (appointments.length === 0 && events.length === 0) {
         await sock.sendMessage(targetJid, {
-          text: '📅 Você não tem compromissos agendados nos próximos dias.',
+          text: isAskingToday
+            ? '📅 Você não tem nenhum compromisso agendado para hoje!'
+            : '📅 Você não tem compromissos agendados nos próximos dias.',
         });
         return;
       }
 
-      let responseText = `📅 *Seus Próximos Compromissos:*\n`;
+      let responseText = isAskingToday ? `📅 *Seus Compromissos de Hoje:*\n` : `📅 *Seus Próximos Compromissos:*\n`;
 
       for (const apt of appointments) {
         const startObj = new Date(apt.start_datetime);
         const dStr = startObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
         const tStr = startObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        responseText += `\n• *${apt.title}*\n  🗓️ ${dStr} às ${tStr}${apt.location ? ` (📍 ${apt.location})` : ''}`;
+        responseText += `\n• *${apt.title}*\n  🗓️ ${isAskingToday ? `Hoje às ${tStr}` : `${dStr} às ${tStr}`}${apt.location ? ` (📍 ${apt.location})` : ''}`;
       }
 
       if (user.role === 'ADMIN') {
         for (const ev of events) {
-          const isAlreadyShown = appointments.some(a => a.title.toLowerCase() === (ev.summary || '').toLowerCase());
+          const isAlreadyShown = appointments.some((a) => a.title.toLowerCase() === (ev.summary || '').toLowerCase());
           if (!isAlreadyShown) {
             const startRaw = ev.start?.dateTime || ev.start?.date;
             const startObj = new Date(startRaw);
             const dStr = startObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
             const tStr = startObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            responseText += `\n• *${ev.summary || 'Sem título'}* (Google Calendar)\n  🗓️ ${dStr} às ${tStr}`;
+            responseText += `\n• *${ev.summary || 'Sem título'}* (Google Calendar)\n  🗓️ ${isAskingToday ? `Hoje às ${tStr}` : `${dStr} às ${tStr}`}`;
           }
         }
       }
