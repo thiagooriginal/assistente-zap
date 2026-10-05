@@ -1371,12 +1371,33 @@
 
   <!-- JAVASCRIPT LOGIC & CHARTS -->
   <script>
-    // Intercept Magic Token from URL and store in localStorage
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlToken = urlParams.get('token');
-    if (urlToken) {
-      localStorage.setItem('auth_token', urlToken);
-      window.history.replaceState({}, document.title, window.location.pathname);
+    // Intercept Magic Token from URL and store in localStorage & memory
+    let memoryToken = null;
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlToken = urlParams.get('token');
+      if (urlToken) {
+        memoryToken = urlToken;
+        try {
+          localStorage.setItem('auth_token', urlToken);
+        } catch (e) {}
+      }
+    } catch (e) {}
+
+    function getActiveToken() {
+      if (memoryToken) return memoryToken;
+      try {
+        const stored = localStorage.getItem('auth_token');
+        if (stored) return stored;
+      } catch (e) {}
+      try {
+        const param = new URLSearchParams(window.location.search).get('token');
+        if (param) {
+          memoryToken = param;
+          return param;
+        }
+      } catch (e) {}
+      return null;
     }
 
     let currentUser = null;
@@ -1386,13 +1407,18 @@
     let currentTab = 'expenses';
 
     async function authFetch(url, options = {}) {
-      const token = localStorage.getItem('auth_token');
+      const token = getActiveToken();
       const headers = { ...(options.headers || {}) };
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+        headers['x-auth-token'] = token;
+      }
+      let fetchUrl = url;
+      if (token && !fetchUrl.includes('token=')) {
+        fetchUrl += (fetchUrl.includes('?') ? '&' : '?') + `token=${encodeURIComponent(token)}`;
       }
       try {
-        const res = await fetch(url, { ...options, credentials: 'include', headers });
+        const res = await fetch(fetchUrl, { ...options, credentials: 'include', headers });
         if (res.status === 401) {
           showUnauthorizedScreen();
           throw new Error('Acesso não autorizado');
@@ -2067,8 +2093,6 @@
       if (e.target.id === 'descubraModal') closeDescubraModal();
     });
 
-    }
-
     // Set today's date in header
     function updateHeaderDate() {
       const now = new Date();
@@ -2246,21 +2270,28 @@
     }
 
     function renderCategoryChart(categories) {
-      const ctx = document.getElementById('categoryChart').getContext('2d');
+      if (typeof Chart === 'undefined') {
+        console.warn('Chart.js ainda não carregado, aguardando...');
+        setTimeout(() => renderCategoryChart(categories), 400);
+        return;
+      }
+      const canvas = document.getElementById('categoryChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
       const noDataEl = document.getElementById('noCategoryData');
       const legendEl = document.getElementById('categoryLegend');
 
       if (!categories || categories.length === 0) {
-        noDataEl.classList.remove('hidden');
+        if (noDataEl) noDataEl.classList.remove('hidden');
         if (categoryChartInstance) categoryChartInstance.destroy();
-        legendEl.innerHTML = '';
+        if (legendEl) legendEl.innerHTML = '';
         return;
       }
-      noDataEl.classList.add('hidden');
+      if (noDataEl) noDataEl.classList.add('hidden');
 
       const labels = categories.map(c => c.category);
       const values = categories.map(c => c.total);
-      const colors = categories.map(c => (categoryColors[c.category] || categoryColors['Outros']).hex);
+      const colors = categories.map(c => (categoryColors[c.category]?.hex || categoryColors['Outros']?.hex || '#94A3B8'));
 
       if (categoryChartInstance) categoryChartInstance.destroy();
 
@@ -2300,25 +2331,36 @@
         }
       });
 
-      legendEl.innerHTML = categories.map(c => {
-        const color = (categoryColors[c.category] || categoryColors['Outros']).hex;
-        return `
-          <div class="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg hover:bg-[#172138] transition">
-            <div class="flex items-center gap-2">
-              <span class="w-2.5 h-2.5 rounded-full shadow-sm" style="background-color: ${color}; box-shadow: 0 0 8px ${color}80;"></span>
-              <span class="font-medium text-slate-200">${c.category}</span>
+      if (legendEl) {
+        legendEl.innerHTML = categories.map(c => {
+          const color = (categoryColors[c.category]?.hex || categoryColors['Outros']?.hex || '#94A3B8');
+          return `
+            <div class="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg hover:bg-[#172138] transition">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full shadow-sm" style="background-color: ${color}; box-shadow: 0 0 8px ${color}80;"></span>
+                <span class="font-medium text-slate-200">${c.category}</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-slate-400 font-mono text-[11px]">${c.percentage}%</span>
+                <span class="font-bold text-white">${formatCurrency(c.total)}</span>
+              </div>
             </div>
-            <div class="flex items-center gap-3">
-              <span class="text-slate-400 font-mono text-[11px]">${c.percentage}%</span>
-              <span class="font-bold text-white">${formatCurrency(c.total)}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
+          `;
+        }).join('');
+      }
     }
 
     function renderDailyChart(daily) {
-      const ctx = document.getElementById('dailyChart').getContext('2d');
+      if (typeof Chart === 'undefined') {
+        console.warn('Chart.js ainda não carregado, aguardando...');
+        setTimeout(() => renderDailyChart(daily), 400);
+        return;
+      }
+      const canvas = document.getElementById('dailyChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!daily || daily.length === 0) return;
+
       const labels = daily.map(d => d.displayDate);
       const values = daily.map(d => d.total);
 
