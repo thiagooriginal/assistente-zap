@@ -102,7 +102,7 @@ As intenções possíveis são:
    - "Cancela o gasto de 50 reais" -> intent: "EXPENSE_DELETE", expenseDelete: { "target": "specific", "amount": 50, "description": null }
    - ATENÇÃO MÁXIMA: NUNCA confunda pedidos de "tira", "apaga", "remove", "exclui" ou "cancela" com GENERAL_CHAT! Mesmo que mencione "gato", "remédio", "cerveja", "pizza", "uber", o usuário está solicitando a exclusão de uma DESPESA registrada com esse nome ou valor!
 
-8. "EXPENSE_UPDATE": O usuário quer alterar, corrigir, editar ou ajustar o valor, a categoria ou a descrição de um gasto/despesa já registrado anteriormente (seja o último gasto ou um gasto específico).
+8. "EXPENSE_UPDATE": O usuário quer alterar, corrigir, editar ou ajustar o valor, a categoria, a descrição ou a FORMA DE PAGAMENTO de um gasto/despesa já registrado anteriormente (seja o último gasto ou um gasto específico).
    Exemplos:
    - "o valor era 50 e não 150" -> intent: "EXPENSE_UPDATE", expenseUpdate: { "oldAmount": 150, "newAmount": 50, "target": "last" }
    - "o valor dito no áudio era 50,00 e não 150,00" -> intent: "EXPENSE_UPDATE", expenseUpdate: { "oldAmount": 150, "newAmount": 50, "target": "last" }
@@ -111,7 +111,13 @@ As intenções possíveis são:
    - "errei o valor do almoço, foi 35" -> intent: "EXPENSE_UPDATE", expenseUpdate: { "searchTerm": "almoço", "newAmount": 35 }
    - "muda a categoria da gasolina para Transporte" -> intent: "EXPENSE_UPDATE", expenseUpdate: { "searchTerm": "gasolina", "newCategory": "Transporte" }
    - "troca a descrição para Padaria Real" -> intent: "EXPENSE_UPDATE", expenseUpdate: { "newDescription": "Padaria Real", "target": "last" }
-   - ATENÇÃO MÁXIMA: Se o usuário estiver citando ou respondendo a uma mensagem de confirmação de gasto ("✅ Gasto Registrado com Sucesso!") corrigindo o valor, trata-se OBRIGATORIAMENTE de EXPENSE_UPDATE! NUNCA classifique como UPDATE_BILL (contas a pagar / boletos futuros)!
+   - "pagamento no débito", "foi no débito", "no débito", "passei no débito" -> intent: "EXPENSE_UPDATE", expenseUpdate: { "newPaymentMethod": "Cartão de Débito", "target": "last" }
+   - "pagamento no crédito", "foi no crédito", "no crédito", "cartão de crédito" -> intent: "EXPENSE_UPDATE", expenseUpdate: { "newPaymentMethod": "Cartão de Crédito", "target": "last" }
+   - "foi no pix", "paguei no pix", "no pix" -> intent: "EXPENSE_UPDATE", expenseUpdate: { "newPaymentMethod": "Pix", "target": "last" }
+   - "foi em dinheiro", "paguei no dinheiro" -> intent: "EXPENSE_UPDATE", expenseUpdate: { "newPaymentMethod": "Dinheiro", "target": "last" }
+   - "o almoço foi no débito" -> intent: "EXPENSE_UPDATE", expenseUpdate: { "searchTerm": "almoço", "newPaymentMethod": "Cartão de Débito" }
+   - ATENÇÃO CRÍTICA: Se o usuário enviar apenas a forma de pagamento (ex: "Pagamento no débito", "no crédito", "foi no pix"), NUNCA peça valor ou descrição e NUNCA classifique como GENERAL_CHAT! Trata-se OBRIGATORIAMENTE de EXPENSE_UPDATE para complementar a forma de pagamento do último gasto registrado!
+   - ATENÇÃO MÁXIMA: Se o usuário estiver citando ou respondendo a uma mensagem de confirmação de gasto ("✅ Gasto Registrado com Sucesso!") corrigindo o valor ou forma de pagamento, trata-se OBRIGATORIAMENTE de EXPENSE_UPDATE! NUNCA classifique como UPDATE_BILL (contas a pagar / boletos futuros)!
 
 9. "DELETE_LAST_EXPENSE": O usuário quer apagar ou cancelar o último gasto registrado (sinônimo de EXPENSE_DELETE com target="last").
    Exemplos: "apagar último gasto", "cancela o último registro", "errei o valor, apaga o anterior".
@@ -235,7 +241,8 @@ Estrutura do JSON:
     "oldAmount": number | null,
     "newAmount": number | null,
     "newCategory": string | null,
-    "newDescription": string | null
+    "newDescription": string | null,
+    "newPaymentMethod": string | null
   },
   "expenseDelete": {
     "target": "specific" | "last",

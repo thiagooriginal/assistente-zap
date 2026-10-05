@@ -125,6 +125,64 @@ function parseExpenseCorrection(text, quotedText = null) {
   return null;
 }
 
+function parsePaymentMethodUpdate(text, quotedText = null) {
+  if (!text) return null;
+  const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  const identifyMethod = (str) => {
+    if (!str) return null;
+    const s = str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    if (/(?:cartao\s+de\s+)?debito/i.test(s)) return 'Cartão de Débito';
+    if (/(?:cartao\s+de\s+)?credito/i.test(s)) return 'Cartão de Crédito';
+    if (/\bpix\b/i.test(s)) return 'Pix';
+    if (/\b(?:dinheiro|especie)\b/i.test(s)) return 'Dinheiro';
+    if (/\b(?:vale(?:\s+refeicao|\s+alimentacao)?|vr|va)\b/i.test(s)) return 'Vale Refeição / Alimentação';
+    return null;
+  };
+
+  const methodWords = '(?:cartao\\s+de\\s+debito|cartao\\s+de\\s+credito|cartao\\s+debito|cartao\\s+credito|cartao|debito|credito|pix|dinheiro|especie|vale\\s+refeicao|vale\\s+alimentacao|vr|va)';
+
+  // Pattern 1: Direct payment declaration:
+  // "pagamento no debito", "pagamento debito", "pagamento em credito", "forma de pagamento debito", "foi no debito", "no debito", "no credito", "no pix", "em dinheiro"
+  const directRegex = new RegExp('^(?:forma\\s+de\\s+)?(?:o\\s+)?(?:pagamento|pgto)?\\s*(?:foi|era|seria)?\\s*(?:no|em|via|de|com|pelo|por)?\\s*(' + methodWords + ')$', 'i');
+  const directMatch = norm.match(directRegex);
+  if (directMatch) {
+    const method = identifyMethod(directMatch[1]);
+    if (method) return { newPaymentMethod: method, target: 'last' };
+  }
+
+  // Pattern 2: Actions: "coloca no debito", "muda para debito", "troca para credito", "altera para pix", "paguei no debito", "passei no debito"
+  const actionRegex = new RegExp('^(?:coloca|colocar|muda|mudar|troca|trocar|altera|alterar|corrige|corrigir|atualiza|atualizar|paguei|passei)\\s+(?:o\\s+)?(?:pagamento|forma\\s+de\\s+pagamento)?\\s*(?:para|pra|no|em|como|com)?\\s*(' + methodWords + ')$', 'i');
+  const actionMatch = norm.match(actionRegex);
+  if (actionMatch) {
+    const method = identifyMethod(actionMatch[1]);
+    if (method) return { newPaymentMethod: method, target: 'last' };
+  }
+
+  // Pattern 3: With specific description / term: "adega no debito", "o da adega foi no debito", "almoço no credito", "61 no debito"
+  const withDescRegex = new RegExp('^(?:o\\s+)?(?:da\\s+|do\\s+)?(.+?)\\s+(?:o\\s+)?(?:pagamento\\s+)?(?:foi\\s+)?(?:no|em|via|de|com|pelo|por)\\s+(' + methodWords + ')$', 'i');
+  const withDescMatch = norm.match(withDescRegex);
+  if (withDescMatch) {
+    const candidateDesc = withDescMatch[1].trim();
+    const candidateMethod = identifyMethod(withDescMatch[2]);
+    if (candidateMethod && candidateDesc && !['gasto', 'valor', 'compra', 'isso', 'aqui', 'tudo', 'ele'].includes(candidateDesc)) {
+      const amtMatch = candidateDesc.match(/^(?:r\$\s*)?(\d+(?:[.,]\d+)?)$/);
+      if (amtMatch) {
+        return { newPaymentMethod: candidateMethod, oldAmount: parseFloat(amtMatch[1].replace(',', '.')) };
+      }
+      return { newPaymentMethod: candidateMethod, searchTerm: candidateDesc };
+    }
+  }
+
+  // Pattern 4: If quoting an expense message: user sends "debito", "credito", "pix", "dinheiro", etc.
+  if (quotedText && (/gasto registrado/i.test(quotedText) || /valor:\s*r\$/i.test(quotedText) || /pagamento:\s*n[aã]o informado/i.test(quotedText))) {
+    const method = identifyMethod(norm);
+    if (method) return { newPaymentMethod: method, target: 'last' };
+  }
+
+  return null;
+}
+
 async function sendAdminInviteCode(sock, targetJid, userId) {
   const invite = userService.createInviteCode({ createdBy: userId, trialDays: 7 });
   const botPhone = sock.user?.id ? getCleanNumber(sock.user.id) : '5511966619866';
@@ -759,6 +817,38 @@ async function handleIncomingMessage(sock, msg) {
     }
   }
 
+  // Fast Deterministic Payment Method Update: "pagamento no debito", "no credito", "foi no pix", "paguei no debito"
+  if (text) {
+    const paymentUpdate = parsePaymentMethodUpdate(text, quotedText);
+    if (paymentUpdate) {
+      try {
+        const result = financeService.updateExpense({
+          userId: user.id,
+          searchTerm: paymentUpdate.searchTerm,
+          oldAmount: paymentUpdate.oldAmount,
+          newPaymentMethod: paymentUpdate.newPaymentMethod,
+        });
+
+        const prevMethod = result.previous.payment_method || 'Não informado';
+        const newMethod = result.updated.payment_method;
+        const amt = financeService.formatCurrency(result.updated.amount);
+
+        const responseText = `💳 *Forma de Pagamento Atualizada!*\n\n` +
+                             `📝 *Gasto*: ${result.updated.description}\n` +
+                             `💰 *Valor*: ${amt}\n` +
+                             `💳 *Pagamento*: *${newMethod}*${prevMethod !== newMethod ? ` _(anterior: ${prevMethod})_` : ''}\n` +
+                             `📁 *Categoria*: ${result.updated.category}\n` +
+                             `📅 *Data*: ${financeService.formatDateBR(result.updated.date)}\n\n` +
+                             `📊 _Atualizado com sucesso no seu Dashboard e relatórios!_`;
+
+        await sock.sendMessage(targetJid, { text: responseText });
+        return;
+      } catch (err) {
+        console.warn('Fast text payment update error:', err.message);
+      }
+    }
+  }
+
   // Send typing indicator
   try {
     await sock.sendPresenceUpdate('composing', targetJid);
@@ -874,6 +964,37 @@ async function handleIncomingMessage(sock, msg) {
           return;
         } catch (err) {
           console.warn('Fast audio expense correction error:', err.message);
+        }
+      }
+
+      // Fast Audio Payment Method Update: "foi no debito", "pagamento no credito", "paguei no pix"
+      const audioPaymentUpdate = parsePaymentMethodUpdate(transcription, quotedText);
+      if (audioPaymentUpdate) {
+        try {
+          const result = financeService.updateExpense({
+            userId: user.id,
+            searchTerm: audioPaymentUpdate.searchTerm,
+            oldAmount: audioPaymentUpdate.oldAmount,
+            newPaymentMethod: audioPaymentUpdate.newPaymentMethod,
+          });
+
+          const prevMethod = result.previous.payment_method || 'Não informado';
+          const newMethod = result.updated.payment_method;
+          const amt = financeService.formatCurrency(result.updated.amount);
+
+          const responseText = `💳 *Forma de Pagamento Atualizada!*\n\n` +
+                               `📝 *Gasto*: ${result.updated.description}\n` +
+                               `💰 *Valor*: ${amt}\n` +
+                               `💳 *Pagamento*: *${newMethod}*${prevMethod !== newMethod ? ` _(anterior: ${prevMethod})_` : ''}\n` +
+                               `📁 *Categoria*: ${result.updated.category}\n` +
+                               `📅 *Data*: ${financeService.formatDateBR(result.updated.date)}\n\n` +
+                               `🎙️ _Áudio detectado: "${transcription}"_\n` +
+                               `📊 _Atualizado com sucesso no seu Dashboard e relatórios!_`;
+
+          await sock.sendMessage(targetJid, { text: responseText });
+          return;
+        } catch (err) {
+          console.warn('Fast audio payment update error:', err.message);
         }
       }
     }
@@ -1167,29 +1288,33 @@ async function handleIncomingMessage(sock, msg) {
           newAmount: updData.newAmount,
           newCategory: updData.newCategory,
           newDescription: updData.newDescription,
+          newPaymentMethod: updData.newPaymentMethod,
         });
 
         const prevAmt = financeService.formatCurrency(result.previous.amount);
         const newAmt = financeService.formatCurrency(result.updated.amount);
+        const prevMethod = result.previous.payment_method || 'Não informado';
+        const newMethod = result.updated.payment_method;
 
-        let responseText = `✏️ *Gasto Corrigido com Sucesso!*\n\n` +
+        let responseText = `✏️ *Gasto Atualizado com Sucesso!*\n\n` +
                            `📝 *Descrição*: ${result.updated.description}\n` +
-                           `💰 *Novo Valor*: *${newAmt}*${result.previous.amount !== result.updated.amount ? ` _(anterior: ${prevAmt})_` : ''}\n` +
+                           `💰 *Valor*: *${newAmt}*${result.previous.amount !== result.updated.amount ? ` _(anterior: ${prevAmt})_` : ''}\n` +
                            `📁 *Categoria*: ${result.updated.category}\n` +
+                           `💳 *Pagamento*: *${newMethod}*${prevMethod !== newMethod ? ` _(anterior: ${prevMethod})_` : ''}\n` +
                            `📅 *Data*: ${financeService.formatDateBR(result.updated.date)}`;
 
         if (transcription) {
           responseText += `\n\n🎙️ _Áudio detectado: "${transcription}"_`;
         }
 
-        responseText += `\n\n📊 _Total corrigido no Dashboard e nos seus relatórios!_`;
+        responseText += `\n\n📊 _Atualizado no Dashboard e nos seus relatórios!_`;
 
         await sock.sendMessage(targetJid, { text: responseText });
         return;
       } catch (err) {
         console.warn('Erro ao atualizar gasto via EXPENSE_UPDATE:', err.message);
         await sock.sendMessage(targetJid, {
-          text: `⚠️ Não consegui localizar o gasto para corrigir (${err.message}). Você pode consultar seus gastos dizendo *"Últimos gastos"*.`,
+          text: `⚠️ Não consegui localizar o gasto para atualizar (${err.message}). Você pode consultar seus gastos dizendo *"Últimos gastos"*.`,
         });
         return;
       }
