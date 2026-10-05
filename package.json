@@ -7,6 +7,7 @@
     "start": "node src/index.js",
     "tunnel": ".\\cloudflared.exe tunnel --url http://localhost:3333",
     "auth-calendar": "node src/scripts/authCalendar.js",
+    "push-calendar": "node src/scripts/pushCalendarCredentials.js",
     "test-finance": "node -e \"console.log(require('./src/services/financeService').getRecentExpenses())\""
   },
   "keywords": [

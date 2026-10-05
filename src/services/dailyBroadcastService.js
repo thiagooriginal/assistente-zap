@@ -226,7 +226,9 @@ async function getTodaySummary(user, dateStr) {
 
   // 2. Google Calendar events (for Admin if connected)
   let googleEvents = [];
-  if (user.role === 'ADMIN' && calendarService.isCalendarConnected()) {
+  const userService = require('./userService');
+  const isAdminUser = userService.isUserAdmin ? userService.isUserAdmin(user) : (user.role === 'ADMIN' || user.id === 1);
+  if (isAdminUser && calendarService.isCalendarConnected()) {
     try {
       const list = await calendarService.listUpcomingEvents({ maxResults: 15 });
       googleEvents = list.filter((ev) => {

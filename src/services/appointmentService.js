@@ -192,6 +192,67 @@ function silenceAppointment({ userId = 1, searchTerm }) {
   return target;
 }
 
+/**
+ * Update Google Calendar Event ID
+ */
+function setGoogleEventId(id, googleEventId) {
+  try {
+    db.prepare('UPDATE appointments SET google_event_id = ? WHERE id = ?').run(googleEventId, id);
+  } catch (e) {
+    console.error(`Erro ao salvar google_event_id no compromisso #${id}:`, e.message);
+  }
+}
+
+/**
+ * Retroactively sync unsynced future appointments for Admin/Owner to Google Calendar
+ */
+async function syncPendingAdminAppointmentsToGoogle() {
+  const calendarService = require('./calendarService');
+  if (!calendarService.isCalendarConnected()) {
+    return { synced: 0, reason: 'Google Calendar desconectado' };
+  }
+
+  const now = new Date().toISOString();
+  let unsynced = [];
+  try {
+    unsynced = db.prepare(`
+      SELECT a.* FROM appointments a
+      JOIN users u ON a.user_id = u.id
+      WHERE (u.role = 'ADMIN' OR u.id = 1 OR u.phone_number LIKE '%951364159')
+        AND a.status = 'SCHEDULED'
+        AND a.start_datetime >= ?
+        AND (a.google_event_id IS NULL OR a.google_event_id = '')
+      ORDER BY a.start_datetime ASC
+    `).all(now);
+  } catch (e) {
+    console.error('Erro ao buscar compromissos pendentes de sincronização:', e.message);
+    return { synced: 0, error: e.message };
+  }
+
+  let count = 0;
+  for (const apt of unsynced) {
+    try {
+      const gEvent = await calendarService.createCalendarEvent({
+        summary: apt.title,
+        description: apt.description || 'Criado via Assistente Zap',
+        startDateTime: apt.start_datetime,
+        endDateTime: apt.end_datetime,
+        location: apt.location,
+      });
+
+      if (gEvent && gEvent.id) {
+        setGoogleEventId(apt.id, gEvent.id);
+        count++;
+        console.log(`[Google Calendar Sync] Compromisso #${apt.id} "${apt.title}" enviado ao Google Calendar com ID: ${gEvent.id}`);
+      }
+    } catch (err) {
+      console.error(`[Google Calendar Sync] Erro ao sincronizar #${apt.id}:`, err.message);
+    }
+  }
+
+  return { synced: count, totalFound: unsynced.length };
+}
+
 module.exports = {
   createAppointment,
   getAppointments,
@@ -201,4 +262,6 @@ module.exports = {
   deleteAppointment,
   setNotified,
   silenceAppointment,
+  setGoogleEventId,
+  syncPendingAdminAppointmentsToGoogle,
 };

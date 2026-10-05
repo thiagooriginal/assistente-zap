@@ -26,9 +26,17 @@ if (!config.geminiApiKey) {
 
 if (calendarService.isCalendarConnected()) {
   console.log('✅ Google Calendar conectado com sucesso.');
+  const appointmentService = require('./services/appointmentService');
+  appointmentService.syncPendingAdminAppointmentsToGoogle()
+    .then((r) => {
+      if (r && r.synced > 0) {
+        console.log(`[Google Calendar Sync] ${r.synced} compromisso(s) sincronizado(s) na inicialização.`);
+      }
+    })
+    .catch((err) => console.error('[Google Calendar Sync] Erro:', err.message));
 } else {
   console.log('ℹ️ Google Calendar ainda não autenticado (opcional para iniciar).');
-  console.log('   Para autenticar o Calendar, execute: npm run auth-calendar\n');
+  console.log('   Para autenticar o Calendar, execute: npm run auth-calendar ou defina as variáveis no Easypanel.\n');
 }
 
 // Start visual web dashboard

@@ -1047,7 +1047,8 @@ async function handleIncomingMessage(sock, msg) {
       if (hasCalendarQuery) {
         const appointments = appointmentService.getUpcomingAppointments(user.id, 5);
         let events = [];
-        if (user.role === 'ADMIN' && calendarService.isCalendarConnected()) {
+        const isAdminUser = userService.isUserAdmin ? userService.isUserAdmin(user) : (user.role === 'ADMIN' || user.id === 1);
+        if (isAdminUser && calendarService.isCalendarConnected()) {
           try {
             events = await calendarService.listUpcomingEvents({ maxResults: 5 });
           } catch (e) {}
@@ -1063,7 +1064,7 @@ async function handleIncomingMessage(sock, msg) {
             const tStr = startObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
             calPart += `\n• *${apt.title}*\n  🗓️ ${dStr} às ${tStr}${apt.location ? ` (📍 ${apt.location})` : ''}`;
           }
-          if (user.role === 'ADMIN') {
+          if (isAdminUser) {
             for (const ev of events) {
               const isAlreadyShown = appointments.some(a => a.title.toLowerCase() === (ev.summary || '').toLowerCase());
               if (!isAlreadyShown) {
@@ -1335,9 +1336,13 @@ async function handleIncomingMessage(sock, msg) {
         });
 
         // If User 1 (Admin/Owner) and Google Calendar is connected, also mirror to personal Google Calendar
-        if (user.role === 'ADMIN' && calendarService.isCalendarConnected()) {
+        const isAdminUser = userService.isUserAdmin ? userService.isUserAdmin(user) : (user.role === 'ADMIN' || user.id === 1);
+        if (isAdminUser && calendarService.isCalendarConnected()) {
           try {
-            await calendarService.createCalendarEvent(calendarEvent);
+            const calEvent = await calendarService.createCalendarEvent(calendarEvent);
+            if (calEvent && calEvent.id) {
+              appointmentService.setGoogleEventId(createdApt.id, calEvent.id);
+            }
           } catch (calErr) {
             console.warn('Erro ao espelhar evento no Google Calendar do Admin:', calErr.message);
           }
@@ -1404,7 +1409,8 @@ async function handleIncomingMessage(sock, msg) {
         }
 
         // If User 1 (Admin/Owner) and Google Calendar is connected, also update in Google Calendar
-        if (user.role === 'ADMIN' && calendarService.isCalendarConnected()) {
+        const isAdminUser = userService.isUserAdmin ? userService.isUserAdmin(user) : (user.role === 'ADMIN' || user.id === 1);
+        if (isAdminUser && calendarService.isCalendarConnected()) {
           try {
             const targetEvent = await calendarService.findEventToModify(calendarUpdate.targetSummary);
             if (targetEvent) {
@@ -1420,7 +1426,7 @@ async function handleIncomingMessage(sock, msg) {
           }
         }
 
-        if (!targetApt && (!calendarService.isCalendarConnected() || user.role !== 'ADMIN')) {
+        if (!targetApt && (!calendarService.isCalendarConnected() || !isAdminUser)) {
           await sock.sendMessage(targetJid, {
             text: `🤔 Não encontrei nenhum compromisso agendado correspondente a "${calendarUpdate.targetSummary || 'último compromisso'}".\n\nVocê pode consultar seus compromissos dizendo: "Quais meus compromissos?"`,
           });
@@ -1458,7 +1464,8 @@ async function handleIncomingMessage(sock, msg) {
         }
 
         // If User 1 (Admin/Owner) and Google Calendar is connected, also delete in Google Calendar
-        if (user.role === 'ADMIN' && calendarService.isCalendarConnected()) {
+        const isAdminUser = userService.isUserAdmin ? userService.isUserAdmin(user) : (user.role === 'ADMIN' || user.id === 1);
+        if (isAdminUser && calendarService.isCalendarConnected()) {
           try {
             const targetEvent = await calendarService.findEventToModify(calendarDelete.targetSummary);
             if (targetEvent) {
@@ -1469,7 +1476,7 @@ async function handleIncomingMessage(sock, msg) {
           }
         }
 
-        if (!targetApt && (!calendarService.isCalendarConnected() || user.role !== 'ADMIN')) {
+        if (!targetApt && (!calendarService.isCalendarConnected() || !isAdminUser)) {
           await sock.sendMessage(targetJid, {
             text: `🤔 Não encontrei nenhum compromisso agendado para cancelar com o termo "${calendarDelete.targetSummary}".`,
           });
@@ -1496,7 +1503,8 @@ async function handleIncomingMessage(sock, msg) {
 
       let appointments = appointmentService.getUpcomingAppointments(user.id, 15);
       let events = [];
-      if (user.role === 'ADMIN' && calendarService.isCalendarConnected()) {
+      const isAdminUser = userService.isUserAdmin ? userService.isUserAdmin(user) : (user.role === 'ADMIN' || user.id === 1);
+      if (isAdminUser && calendarService.isCalendarConnected()) {
         try {
           events = await calendarService.listUpcomingEvents({ maxResults: 15 });
         } catch (e) {}
@@ -1531,7 +1539,7 @@ async function handleIncomingMessage(sock, msg) {
         responseText += `\n• *${apt.title}*\n  🗓️ ${isAskingToday ? `Hoje às ${tStr}` : `${dStr} às ${tStr}`}${apt.location ? ` (📍 ${apt.location})` : ''}`;
       }
 
-      if (user.role === 'ADMIN') {
+      if (isAdminUser) {
         for (const ev of events) {
           const isAlreadyShown = appointments.some((a) => a.title.toLowerCase() === (ev.summary || '').toLowerCase());
           if (!isAlreadyShown) {

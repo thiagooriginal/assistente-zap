@@ -1,20 +1,91 @@
 const fs = require('fs');
+const path = require('path');
 const { google } = require('googleapis');
 const config = require('../config');
 
 let oauth2Client = null;
 
+const persistentCredentialsPath = path.resolve(__dirname, '../../data/google_credentials.json');
+const persistentTokenPath = path.resolve(__dirname, '../../data/google_token.json');
+
+function resolveCredentialsContent() {
+  // 1. Primary configured path
+  if (fs.existsSync(config.googleCredentialsPath)) {
+    try {
+      return fs.readFileSync(config.googleCredentialsPath, 'utf8');
+    } catch (e) {}
+  }
+  // 2. Persistent volume data/ path
+  if (fs.existsSync(persistentCredentialsPath)) {
+    try {
+      return fs.readFileSync(persistentCredentialsPath, 'utf8');
+    } catch (e) {}
+  }
+  // 3. Environment variable (raw JSON)
+  if (process.env.GOOGLE_CREDENTIALS_JSON) {
+    try {
+      return process.env.GOOGLE_CREDENTIALS_JSON;
+    } catch (e) {}
+  }
+  // 4. Environment variable (Base64)
+  if (process.env.GOOGLE_CREDENTIALS_BASE64) {
+    try {
+      return Buffer.from(process.env.GOOGLE_CREDENTIALS_BASE64, 'base64').toString('utf8');
+    } catch (e) {}
+  }
+  return null;
+}
+
+function resolveTokenContent() {
+  // 1. Primary configured path
+  if (fs.existsSync(config.googleTokenPath)) {
+    try {
+      return fs.readFileSync(config.googleTokenPath, 'utf8');
+    } catch (e) {}
+  }
+  // 2. Persistent volume data/ path
+  if (fs.existsSync(persistentTokenPath)) {
+    try {
+      return fs.readFileSync(persistentTokenPath, 'utf8');
+    } catch (e) {}
+  }
+  // 3. Environment variable (raw JSON)
+  if (process.env.GOOGLE_TOKEN_JSON) {
+    try {
+      return process.env.GOOGLE_TOKEN_JSON;
+    } catch (e) {}
+  }
+  // 4. Environment variable (Base64)
+  if (process.env.GOOGLE_TOKEN_BASE64) {
+    try {
+      return Buffer.from(process.env.GOOGLE_TOKEN_BASE64, 'base64').toString('utf8');
+    } catch (e) {}
+  }
+  // 5. Database users table (stored for admin)
+  try {
+    const db = require('../database/db');
+    const row = db.prepare(`SELECT google_token FROM users WHERE (role = 'ADMIN' OR id = 1) AND google_token IS NOT NULL LIMIT 1`).get();
+    if (row && row.google_token) {
+      return row.google_token;
+    }
+  } catch (e) {}
+
+  return null;
+}
+
 function getOAuthClient() {
   if (oauth2Client) return oauth2Client;
 
-  if (!fs.existsSync(config.googleCredentialsPath)) {
+  const credsRaw = resolveCredentialsContent();
+  if (!credsRaw) {
     return null;
   }
 
   try {
-    const content = fs.readFileSync(config.googleCredentialsPath, 'utf8');
-    const credentials = JSON.parse(content);
-    const { client_secret, client_id, redirect_uris } = credentials.installed || credentials.web;
+    const credentials = JSON.parse(credsRaw);
+    const { client_secret, client_id, redirect_uris } = credentials.installed || credentials.web || credentials;
+
+    if (!client_id || !client_secret) return null;
 
     oauth2Client = new google.auth.OAuth2(
       client_id,
@@ -22,16 +93,35 @@ function getOAuthClient() {
       (redirect_uris && redirect_uris[0]) || 'http://localhost:3000/oauth2callback'
     );
 
-    if (fs.existsSync(config.googleTokenPath)) {
-      const token = JSON.parse(fs.readFileSync(config.googleTokenPath, 'utf8'));
+    const tokenRaw = resolveTokenContent();
+    if (tokenRaw) {
+      const token = JSON.parse(tokenRaw);
       oauth2Client.setCredentials(token);
+
+      // Cache token to disk if possible
+      try {
+        if (!fs.existsSync(config.googleTokenPath)) fs.writeFileSync(config.googleTokenPath, tokenRaw, 'utf8');
+        if (!fs.existsSync(persistentTokenPath)) fs.writeFileSync(persistentTokenPath, tokenRaw, 'utf8');
+      } catch (e) {}
 
       // Handle automatic token refresh
       oauth2Client.on('tokens', (tokens) => {
         try {
-          const currentToken = JSON.parse(fs.readFileSync(config.googleTokenPath, 'utf8'));
+          let currentToken = {};
+          try {
+            currentToken = JSON.parse(resolveTokenContent() || '{}');
+          } catch (e) {}
           const updatedToken = { ...currentToken, ...tokens };
-          fs.writeFileSync(config.googleTokenPath, JSON.stringify(updatedToken, null, 2));
+          const updatedStr = JSON.stringify(updatedToken, null, 2);
+
+          try { fs.writeFileSync(config.googleTokenPath, updatedStr, 'utf8'); } catch (e) {}
+          try { fs.writeFileSync(persistentTokenPath, updatedStr, 'utf8'); } catch (e) {}
+
+          // Also persist in DB
+          try {
+            const db = require('../database/db');
+            db.prepare(`UPDATE users SET google_token = ? WHERE role = 'ADMIN' OR id = 1`).run(updatedStr);
+          } catch (e) {}
         } catch (err) {
           console.error('Erro ao atualizar token:', err);
         }
@@ -47,7 +137,36 @@ function getOAuthClient() {
 
 function isCalendarConnected() {
   const client = getOAuthClient();
-  return !!(client && fs.existsSync(config.googleTokenPath));
+  if (!client || !client.credentials) return false;
+  return !!(client.credentials.access_token || client.credentials.refresh_token);
+}
+
+function reloadCredentials() {
+  oauth2Client = null;
+  return getOAuthClient();
+}
+
+function saveCredentialsAndToken({ credentials, token }) {
+  if (credentials) {
+    const credsStr = typeof credentials === 'string' ? credentials : JSON.stringify(credentials, null, 2);
+    JSON.parse(credsStr); // validate syntax
+    try { fs.writeFileSync(config.googleCredentialsPath, credsStr, 'utf8'); } catch (e) {}
+    try { fs.writeFileSync(persistentCredentialsPath, credsStr, 'utf8'); } catch (e) {}
+  }
+
+  if (token) {
+    const tokenStr = typeof token === 'string' ? token : JSON.stringify(token, null, 2);
+    JSON.parse(tokenStr); // validate syntax
+    try { fs.writeFileSync(config.googleTokenPath, tokenStr, 'utf8'); } catch (e) {}
+    try { fs.writeFileSync(persistentTokenPath, tokenStr, 'utf8'); } catch (e) {}
+
+    try {
+      const db = require('../database/db');
+      db.prepare(`UPDATE users SET google_token = ? WHERE role = 'ADMIN' OR id = 1`).run(tokenStr);
+    } catch (e) {}
+  }
+
+  return isCalendarConnected();
 }
 
 /**
@@ -55,8 +174,8 @@ function isCalendarConnected() {
  */
 async function createCalendarEvent({ summary, description, startDateTime, endDateTime, location }) {
   const auth = getOAuthClient();
-  if (!auth || !fs.existsSync(config.googleTokenPath)) {
-    throw new Error('Google Calendar não está autenticado. Execute o script de login ou configure as credenciais.');
+  if (!auth || !isCalendarConnected()) {
+    throw new Error('Google Calendar não está autenticado. Configure as credenciais no painel ou variáveis.');
   }
 
   const calendar = google.calendar({ version: 'v3', auth });
@@ -95,7 +214,7 @@ async function createCalendarEvent({ summary, description, startDateTime, endDat
  */
 async function listUpcomingEvents({ maxResults = 10, timeMin = new Date().toISOString(), timeMax = null }) {
   const auth = getOAuthClient();
-  if (!auth || !fs.existsSync(config.googleTokenPath)) {
+  if (!auth || !isCalendarConnected()) {
     return [];
   }
 
@@ -168,7 +287,7 @@ async function findEventToModify(targetSummary) {
  */
 async function updateCalendarEvent(eventId, { summary, description, startDateTime, endDateTime, location }) {
   const auth = getOAuthClient();
-  if (!auth || !fs.existsSync(config.googleTokenPath)) {
+  if (!auth || !isCalendarConnected()) {
     throw new Error('Google Calendar não está autenticado.');
   }
 
@@ -209,7 +328,7 @@ async function updateCalendarEvent(eventId, { summary, description, startDateTim
  */
 async function deleteCalendarEvent(eventId) {
   const auth = getOAuthClient();
-  if (!auth || !fs.existsSync(config.googleTokenPath)) {
+  if (!auth || !isCalendarConnected()) {
     throw new Error('Google Calendar não está autenticado.');
   }
 
@@ -226,6 +345,8 @@ async function deleteCalendarEvent(eventId) {
 module.exports = {
   getOAuthClient,
   isCalendarConnected,
+  reloadCredentials,
+  saveCredentialsAndToken,
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,

@@ -150,11 +150,13 @@ function ensureColumnExists(tableName, columnName, columnDef) {
 ensureColumnExists('expenses', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumnExists('scheduled_payments', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumnExists('reminder_logs', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
+ensureColumnExists('appointments', 'google_event_id', 'TEXT');
 
 try {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_expenses_user ON expenses(user_id);
     CREATE INDEX IF NOT EXISTS idx_payments_user ON scheduled_payments(user_id);
+    CREATE INDEX IF NOT EXISTS idx_appointments_google_id ON appointments(google_event_id);
   `);
 } catch (e) {}
 
@@ -162,20 +164,39 @@ try {
 try {
   const masterPhone = '5511951364159';
   const existingUser = db.prepare('SELECT id FROM users WHERE phone_number = ?').get(masterPhone);
-  if (!existingUser) {
-    // Read google_token if available
-    let googleTokenStr = null;
-    if (fs.existsSync(config.googleTokenPath)) {
-      try {
-        googleTokenStr = fs.readFileSync(config.googleTokenPath, 'utf8');
-      } catch (e) {}
-    }
 
+  // Read google_token if available
+  let googleTokenStr = null;
+  if (fs.existsSync(config.googleTokenPath)) {
+    try {
+      googleTokenStr = fs.readFileSync(config.googleTokenPath, 'utf8');
+    } catch (e) {}
+  }
+
+  if (!existingUser) {
     db.prepare(`
       INSERT INTO users (phone_number, name, role, plan, google_token)
       VALUES (?, ?, 'ADMIN', 'PRO', ?)
     `).run(masterPhone, 'Administrador', googleTokenStr);
     console.log(`[Database] Usuário Master (${masterPhone}) configurado como ADMIN/PRO.`);
+  } else {
+    // Ensure role and plan are ADMIN and PRO
+    db.prepare(`
+      UPDATE users SET role = 'ADMIN', plan = 'PRO'
+      ${googleTokenStr ? ', google_token = ?' : ''}
+      WHERE id = ?
+    `).run(...(googleTokenStr ? [googleTokenStr, existingUser.id] : [existingUser.id]));
+  }
+
+  // Also ensure User #1 has role = 'ADMIN'
+  db.prepare(`UPDATE users SET role = 'ADMIN', plan = 'PRO' WHERE id = 1`).run();
+
+  // If authorizedPhone is configured in env, make sure it is also ADMIN
+  if (config.authorizedPhone) {
+    const phones = config.authorizedPhone.split(',').map(p => p.trim().replace(/\D/g, '')).filter(Boolean);
+    for (const p of phones) {
+      db.prepare(`UPDATE users SET role = 'ADMIN', plan = 'PRO' WHERE phone_number LIKE ?`).run(`%${p.slice(-8)}`);
+    }
   }
 } catch (err) {
   console.error('[Database] Erro ao verificar/criar usuário master:', err.message);
