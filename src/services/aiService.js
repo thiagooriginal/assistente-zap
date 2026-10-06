@@ -13,6 +13,13 @@ function getGenAI() {
   return genAI;
 }
 
+function setApiKey(newKey) {
+  if (newKey) {
+    config.geminiApiKey = newKey.trim();
+    genAI = new GoogleGenerativeAI(config.geminiApiKey);
+  }
+}
+
 function getSystemInstruction(userContext = {}) {
   const now = new Date();
   const nowBR = now.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
@@ -423,6 +430,7 @@ Preencha a descrição resumida no campo "transcription".`;
 
 
 module.exports = {
+  setApiKey,
   processTextMessage,
   processAudioMessage,
   processImageMessage,
