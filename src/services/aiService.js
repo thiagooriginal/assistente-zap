@@ -153,15 +153,18 @@ As intenções possíveis são:
      * newEndDateTime: nova data e hora ISO de término se informada.
      * newLocation: novo local se informado.
 
-5. "CALENDAR_DELETE": O usuário quer cancelar, desmarcar, apagar ou excluir um compromisso da agenda do Google Calendar.
-   Exemplos: "cancela o dentista", "desmarcar o compromisso de amanhã", "apaga a reunião com Gabriel da agenda".
+5. "CALENDAR_DELETE": O usuário quer cancelar, desmarcar, apagar ou excluir um compromisso da agenda ou Google Calendar.
+   Exemplos: "cancela o dentista", "desmarcar o compromisso de amanhã", "apaga a reunião com Gabriel da agenda", "cancelar esse compromisso", "desmarcar esse compromisso", "desmarca o compromisso", "cancela a consulta no pediatra", "cancela ele".
+   - Se o usuário estiver respondendo/citando uma mensagem de compromisso agendado (ex: "Compromisso Agendado com Sucesso! Título: Consulta no pediatra"), extraia o título no targetSummary!
+   - Se disser "cancelar esse compromisso" ou "desmarcar compromisso", defina targetSummary com o nome do compromisso se citado, ou o título da mensagem citada.
+   - NUNCA confunda "cancelar compromisso", "desmarcar consulta", "desmarcar dentista" com EXPENSE_DELETE! Compromissos são SEMPRE CALENDAR_DELETE!
    - Extraia no campo "calendarDelete":
-     * targetSummary: nome ou palavra-chave do compromisso a cancelar (ex: "Dentista", "Reunião").
+     * targetSummary: nome ou palavra-chave do compromisso a cancelar (ex: "Consulta no pediatra", "Dentista", "Reunião").
 
 6. "CALENDAR_QUERY": O usuário quer ver seus compromissos.
    Exemplos: "quais meus compromissos de hoje?", "tenho algo amanhã?", "minha agenda da semana".
 
-7. "EXPENSE_DELETE": O usuário quer apagar, remover, excluir, cancelar ou tirar um gasto ou registro do histórico (seja o último gasto ou um gasto específico por nome, palavra-chave ou valor).
+7. "EXPENSE_DELETE": O usuário quer apagar, remover, excluir, cancelar ou tirar um GASTO ou DESPESA do histórico (seja o último gasto ou um gasto específico por nome, palavra-chave ou valor).
    Exemplos:
    - "Tira os 6 do gato" -> intent: "EXPENSE_DELETE", expenseDelete: { "target": "specific", "amount": 6, "description": "gato" }
    - "Tira o café de 4 reais" -> intent: "EXPENSE_DELETE", expenseDelete: { "target": "specific", "amount": 4, "description": "café" }
@@ -170,7 +173,9 @@ As intenções possíveis são:
    - "Tira o sachê de gato" -> intent: "EXPENSE_DELETE", expenseDelete: { "target": "specific", "amount": null, "description": "sachê de gato" }
    - "Apagar último gasto" / "cancela o último registro" / "apaga o anterior" -> intent: "EXPENSE_DELETE", expenseDelete: { "target": "last", "amount": null, "description": null }
    - "Cancela o gasto de 50 reais" -> intent: "EXPENSE_DELETE", expenseDelete: { "target": "specific", "amount": 50, "description": null }
-   - ATENÇÃO MÁXIMA: NUNCA confunda pedidos de "tira", "apaga", "remove", "exclui" ou "cancela" com GENERAL_CHAT! Mesmo que mencione "gato", "remédio", "cerveja", "pizza", "uber", o usuário está solicitando a exclusão de uma DESPESA registrada com esse nome ou valor!
+   - ATENÇÃO MÁXIMA: NUNCA use EXPENSE_DELETE se o usuário falar de compromisso, consulta, dentista, médico, pediatra, reunião, evento, agenda! Isso é SEMPRE CALENDAR_DELETE!
+   - NUNCA use EXPENSE_DELETE se o usuário falar de receita, entrada, recebimento, salário ou pix recebido! Isso é INCOME_DELETE!
+   - NUNCA confunda pedidos de "tira", "apaga", "remove", "exclui" ou "cancela" com GENERAL_CHAT! Mesmo que mencione "gato", "remédio", "cerveja", "pizza", "uber", o usuário está solicitando a exclusão de uma DESPESA registrada com esse nome ou valor!
 
 8. "EXPENSE_UPDATE": O usuário quer alterar, corrigir, editar ou ajustar o valor, a categoria, a descrição ou a FORMA DE PAGAMENTO de um gasto/despesa já registrado anteriormente (seja o último gasto ou um gasto específico).
    Exemplos:

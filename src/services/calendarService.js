@@ -257,12 +257,14 @@ async function findEventToModify(targetSummary) {
   const upcoming = await listUpcomingEvents({ maxResults: 30 });
   if (!upcoming || upcoming.length === 0) return null;
 
-  if (!targetSummary) {
+  const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  const genericTerms = ['esse', 'este', 'esse compromisso', 'este compromisso', 'o compromisso', 'meu compromisso', 'o ultimo', 'ultimo', 'recente', 'agendamento'];
+
+  if (!targetSummary || genericTerms.includes(norm(targetSummary))) {
     // Return the nearest upcoming event
     return upcoming[0];
   }
 
-  const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const cleanTarget = norm(targetSummary);
 
   // 1. Exact or partial match on normalized summary

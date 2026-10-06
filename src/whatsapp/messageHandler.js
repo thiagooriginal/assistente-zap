@@ -48,9 +48,102 @@ function isAdminInviteRequest(text) {
   return false;
 }
 
+function parseCalendarDelete(text, quotedText = null) {
+  if (!text) return null;
+  const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  const cancelVerbs = '(?:cancela|cancelar|cancele|desmarca|desmarcar|desmarque|apaga|apagar|apague|remove|remover|remova|exclui|excluir|exclua|deleta|deletar|tira|tirar|tire)';
+
+  // Pattern A: Quoting an appointment confirmation or calendar message
+  if (quotedText && (/compromisso agendado/i.test(quotedText) || /t[ií]tulo:/i.test(quotedText) || /agenda/i.test(quotedText))) {
+    const isCancelWord = new RegExp(`^${cancelVerbs}`, 'i').test(norm) ||
+                         norm.includes('cancelar') || norm.includes('desmarcar') || norm.includes('nao vai dar') || norm.includes('apagar');
+    if (isCancelWord) {
+      const titleMatch = quotedText.match(/t[ií]tulo:\s*([^\n\r]+)/i);
+      const title = titleMatch ? titleMatch[1].trim() : null;
+      return { targetSummary: title };
+    }
+  }
+
+  // Pattern B: Generic cancellation terms ("cancelar esse compromisso", "desmarca o agendamento", "cancela ele")
+  const mGeneric = norm.match(new RegExp(`^${cancelVerbs}\\s+(?:o|a|os|as|esse|este|meu|minha)?\\s*(?:esse compromisso|este compromisso|o compromisso|meu compromisso|compromisso|agendamento|evento|lembrete|esse|este|ele)$`, 'i'));
+  if (mGeneric) {
+    return { targetSummary: null };
+  }
+
+  // Pattern C: Specific appointment mentions (e.g. "cancelar o dentista", "desmarcar consulta no pediatra", "apagar reuniao com cliente")
+  const mSpecific = norm.match(new RegExp(`^${cancelVerbs}\\s+(?:o|a|os|as|meu|minha)?\\s*(.+)$`, 'i'));
+  if (mSpecific) {
+    const rest = mSpecific[1].trim();
+    const calKeywords = ['consulta', 'dentista', 'medico', 'médico', 'pediatra', 'reuniao', 'reunião', 'compromisso', 'agenda', 'visita', 'aula', 'sessao', 'sessão'];
+    const isDesmarcar = /^(?:desmarca|desmarcar|desmarque)/i.test(norm);
+    if (isDesmarcar || calKeywords.some(k => rest.includes(k))) {
+      return { targetSummary: rest };
+    }
+  }
+
+  return null;
+}
+
+async function handleCalendarDelete(calendarDeleteReq, user, sock, targetJid) {
+  try {
+    const searchTerm = calendarDeleteReq?.targetSummary || null;
+    const targetApt = appointmentService.findAppointmentToModify(user.id, searchTerm);
+
+    if (targetApt) {
+      appointmentService.deleteAppointment(targetApt.id, user.id);
+    }
+
+    // If User 1 (Admin/Owner) and Google Calendar is connected, also delete in Google Calendar
+    const isAdminUser = userService.isUserAdmin ? userService.isUserAdmin(user) : (user.role === 'ADMIN' || user.id === 1);
+    if (isAdminUser && calendarService.isCalendarConnected()) {
+      try {
+        const searchForGoogle = (targetApt && targetApt.title) ? targetApt.title : searchTerm;
+        const targetEvent = await calendarService.findEventToModify(searchForGoogle);
+        if (targetEvent) {
+          await calendarService.deleteCalendarEvent(targetEvent.id);
+        }
+      } catch (calErr) {
+        console.warn('Erro ao deletar no Google Calendar do Admin:', calErr.message);
+      }
+    }
+
+    if (!targetApt && (!calendarService.isCalendarConnected() || !isAdminUser)) {
+      await sock.sendMessage(targetJid, {
+        text: `🤔 Não encontrei nenhum compromisso agendado para cancelar${searchTerm ? ` com o termo "${searchTerm}"` : ''}.\n\nVocê pode consultar seus compromissos dizendo *"Quais meus compromissos?"*.`,
+      });
+      return;
+    }
+
+    const titleRemoved = targetApt ? targetApt.title : (searchTerm || 'Compromisso');
+    await sock.sendMessage(targetJid, {
+      text: `🗑️ *Compromisso Desmarcado com Sucesso!*\n\n` +
+            `Removi dos seus lembretes e da sua agenda:\n` +
+            `📌 *${titleRemoved}*\n\n` +
+            `_Você não receberá mais avisos antes desse horário._`,
+    });
+  } catch (err) {
+    console.error('Erro ao desmarcar compromisso:', err);
+    await sock.sendMessage(targetJid, {
+      text: `❌ Não consegui desmarcar o compromisso: ${err.message}`,
+    });
+  }
+}
+
 function parseExpenseDelete(text) {
   if (!text) return null;
   const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  // Guard: NEVER delete expense if the message mentions calendar/appointments, incomes, or bills!
+  const nonExpenseWords = [
+    'compromisso', 'consulta', 'reuniao', 'reunião', 'dentista', 'medico', 'médico',
+    'pediatra', 'agenda', 'evento', 'lembrete', 'agendamento', 'marcado', 'marcada',
+    'entrada', 'receita', 'recebimento', 'pix recebido', 'salario', 'salário',
+    'boleto', 'conta', 'parcela', 'fatura'
+  ];
+  if (nonExpenseWords.some(w => norm.includes(w))) {
+    return null;
+  }
 
   // Pattern A: apagar último gasto, cancela o último, tira o anterior
   if (/^(apaga|apagar|apague|cancela|cancelar|cancele|tira|tirar|tire|remove|remover|remova|exclui|excluir|exclua|deleta|deletar)\s+(o\s+)?(ultimo|anterior|recente)\s*(gasto|registro|despesa)?$/i.test(norm)) {
@@ -86,7 +179,7 @@ function parseExpenseDelete(text) {
   const m4 = norm.match(new RegExp('^' + deleteVerbs + '\\s+(?:o|os|a|as|do|da)?\\s*(?:gasto|despesa)?\\s*(?:d[oe]s?|da|de)?\\s*(.+)$', 'i'));
   if (m4) {
     const desc = m4[1].trim();
-    if (desc && desc.length >= 2 && !['isso', 'tudo', 'aqui'].includes(desc)) {
+    if (desc && desc.length >= 2 && !['isso', 'tudo', 'aqui', 'esse', 'este', 'essa', 'esta', 'ele', 'ela', 'dele', 'dela', 'esse compromisso', 'este compromisso'].includes(desc)) {
       return { target: 'specific', amount: null, description: desc };
     }
   }
@@ -97,6 +190,16 @@ function parseExpenseDelete(text) {
 function parseIncomeDelete(text) {
   if (!text) return null;
   const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  // Guard: NEVER delete income if the message mentions calendar or expense words!
+  const nonIncomeWords = [
+    'compromisso', 'consulta', 'reuniao', 'reunião', 'dentista', 'medico', 'médico',
+    'pediatra', 'agenda', 'evento', 'lembrete', 'agendamento', 'marcado', 'marcada',
+    'gasto', 'despesa', 'boleto', 'conta', 'parcela'
+  ];
+  if (nonIncomeWords.some(w => norm.includes(w))) {
+    return null;
+  }
 
   // Pattern A: apagar última entrada / receita / recebimento
   if (/^(apaga|apagar|apague|cancela|cancelar|cancele|tira|tirar|tire|remove|remover|remova|exclui|excluir|exclua|deleta|deletar)\s+(a|o\s+)?(ultima|ultimo|anterior|recente)\s*(entrada|receita|recebimento|pix recebido)?$/i.test(norm)) {
@@ -930,6 +1033,15 @@ async function handleIncomingMessage(sock, msg) {
           }
         }
       }
+    }
+  }
+
+  // Fast Deterministic Calendar Delete Trigger: "cancelar esse compromisso", "desmarca o dentista", quoting an appointment
+  if (text) {
+    const calendarDeleteReq = parseCalendarDelete(text, quotedText);
+    if (calendarDeleteReq) {
+      await handleCalendarDelete(calendarDeleteReq, user, sock, targetJid);
+      return;
     }
   }
 
@@ -1808,43 +1920,8 @@ async function handleIncomingMessage(sock, msg) {
     }
 
     // 6. CANCELAR/DESMARCAR COMPROMISSO
-    if (intent === 'CALENDAR_DELETE' && calendarDelete) {
-      try {
-        const targetApt = appointmentService.findAppointmentToModify(user.id, calendarDelete.targetSummary);
-
-        if (targetApt) {
-          appointmentService.deleteAppointment(targetApt.id, user.id);
-        }
-
-        // If User 1 (Admin/Owner) and Google Calendar is connected, also delete in Google Calendar
-        const isAdminUser = userService.isUserAdmin ? userService.isUserAdmin(user) : (user.role === 'ADMIN' || user.id === 1);
-        if (isAdminUser && calendarService.isCalendarConnected()) {
-          try {
-            const targetEvent = await calendarService.findEventToModify(calendarDelete.targetSummary);
-            if (targetEvent) {
-              await calendarService.deleteCalendarEvent(targetEvent.id);
-            }
-          } catch (calErr) {
-            console.warn('Erro ao deletar no Google Calendar do Admin:', calErr.message);
-          }
-        }
-
-        if (!targetApt && (!calendarService.isCalendarConnected() || !isAdminUser)) {
-          await sock.sendMessage(targetJid, {
-            text: `🤔 Não encontrei nenhum compromisso agendado para cancelar com o termo "${calendarDelete.targetSummary}".`,
-          });
-          return;
-        }
-
-        await sock.sendMessage(targetJid, {
-          text: `🗑️ *Compromisso Desmarcado!*\n\nRemovi dos seus lembretes e da sua agenda:\n📌 *${targetApt ? targetApt.title : calendarDelete.targetSummary}*`,
-        });
-      } catch (err) {
-        console.error('Erro ao desmarcar compromisso:', err);
-        await sock.sendMessage(targetJid, {
-          text: `❌ Não consegui desmarcar o compromisso: ${err.message}`,
-        });
-      }
+    if (intent === 'CALENDAR_DELETE') {
+      await handleCalendarDelete(calendarDelete || (text ? parseCalendarDelete(text, quotedText) : null) || {}, user, sock, targetJid);
       return;
     }
 

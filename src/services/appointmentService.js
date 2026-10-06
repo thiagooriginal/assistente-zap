@@ -93,24 +93,28 @@ function getUpcomingAppointments(userId = 1, limit = 10) {
  * Find an upcoming appointment to modify or cancel
  */
 function findAppointmentToModify(userId = 1, searchTerm) {
-  const upcoming = getUpcomingAppointments(userId, 20);
-  if (upcoming.length === 0) return null;
+  let list = getUpcomingAppointments(userId, 20);
+  if (list.length === 0) {
+    list = getAppointments({ userId, status: 'SCHEDULED', limit: 20 });
+  }
+  if (list.length === 0) return null;
 
-  if (!searchTerm || !searchTerm.trim()) {
-    return upcoming[0];
+  const genericTerms = ['esse', 'este', 'esse compromisso', 'este compromisso', 'o compromisso', 'meu compromisso', 'o ultimo', 'ultimo', 'recente', 'agendamento'];
+  if (!searchTerm || !searchTerm.trim() || genericTerms.includes(norm(searchTerm))) {
+    return list[0];
   }
 
   const cleanSearch = norm(searchTerm);
 
   // 1. Direct includes
-  const direct = upcoming.find(
+  const direct = list.find(
     (ev) => norm(ev.title).includes(cleanSearch) || cleanSearch.includes(norm(ev.title))
   );
   if (direct) return direct;
 
   // 2. Word by word match
   const searchWords = cleanSearch.split(/\s+/).filter((w) => w.length > 2);
-  for (const ev of upcoming) {
+  for (const ev of list) {
     const evNorm = norm(ev.title);
     if (searchWords.some((w) => evNorm.includes(w))) {
       return ev;
@@ -118,7 +122,7 @@ function findAppointmentToModify(userId = 1, searchTerm) {
   }
 
   // 3. Fallback to earliest upcoming
-  return upcoming[0];
+  return list[0];
 }
 
 /**
