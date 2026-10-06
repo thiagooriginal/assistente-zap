@@ -137,17 +137,22 @@ As intenções possíveis são:
      * endDateTime: data e hora de término (se não especificado, 1 hora após o início).
      * location: local se citado.
 
-4. "CALENDAR_UPDATE": O usuário quer alterar, remarcar, adiar, adiantar ou mudar o horário/data/título/local de um compromisso na agenda do Google Calendar.
-   Exemplos:
-   - "muda o horário do compromisso para as 16h"
+4. "CALENDAR_UPDATE": O usuário quer alterar, remarcar, adiar, adiantar ou mudar a DATA, HORÁRIO, TÍTULO ou LOCAL de um compromisso na agenda / Google Calendar.
+   Exemplos de troca de DATA e/ou HORÁRIO:
+   - "muda a data do compromisso para amanhã"
+   - "remarca o dentista para sexta"
+   - "muda para o dia 15"
+   - "troca a data da reunião para segunda às 10h"
+   - "adia a consulta para semana que vem"
+   - "passa o compromisso para sexta às 16h"
+   - "muda o horário para as 16h"
    - "altera o dentista para as 16:30"
-   - "remarca a reunião para sexta às 10h"
-   - "adia a visita para as 19h"
    - "troca o título do compromisso para Dentista Dr. Pedro"
    - "muda o compromisso de amanhã para as 17h"
-   - "troca para as 16 horas"
+   - Se o usuário estiver respondendo/citando uma mensagem de compromisso agendado (ex: "📌 Título: Consulta no pediatra"), extraia esse título no targetSummary!
+   - Se o usuário citar "esse compromisso" ou "o compromisso" sem especificar nome, targetSummary pode ser null ou o título da mensagem citada.
    - Extraia no campo "calendarUpdate":
-     * targetSummary: nome ou palavra-chave do compromisso a alterar (ex: "Dentista", "Reunião", "Visita", ou null se referir ao último agendado).
+     * targetSummary: nome ou palavra-chave do compromisso a alterar (ex: "Dentista", "Reunião", "Consulta no pediatra", ou null se for o próximo/último).
      * newSummary: novo título se alterado.
      * newStartDateTime: nova data e hora ISO (YYYY-MM-DDTHH:mm:ss) se alterada (calcule com base na data atual/referenciada).
      * newEndDateTime: nova data e hora ISO de término se informada.

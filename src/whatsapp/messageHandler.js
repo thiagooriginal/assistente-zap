@@ -1841,20 +1841,42 @@ async function handleIncomingMessage(sock, msg) {
     // 5. ALTERAR/REMARCAR COMPROMISSO
     if (intent === 'CALENDAR_UPDATE' && calendarUpdate) {
       try {
-        const targetApt = appointmentService.findAppointmentToModify(user.id, calendarUpdate.targetSummary);
+        let targetSummary = calendarUpdate.targetSummary;
+        if (!targetSummary && quotedText && (/compromisso agendado/i.test(quotedText) || /t[ií]tulo:/i.test(quotedText) || /agenda/i.test(quotedText))) {
+          const titleMatch = quotedText.match(/t[ií]tulo:\s*([^\n\r]+)/i);
+          if (titleMatch) targetSummary = titleMatch[1].trim();
+        }
+
+        const targetApt = appointmentService.findAppointmentToModify(user.id, targetSummary);
 
         let finalStartDateTime = calendarUpdate.newStartDateTime;
         let finalEndDateTime = calendarUpdate.newEndDateTime;
 
+        const rawInput = (text || transcription || caption || '').toLowerCase();
+
         if (finalStartDateTime && targetApt?.start_datetime) {
           const origDate = targetApt.start_datetime.slice(0, 10);
+          const origTime = targetApt.start_datetime.slice(11);
           const aiDatePart = finalStartDateTime.slice(0, 10);
-          const todayStr = new Date().toISOString().slice(0, 10);
+          const aiTimePart = finalStartDateTime.slice(11);
 
-          if (aiDatePart === todayStr && origDate !== todayStr && !transcription?.toLowerCase().includes('hoje')) {
-            finalStartDateTime = `${origDate}T${finalStartDateTime.slice(11)}`;
+          const mentionsNewDate = /(?:amanha|amanhã|hoje|segunda|terca|terça|quarta|quinta|sexta|sabado|sábado|domingo|dia \d+|\d{1,2}\/\d{1,2})/i.test(rawInput);
+          const mentionsNewTime = /(?:às|\bas\b|\bhs\b|\bhoras?\b|\b\d{1,2}:\d{2}\b|\b\d{1,2}h\b)/i.test(rawInput);
+
+          // If user changed ONLY the time (didn't specify any new date), preserve the original appointment date
+          if (!mentionsNewDate && origDate !== aiDatePart) {
+            finalStartDateTime = `${origDate}T${aiTimePart}`;
             if (finalEndDateTime) {
               finalEndDateTime = `${origDate}T${finalEndDateTime.slice(11)}`;
+            }
+          }
+
+          // If user changed ONLY the date (didn't specify any new time), preserve the original appointment time
+          if (mentionsNewDate && !mentionsNewTime) {
+            finalStartDateTime = `${aiDatePart}T${origTime}`;
+            if (finalEndDateTime && targetApt.end_datetime) {
+              const origEndTime = targetApt.end_datetime.slice(11);
+              finalEndDateTime = `${aiDatePart}T${origEndTime}`;
             }
           }
         }
@@ -1877,7 +1899,8 @@ async function handleIncomingMessage(sock, msg) {
         const isAdminUser = userService.isUserAdmin ? userService.isUserAdmin(user) : (user.role === 'ADMIN' || user.id === 1);
         if (isAdminUser && calendarService.isCalendarConnected()) {
           try {
-            const targetEvent = await calendarService.findEventToModify(calendarUpdate.targetSummary);
+            const searchForGoogle = (targetApt && targetApt.title) ? targetApt.title : targetSummary;
+            const targetEvent = await calendarService.findEventToModify(searchForGoogle);
             if (targetEvent) {
               await calendarService.updateCalendarEvent(targetEvent.id, {
                 summary: calendarUpdate.newSummary,
