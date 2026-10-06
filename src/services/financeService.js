@@ -56,6 +56,42 @@ function normalizeCategory(category) {
 }
 
 /**
+ * Standardize and capitalize income category names
+ */
+function normalizeIncomeCategory(category) {
+  if (!category) return 'Outros';
+  const clean = category.trim().toLowerCase();
+
+  if (clean.includes('salari') || clean.includes('salário') || clean.includes('holerite') || clean.includes('pro labore') || clean.includes('pró-labore') || clean.includes('empresa') || clean.includes('ordenado') || clean.includes('adiantamento')) {
+    return 'Salário';
+  }
+  if (clean.includes('servic') || clean.includes('serviço') || clean.includes('freela') || clean.includes('cliente') || clean.includes('consultor') || clean.includes('projeto') || clean.includes('honorari')) {
+    return 'Serviços';
+  }
+  if (clean.includes('venda') || clean.includes('produto') || clean.includes('loja') || clean.includes('comercio') || clean.includes('comércio')) {
+    return 'Vendas';
+  }
+  if (clean.includes('comiss') || clean.includes('comissão')) {
+    return 'Comissão';
+  }
+  if (clean.includes('rendimento') || clean.includes('dividendo') || clean.includes('invest') || clean.includes('juro') || clean.includes('cdi') || clean.includes('poupanca') || clean.includes('poupança')) {
+    return 'Rendimentos';
+  }
+  if (clean.includes('aluguel') || clean.includes('locacao') || clean.includes('locação')) {
+    return 'Aluguel';
+  }
+  if (clean.includes('reembolso') || clean.includes('devoluc') || clean.includes('devolução') || clean.includes('estorno')) {
+    return 'Reembolso';
+  }
+  if (clean.includes('pix') || clean.includes('transfer')) {
+    return 'Pix Recebido';
+  }
+
+  // Capitalize first letter
+  return category.charAt(0).toUpperCase() + category.slice(1);
+}
+
+/**
  * Add a new expense
  */
 function addExpense({ userId = 1, amount, category, description, paymentMethod, date, sourceType = 'text' }) {
@@ -307,6 +343,293 @@ function updateExpense({ userId = 1, targetId, searchTerm, oldAmount, newAmount,
   };
 }
 
+/**
+ * Add a new income
+ */
+function addIncome({ userId = 1, amount, source, category, paymentMethod = 'Pix', date, sourceType = 'text' }) {
+  const normCategory = normalizeIncomeCategory(category || source);
+  const incomeDate = date || new Date().toISOString();
+  const incomeSource = (source && source.trim()) ? source.trim() : (category || 'Receita');
+
+  const stmt = db.prepare(`
+    INSERT INTO incomes (user_id, amount, source, category, payment_method, date, source_type)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const result = stmt.run(
+    userId,
+    Number(amount),
+    incomeSource,
+    normCategory,
+    paymentMethod || 'Pix',
+    incomeDate,
+    sourceType
+  );
+
+  return {
+    id: result.lastInsertRowid,
+    userId,
+    amount: Number(amount),
+    source: incomeSource,
+    category: normCategory,
+    paymentMethod: paymentMethod || 'Pix',
+    date: incomeDate,
+    sourceType,
+  };
+}
+
+/**
+ * Query incomes with flexible filters
+ */
+function queryIncomes({ userId = 1, category, startDate, endDate }) {
+  let query = 'SELECT * FROM incomes WHERE user_id = ?';
+  const params = [userId];
+
+  if (category) {
+    const norm = normalizeIncomeCategory(category);
+    query += ' AND (category LIKE ? OR source LIKE ?)';
+    params.push(`%${norm}%`, `%${category}%`);
+  }
+
+  if (startDate) {
+    query += ' AND date >= ?';
+    params.push(startDate);
+  }
+
+  if (endDate) {
+    query += ' AND date <= ?';
+    params.push(endDate);
+  }
+
+  query += ' ORDER BY date DESC, id DESC';
+  const stmt = db.prepare(query);
+  const rows = stmt.all(...params);
+
+  const total = rows.reduce((acc, row) => acc + Number(row.amount), 0);
+
+  return {
+    rows,
+    total,
+    count: rows.length,
+    formattedTotal: formatCurrency(total),
+  };
+}
+
+/**
+ * Query incomes by last N days
+ */
+function queryIncomesLastDays(category, days, userId = 1) {
+  const now = new Date();
+  const past = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  const startDate = past.toISOString();
+
+  return queryIncomes({
+    userId,
+    category,
+    startDate,
+  });
+}
+
+/**
+ * Get recent incomes
+ */
+function getRecentIncomes(limit = 5, userId = 1) {
+  const stmt = db.prepare(`
+    SELECT * FROM incomes WHERE user_id = ? ORDER BY date DESC, id DESC LIMIT ?
+  `);
+  const rows = stmt.all(userId, limit);
+  return rows;
+}
+
+/**
+ * Delete the latest income for a specific user
+ */
+function deleteLastIncome(userId = 1) {
+  const recent = db.prepare(`SELECT * FROM incomes WHERE user_id = ? ORDER BY id DESC LIMIT 1`).get(userId);
+  if (!recent) return null;
+
+  db.prepare(`DELETE FROM incomes WHERE id = ?`).run(recent.id);
+  return recent;
+}
+
+/**
+ * Delete an income by amount, source/keyword, or last registered
+ */
+function deleteIncome({ userId = 1, amount, source, target = 'specific' }) {
+  if (target === 'last' && !amount && !source) {
+    return deleteLastIncome(userId);
+  }
+
+  const numAmount = (amount !== null && amount !== undefined && !isNaN(Number(amount))) ? Number(amount) : null;
+  const cleanSource = source
+    ? source.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+    : null;
+
+  // Fetch recent 50 incomes for this user
+  const recent = db.prepare('SELECT * FROM incomes WHERE user_id = ? ORDER BY id DESC LIMIT 50').all(userId);
+  if (!recent || recent.length === 0) return null;
+
+  let candidate = null;
+
+  const getNormText = (inc) => {
+    const s = (inc.source || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const c = (inc.category || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    return `${s} ${c}`;
+  };
+
+  // 1. Both amount and source provided
+  if (numAmount !== null && cleanSource) {
+    candidate = recent.find((inc) => {
+      const matchAmt = Math.abs(Number(inc.amount) - numAmount) < 0.01;
+      const text = getNormText(inc);
+      const matchSrc = text.includes(cleanSource);
+      return matchAmt && matchSrc;
+    });
+  }
+
+  // 2. By source / keyword
+  if (!candidate && cleanSource) {
+    candidate = recent.find((inc) => {
+      const text = getNormText(inc);
+      return text.includes(cleanSource);
+    });
+  }
+
+  // 3. By amount
+  if (!candidate && numAmount !== null) {
+    candidate = recent.find((inc) => {
+      return Math.abs(Number(inc.amount) - numAmount) < 0.01;
+    });
+  }
+
+  // 4. Fallback to last income if target is 'last'
+  if (!candidate && target === 'last') {
+    candidate = recent[0];
+  }
+
+  if (candidate) {
+    db.prepare('DELETE FROM incomes WHERE id = ?').run(candidate.id);
+    return candidate;
+  }
+
+  return null;
+}
+
+/**
+ * Update an existing income
+ */
+function updateIncome({ userId = 1, targetId, searchTerm, oldAmount, newAmount, newCategory, newSource, newPaymentMethod }) {
+  let target = null;
+
+  if (targetId) {
+    target = db.prepare('SELECT * FROM incomes WHERE id = ? AND user_id = ?').get(targetId, userId);
+  }
+
+  const recent = db.prepare('SELECT * FROM incomes WHERE user_id = ? ORDER BY id DESC LIMIT 30').all(userId);
+  if (!recent || recent.length === 0) {
+    throw new Error('Nenhuma entrada encontrada no histórico para atualizar.');
+  }
+
+  if (!target && oldAmount !== undefined && oldAmount !== null) {
+    const numOld = Number(oldAmount);
+    target = recent.find(e => Math.abs(Number(e.amount) - numOld) < 0.01);
+  }
+
+  if (!target && searchTerm) {
+    const cleanSearch = searchTerm.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    target = recent.find(e => {
+      const src = (e.source || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const cat = (e.category || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      return src.includes(cleanSearch) || cat.includes(cleanSearch);
+    });
+  }
+
+  if (!target) {
+    target = recent[0];
+  }
+
+  const previous = { ...target };
+
+  const updatedAmount = (newAmount !== undefined && newAmount !== null) ? Number(newAmount) : target.amount;
+  const updatedCategory = newCategory ? normalizeIncomeCategory(newCategory) : target.category;
+  const updatedSource = newSource ? newSource.trim() : target.source;
+  const updatedPaymentMethod = newPaymentMethod || target.payment_method;
+
+  db.prepare(`
+    UPDATE incomes 
+    SET amount = ?, category = ?, source = ?, payment_method = ?
+    WHERE id = ?
+  `).run(updatedAmount, updatedCategory, updatedSource, updatedPaymentMethod, target.id);
+
+  const updated = db.prepare('SELECT * FROM incomes WHERE id = ?').get(target.id);
+
+  return {
+    previous,
+    updated,
+  };
+}
+
+/**
+ * Get monthly financial balance (Incomes vs Expenses)
+ */
+function getMonthlyBalance(yearMonth, userId = 1) {
+  const target = yearMonth || new Date().toISOString().slice(0, 7);
+
+  const incomeRow = db.prepare(`
+    SELECT SUM(amount) as total, COUNT(*) as count
+    FROM incomes
+    WHERE user_id = ? AND date LIKE ?
+  `).get(userId, `${target}%`);
+
+  const expenseRow = db.prepare(`
+    SELECT SUM(amount) as total, COUNT(*) as count
+    FROM expenses
+    WHERE user_id = ? AND date LIKE ?
+  `).get(userId, `${target}%`);
+
+  const totalIncomes = Number(incomeRow?.total || 0);
+  const countIncomes = Number(incomeRow?.count || 0);
+  const totalExpenses = Number(expenseRow?.total || 0);
+  const countExpenses = Number(expenseRow?.count || 0);
+  const balance = totalIncomes - totalExpenses;
+
+  return {
+    month: target,
+    totalIncomes,
+    countIncomes,
+    formattedIncomes: formatCurrency(totalIncomes),
+    totalExpenses,
+    countExpenses,
+    formattedExpenses: formatCurrency(totalExpenses),
+    balance,
+    formattedBalance: formatCurrency(balance),
+    isPositive: balance >= 0,
+  };
+}
+
+/**
+ * Get monthly income category breakdown
+ */
+function getMonthlyIncomesSummary(yearMonth, userId = 1) {
+  const target = yearMonth || new Date().toISOString().slice(0, 7);
+
+  const stmt = db.prepare(`
+    SELECT category, SUM(amount) as total, COUNT(*) as count
+    FROM incomes
+    WHERE user_id = ? AND date LIKE ?
+    GROUP BY category
+    ORDER BY total DESC
+  `);
+  const rows = stmt.all(userId, `${target}%`);
+  const total = rows.reduce((acc, row) => acc + Number(row.total), 0);
+
+  return {
+    month: target,
+    categories: rows,
+    total,
+  };
+}
+
 module.exports = {
   addExpense,
   queryExpenses,
@@ -316,7 +639,17 @@ module.exports = {
   deleteExpense,
   updateExpense,
   getMonthlySummary,
+  addIncome,
+  queryIncomes,
+  queryIncomesLastDays,
+  getRecentIncomes,
+  deleteLastIncome,
+  deleteIncome,
+  updateIncome,
+  getMonthlyBalance,
+  getMonthlyIncomesSummary,
   formatCurrency,
   formatDateBR,
   normalizeCategory,
+  normalizeIncomeCategory,
 };

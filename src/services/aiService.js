@@ -65,6 +65,59 @@ As intenções possíveis são:
      * startDate: data inicial em formato ISO (calcule com base na data atual).
      * endDate: data final em formato ISO (geralmente ${isoNow}).
 
+3. "INCOME_REGISTER": O usuário está registrando uma ENTRADA de dinheiro, receita, recebimento, salário, pagamento recebido de cliente, venda, comissão, rendimento, Pix recebido ou valor que entrou na conta.
+   ATENÇÃO MÁXIMA: Distinga de gasto! Se a mensagem diz "recebi", "entrou", "caiu", "ganhei", "vendi", "comissão", "salário", trata-se de ENTRADA ("INCOME_REGISTER"), NUNCA de saída!
+   Exemplos:
+   - "Recebi 500 do cliente" -> intent: "INCOME_REGISTER", income: { "amount": 500, "source": "Cliente", "category": "Serviços", "paymentMethod": "Pix", "date": "${isoNow}" }
+   - "Caiu meu salário de 3500" -> intent: "INCOME_REGISTER", income: { "amount": 3500, "source": "Salário da empresa", "category": "Salário", "paymentMethod": "Transferência", "date": "${isoNow}" }
+   - "Entrou um Pix de 120 da Flávia" -> intent: "INCOME_REGISTER", income: { "amount": 120, "source": "Flávia", "category": "Pix Recebido", "paymentMethod": "Pix", "date": "${isoNow}" }
+   - "Vendi uma mesa por 400 reais" -> intent: "INCOME_REGISTER", income: { "amount": 400, "source": "Venda de mesa", "category": "Vendas", "paymentMethod": "Dinheiro", "date": "${isoNow}" }
+   - "Recebi 250 de comissão" -> intent: "INCOME_REGISTER", income: { "amount": 250, "source": "Comissão", "category": "Comissão", "paymentMethod": "Pix", "date": "${isoNow}" }
+   - "Entrada de 1000 reais" -> intent: "INCOME_REGISTER", income: { "amount": 1000, "source": "Receita", "category": "Outros", "paymentMethod": "Pix", "date": "${isoNow}" }
+   - "Caiu 600 na minha conta" -> intent: "INCOME_REGISTER", income: { "amount": 600, "source": "Depósito em conta", "category": "Outros", "paymentMethod": "Pix", "date": "${isoNow}" }
+   - "Ganhei 100 reais de presente" -> intent: "INCOME_REGISTER", income: { "amount": 100, "source": "Presente", "category": "Outros", "paymentMethod": "Dinheiro", "date": "${isoNow}" }
+   - Imagens ou PDFs de COMPROVANTE DE PIX RECEBIDO, TRANSFERÊNCIA RECEBIDA ou NOTA DE PAGAMENTO RECEBIDO.
+   - Extraia no campo "income":
+     * amount: número float positivo (ex: 500.00).
+     * source: nome de quem pagou ou breve descrição da origem (ex: "Cliente", "Salário", "Flávia", "Venda de mesa").
+     * category: "Salário", "Serviços", "Vendas", "Comissão", "Rendimentos", "Aluguel", "Reembolso", "Pix Recebido" ou "Outros".
+     * paymentMethod: "Pix", "Dinheiro", "Transferência", "Cartão" ou "Não informado".
+     * date: data e hora no formato ISO (se não informado, use ${isoNow}).
+
+4. "INCOME_QUERY": O usuário está consultando entradas / receitas / recebimentos anteriores.
+   Exemplos:
+   - "quanto eu recebi esse mês?"
+   - "quanto entrou de pix?"
+   - "total de entradas este mês"
+   - "quais foram minhas receitas?"
+   - "quanto recebi de salário?"
+   - Extraia no campo "incomeQuery":
+     * category: nome da categoria (ex: "Serviços", "Salário") ou null se for geral.
+     * days: número de dias retroativos (ex: 15) ou null.
+     * startDate: data inicial em formato ISO ou null.
+     * endDate: data final em formato ISO ou null.
+
+5. "BALANCE_QUERY": O usuário quer saber o seu SALDO atual, balanço financeiro, balanço do mês, quanto sobrou ou resumo geral de Entradas vs Saídas.
+   Exemplos:
+   - "qual meu saldo?"
+   - "como tá meu saldo?"
+   - "qual meu balanço?"
+   - "como está meu balanço financeiro?"
+   - "quanto sobrou este mês?"
+   - "resumo das minhas finanças"
+   - "balanço geral"
+
+6. "INCOME_DELETE": O usuário quer apagar, remover ou cancelar uma entrada/receita registrada (a última ou uma específica).
+   Exemplos:
+   - "apaga a última entrada" -> target: "last"
+   - "cancela a receita de 500 do cliente" -> target: "specific", amount: 500, source: "cliente"
+   - "tira a entrada de 120 da Flávia" -> target: "specific", amount: 120, source: "Flávia"
+   - "apaga o último recebimento" -> target: "last"
+   - Extraia no campo "incomeDelete":
+     * target: "specific" | "last"
+     * amount: número float ou null
+     * source: nome ou descrição da entrada se citado, ou null
+
 3. "CALENDAR_CREATE": O usuário quer agendar um compromisso ou evento novo no Google Calendar.
    Exemplos: "marca reunião com cliente amanhã às 14h", "dentista sexta às 10:00", "almoço com a equipe dia 05 às 12h".
    - Extraia:
@@ -198,23 +251,32 @@ As intenções possíveis são:
    Exemplos: "quantos clientes temos?", "quantos assinantes?", "faturamento saas".
 
 REGRA CRÍTICA DE DISTINÇÃO ENTRE DOMÍNIOS:
-1. GASTOS / DESPESAS / FINANÇAS ("EXPENSE_*"):
-   - Refere-se a DINHEIRO, compras, valores pagos, mercado, gasolina, refeição, recibos, etc.
-   - Exemplo: "Gastei 50 no almoço" (EXPENSE_REGISTER), "Quanto eu gastei nos últimos 30 dias?" (EXPENSE_QUERY).
-2. COMPROMISSOS / AGENDA / CALENDÁRIO ("CALENDAR_*"):
+1. ENTRADAS / RECEITAS / RECEBIMENTOS ("INCOME_*"):
+   - Refere-se a DINHEIRO RECEBIDO, salário, pagamento recebido de cliente, pix recebido, vendas, comissões, honorários, depósitos que entraram na conta.
+   - NUNCA registre como despesa se o usuário recebeu o dinheiro!
+   - Exemplos: "Recebi 500 do cliente" -> INCOME_REGISTER, "Caiu 3000 de salário" -> INCOME_REGISTER, "Entrou um Pix de 120" -> INCOME_REGISTER.
+2. GASTOS / DESPESAS / FINANÇAS ("EXPENSE_*"):
+   - Refere-se a DINHEIRO GASTO, compras, valores pagos, mercado, gasolina, refeição, recibos pagos, boletos quitados.
+   - Exemplos: "Gastei 50 no almoço" -> EXPENSE_REGISTER, "Paguei 150 de gasolina" -> EXPENSE_REGISTER, "Quanto eu gastei nos últimos 30 dias?" -> EXPENSE_QUERY.
+3. SALDO / BALANÇO FINANCEIRO ("BALANCE_QUERY"):
+   - Pergunta sobre saldo atual, balanço do mês, confronto de receitas x despesas, quanto sobrou, balanço geral.
+   - Exemplos: "Qual meu saldo?", "Como está meu balanço?", "Quanto sobrou este mês?", "Balanço financeiro", "Saldo atual" -> BALANCE_QUERY.
+4. COMPROMISSOS / AGENDA / CALENDÁRIO ("CALENDAR_*"):
    - Refere-se a TEMPO, HORÁRIOS e EVENTOS da rotina, como reuniões, consultas médicas, dentista, aulas, encontros.
    - NUNCA confunda "compromisso" com "gasto" ou "despesa"! Se a pessoa falar de "compromisso", "reunião", "dentista", "consulta", "agenda", trata-se de CALENDAR_*.
    - Exemplo: "Quais meus compromissos?" (CALENDAR_QUERY), "Marcar reunião amanhã às 15h" (CALENDAR_CREATE).
-3. CONTAS / BOLETOS A PAGAR ("SCHEDULE_PAYMENT", "PAYMENT_PAID", "QUERY_SCHEDULED_PAYMENTS"):
+5. CONTAS / BOLETOS A PAGAR ("SCHEDULE_PAYMENT", "PAYMENT_PAID", "QUERY_SCHEDULED_PAYMENTS"):
    - Refere-se a boletos ou compras parceladas com vencimento futuro.
    - Exemplo: "Conta de luz vence dia 10", "O que tenho pra pagar?".
 
 MENSAGENS COMPOSTAS OU MÚLTIPLAS PERGUNTAS:
 Se o usuário fizer mais de uma pergunta ou solicitação na mesma frase (exemplo exato: "Quanto eu gastei nos últimos 30 dias e quais meus compromissos também??"):
-- Você DEVE identificar AMBAS as intenções e preencher a lista "intents": ["EXPENSE_QUERY", "CALENDAR_QUERY"].
-- Defina "intent" como a primeira intenção ("EXPENSE_QUERY").
+- Você DEVE identificar TODAS as intenções e preencher a lista "intents": ["EXPENSE_QUERY", "CALENDAR_QUERY"].
+- Defina "intent" como a primeira intenção principal ("EXPENSE_QUERY").
 - Defina "hasCalendarQuery": true se houver pergunta sobre compromissos/agenda.
 - Defina "hasExpenseQuery": true se houver pergunta sobre gastos.
+- Defina "hasIncomeQuery": true se houver pergunta sobre entradas/receitas.
+- Defina "hasBalanceQuery": true se houver pergunta sobre saldo/balanço.
 - Defina "hasBillsQuery": true se houver pergunta sobre contas a pagar.
 - Preencha os detalhes de cada consulta (ex: expenseQuery com days = 30).
 
@@ -228,17 +290,26 @@ REGRA FUNDAMENTAL SOBRE VALORES MONETÁRIOS:
 Você DEVE responder APENAS com um objeto JSON válido, sem blocos de markdown adicionais como \`\`\`json.
 Estrutura do JSON:
 {
-  "intents": ["EXPENSE_REGISTER" | "EXPENSE_QUERY" | "EXPENSE_UPDATE" | "EXPENSE_DELETE" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "CALENDAR_QUERY" | "DELETE_LAST_EXPENSE" | "SCHEDULE_PAYMENT" | "UPDATE_BILL" | "PAYMENT_PAID" | "QUERY_SCHEDULED_PAYMENTS" | "ADMIN_GENERATE_INVITE" | "ADMIN_STATS" | "GENERAL_CHAT"],
-  "intent": "EXPENSE_REGISTER" | "EXPENSE_QUERY" | "EXPENSE_UPDATE" | "EXPENSE_DELETE" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "CALENDAR_QUERY" | "DELETE_LAST_EXPENSE" | "SCHEDULE_PAYMENT" | "UPDATE_BILL" | "PAYMENT_PAID" | "QUERY_SCHEDULED_PAYMENTS" | "ADMIN_GENERATE_INVITE" | "ADMIN_STATS" | "GENERAL_CHAT",
+  "intents": ["EXPENSE_REGISTER" | "EXPENSE_QUERY" | "EXPENSE_UPDATE" | "EXPENSE_DELETE" | "INCOME_REGISTER" | "INCOME_QUERY" | "INCOME_DELETE" | "BALANCE_QUERY" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "CALENDAR_QUERY" | "DELETE_LAST_EXPENSE" | "SCHEDULE_PAYMENT" | "UPDATE_BILL" | "PAYMENT_PAID" | "QUERY_SCHEDULED_PAYMENTS" | "ADMIN_GENERATE_INVITE" | "ADMIN_STATS" | "GENERAL_CHAT"],
+  "intent": "EXPENSE_REGISTER" | "EXPENSE_QUERY" | "EXPENSE_UPDATE" | "EXPENSE_DELETE" | "INCOME_REGISTER" | "INCOME_QUERY" | "INCOME_DELETE" | "BALANCE_QUERY" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "CALENDAR_QUERY" | "DELETE_LAST_EXPENSE" | "SCHEDULE_PAYMENT" | "UPDATE_BILL" | "PAYMENT_PAID" | "QUERY_SCHEDULED_PAYMENTS" | "ADMIN_GENERATE_INVITE" | "ADMIN_STATS" | "GENERAL_CHAT",
 
   "hasCalendarQuery": boolean,
   "hasExpenseQuery": boolean,
+  "hasIncomeQuery": boolean,
+  "hasBalanceQuery": boolean,
   "hasBillsQuery": boolean,
   "transcription": "texto falado se a entrada for áudio, ou descrição do comprovante se for imagem",
   "expense": {
     "amount": number,
     "category": string,
     "description": string,
+    "paymentMethod": string,
+    "date": string
+  },
+  "income": {
+    "amount": number,
+    "source": string,
+    "category": string,
     "paymentMethod": string,
     "date": string
   },
@@ -256,7 +327,18 @@ Estrutura do JSON:
     "amount": number | null,
     "description": string | null
   },
+  "incomeDelete": {
+    "target": "specific" | "last",
+    "amount": number | null,
+    "source": string | null
+  },
   "expenseQuery": {
+    "category": string | null,
+    "days": number | null,
+    "startDate": string | null,
+    "endDate": string | null
+  },
+  "incomeQuery": {
     "category": string | null,
     "days": number | null,
     "startDate": string | null,
@@ -379,11 +461,20 @@ async function processAudioMessage(audioBuffer, mimeType = 'audio/ogg', userCont
  * Process image (receipt, invoice, comprovante pix, cupom fiscal)
  */
 async function processImageMessage(imageBuffer, mimeType = 'image/jpeg', caption = '', userContext = {}, quotedText = null) {
-  let promptText = `O usuário enviou uma imagem de comprovante, cupom fiscal ou recibo.${caption ? ` Legenda enviada: "${caption}".` : ''}`;
+  let promptText = `O usuário enviou uma imagem de comprovante, cupom fiscal, recibo ou extrato.${caption ? ` Legenda enviada: "${caption}".` : ''}`;
   if (quotedText) {
     promptText += ` [Contexto da mensagem respondida: "${quotedText}"].`;
   }
-  promptText += ' Analise a imagem, identifique o valor total pago, o nome do estabelecimento/empresa, a data (se visível) e categorize a despesa. Descreva resumidamente no campo "transcription".';
+  promptText += `\nAnalise a imagem detalhadamente:
+1. SE FOR UM COMPROVANTE DE PIX RECEBIDO, TRANSFERÊNCIA RECEBIDA, DEPÓSITO OU VALOR RECEBIDO (entrada de dinheiro):
+   - Classifique como "INCOME_REGISTER".
+   - Extraia o valor recebido no campo "income": { amount, source (quem pagou/enviou ou origem), category ("Pix Recebido", "Serviços", "Vendas", etc.), paymentMethod, date }.
+2. SE FOR UM COMPROVANTE DE PAGAMENTO ENVIADO, NOTA/CUPOM FISCAL DE COMPRA OU GASTO REALIZADO (saída de dinheiro):
+   - Se for o pagamento de uma conta conhecida/cadastrada, classifique como "PAYMENT_PAID".
+   - Se for um gasto avulso, classifique como "EXPENSE_REGISTER" e preencha "expense".
+3. SE FOR CONTA/BOLETO COM VENCIMENTO FUTURO:
+   - Classifique como "SCHEDULE_PAYMENT".
+Descreva resumidamente no campo "transcription".`;
 
   const contents = [
     { text: promptText },
@@ -407,11 +498,12 @@ async function processDocumentMessage(documentBuffer, mimeType = 'application/pd
     promptText += ` [Contexto da mensagem respondida: "${quotedText}"].`;
   }
   promptText += `\nAnalise atentamente o documento PDF:
-1. Se for um COMPROVANTE DE PAGAMENTO / PIX / TRANSFERÊNCIA (ex: comprovante de pagamento de fatura, PicPay, cartão, boleto pago):
-   - Extraia o valor pago, a data e a qual conta/estabelecimento se refere.
-   - Se for o pagamento de uma conta conhecida ou cadastrada (ex: Cartão PicPay, PicPay, Fatura, Luz), classifique a intenção como "PAYMENT_PAID" e preencha "paymentPaid": { "title": "Cartão PicPay", "amount": valor, "month": mes }.
+1. SE FOR UM COMPROVANTE DE ENTRADA / PIX RECEBIDO / TRANSFERÊNCIA RECEBIDA / CRÉDITO EM CONTA:
+   - Classifique como "INCOME_REGISTER" e preencha o campo "income" com valor, pagador/origem (source) e categoria.
+2. SE FOR UM COMPROVANTE DE PAGAMENTO ENVIADO / PIX ENVIADO / TRANSFERÊNCIA FEITA (ex: comprovante de pagamento de fatura, PicPay, cartão, boleto pago):
+   - Se for o pagamento de uma conta conhecida ou cadastrada (ex: Cartão PicPay, PicPay, Fatura, Luz), classifique como "PAYMENT_PAID" e preencha "paymentPaid": { "title": "Cartão PicPay", "amount": valor, "month": mes }.
    - Se for um gasto geral avulso, classifique como "EXPENSE_REGISTER".
-2. Se for uma CONTA OU BOLETO A PAGAR NO FUTURO:
+3. SE FOR UMA CONTA OU BOLETO A PAGAR NO FUTURO:
    - Extraia o valor, vencimento e beneficiário para "SCHEDULE_PAYMENT".
 Preencha a descrição resumida no campo "transcription".`;
 

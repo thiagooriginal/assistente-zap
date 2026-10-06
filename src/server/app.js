@@ -580,6 +580,140 @@ app.delete('/api/expenses/:id', authMiddleware, (req, res) => {
   }
 });
 
+// ==========================================
+// INCOMES & BALANCE (TENANT ISOLATED)
+// ==========================================
+// List incomes
+app.get('/api/incomes', authMiddleware, (req, res) => {
+  try {
+    const { category, search, startDate, endDate, limit } = req.query;
+    let query = 'SELECT * FROM incomes WHERE user_id = ?';
+    const params = [req.user.id];
+
+    if (category && category !== 'Todas') {
+      const normCat = financeService.normalizeIncomeCategory(category);
+      query += ' AND category = ?';
+      params.push(normCat);
+    }
+
+    if (search) {
+      query += ' AND (source LIKE ? OR category LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+
+    if (startDate) {
+      query += ' AND date >= ?';
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      query += ' AND date <= ?';
+      params.push(endDate);
+    }
+
+    query += ' ORDER BY date DESC, id DESC';
+
+    if (limit) {
+      query += ' LIMIT ?';
+      params.push(Number(limit));
+    }
+
+    const rows = db.prepare(query).all(...params);
+    res.json({
+      success: true,
+      count: rows.length,
+      data: rows,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Add an income manually from the dashboard
+app.post('/api/incomes', authMiddleware, (req, res) => {
+  try {
+    const { amount, source, category, paymentMethod, date } = req.body;
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, error: 'Valor inválido' });
+    }
+
+    const saved = financeService.addIncome({
+      userId: req.user.id,
+      amount: Number(amount),
+      source: source || 'Entrada manual',
+      category: category || 'Outros',
+      paymentMethod: paymentMethod || 'Pix',
+      date: date ? new Date(date).toISOString() : new Date().toISOString(),
+      sourceType: 'dashboard',
+    });
+
+    res.status(201).json({ success: true, data: saved });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Edit an income (ownership guaranteed)
+app.put('/api/incomes/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, source, category, paymentMethod, date } = req.body;
+
+    const existing = db.prepare('SELECT * FROM incomes WHERE id = ? AND user_id = ?').get(id, req.user.id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Entrada não encontrada' });
+    }
+
+    const normCat = category ? financeService.normalizeIncomeCategory(category) : existing.category;
+
+    db.prepare(`
+      UPDATE incomes
+      SET amount = ?, source = ?, category = ?, payment_method = ?, date = ?
+      WHERE id = ? AND user_id = ?
+    `).run(
+      amount !== undefined ? Number(amount) : existing.amount,
+      source !== undefined ? source.trim() : existing.source,
+      normCat,
+      paymentMethod !== undefined ? paymentMethod : existing.payment_method,
+      date || existing.date,
+      id,
+      req.user.id
+    );
+
+    const updated = db.prepare('SELECT * FROM incomes WHERE id = ? AND user_id = ?').get(id, req.user.id);
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Delete an income (ownership guaranteed)
+app.delete('/api/incomes/:id', authMiddleware, (req, res) => {
+  try {
+    const { id } = req.params;
+    const existing = db.prepare('SELECT * FROM incomes WHERE id = ? AND user_id = ?').get(id, req.user.id);
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Entrada não encontrada' });
+    }
+
+    db.prepare('DELETE FROM incomes WHERE id = ? AND user_id = ?').run(id, req.user.id);
+    res.json({ success: true, message: 'Entrada removida com sucesso', data: existing });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Get monthly balance
+app.get('/api/balance', authMiddleware, (req, res) => {
+  try {
+    const { month } = req.query;
+    const balance = financeService.getMonthlyBalance(month, req.user.id);
+    res.json({ success: true, data: balance });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // 5. Get aggregate statistics (isolated for current user)
 app.get('/api/stats', authMiddleware, (req, res) => {
   try {
@@ -589,17 +723,31 @@ app.get('/api/stats', authMiddleware, (req, res) => {
     const today = now.toISOString().slice(0, 10); // 'YYYY-MM-DD'
     const fifteenDaysAgo = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Total Month
+    // Total Expenses Month
     const monthRow = db.prepare(`
       SELECT SUM(amount) as total, COUNT(*) as count
       FROM expenses
       WHERE user_id = ? AND date LIKE ?
     `).get(userId, `${currentMonth}%`);
 
-    // Total Today
+    // Total Expenses Today
     const todayRow = db.prepare(`
       SELECT SUM(amount) as total, COUNT(*) as count
       FROM expenses
+      WHERE user_id = ? AND date LIKE ?
+    `).get(userId, `${today}%`);
+
+    // Total Incomes Month
+    const incomeMonthRow = db.prepare(`
+      SELECT SUM(amount) as total, COUNT(*) as count
+      FROM incomes
+      WHERE user_id = ? AND date LIKE ?
+    `).get(userId, `${currentMonth}%`);
+
+    // Total Incomes Today
+    const incomeTodayRow = db.prepare(`
+      SELECT SUM(amount) as total, COUNT(*) as count
+      FROM incomes
       WHERE user_id = ? AND date LIKE ?
     `).get(userId, `${today}%`);
 
@@ -611,10 +759,19 @@ app.get('/api/stats', authMiddleware, (req, res) => {
         AND date >= ?
     `).get(userId, fifteenDaysAgo);
 
-    // All categories distribution
+    // All categories distribution (Expenses)
     const categoryRows = db.prepare(`
       SELECT category, SUM(amount) as total, COUNT(*) as count
       FROM expenses
+      WHERE user_id = ?
+      GROUP BY category
+      ORDER BY total DESC
+    `).all(userId);
+
+    // All categories distribution (Incomes)
+    const incomeCategoryRows = db.prepare(`
+      SELECT category, SUM(amount) as total, COUNT(*) as count
+      FROM incomes
       WHERE user_id = ?
       GROUP BY category
       ORDER BY total DESC
@@ -629,25 +786,35 @@ app.get('/api/stats', authMiddleware, (req, res) => {
       ORDER BY total DESC
     `).all(userId);
 
-    // Daily breakdown for the last 14 days
+    // Daily breakdown for the last 14 days (both Expenses and Incomes)
     const dailyStats = [];
     for (let i = 13; i >= 0; i--) {
       const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
       const dayStr = d.toISOString().slice(0, 10);
-      const row = db.prepare(`
+      const rowExp = db.prepare(`
         SELECT SUM(amount) as total
         FROM expenses
+        WHERE user_id = ? AND date LIKE ?
+      `).get(userId, `${dayStr}%`);
+
+      const rowInc = db.prepare(`
+        SELECT SUM(amount) as total
+        FROM incomes
         WHERE user_id = ? AND date LIKE ?
       `).get(userId, `${dayStr}%`);
 
       dailyStats.push({
         date: dayStr,
         displayDate: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-        total: Number(row?.total || 0),
+        total: Number(rowExp?.total || 0),
+        incomes: Number(rowInc?.total || 0),
       });
     }
 
     const totalMonthNum = Number(monthRow?.total || 0);
+    const totalIncomeMonthNum = Number(incomeMonthRow?.total || 0);
+    const balanceMonthNum = totalIncomeMonthNum - totalMonthNum;
+
     const categoriesWithPercent = categoryRows.map((cat) => ({
       ...cat,
       total: Number(cat.total),
@@ -661,9 +828,19 @@ app.get('/api/stats', authMiddleware, (req, res) => {
         countMonth: Number(monthRow?.count || 0),
         totalToday: Number(todayRow?.total || 0),
         countToday: Number(todayRow?.count || 0),
+        totalIncomesMonth: totalIncomeMonthNum,
+        countIncomesMonth: Number(incomeMonthRow?.count || 0),
+        totalIncomesToday: Number(incomeTodayRow?.total || 0),
+        countIncomesToday: Number(incomeTodayRow?.count || 0),
+        balanceMonth: balanceMonthNum,
+        isBalancePositive: balanceMonthNum >= 0,
+        formattedBalance: financeService.formatCurrency(balanceMonthNum),
+        formattedIncomesMonth: financeService.formatCurrency(totalIncomeMonthNum),
+        formattedExpensesMonth: financeService.formatCurrency(totalMonthNum),
         totalGasoline15Days: Number(gasRow?.total || 0),
         countGasoline15Days: Number(gasRow?.count || 0),
         categories: categoriesWithPercent,
+        incomeCategories: incomeCategoryRows,
         payments: paymentRows,
         daily: dailyStats,
       },

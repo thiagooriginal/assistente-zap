@@ -283,15 +283,38 @@
       </div>
     </div>
 
-    <!-- 4 VIBRANT KPI CARDS (Neon Glow) -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+    <!-- 5 VIBRANT KPI CARDS (Neon Glow: Entradas, Gastos, Saldo, Boletos, Gasolina) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       
-      <!-- CARD 1: GASTOS DO MÊS (Purple Neon) -->
+      <!-- CARD 1: ENTRADAS DO MÊS (Emerald Neon) -->
+      <div class="neon-border-card bg-[#111726]/90 border border-emerald-500/30 rounded-2xl p-5 hover:border-emerald-500/60 hover:glow-emerald relative overflow-hidden transition group">
+        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-600/10 rounded-full blur-2xl group-hover:bg-emerald-600/20 transition"></div>
+        <div class="flex items-center justify-between">
+          <p class="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="trending-up" class="w-3.5 h-3.5 text-emerald-400"></i> Entradas (Mês)
+          </p>
+          <div class="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <i data-lucide="arrow-down-left" class="w-4 h-4"></i>
+          </div>
+        </div>
+        <div class="mt-3">
+          <h3 id="cardTotalIncomesMonth" class="text-2xl sm:text-3xl font-extrabold text-emerald-400 tracking-tight">R$ 0,00</h3>
+          <p id="cardCountIncomesMonth" class="text-xs text-emerald-300/70 mt-1 font-medium">0 recebimentos</p>
+        </div>
+        <div class="mt-4 pt-3 border-t border-emerald-500/15 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Receitas & Pix</span>
+          <span class="text-emerald-400 font-bold flex items-center gap-1">
+            <i data-lucide="shield-check" class="w-3 h-3"></i> Confirmadas
+          </span>
+        </div>
+      </div>
+
+      <!-- CARD 2: GASTOS DO MÊS (Purple/Rose Neon) -->
       <div class="neon-border-card bg-[#111726]/90 border border-purple-500/30 rounded-2xl p-5 hover:border-purple-500/60 hover:glow-purple relative overflow-hidden transition group">
         <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-purple-600/10 rounded-full blur-2xl group-hover:bg-purple-600/20 transition"></div>
         <div class="flex items-center justify-between">
           <p class="text-xs font-bold text-purple-300 uppercase tracking-wider flex items-center gap-1.5">
-            <i data-lucide="calendar-days" class="w-3.5 h-3.5"></i> Gastos do Mês
+            <i data-lucide="calendar-days" class="w-3.5 h-3.5 text-purple-400"></i> Gastos (Mês)
           </p>
           <div class="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400">
             <i data-lucide="credit-card" class="w-4 h-4"></i>
@@ -311,35 +334,35 @@
         </div>
       </div>
 
-      <!-- CARD 2: GASTOS HOJE (Cyan Neon) -->
+      <!-- CARD 3: SALDO DO MÊS (Cyan Neon) -->
       <div class="neon-border-card bg-[#111726]/90 border border-cyan-500/30 rounded-2xl p-5 hover:border-cyan-500/60 hover:glow-cyan relative overflow-hidden transition group">
         <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-cyan-600/10 rounded-full blur-2xl group-hover:bg-cyan-600/20 transition"></div>
         <div class="flex items-center justify-between">
           <p class="text-xs font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
-            <i data-lucide="clock" class="w-3.5 h-3.5"></i> Gastos Hoje
+            <i data-lucide="wallet" class="w-3.5 h-3.5 text-cyan-400"></i> Saldo Atual
           </p>
           <div class="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
-            <i data-lucide="trending-up" class="w-4 h-4"></i>
+            <i data-lucide="scale" class="w-4 h-4"></i>
           </div>
         </div>
         <div class="mt-3">
-          <h3 id="cardTotalToday" class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">R$ 0,00</h3>
-          <p id="cardCountToday" class="text-xs text-cyan-300/70 mt-1 font-medium">0 lançamentos hoje</p>
+          <h3 id="cardBalanceMonth" class="text-2xl sm:text-3xl font-extrabold text-cyan-400 tracking-tight">R$ 0,00</h3>
+          <p id="cardBalanceStatus" class="text-xs text-cyan-300/70 mt-1 font-medium">Balanço do mês</p>
         </div>
         <div class="mt-4 pt-3 border-t border-cyan-500/15 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Ritmo do dia</span>
-          <span class="text-cyan-400 font-bold flex items-center gap-1">
-            <i data-lucide="activity" class="w-3 h-3"></i> Atualizado
+          <span>Entradas - Saídas</span>
+          <span id="cardBalanceBadge" class="text-cyan-400 font-bold flex items-center gap-1">
+            <i data-lucide="activity" class="w-3 h-3"></i> Balanço Final
           </span>
         </div>
       </div>
 
-      <!-- CARD 3: CONTAS E PARCELAS PENDENTES (Amber/Orange Neon) -->
+      <!-- CARD 4: CONTAS E PARCELAS PENDENTES (Amber/Orange Neon) -->
       <div class="neon-border-card bg-[#111726]/90 border border-amber-500/30 rounded-2xl p-5 hover:border-amber-500/60 hover:glow-amber relative overflow-hidden transition group">
         <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-amber-600/10 rounded-full blur-2xl group-hover:bg-amber-600/20 transition"></div>
         <div class="flex items-center justify-between">
           <p class="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1.5">
-            <i data-lucide="receipt" class="w-3.5 h-3.5"></i> Boletos & Parcelas
+            <i data-lucide="receipt" class="w-3.5 h-3.5 text-amber-400"></i> Boletos & Parcelas
           </p>
           <div class="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
             <i data-lucide="alert-circle" class="w-4 h-4"></i>
@@ -355,24 +378,24 @@
         </div>
       </div>
 
-      <!-- CARD 4: GASOLINA / 15 DIAS (Emerald Neon) -->
-      <div class="neon-border-card bg-[#111726]/90 border border-emerald-500/30 rounded-2xl p-5 hover:border-emerald-500/60 hover:glow-emerald relative overflow-hidden transition group">
-        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-emerald-600/10 rounded-full blur-2xl group-hover:bg-emerald-600/20 transition"></div>
+      <!-- CARD 5: GASOLINA / 15 DIAS (Blue Neon) -->
+      <div class="neon-border-card bg-[#111726]/90 border border-blue-500/30 rounded-2xl p-5 hover:border-blue-500/60 hover:glow-cyan relative overflow-hidden transition group">
+        <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-blue-600/10 rounded-full blur-2xl group-hover:bg-blue-600/20 transition"></div>
         <div class="flex items-center justify-between">
-          <p class="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-            <i data-lucide="fuel" class="w-3.5 h-3.5"></i> Gasolina (15 dias)
+          <p class="text-xs font-bold text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="fuel" class="w-3.5 h-3.5 text-blue-400"></i> Gasolina (15d)
           </p>
-          <div class="w-9 h-9 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+          <div class="w-9 h-9 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
             <i data-lucide="gauge" class="w-4 h-4"></i>
           </div>
         </div>
         <div class="mt-3">
           <h3 id="cardGasoline15Days" class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">R$ 0,00</h3>
-          <p id="cardCountGasoline" class="text-xs text-emerald-300/70 mt-1 font-medium">0 abastecimentos</p>
+          <p id="cardCountGasoline" class="text-xs text-blue-300/70 mt-1 font-medium">0 abastecimentos</p>
         </div>
-        <div class="mt-4 pt-3 border-t border-emerald-500/15 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Consumo de combustível</span>
-          <span class="text-emerald-400 font-bold">Últimos 15d</span>
+        <div class="mt-4 pt-3 border-t border-blue-500/15 flex items-center justify-between text-[11px] text-slate-400">
+          <span>Combustível</span>
+          <span class="text-blue-400 font-bold">Últimos 15d</span>
         </div>
       </div>
 
@@ -443,6 +466,13 @@
             <i data-lucide="receipt" class="w-4 h-4"></i>
             Gastos Realizados
             <span id="badgeExpensesCount" class="ml-1 px-2 py-0.5 text-xs font-mono bg-purple-500/20 text-purple-300 rounded-full border border-purple-500/30">0</span>
+          </button>
+
+          <!-- Tab 2: Entradas & Receitas -->
+          <button onclick="switchTab('incomes')" id="tabBtnIncomes" class="pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200 whitespace-nowrap shrink-0">
+            <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i>
+            Entradas & Receitas
+            <span id="badgeIncomesCount" class="ml-1 px-2 py-0.5 text-xs font-mono bg-emerald-500/20 text-emerald-300 rounded-full border border-emerald-500/30">0</span>
           </button>
 
           <!-- Tab 2: Contas a Pagar & Parcelas -->
@@ -527,6 +557,60 @@
               <tr>
                 <td colspan="7" class="text-center py-12 text-slate-500">
                   <div class="inline-block animate-spin mr-2">◷</div> Carregando despesas...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB: ENTRADAS & RECEITAS -->
+      <div id="tabContentIncomes" class="hidden">
+        
+        <!-- Filter Toolbar -->
+        <div class="p-5 border-b border-[#1E293B] flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#0D1322]">
+          <div class="relative w-full sm:w-80">
+            <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-3"></i>
+            <input type="text" id="searchIncomeInput" oninput="debounceLoadIncomes()" placeholder="Buscar por cliente, salário, origem..." class="w-full pl-10 pr-3.5 py-2 text-sm bg-[#131B2E] border border-[#22304C] rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-white placeholder-slate-500 transition">
+          </div>
+
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <select id="categoryIncomeFilter" onchange="loadIncomes()" class="w-full sm:w-auto py-2 px-3 text-sm bg-[#131B2E] border border-[#22304C] rounded-xl focus:outline-none focus:border-emerald-500 text-slate-200 font-medium">
+              <option value="Todas">Todas as categorias</option>
+              <option value="Serviços">Serviços / Clientes</option>
+              <option value="Salário">Salário</option>
+              <option value="Vendas">Vendas</option>
+              <option value="Comissão">Comissão</option>
+              <option value="Rendimentos">Rendimentos</option>
+              <option value="Aluguel">Aluguel</option>
+              <option value="Pix Recebido">Pix Recebido</option>
+              <option value="Outros">Outros</option>
+            </select>
+
+            <button onclick="openIncomeModal()" class="px-3.5 py-2 text-sm font-semibold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 rounded-xl hover:bg-emerald-500/25 transition whitespace-nowrap shrink-0">
+              + Nova Entrada
+            </button>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm text-slate-300">
+            <thead class="bg-[#0A0F1D] text-xs uppercase font-bold text-slate-400 border-b border-[#1E293B]">
+              <tr>
+                <th class="px-5 py-3.5">Data / Hora</th>
+                <th class="px-5 py-3.5">Origem / Pagador</th>
+                <th class="px-5 py-3.5">Categoria</th>
+                <th class="px-5 py-3.5">Forma</th>
+                <th class="px-5 py-3.5">Origem</th>
+                <th class="px-5 py-3.5 text-right">Valor Recebido</th>
+                <th class="px-5 py-3.5 text-center">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="incomesTableBody" class="divide-y divide-[#18233C]">
+              <tr>
+                <td colspan="7" class="text-center py-12 text-slate-500">
+                  <div class="inline-block animate-spin mr-2">◷</div> Carregando entradas...
                 </td>
               </tr>
             </tbody>
@@ -1164,6 +1248,79 @@
           </button>
           <button type="submit" class="px-5 py-2 text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-xl shadow-lg shadow-purple-600/30 transition">
             Salvar Gasto
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: NOVA / EDITAR ENTRADA -->
+  <div id="incomeModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-[#111726] rounded-2xl border border-emerald-500/30 w-full max-w-md overflow-hidden shadow-2xl shadow-emerald-950/60">
+      
+      <div class="px-6 py-4 border-b border-[#1E293B] flex items-center justify-between bg-[#0E1524]">
+        <h3 id="incomeModalTitle" class="font-bold text-white text-lg flex items-center gap-2">
+          <i data-lucide="plus-circle" class="w-5 h-5 text-emerald-400"></i>
+          Nova Entrada / Receita
+        </h3>
+        <button onclick="closeIncomeModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="incomeForm" onsubmit="handleIncomeSubmit(event)" class="p-6 space-y-4">
+        <input type="hidden" id="incomeId">
+
+        <div>
+          <label class="block text-xs font-bold text-emerald-300 uppercase tracking-wider mb-1.5">Valor Recebido (R$)*</label>
+          <div class="relative">
+            <span class="absolute left-3.5 top-3 text-lg font-bold text-slate-400">R$</span>
+            <input type="number" step="0.01" id="formIncomeAmount" required placeholder="0,00" class="w-full pl-11 pr-3.5 py-2.5 text-xl font-extrabold text-emerald-400 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-emerald-300 uppercase tracking-wider mb-1.5">Categoria*</label>
+          <select id="formIncomeCategory" required class="w-full px-3.5 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-emerald-500 text-white font-medium text-sm">
+            <option value="Serviços">Serviços / Clientes</option>
+            <option value="Salário">Salário</option>
+            <option value="Vendas">Vendas</option>
+            <option value="Comissão">Comissão</option>
+            <option value="Rendimentos">Rendimentos</option>
+            <option value="Aluguel">Aluguel</option>
+            <option value="Pix Recebido">Pix Recebido</option>
+            <option value="Outros">Outros</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-emerald-300 uppercase tracking-wider mb-1.5">Origem / Pagador*</label>
+          <input type="text" id="formIncomeSource" required placeholder="Ex: Cliente João, Empresa XPTO, Venda produto" class="w-full px-3.5 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-emerald-500 text-white placeholder-slate-500 text-sm">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-emerald-300 uppercase tracking-wider mb-1.5">Pagamento</label>
+            <select id="formIncomePaymentMethod" class="w-full px-3.5 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-emerald-500 text-white text-sm">
+              <option value="Pix">Pix</option>
+              <option value="Dinheiro">Dinheiro</option>
+              <option value="Transferência">Transferência Bancária</option>
+              <option value="Cartão">Cartão</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-emerald-300 uppercase tracking-wider mb-1.5">Data / Hora</label>
+            <input type="datetime-local" id="formIncomeDate" class="w-full px-3 py-2.5 bg-[#172138] border border-[#233150] rounded-xl focus:outline-none focus:border-emerald-500 text-white text-sm">
+          </div>
+        </div>
+
+        <div class="pt-4 flex items-center justify-end space-x-3">
+          <button type="button" onclick="closeIncomeModal()" class="px-4 py-2 text-sm font-semibold text-slate-400 hover:text-white rounded-xl transition">
+            Cancelar
+          </button>
+          <button type="submit" class="px-5 py-2 text-sm font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-xl shadow-lg shadow-emerald-600/30 transition">
+            Salvar Entrada
           </button>
         </div>
       </form>
@@ -1817,6 +1974,17 @@
       },
     };
 
+    const incomeCategoryColors = {
+      'Salário': { border: 'border-emerald-500/40', bg: 'bg-emerald-500/15 text-emerald-300' },
+      'Serviços': { border: 'border-teal-500/40', bg: 'bg-teal-500/15 text-teal-300' },
+      'Vendas': { border: 'border-cyan-500/40', bg: 'bg-cyan-500/15 text-cyan-300' },
+      'Comissão': { border: 'border-sky-500/40', bg: 'bg-sky-500/15 text-sky-300' },
+      'Rendimentos': { border: 'border-indigo-500/40', bg: 'bg-indigo-500/15 text-indigo-300' },
+      'Aluguel': { border: 'border-violet-500/40', bg: 'bg-violet-500/15 text-violet-300' },
+      'Pix Recebido': { border: 'border-green-500/40', bg: 'bg-green-500/15 text-green-300' },
+      'Outros': { border: 'border-slate-500/40', bg: 'bg-slate-500/15 text-slate-300' }
+    };
+
     function formatCurrency(val) {
       return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val || 0);
     }
@@ -1853,23 +2021,27 @@
     function switchTab(tab) {
       currentTab = tab;
       const tabExpenses = document.getElementById('tabContentExpenses');
+      const tabIncomes = document.getElementById('tabContentIncomes');
       const tabBills = document.getElementById('tabContentBills');
       const tabAppointments = document.getElementById('tabContentAppointments');
       const tabAdmin = document.getElementById('tabContentAdmin');
       const tabDescubra = document.getElementById('tabContentDescubra');
       const btnExpenses = document.getElementById('tabBtnExpenses');
+      const btnIncomes = document.getElementById('tabBtnIncomes');
       const btnBills = document.getElementById('tabBtnBills');
       const btnAppointments = document.getElementById('tabBtnAppointments');
       const btnAdmin = document.getElementById('tabBtnAdmin');
       const btnDescubra = document.getElementById('tabBtnDescubra');
 
       tabExpenses.classList.add('hidden');
+      if (tabIncomes) tabIncomes.classList.add('hidden');
       tabBills.classList.add('hidden');
       if (tabAppointments) tabAppointments.classList.add('hidden');
       if (tabAdmin) tabAdmin.classList.add('hidden');
       if (tabDescubra) tabDescubra.classList.add('hidden');
 
       btnExpenses.className = 'pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200';
+      if (btnIncomes) btnIncomes.className = 'pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200';
       btnBills.className = 'pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200';
       if (btnAppointments) btnAppointments.className = 'pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200';
       if (btnAdmin) btnAdmin.className = 'pb-3 px-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-white flex items-center gap-2 transition duration-200';
@@ -1878,6 +2050,10 @@
       if (tab === 'expenses') {
         tabExpenses.classList.remove('hidden');
         btnExpenses.className = 'pb-3 px-3 text-sm font-bold border-b-2 border-purple-500 text-purple-400 flex items-center gap-2 transition duration-200';
+      } else if (tab === 'incomes') {
+        if (tabIncomes) tabIncomes.classList.remove('hidden');
+        if (btnIncomes) btnIncomes.className = 'pb-3 px-3 text-sm font-bold border-b-2 border-emerald-500 text-emerald-400 flex items-center gap-2 transition duration-200';
+        loadIncomes();
       } else if (tab === 'bills') {
         tabBills.classList.remove('hidden');
         btnBills.className = 'pb-3 px-3 text-sm font-bold border-b-2 border-amber-500 text-amber-400 flex items-center gap-2 transition duration-200';
@@ -2111,6 +2287,27 @@
         const data = json.data;
         document.getElementById('cardTotalMonth').innerText = formatCurrency(data.totalMonth);
         document.getElementById('cardCountMonth').innerText = `${data.countMonth} transações no mês`;
+
+        // Incomes & Balance KPIs
+        if (document.getElementById('cardTotalIncomesMonth')) {
+          document.getElementById('cardTotalIncomesMonth').innerText = formatCurrency(data.totalIncomesMonth || 0);
+        }
+        if (document.getElementById('cardCountIncomesMonth')) {
+          document.getElementById('cardCountIncomesMonth').innerText = `${data.countIncomesMonth || 0} recebimentos`;
+        }
+        if (document.getElementById('cardBalanceMonth')) {
+          const bal = Number(data.balanceMonth || 0);
+          document.getElementById('cardBalanceMonth').innerText = formatCurrency(bal);
+          if (bal >= 0) {
+            document.getElementById('cardBalanceMonth').className = 'text-2xl sm:text-3xl font-extrabold text-cyan-400 tracking-tight';
+          } else {
+            document.getElementById('cardBalanceMonth').className = 'text-2xl sm:text-3xl font-extrabold text-rose-400 tracking-tight';
+          }
+        }
+        if (document.getElementById('cardBalanceStatus')) {
+          const bal = Number(data.balanceMonth || 0);
+          document.getElementById('cardBalanceStatus').innerText = bal >= 0 ? '🟢 Balanço Positivo' : '🔴 Balanço Negativo';
+        }
 
         document.getElementById('cardTotalToday').innerText = formatCurrency(data.totalToday);
         document.getElementById('cardCountToday').innerText = `${data.countToday} lançamentos hoje`;
@@ -2363,6 +2560,7 @@
 
       const labels = daily.map(d => d.displayDate);
       const values = daily.map(d => d.total);
+      const incomeValues = daily.map(d => d.incomes || 0);
 
       if (dailyChartInstance) dailyChartInstance.destroy();
 
@@ -2376,37 +2574,63 @@
         type: 'line',
         data: {
           labels,
-          datasets: [{
-            label: 'Total Gasto (R$)',
-            data: values,
-            borderColor: '#8B5CF6',
-            borderWidth: 3,
-            backgroundColor: gradient,
-            fill: true,
-            tension: 0.38,
-            pointBackgroundColor: '#06B6D4',
-            pointBorderColor: '#0E1526',
-            pointBorderWidth: 2,
-            pointRadius: 4,
-            pointHoverRadius: 6,
-            pointHoverBackgroundColor: '#FFFFFF',
-            pointHoverBorderColor: '#8B5CF6',
-          }]
+          datasets: [
+            {
+              label: 'Entradas',
+              data: incomeValues,
+              borderColor: '#10B981',
+              borderWidth: 2.5,
+              backgroundColor: 'rgba(16, 185, 129, 0.12)',
+              fill: true,
+              tension: 0.38,
+              pointBackgroundColor: '#10B981',
+              pointBorderColor: '#0E1526',
+              pointBorderWidth: 2,
+              pointRadius: 3.5,
+              pointHoverRadius: 6,
+            },
+            {
+              label: 'Gastos',
+              data: values,
+              borderColor: '#8B5CF6',
+              borderWidth: 2.5,
+              backgroundColor: gradient,
+              fill: true,
+              tension: 0.38,
+              pointBackgroundColor: '#06B6D4',
+              pointBorderColor: '#0E1526',
+              pointBorderWidth: 2,
+              pointRadius: 3.5,
+              pointHoverRadius: 6,
+              pointHoverBackgroundColor: '#FFFFFF',
+              pointHoverBorderColor: '#8B5CF6',
+            }
+          ]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
-            legend: { display: false },
+            legend: {
+              display: true,
+              position: 'top',
+              labels: {
+                color: '#94A3B8',
+                font: { family: 'Plus Jakarta Sans', size: 11, weight: '600' },
+                boxWidth: 12,
+                boxHeight: 12,
+                usePointStyle: true,
+              }
+            },
             tooltip: {
               backgroundColor: '#0E1526',
               titleColor: '#FFFFFF',
-              bodyColor: '#06B6D4',
+              bodyColor: '#38BDF8',
               borderColor: '#233150',
               borderWidth: 1,
               padding: 10,
               callbacks: {
-                label: (item) => ` Gasto: ${formatCurrency(item.raw)}`
+                label: (item) => ` ${item.dataset.label}: ${formatCurrency(item.raw)}`
               }
             }
           },
@@ -2586,6 +2810,181 @@
       if (!confirm('Tem certeza que deseja excluir este gasto?')) return;
       try {
         const res = await authFetch(`/api/expenses/${id}`, { method: 'DELETE' });
+        const json = await res.json();
+        if (json.success) {
+          loadAll();
+        } else {
+          alert('Erro: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    }
+
+    // ==========================================
+    // ENTRADAS & RECEITAS: CONTROLS & HANDLERS
+    // ==========================================
+    let debounceIncomeTimer;
+    function debounceLoadIncomes() {
+      clearTimeout(debounceIncomeTimer);
+      debounceIncomeTimer = setTimeout(loadIncomes, 300);
+    }
+
+    async function loadIncomes() {
+      const search = document.getElementById('searchIncomeInput') ? document.getElementById('searchIncomeInput').value : '';
+      const category = document.getElementById('categoryIncomeFilter') ? document.getElementById('categoryIncomeFilter').value : 'Todas';
+
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (category && category !== 'Todas') params.append('category', category);
+
+      try {
+        const res = await authFetch(`/api/incomes?${params.toString()}`);
+        const json = await res.json();
+        const tbody = document.getElementById('incomesTableBody');
+
+        if (document.getElementById('badgeIncomesCount')) {
+          document.getElementById('badgeIncomesCount').innerText = json.data ? json.data.length : 0;
+        }
+
+        if (!tbody) return;
+
+        if (!json.data || json.data.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="7" class="text-center py-12 text-slate-500">
+                <i data-lucide="wallet" class="w-9 h-9 mx-auto mb-2 text-emerald-400 opacity-60"></i>
+                Nenhuma entrada registrada com os filtros selecionados.
+              </td>
+            </tr>
+          `;
+          lucide.createIcons();
+          return;
+        }
+
+        tbody.innerHTML = json.data.map(r => {
+          const style = incomeCategoryColors[r.category] || incomeCategoryColors['Outros'];
+          return `
+            <tr class="hover:bg-[#151F36]/80 transition group">
+              <td class="px-5 py-4 whitespace-nowrap text-slate-400 font-mono text-xs">
+                ${formatDate(r.date)}
+              </td>
+              <td class="px-5 py-4 font-semibold text-white">
+                ${r.source || 'Não informado'}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${style.border} ${style.bg}">
+                  ${r.category}
+                </span>
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap text-slate-300 text-xs">
+                ${r.payment_method || 'Pix'}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap">
+                ${getSourceBadge(r.source_type)}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap text-right font-extrabold text-emerald-400 text-base">
+                + ${formatCurrency(r.amount)}
+              </td>
+              <td class="px-5 py-4 whitespace-nowrap text-center">
+                <div class="inline-flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition">
+                  <button onclick="editIncome(${r.id})" title="Editar" class="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition">
+                    <i data-lucide="pencil" class="w-4 h-4"></i>
+                  </button>
+                  <button onclick="deleteIncomeItem(${r.id})" title="Excluir" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Erro ao carregar entradas:', err);
+      }
+    }
+
+    function openIncomeModal(data = null) {
+      const modal = document.getElementById('incomeModal');
+      const title = document.getElementById('incomeModalTitle');
+      const form = document.getElementById('incomeForm');
+
+      if (data) {
+        title.innerHTML = '<i data-lucide="pencil" class="w-5 h-5 text-emerald-400"></i> Editar Entrada';
+        document.getElementById('incomeId').value = data.id;
+        document.getElementById('formIncomeAmount').value = data.amount;
+        document.getElementById('formIncomeCategory').value = data.category;
+        document.getElementById('formIncomeSource').value = data.source;
+        document.getElementById('formIncomePaymentMethod').value = data.payment_method || 'Pix';
+        if (data.date) {
+          const d = new Date(data.date);
+          d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+          document.getElementById('formIncomeDate').value = d.toISOString().slice(0, 16);
+        }
+      } else {
+        title.innerHTML = '<i data-lucide="plus-circle" class="w-5 h-5 text-emerald-400"></i> Nova Entrada / Receita';
+        form.reset();
+        document.getElementById('incomeId').value = '';
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('formIncomeDate').value = now.toISOString().slice(0, 16);
+      }
+      modal.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeIncomeModal() {
+      document.getElementById('incomeModal').classList.add('hidden');
+    }
+
+    async function handleIncomeSubmit(e) {
+      e.preventDefault();
+      const id = document.getElementById('incomeId').value;
+      const payload = {
+        amount: document.getElementById('formIncomeAmount').value,
+        category: document.getElementById('formIncomeCategory').value,
+        source: document.getElementById('formIncomeSource').value,
+        paymentMethod: document.getElementById('formIncomePaymentMethod').value,
+        date: document.getElementById('formIncomeDate').value ? new Date(document.getElementById('formIncomeDate').value).toISOString() : new Date().toISOString()
+      };
+
+      try {
+        const url = id ? `/api/incomes/${id}` : '/api/incomes';
+        const method = id ? 'PUT' : 'POST';
+        const res = await authFetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (json.success) {
+          closeIncomeModal();
+          loadAll();
+        } else {
+          alert('Erro: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro ao conectar ao servidor: ' + err.message);
+      }
+    }
+
+    async function editIncome(id) {
+      try {
+        const res = await authFetch(`/api/incomes`);
+        const json = await res.json();
+        const item = json.data.find(x => x.id === id);
+        if (item) openIncomeModal(item);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    async function deleteIncomeItem(id) {
+      if (!confirm('Tem certeza que deseja excluir esta entrada?')) return;
+      try {
+        const res = await authFetch(`/api/incomes/${id}`, { method: 'DELETE' });
         const json = await res.json();
         if (json.success) {
           loadAll();
@@ -2794,6 +3193,7 @@
       loadMe();
       loadStats();
       loadExpenses();
+      loadIncomes();
       loadBills();
       loadAppointments();
       if (currentTab === 'admin') {

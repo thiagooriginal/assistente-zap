@@ -46,6 +46,21 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
   CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
 
+  CREATE TABLE IF NOT EXISTS incomes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL DEFAULT 1,
+    amount REAL NOT NULL,
+    source TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'Outros',
+    payment_method TEXT DEFAULT 'Pix',
+    date TEXT NOT NULL,
+    source_type TEXT NOT NULL DEFAULT 'text',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_incomes_date ON incomes(date);
+  CREATE INDEX IF NOT EXISTS idx_incomes_category ON incomes(category);
+
   CREATE TABLE IF NOT EXISTS reminder_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL DEFAULT 1,
@@ -148,6 +163,7 @@ function ensureColumnExists(tableName, columnName, columnDef) {
 }
 
 ensureColumnExists('expenses', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
+ensureColumnExists('incomes', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumnExists('scheduled_payments', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumnExists('reminder_logs', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumnExists('appointments', 'google_event_id', 'TEXT');
@@ -155,6 +171,7 @@ ensureColumnExists('appointments', 'google_event_id', 'TEXT');
 try {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_expenses_user ON expenses(user_id);
+    CREATE INDEX IF NOT EXISTS idx_incomes_user ON incomes(user_id);
     CREATE INDEX IF NOT EXISTS idx_payments_user ON scheduled_payments(user_id);
     CREATE INDEX IF NOT EXISTS idx_appointments_google_id ON appointments(google_event_id);
   `);

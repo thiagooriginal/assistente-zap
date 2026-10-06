@@ -94,6 +94,28 @@ function parseExpenseDelete(text) {
   return null;
 }
 
+function parseIncomeDelete(text) {
+  if (!text) return null;
+  const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  // Pattern A: apagar última entrada / receita / recebimento
+  if (/^(apaga|apagar|apague|cancela|cancelar|cancele|tira|tirar|tire|remove|remover|remova|exclui|excluir|exclua|deleta|deletar)\s+(a|o\s+)?(ultima|ultimo|anterior|recente)\s*(entrada|receita|recebimento|pix recebido)?$/i.test(norm)) {
+    return { target: 'last' };
+  }
+
+  const deleteVerbs = '(?:tira|tirar|tire|apaga|apagar|apague|remove|remover|remova|exclui|excluir|exclua|cancela|cancelar|cancele|deleta|deletar)';
+
+  // Pattern B: Verb + (entrada/receita/recebimento) + amount + source
+  const m1 = norm.match(new RegExp('^' + deleteVerbs + '\\s+(?:a|o|as|os)?\\s*(?:entrada|receita|recebimento)?\\s*(?:de\\s+)?(?:r\\$\\s*)?(\\d+(?:[.,]\\d+)?)\\s*(?:reais)?\\s*(?:d[oe]s?|referente\\s+a[os]?|da|de|do)?\\s*(.+)$', 'i'));
+  if (m1 && (norm.includes('entrada') || norm.includes('receita') || norm.includes('recebimento') || norm.includes('recebi'))) {
+    const val = parseFloat(m1[1].replace(',', '.'));
+    const src = m1[2].replace(/^(reais|real)\s*/, '').trim();
+    return { target: 'specific', amount: val, source: src || null };
+  }
+
+  return null;
+}
+
 function parseExpenseCorrection(text, quotedText = null) {
   if (!text) return null;
   const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -788,6 +810,77 @@ async function handleIncomingMessage(sock, msg) {
     }
   }
 
+  // Fast Deterministic Income Delete Trigger: "apagar ultima entrada", "tira o recebimento de 500"
+  if (text) {
+    const incomeDeleteReq = parseIncomeDelete(text);
+    if (incomeDeleteReq) {
+      const deleted = financeService.deleteIncome({
+        userId: user.id,
+        amount: incomeDeleteReq.amount,
+        source: incomeDeleteReq.source,
+        target: incomeDeleteReq.target,
+      });
+
+      if (!deleted) {
+        let notFoundMsg = '🔍 Não encontrei nenhuma entrada correspondente no seu histórico para remover.';
+        if (incomeDeleteReq.source || incomeDeleteReq.amount) {
+          const detail = [
+            incomeDeleteReq.amount ? financeService.formatCurrency(incomeDeleteReq.amount) : '',
+            incomeDeleteReq.source ? `"${incomeDeleteReq.source}"` : '',
+          ].filter(Boolean).join(' de ');
+          notFoundMsg = `🔍 Não encontrei nenhuma entrada de *${detail}* no seu histórico para remover.`;
+        }
+        await sock.sendMessage(targetJid, { text: notFoundMsg });
+      } else {
+        const bal = financeService.getMonthlyBalance(null, user.id);
+        await sock.sendMessage(targetJid, {
+          text: `🗑️ *Entrada Removida com Sucesso!*\n\n` +
+                `Excluí o seguinte registro de entrada do seu histórico:\n` +
+                `• *${financeService.formatCurrency(deleted.amount)}* - ${deleted.source} (${deleted.category})\n\n` +
+                `📊 *Novo Saldo do Mês*: *${bal.formattedBalance}*`,
+        });
+      }
+      return;
+    }
+  }
+
+  // Fast Deterministic Balance Query Trigger: "saldo", "meu saldo", "qual meu saldo", "balanço"
+  if (text) {
+    const normText = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+    if (['saldo', 'meu saldo', 'qual meu saldo', 'qual o meu saldo', 'como esta meu saldo', 'como ta meu saldo', 'balanco', 'balanço', 'meu balanco', 'meu balanço', 'qual meu balanco', 'qual meu balanço', 'como esta meu balanco', 'quanto sobrou', 'balanco geral', 'balanço geral'].includes(normText)) {
+      const balanceInfo = financeService.getMonthlyBalance(null, user.id);
+      const recentIncomes = financeService.getRecentIncomes(3, user.id);
+      const recentExpenses = financeService.getRecentExpenses(3, user.id);
+
+      let responseText = `💵 *Seu Balanço Financeiro do Mês (${balanceInfo.month}):*\n\n` +
+                         `🟢 *Total de Entradas*: *${balanceInfo.formattedIncomes}* (${balanceInfo.countIncomes} ${balanceInfo.countIncomes === 1 ? 'recebimento' : 'recebimentos'})\n` +
+                         `🔴 *Total de Saídas*: *${balanceInfo.formattedExpenses}* (${balanceInfo.countExpenses} ${balanceInfo.countExpenses === 1 ? 'gasto' : 'gastos'})\n` +
+                         `─────────────────────────\n` +
+                         `💰 *Saldo Atual*: *${balanceInfo.formattedBalance}* ${balanceInfo.isPositive ? '🟢 (Positivo)' : '🔴 (Negativo)'}\n`;
+
+      if (recentIncomes.length > 0 || recentExpenses.length > 0) {
+        responseText += `\n📌 *Últimas Movimentações:*`;
+        if (recentIncomes.length > 0) {
+          responseText += `\n*Entradas Recentes:*`;
+          for (const inc of recentIncomes) {
+            responseText += `\n• ${financeService.formatDateBR(inc.date).slice(0, 5)}: 🟢 *+${financeService.formatCurrency(inc.amount)}* - ${inc.source} (${inc.category})`;
+          }
+        }
+        if (recentExpenses.length > 0) {
+          responseText += `\n*Saídas Recentes:*`;
+          for (const exp of recentExpenses) {
+            responseText += `\n• ${financeService.formatDateBR(exp.date).slice(0, 5)}: 🔴 *-${financeService.formatCurrency(exp.amount)}* - ${exp.description} (${exp.category})`;
+          }
+        }
+      }
+
+      responseText += `\n\n_Para ver gráficos e relatórios completos, digite *painel*!_`;
+
+      await sock.sendMessage(targetJid, { text: responseText });
+      return;
+    }
+  }
+
   // Fast Deterministic Expense Correction Trigger: "o valor era 50 e nao 150", "corrige para 50"
   if (text) {
     const expenseCorr = parseExpenseCorrection(text, quotedText);
@@ -892,6 +985,9 @@ async function handleIncomingMessage(sock, msg) {
       expense,
       expenseQuery,
       expenseUpdate,
+      income,
+      incomeQuery,
+      incomeDelete,
       calendarEvent,
       calendarUpdate,
       calendarDelete,
@@ -1193,12 +1289,51 @@ async function handleIncomingMessage(sock, msg) {
         sourceType,
       });
 
+      const monthlyBalance = financeService.getMonthlyBalance(null, user.id);
+
       let responseText = `✅ *Gasto Registrado com Sucesso!*\n\n` +
                          `💰 *Valor*: ${financeService.formatCurrency(saved.amount)}\n` +
                          `📁 *Categoria*: ${saved.category}\n` +
                          `📝 *Descrição*: ${saved.description}\n` +
                          `💳 *Pagamento*: ${saved.paymentMethod}\n` +
-                         `📅 *Data*: ${financeService.formatDateBR(saved.date)}`;
+                         `📅 *Data*: ${financeService.formatDateBR(saved.date)}\n\n` +
+                         `📊 *Balanço do Mês (${monthlyBalance.month}):*\n` +
+                         `🟢 Entradas: *${monthlyBalance.formattedIncomes}* | 🔴 Saídas: *${monthlyBalance.formattedExpenses}*\n` +
+                         `💵 *Saldo Atual*: *${monthlyBalance.formattedBalance}* ${monthlyBalance.isPositive ? '📈' : '⚠️'}`;
+
+      if (transcription) {
+        responseText += `\n\n🔍 _${audioBuffer ? '🎙️ Áudio detectado' : imageBuffer ? '📸 Recibo identificado' : documentBuffer ? '📄 Documento PDF analisado' : 'Mensagem'}: "${transcription}"_`;
+      }
+
+      await sock.sendMessage(targetJid, { text: responseText });
+      return;
+    }
+
+    // 1.1 REGISTRO DE ENTRADA / RECEITA
+    if (intent === 'INCOME_REGISTER' && income && income.amount > 0) {
+      const sourceType = audioBuffer ? 'audio' : imageBuffer ? 'image' : documentBuffer ? 'document' : 'text';
+      const saved = financeService.addIncome({
+        userId: user.id,
+        amount: income.amount,
+        source: income.source,
+        category: income.category,
+        paymentMethod: income.paymentMethod,
+        date: income.date,
+        sourceType,
+      });
+
+      const monthlyBalance = financeService.getMonthlyBalance(null, user.id);
+
+      let responseText = `🟢 *Entrada Registrada com Sucesso!*\n\n` +
+                         `💰 *Valor Recebido*: *${financeService.formatCurrency(saved.amount)}*\n` +
+                         `📁 *Categoria*: ${saved.category}\n` +
+                         `👤 *Origem/Pagador*: ${saved.source}\n` +
+                         `💳 *Forma*: ${saved.paymentMethod}\n` +
+                         `📅 *Data*: ${financeService.formatDateBR(saved.date)}\n\n` +
+                         `📊 *Balanço Atualizado do Mês (${monthlyBalance.month}):*\n` +
+                         `🟢 Entradas: *${monthlyBalance.formattedIncomes}*\n` +
+                         `🔴 Saídas: *${monthlyBalance.formattedExpenses}*\n` +
+                         `💵 *Saldo Líquido*: *${monthlyBalance.formattedBalance}* ${monthlyBalance.isPositive ? '📈' : '⚠️'}`;
 
       if (transcription) {
         responseText += `\n\n🔍 _${audioBuffer ? '🎙️ Áudio detectado' : imageBuffer ? '📸 Recibo identificado' : documentBuffer ? '📄 Documento PDF analisado' : 'Mensagem'}: "${transcription}"_`;
@@ -1244,6 +1379,111 @@ async function handleIncomingMessage(sock, msg) {
       }
 
       await sock.sendMessage(targetJid, { text: responseText });
+      return;
+    }
+
+    // 2.1 CONSULTA DE ENTRADAS / RECEITAS
+    if (intent === 'INCOME_QUERY') {
+      const category = incomeQuery?.category || null;
+      const days = incomeQuery?.days || null;
+      const startDate = incomeQuery?.startDate || null;
+      const endDate = incomeQuery?.endDate || null;
+
+      let result;
+      if (days) {
+        result = financeService.queryIncomesLastDays(category, days, user.id);
+      } else {
+        result = financeService.queryIncomes({ userId: user.id, category, startDate, endDate });
+      }
+
+      const categoryName = category ? `de *${financeService.normalizeIncomeCategory(category)}* ` : '';
+      const periodName = days ? `nos últimos *${days} dias*` : 'no período consultado';
+
+      if (result.count === 0) {
+        await sock.sendMessage(targetJid, {
+          text: `🟢 Você não teve nenhuma entrada registrada ${categoryName}${periodName}.`,
+        });
+        return;
+      }
+
+      let responseText = `🟢 Você teve um total de *${result.formattedTotal}* em entradas ${categoryName}${periodName} (${result.count} ${result.count === 1 ? 'registro' : 'registros'}).\n\n*Detalhes recentes:*`;
+
+      const previewRows = result.rows.slice(0, 5);
+      for (const row of previewRows) {
+        responseText += `\n• ${financeService.formatDateBR(row.date).slice(0, 5)}: *${financeService.formatCurrency(row.amount)}* - ${row.source} (${row.category})`;
+      }
+
+      if (result.count > 5) {
+        responseText += `\n_... e mais ${result.count - 5} recebimentos._`;
+      }
+
+      await sock.sendMessage(targetJid, { text: responseText });
+      return;
+    }
+
+    // 2.2 CONSULTA DE SALDO / BALANÇO FINANCEIRO
+    if (intent === 'BALANCE_QUERY') {
+      const balanceInfo = financeService.getMonthlyBalance(null, user.id);
+      const recentIncomes = financeService.getRecentIncomes(3, user.id);
+      const recentExpenses = financeService.getRecentExpenses(3, user.id);
+
+      let responseText = `💵 *Seu Balanço Financeiro do Mês (${balanceInfo.month}):*\n\n` +
+                         `🟢 *Total de Entradas*: *${balanceInfo.formattedIncomes}* (${balanceInfo.countIncomes} ${balanceInfo.countIncomes === 1 ? 'recebimento' : 'recebimentos'})\n` +
+                         `🔴 *Total de Saídas*: *${balanceInfo.formattedExpenses}* (${balanceInfo.countExpenses} ${balanceInfo.countExpenses === 1 ? 'gasto' : 'gastos'})\n` +
+                         `─────────────────────────\n` +
+                         `💰 *Saldo Atual*: *${balanceInfo.formattedBalance}* ${balanceInfo.isPositive ? '🟢 (Positivo)' : '🔴 (Negativo)'}\n`;
+
+      if (recentIncomes.length > 0 || recentExpenses.length > 0) {
+        responseText += `\n📌 *Últimas Movimentações:*`;
+        if (recentIncomes.length > 0) {
+          responseText += `\n*Entradas Recentes:*`;
+          for (const inc of recentIncomes) {
+            responseText += `\n• ${financeService.formatDateBR(inc.date).slice(0, 5)}: 🟢 *+${financeService.formatCurrency(inc.amount)}* - ${inc.source} (${inc.category})`;
+          }
+        }
+        if (recentExpenses.length > 0) {
+          responseText += `\n*Saídas Recentes:*`;
+          for (const exp of recentExpenses) {
+            responseText += `\n• ${financeService.formatDateBR(exp.date).slice(0, 5)}: 🔴 *-${financeService.formatCurrency(exp.amount)}* - ${exp.description} (${exp.category})`;
+          }
+        }
+      }
+
+      responseText += `\n\n_Para ver gráficos e relatórios completos, digite *painel*!_`;
+
+      await sock.sendMessage(targetJid, { text: responseText });
+      return;
+    }
+
+    // 2.3 APAGAR / EXCLUIR ENTRADA (ÚLTIMA OU ESPECÍFICA)
+    if (intent === 'DELETE_LAST_INCOME' || intent === 'INCOME_DELETE') {
+      const delData = aiResult.incomeDelete || incomeDelete || {};
+      const deleted = financeService.deleteIncome({
+        userId: user.id,
+        amount: delData.amount,
+        source: delData.source,
+        target: intent === 'DELETE_LAST_INCOME' ? 'last' : (delData.target || 'specific'),
+      });
+
+      if (!deleted) {
+        let notFoundMsg = '🔍 Não encontrei nenhuma entrada correspondente no seu histórico para remover.';
+        if (delData.source || delData.amount) {
+          const detail = [
+            delData.amount ? financeService.formatCurrency(delData.amount) : '',
+            delData.source ? `"${delData.source}"` : '',
+          ].filter(Boolean).join(' de ');
+          notFoundMsg = `🔍 Não encontrei nenhuma entrada de *${detail}* no seu histórico para remover.`;
+        }
+        await sock.sendMessage(targetJid, { text: notFoundMsg });
+      } else {
+        const bal = financeService.getMonthlyBalance(null, user.id);
+        await sock.sendMessage(targetJid, {
+          text: `🗑️ *Entrada Removida com Sucesso!*\n\n` +
+                `Excluí o seguinte registro de entrada:\n` +
+                `• *${financeService.formatCurrency(deleted.amount)}* - ${deleted.source} (${deleted.category})\n\n` +
+                `📊 *Novo Saldo do Mês*: *${bal.formattedBalance}*`,
+        });
+      }
       return;
     }
 
