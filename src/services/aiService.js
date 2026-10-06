@@ -97,15 +97,25 @@ As intenções possíveis são:
      * startDate: data inicial em formato ISO ou null.
      * endDate: data final em formato ISO ou null.
 
-5. "BALANCE_QUERY": O usuário quer saber o seu SALDO atual, balanço financeiro, balanço do mês, quanto sobrou ou resumo geral de Entradas vs Saídas.
+5. "BALANCE_QUERY": O usuário quer saber o seu SALDO atual, balanço financeiro, balanço do mês, quanto sobrou, balanço nos últimos 30 dias ou resumo geral de Entradas vs Saídas.
    Exemplos:
-   - "qual meu saldo?"
-   - "como tá meu saldo?"
-   - "qual meu balanço?"
-   - "como está meu balanço financeiro?"
-   - "quanto sobrou este mês?"
-   - "resumo das minhas finanças"
-   - "balanço geral"
+   - "qual meu saldo?" -> scope: "overall"
+   - "como tá meu saldo?" -> scope: "overall"
+   - "qual meu balanço?" -> scope: "month"
+   - "como está meu balanço financeiro?" -> scope: "month"
+   - "quanto sobrou este mês?" -> scope: "month"
+   - "quanto ficou meu balanço de entradas e saídas nos últimos 30 dias?" -> scope: "period", days: 30
+   - "balanço dos últimos 15 dias" -> scope: "period", days: 15
+   - "balanço dos últimos 7 dias" -> scope: "period", days: 7
+   - "balanço de setembro" -> scope: "month", month: "2026-09"
+   - "resumo das minhas finanças" -> scope: "overall"
+   - "balanço geral" -> scope: "overall"
+   - Extraia no campo "balanceQuery":
+     * days: número de dias retroativos se citado (ex: "últimos 30 dias" -> 30, "últimos 15 dias" -> 15, "últimos 7 dias" -> 7), ou null.
+     * month: mês no formato "YYYY-MM" se citado (ex: "2026-09"), ou null.
+     * startDate: data inicial em formato ISO se citada, ou null.
+     * endDate: data final em formato ISO se citada, ou null.
+     * scope: "period" (se especificou dias ou intervalo), "month" (se especificou mês ou é do mês atual), "overall" (se pediu saldo geral/total em caixa).
 
 6. "INCOME_DELETE": O usuário quer apagar, remover ou cancelar uma entrada/receita registrada (a última ou uma específica).
    Exemplos:
@@ -343,6 +353,13 @@ Estrutura do JSON:
     "days": number | null,
     "startDate": string | null,
     "endDate": string | null
+  },
+  "balanceQuery": {
+    "days": number | null,
+    "month": string | null,
+    "startDate": string | null,
+    "endDate": string | null,
+    "scope": "period" | "month" | "overall" | null
   },
   "calendarEvent": {
     "summary": string,

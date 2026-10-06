@@ -2296,7 +2296,7 @@
           document.getElementById('cardCountIncomesMonth').innerText = `${data.countIncomesMonth || 0} recebimentos`;
         }
         if (document.getElementById('cardBalanceMonth')) {
-          const bal = Number(data.balanceMonth || 0);
+          const bal = Number(data.overallBalance !== undefined ? data.overallBalance : data.balanceMonth || 0);
           document.getElementById('cardBalanceMonth').innerText = formatCurrency(bal);
           if (bal >= 0) {
             document.getElementById('cardBalanceMonth').className = 'text-2xl sm:text-3xl font-extrabold text-cyan-400 tracking-tight';
@@ -2305,8 +2305,8 @@
           }
         }
         if (document.getElementById('cardBalanceStatus')) {
-          const bal = Number(data.balanceMonth || 0);
-          document.getElementById('cardBalanceStatus').innerText = bal >= 0 ? '🟢 Balanço Positivo' : '🔴 Balanço Negativo';
+          const mBal = Number(data.balanceMonth || 0);
+          document.getElementById('cardBalanceStatus').innerText = `Saldo em Caixa (${mBal >= 0 ? '+' : ''}${formatCurrency(mBal)} no mês)`;
         }
 
         document.getElementById('cardTotalToday').innerText = formatCurrency(data.totalToday);

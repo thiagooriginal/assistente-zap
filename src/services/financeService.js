@@ -570,6 +570,132 @@ function updateIncome({ userId = 1, targetId, searchTerm, oldAmount, newAmount, 
 }
 
 /**
+ * Format ISO date to simple DD/MM/YYYY
+ */
+function formatDateSimple(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  } catch (e) {
+    return dateStr.slice(0, 10);
+  }
+}
+
+/**
+ * Get cumulative overall balance (Total Incomes ever - Total Expenses ever)
+ */
+function getOverallBalance(userId = 1) {
+  const incomeRow = db.prepare(`
+    SELECT SUM(amount) as total, COUNT(*) as count
+    FROM incomes
+    WHERE user_id = ?
+  `).get(userId);
+
+  const expenseRow = db.prepare(`
+    SELECT SUM(amount) as total, COUNT(*) as count
+    FROM expenses
+    WHERE user_id = ?
+  `).get(userId);
+
+  const totalIncomes = Number(incomeRow?.total || 0);
+  const countIncomes = Number(incomeRow?.count || 0);
+  const totalExpenses = Number(expenseRow?.total || 0);
+  const countExpenses = Number(expenseRow?.count || 0);
+  const balance = totalIncomes - totalExpenses;
+
+  return {
+    totalIncomes,
+    countIncomes,
+    formattedIncomes: formatCurrency(totalIncomes),
+    totalExpenses,
+    countExpenses,
+    formattedExpenses: formatCurrency(totalExpenses),
+    balance,
+    formattedBalance: formatCurrency(balance),
+    isPositive: balance >= 0,
+  };
+}
+
+/**
+ * Get period financial balance (e.g. last 30 days, or custom date range)
+ */
+function getPeriodBalance({ days = 30, startDate, endDate, userId = 1 }) {
+  let startISO, endISO, periodLabel;
+
+  if (startDate && endDate) {
+    startISO = new Date(startDate).toISOString();
+    endISO = new Date(endDate).toISOString();
+    periodLabel = `Período (${formatDateSimple(startISO)} a ${formatDateSimple(endISO)})`;
+  } else {
+    const numDays = days ? Number(days) : 30;
+    const now = new Date();
+    const past = new Date(now.getTime() - numDays * 24 * 60 * 60 * 1000);
+    startISO = past.toISOString();
+    endISO = now.toISOString();
+    periodLabel = `Últimos ${numDays} Dias`;
+  }
+
+  const incomeRow = db.prepare(`
+    SELECT SUM(amount) as total, COUNT(*) as count
+    FROM incomes
+    WHERE user_id = ? AND date >= ? AND date <= ?
+  `).get(userId, startISO, endISO);
+
+  const expenseRow = db.prepare(`
+    SELECT SUM(amount) as total, COUNT(*) as count
+    FROM expenses
+    WHERE user_id = ? AND date >= ? AND date <= ?
+  `).get(userId, startISO, endISO);
+
+  const recentIncomes = db.prepare(`
+    SELECT * FROM incomes
+    WHERE user_id = ? AND date >= ? AND date <= ?
+    ORDER BY date DESC LIMIT 5
+  `).all(userId, startISO, endISO);
+
+  const recentExpenses = db.prepare(`
+    SELECT * FROM expenses
+    WHERE user_id = ? AND date >= ? AND date <= ?
+    ORDER BY date DESC LIMIT 5
+  `).all(userId, startISO, endISO);
+
+  const totalIncomes = Number(incomeRow?.total || 0);
+  const countIncomes = Number(incomeRow?.count || 0);
+  const totalExpenses = Number(expenseRow?.total || 0);
+  const countExpenses = Number(expenseRow?.count || 0);
+  const balance = totalIncomes - totalExpenses;
+
+  const overall = getOverallBalance(userId);
+
+  return {
+    periodLabel,
+    days: days || 30,
+    startDate: startISO,
+    endDate: endISO,
+    totalIncomes,
+    countIncomes,
+    formattedIncomes: formatCurrency(totalIncomes),
+    totalExpenses,
+    countExpenses,
+    formattedExpenses: formatCurrency(totalExpenses),
+    balance,
+    formattedBalance: formatCurrency(balance),
+    isPositive: balance >= 0,
+    recentIncomes,
+    recentExpenses,
+    overallBalance: overall.balance,
+    formattedOverallBalance: overall.formattedBalance,
+    isOverallPositive: overall.isPositive,
+  };
+}
+
+/**
  * Get monthly financial balance (Incomes vs Expenses)
  */
 function getMonthlyBalance(yearMonth, userId = 1) {
@@ -593,6 +719,8 @@ function getMonthlyBalance(yearMonth, userId = 1) {
   const countExpenses = Number(expenseRow?.count || 0);
   const balance = totalIncomes - totalExpenses;
 
+  const overall = getOverallBalance(userId);
+
   return {
     month: target,
     totalIncomes,
@@ -604,6 +732,9 @@ function getMonthlyBalance(yearMonth, userId = 1) {
     balance,
     formattedBalance: formatCurrency(balance),
     isPositive: balance >= 0,
+    overallBalance: overall.balance,
+    formattedOverallBalance: overall.formattedBalance,
+    isOverallPositive: overall.isPositive,
   };
 }
 
@@ -647,9 +778,12 @@ module.exports = {
   deleteIncome,
   updateIncome,
   getMonthlyBalance,
+  getOverallBalance,
+  getPeriodBalance,
   getMonthlyIncomesSummary,
   formatCurrency,
   formatDateBR,
+  formatDateSimple,
   normalizeCategory,
   normalizeIncomeCategory,
 };

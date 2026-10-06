@@ -703,10 +703,19 @@ app.delete('/api/incomes/:id', authMiddleware, (req, res) => {
   }
 });
 
-// Get monthly balance
+// Get financial balance (supports month, days, or date range)
 app.get('/api/balance', authMiddleware, (req, res) => {
   try {
-    const { month } = req.query;
+    const { month, days, startDate, endDate } = req.query;
+    if (days || (startDate && endDate)) {
+      const balance = financeService.getPeriodBalance({
+        days: days ? Number(days) : undefined,
+        startDate,
+        endDate,
+        userId: req.user.id,
+      });
+      return res.json({ success: true, data: balance });
+    }
     const balance = financeService.getMonthlyBalance(month, req.user.id);
     res.json({ success: true, data: balance });
   } catch (err) {
@@ -815,6 +824,8 @@ app.get('/api/stats', authMiddleware, (req, res) => {
     const totalIncomeMonthNum = Number(incomeMonthRow?.total || 0);
     const balanceMonthNum = totalIncomeMonthNum - totalMonthNum;
 
+    const overall = financeService.getOverallBalance(userId);
+
     const categoriesWithPercent = categoryRows.map((cat) => ({
       ...cat,
       total: Number(cat.total),
@@ -837,6 +848,11 @@ app.get('/api/stats', authMiddleware, (req, res) => {
         formattedBalance: financeService.formatCurrency(balanceMonthNum),
         formattedIncomesMonth: financeService.formatCurrency(totalIncomeMonthNum),
         formattedExpensesMonth: financeService.formatCurrency(totalMonthNum),
+        overallBalance: overall.balance,
+        formattedOverallBalance: overall.formattedBalance,
+        isOverallPositive: overall.isPositive,
+        overallIncomes: overall.totalIncomes,
+        overallExpenses: overall.totalExpenses,
         totalGasoline15Days: Number(gasRow?.total || 0),
         countGasoline15Days: Number(gasRow?.count || 0),
         categories: categoriesWithPercent,

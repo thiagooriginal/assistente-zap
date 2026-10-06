@@ -116,6 +116,162 @@ function parseIncomeDelete(text) {
   return null;
 }
 
+function parseBalanceQuery(text) {
+  if (!text) return null;
+  const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  // Primary check: does this look like a balance / saldo / financial summary query?
+  const hasBalanceWord = /(?:balanco|saldo|quanto sobrou|sobra|quanto tenho|entradas e saidas|balanco de entradas|resumo financeiro)/i.test(norm);
+  if (!hasBalanceWord) return null;
+
+  // 1. Period check: "últimos X dias", "nos últimos X dias", "X dias"
+  const daysMatch = norm.match(/(?:ultimos|ultimas|nos|nas|de)\s+(\d+)\s+dias/i) || norm.match(/(\d+)\s+dias/i);
+  if (daysMatch) {
+    const days = parseInt(daysMatch[1], 10);
+    if (!isNaN(days) && days > 0) {
+      return { type: 'period', days };
+    }
+  }
+
+  // 2. Month check: "setembro", "outubro", "agosto", etc. Or "mês passado"
+  const monthNames = {
+    'janeiro': '01', 'fevereiro': '02', 'marco': '03', 'abril': '04',
+    'maio': '05', 'junho': '06', 'julho': '07', 'agosto': '08',
+    'setembro': '09', 'outubro': '10', 'novembro': '11', 'dezembro': '12'
+  };
+
+  for (const [mName, mNum] of Object.entries(monthNames)) {
+    if (norm.includes(mName)) {
+      const year = new Date().getFullYear();
+      return { type: 'month', yearMonth: `${year}-${mNum}`, monthName: mName };
+    }
+  }
+
+  if (norm.includes('mes passado') || norm.includes('mes anterior')) {
+    const prev = new Date();
+    prev.setMonth(prev.getMonth() - 1);
+    return { type: 'month', yearMonth: prev.toISOString().slice(0, 7) };
+  }
+
+  if (norm.includes('este mes') || norm.includes('desse mes') || norm.includes('do mes') || norm.includes('no mes')) {
+    return { type: 'month', yearMonth: new Date().toISOString().slice(0, 7) };
+  }
+
+  if (norm.includes('geral') || norm.includes('total') || norm.includes('acumulado')) {
+    return { type: 'overall' };
+  }
+
+  return { type: 'default' };
+}
+
+function handleBalanceResponse(balanceQuery, userId) {
+  const query = balanceQuery || { type: 'default' };
+
+  if (query.type === 'period' || query.days) {
+    const days = query.days ? Number(query.days) : 30;
+    const periodInfo = financeService.getPeriodBalance({
+      days,
+      startDate: query.startDate,
+      endDate: query.endDate,
+      userId,
+    });
+
+    let responseText = `💵 *Seu Balanço dos ${periodInfo.periodLabel}:*\n\n` +
+                       `🟢 *Total de Entradas*: *${periodInfo.formattedIncomes}* (${periodInfo.countIncomes} ${periodInfo.countIncomes === 1 ? 'recebimento' : 'recebimentos'})\n` +
+                       `🔴 *Total de Saídas*: *${periodInfo.formattedExpenses}* (${periodInfo.countExpenses} ${periodInfo.countExpenses === 1 ? 'gasto' : 'gastos'})\n` +
+                       `─────────────────────────\n` +
+                       `💰 *Resultado do Período*: *${periodInfo.formattedBalance}* ${periodInfo.isPositive ? '🟢 (Positivo)' : '🔴 (Negativo)'}\n\n` +
+                       `💼 *Saldo Geral em Caixa*: *${periodInfo.formattedOverallBalance}* ${periodInfo.isOverallPositive ? '🟢' : '🔴'}\n`;
+
+    if (periodInfo.recentIncomes.length > 0 || periodInfo.recentExpenses.length > 0) {
+      responseText += `\n📌 *Movimentações no Período:*`;
+      if (periodInfo.recentIncomes.length > 0) {
+        responseText += `\n*Entradas:*`;
+        for (const inc of periodInfo.recentIncomes) {
+          responseText += `\n• ${financeService.formatDateBR(inc.date).slice(0, 5)}: 🟢 *+${financeService.formatCurrency(inc.amount)}* - ${inc.source} (${inc.category})`;
+        }
+      }
+      if (periodInfo.recentExpenses.length > 0) {
+        responseText += `\n*Saídas:*`;
+        for (const exp of periodInfo.recentExpenses) {
+          responseText += `\n• ${financeService.formatDateBR(exp.date).slice(0, 5)}: 🔴 *-${financeService.formatCurrency(exp.amount)}* - ${exp.description} (${exp.category})`;
+        }
+      }
+    }
+
+    responseText += `\n\n_Para ver gráficos e relatórios completos, digite *painel*!_`;
+    return responseText;
+  }
+
+  if (query.type === 'month' || query.month || query.yearMonth) {
+    const ym = query.yearMonth || query.month || new Date().toISOString().slice(0, 7);
+    const balanceInfo = financeService.getMonthlyBalance(ym, userId);
+    const overall = financeService.getOverallBalance(userId);
+
+    let responseText = `💵 *Seu Balanço Financeiro do Mês (${balanceInfo.month}):*\n\n` +
+                       `🟢 *Total de Entradas*: *${balanceInfo.formattedIncomes}* (${balanceInfo.countIncomes} ${balanceInfo.countIncomes === 1 ? 'recebimento' : 'recebimentos'})\n` +
+                       `🔴 *Total de Saídas*: *${balanceInfo.formattedExpenses}* (${balanceInfo.countExpenses} ${balanceInfo.countExpenses === 1 ? 'gasto' : 'gastos'})\n` +
+                       `─────────────────────────\n` +
+                       `💰 *Resultado do Mês*: *${balanceInfo.formattedBalance}* ${balanceInfo.isPositive ? '🟢 (Positivo)' : '🔴 (Negativo)'}\n\n` +
+                       `💼 *Saldo Geral em Caixa*: *${overall.formattedBalance}* ${overall.isPositive ? '🟢' : '🔴'}\n`;
+
+    const recentIncomes = financeService.getRecentIncomes(3, userId);
+    const recentExpenses = financeService.getRecentExpenses(3, userId);
+    if (recentIncomes.length > 0 || recentExpenses.length > 0) {
+      responseText += `\n📌 *Últimas Movimentações:*`;
+      if (recentIncomes.length > 0) {
+        responseText += `\n*Entradas Recentes:*`;
+        for (const inc of recentIncomes) {
+          responseText += `\n• ${financeService.formatDateBR(inc.date).slice(0, 5)}: 🟢 *+${financeService.formatCurrency(inc.amount)}* - ${inc.source} (${inc.category})`;
+        }
+      }
+      if (recentExpenses.length > 0) {
+        responseText += `\n*Saídas Recentes:*`;
+        for (const exp of recentExpenses) {
+          responseText += `\n• ${financeService.formatDateBR(exp.date).slice(0, 5)}: 🔴 *-${financeService.formatCurrency(exp.amount)}* - ${exp.description} (${exp.category})`;
+        }
+      }
+    }
+
+    responseText += `\n\n_Para ver gráficos e relatórios completos, digite *painel*!_`;
+    return responseText;
+  }
+
+  // Default: overall balance + current month summary
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const monthlyInfo = financeService.getMonthlyBalance(currentMonth, userId);
+  const overallInfo = financeService.getOverallBalance(userId);
+  const recentIncomes = financeService.getRecentIncomes(3, userId);
+  const recentExpenses = financeService.getRecentExpenses(3, userId);
+
+  let responseText = `💵 *Seu Saldo & Balanço Financeiro:*\n\n` +
+                     `💰 *Saldo Atual em Caixa*: *${overallInfo.formattedBalance}* ${overallInfo.isPositive ? '🟢 (Positivo)' : '🔴 (Negativo)'}\n` +
+                     `─────────────────────────\n` +
+                     `📊 *Resumo do Mês Atual (${monthlyInfo.month}):*\n` +
+                     `🟢 Entradas: *${monthlyInfo.formattedIncomes}* (${monthlyInfo.countIncomes} ${monthlyInfo.countIncomes === 1 ? 'recebimento' : 'recebimentos'})\n` +
+                     `🔴 Saídas: *${monthlyInfo.formattedExpenses}* (${monthlyInfo.countExpenses} ${monthlyInfo.countExpenses === 1 ? 'gasto' : 'gastos'})\n` +
+                     `💵 Resultado do Mês: *${monthlyInfo.formattedBalance}* ${monthlyInfo.isPositive ? '🟢' : '🔴'}\n`;
+
+  if (recentIncomes.length > 0 || recentExpenses.length > 0) {
+    responseText += `\n📌 *Últimas Movimentações:*`;
+    if (recentIncomes.length > 0) {
+      responseText += `\n*Entradas Recentes:*`;
+      for (const inc of recentIncomes) {
+        responseText += `\n• ${financeService.formatDateBR(inc.date).slice(0, 5)}: 🟢 *+${financeService.formatCurrency(inc.amount)}* - ${inc.source} (${inc.category})`;
+      }
+    }
+    if (recentExpenses.length > 0) {
+      responseText += `\n*Saídas Recentes:*`;
+      for (const exp of recentExpenses) {
+        responseText += `\n• ${financeService.formatDateBR(exp.date).slice(0, 5)}: 🔴 *-${financeService.formatCurrency(exp.amount)}* - ${exp.description} (${exp.category})`;
+      }
+    }
+  }
+
+  responseText += `\n\n_Para ver gráficos e relatórios completos, digite *painel*!_`;
+  return responseText;
+}
+
 function parseExpenseCorrection(text, quotedText = null) {
   if (!text) return null;
   const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
@@ -844,38 +1000,11 @@ async function handleIncomingMessage(sock, msg) {
     }
   }
 
-  // Fast Deterministic Balance Query Trigger: "saldo", "meu saldo", "qual meu saldo", "balanço"
+  // Fast Deterministic Balance Query Trigger: "saldo", "meu saldo", "qual meu saldo", "balanço", "últimos 30 dias"
   if (text) {
-    const normText = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-    if (['saldo', 'meu saldo', 'qual meu saldo', 'qual o meu saldo', 'como esta meu saldo', 'como ta meu saldo', 'balanco', 'balanço', 'meu balanco', 'meu balanço', 'qual meu balanco', 'qual meu balanço', 'como esta meu balanco', 'quanto sobrou', 'balanco geral', 'balanço geral'].includes(normText)) {
-      const balanceInfo = financeService.getMonthlyBalance(null, user.id);
-      const recentIncomes = financeService.getRecentIncomes(3, user.id);
-      const recentExpenses = financeService.getRecentExpenses(3, user.id);
-
-      let responseText = `💵 *Seu Balanço Financeiro do Mês (${balanceInfo.month}):*\n\n` +
-                         `🟢 *Total de Entradas*: *${balanceInfo.formattedIncomes}* (${balanceInfo.countIncomes} ${balanceInfo.countIncomes === 1 ? 'recebimento' : 'recebimentos'})\n` +
-                         `🔴 *Total de Saídas*: *${balanceInfo.formattedExpenses}* (${balanceInfo.countExpenses} ${balanceInfo.countExpenses === 1 ? 'gasto' : 'gastos'})\n` +
-                         `─────────────────────────\n` +
-                         `💰 *Saldo Atual*: *${balanceInfo.formattedBalance}* ${balanceInfo.isPositive ? '🟢 (Positivo)' : '🔴 (Negativo)'}\n`;
-
-      if (recentIncomes.length > 0 || recentExpenses.length > 0) {
-        responseText += `\n📌 *Últimas Movimentações:*`;
-        if (recentIncomes.length > 0) {
-          responseText += `\n*Entradas Recentes:*`;
-          for (const inc of recentIncomes) {
-            responseText += `\n• ${financeService.formatDateBR(inc.date).slice(0, 5)}: 🟢 *+${financeService.formatCurrency(inc.amount)}* - ${inc.source} (${inc.category})`;
-          }
-        }
-        if (recentExpenses.length > 0) {
-          responseText += `\n*Saídas Recentes:*`;
-          for (const exp of recentExpenses) {
-            responseText += `\n• ${financeService.formatDateBR(exp.date).slice(0, 5)}: 🔴 *-${financeService.formatCurrency(exp.amount)}* - ${exp.description} (${exp.category})`;
-          }
-        }
-      }
-
-      responseText += `\n\n_Para ver gráficos e relatórios completos, digite *painel*!_`;
-
+    const balanceQueryParsed = parseBalanceQuery(text);
+    if (balanceQueryParsed) {
+      const responseText = handleBalanceResponse(balanceQueryParsed, user.id);
       await sock.sendMessage(targetJid, { text: responseText });
       return;
     }
@@ -1289,7 +1418,9 @@ async function handleIncomingMessage(sock, msg) {
         sourceType,
       });
 
-      const monthlyBalance = financeService.getMonthlyBalance(null, user.id);
+      const targetMonth = saved.date ? saved.date.slice(0, 7) : new Date().toISOString().slice(0, 7);
+      const monthlyBalance = financeService.getMonthlyBalance(targetMonth, user.id);
+      const overallBalance = financeService.getOverallBalance(user.id);
 
       let responseText = `✅ *Gasto Registrado com Sucesso!*\n\n` +
                          `💰 *Valor*: ${financeService.formatCurrency(saved.amount)}\n` +
@@ -1297,9 +1428,11 @@ async function handleIncomingMessage(sock, msg) {
                          `📝 *Descrição*: ${saved.description}\n` +
                          `💳 *Pagamento*: ${saved.paymentMethod}\n` +
                          `📅 *Data*: ${financeService.formatDateBR(saved.date)}\n\n` +
+                         `━━━━━━━━━━━━━━━━━━\n` +
                          `📊 *Balanço do Mês (${monthlyBalance.month}):*\n` +
                          `🟢 Entradas: *${monthlyBalance.formattedIncomes}* | 🔴 Saídas: *${monthlyBalance.formattedExpenses}*\n` +
-                         `💵 *Saldo Atual*: *${monthlyBalance.formattedBalance}* ${monthlyBalance.isPositive ? '📈' : '⚠️'}`;
+                         `💵 Saldo do Mês: *${monthlyBalance.formattedBalance}* ${monthlyBalance.isPositive ? '📈' : '⚠️'}\n\n` +
+                         `💼 *Saldo Geral em Caixa*: *${overallBalance.formattedBalance}* ${overallBalance.isPositive ? '🟢' : '🔴'}`;
 
       if (transcription) {
         responseText += `\n\n🔍 _${audioBuffer ? '🎙️ Áudio detectado' : imageBuffer ? '📸 Recibo identificado' : documentBuffer ? '📄 Documento PDF analisado' : 'Mensagem'}: "${transcription}"_`;
@@ -1322,7 +1455,9 @@ async function handleIncomingMessage(sock, msg) {
         sourceType,
       });
 
-      const monthlyBalance = financeService.getMonthlyBalance(null, user.id);
+      const targetMonth = saved.date ? saved.date.slice(0, 7) : new Date().toISOString().slice(0, 7);
+      const monthlyBalance = financeService.getMonthlyBalance(targetMonth, user.id);
+      const overallBalance = financeService.getOverallBalance(user.id);
 
       let responseText = `🟢 *Entrada Registrada com Sucesso!*\n\n` +
                          `💰 *Valor Recebido*: *${financeService.formatCurrency(saved.amount)}*\n` +
@@ -1330,10 +1465,12 @@ async function handleIncomingMessage(sock, msg) {
                          `👤 *Origem/Pagador*: ${saved.source}\n` +
                          `💳 *Forma*: ${saved.paymentMethod}\n` +
                          `📅 *Data*: ${financeService.formatDateBR(saved.date)}\n\n` +
-                         `📊 *Balanço Atualizado do Mês (${monthlyBalance.month}):*\n` +
+                         `━━━━━━━━━━━━━━━━━━\n` +
+                         `📊 *Balanço do Mês (${monthlyBalance.month}):*\n` +
                          `🟢 Entradas: *${monthlyBalance.formattedIncomes}*\n` +
                          `🔴 Saídas: *${monthlyBalance.formattedExpenses}*\n` +
-                         `💵 *Saldo Líquido*: *${monthlyBalance.formattedBalance}* ${monthlyBalance.isPositive ? '📈' : '⚠️'}`;
+                         `💵 Saldo do Mês: *${monthlyBalance.formattedBalance}* ${monthlyBalance.isPositive ? '🟢' : '🔴'}\n\n` +
+                         `💼 *Saldo Geral em Caixa*: *${overallBalance.formattedBalance}* ${overallBalance.isPositive ? '🟢' : '🔴'}`;
 
       if (transcription) {
         responseText += `\n\n🔍 _${audioBuffer ? '🎙️ Áudio detectado' : imageBuffer ? '📸 Recibo identificado' : documentBuffer ? '📄 Documento PDF analisado' : 'Mensagem'}: "${transcription}"_`;
@@ -1423,34 +1560,8 @@ async function handleIncomingMessage(sock, msg) {
 
     // 2.2 CONSULTA DE SALDO / BALANÇO FINANCEIRO
     if (intent === 'BALANCE_QUERY') {
-      const balanceInfo = financeService.getMonthlyBalance(null, user.id);
-      const recentIncomes = financeService.getRecentIncomes(3, user.id);
-      const recentExpenses = financeService.getRecentExpenses(3, user.id);
-
-      let responseText = `💵 *Seu Balanço Financeiro do Mês (${balanceInfo.month}):*\n\n` +
-                         `🟢 *Total de Entradas*: *${balanceInfo.formattedIncomes}* (${balanceInfo.countIncomes} ${balanceInfo.countIncomes === 1 ? 'recebimento' : 'recebimentos'})\n` +
-                         `🔴 *Total de Saídas*: *${balanceInfo.formattedExpenses}* (${balanceInfo.countExpenses} ${balanceInfo.countExpenses === 1 ? 'gasto' : 'gastos'})\n` +
-                         `─────────────────────────\n` +
-                         `💰 *Saldo Atual*: *${balanceInfo.formattedBalance}* ${balanceInfo.isPositive ? '🟢 (Positivo)' : '🔴 (Negativo)'}\n`;
-
-      if (recentIncomes.length > 0 || recentExpenses.length > 0) {
-        responseText += `\n📌 *Últimas Movimentações:*`;
-        if (recentIncomes.length > 0) {
-          responseText += `\n*Entradas Recentes:*`;
-          for (const inc of recentIncomes) {
-            responseText += `\n• ${financeService.formatDateBR(inc.date).slice(0, 5)}: 🟢 *+${financeService.formatCurrency(inc.amount)}* - ${inc.source} (${inc.category})`;
-          }
-        }
-        if (recentExpenses.length > 0) {
-          responseText += `\n*Saídas Recentes:*`;
-          for (const exp of recentExpenses) {
-            responseText += `\n• ${financeService.formatDateBR(exp.date).slice(0, 5)}: 🔴 *-${financeService.formatCurrency(exp.amount)}* - ${exp.description} (${exp.category})`;
-          }
-        }
-      }
-
-      responseText += `\n\n_Para ver gráficos e relatórios completos, digite *painel*!_`;
-
+      const bQuery = aiResult.balanceQuery || (text ? parseBalanceQuery(text) : null);
+      const responseText = handleBalanceResponse(bQuery, user.id);
       await sock.sendMessage(targetJid, { text: responseText });
       return;
     }
@@ -1477,11 +1588,13 @@ async function handleIncomingMessage(sock, msg) {
         await sock.sendMessage(targetJid, { text: notFoundMsg });
       } else {
         const bal = financeService.getMonthlyBalance(null, user.id);
+        const overall = financeService.getOverallBalance(user.id);
         await sock.sendMessage(targetJid, {
           text: `🗑️ *Entrada Removida com Sucesso!*\n\n` +
                 `Excluí o seguinte registro de entrada:\n` +
                 `• *${financeService.formatCurrency(deleted.amount)}* - ${deleted.source} (${deleted.category})\n\n` +
-                `📊 *Novo Saldo do Mês*: *${bal.formattedBalance}*`,
+                `📊 *Novo Saldo do Mês*: *${bal.formattedBalance}*\n` +
+                `💼 *Saldo Geral em Caixa*: *${overall.formattedBalance}*`,
         });
       }
       return;
