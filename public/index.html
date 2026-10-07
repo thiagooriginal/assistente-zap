@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Pierre • Dashboard Financeiro Inteligente</title>
+  <title>Assistente • Dashboard Financeiro Inteligente</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -85,7 +85,7 @@
   <!-- APP CONTAINER (Mobile Frame centered on desktop, 100% on mobile) -->
   <div class="w-full max-w-md sm:max-w-lg mx-auto px-4 pt-4 sm:pt-6 space-y-4">
     
-    <!-- 1. TOP HEADER (Avatar, User Name, Privacy Eye, Pierre Pro Badge) -->
+    <!-- 1. TOP HEADER (Avatar, User Name, Privacy Eye, Assistente Pro Badge) -->
     <header class="flex items-center justify-between py-2">
       <div class="flex items-center gap-3">
         <!-- Avatar with glowing border -->
@@ -106,13 +106,13 @@
         </div>
       </div>
 
-      <!-- Plan Badge: Pierre Pro ⭐ -->
+      <!-- Plan Badge: Assistente Pro ⭐ -->
       <div class="flex items-center gap-2">
         <button id="adminQuickBtn" onclick="openAdminModal()" class="hidden px-2.5 py-1 text-xs font-bold bg-zinc-800 text-zinc-300 hover:text-white rounded-full border border-zinc-700 transition">
           Admin
         </button>
-        <div id="pierreProBadge" class="px-3.5 py-1.5 rounded-full bg-[#ccff00] text-black font-extrabold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition cursor-pointer" onclick="openPixModal()">
-          <span>Pierre Pro</span>
+        <div id="assistenteProBadge" class="px-3.5 py-1.5 rounded-full bg-[#ccff00] text-black font-extrabold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition cursor-pointer" onclick="openPixModal()">
+          <span>Assistente Pro</span>
           <i data-lucide="sparkles" class="w-3.5 h-3.5 fill-black stroke-black"></i>
         </div>
       </div>
@@ -471,7 +471,7 @@
 
   </div>
 
-  <!-- FLOATING BOTTOM NAVIGATION BAR (Home, Pergunte ao Pierre, Mascot) -->
+  <!-- FLOATING BOTTOM NAVIGATION BAR (Home, Pergunte ao Assistente, Mascot) -->
   <div class="fixed bottom-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
     <div class="glass-nav rounded-full px-5 py-2.5 flex items-center gap-4 shadow-2xl pointer-events-auto max-w-sm w-full justify-between">
       
@@ -480,14 +480,14 @@
         <i data-lucide="home" class="w-6 h-6 stroke-[2.2]"></i>
       </button>
 
-      <!-- Center Action Pill: Pergunte ao Pierre -->
-      <button onclick="openPierreActionsModal()" class="flex-1 max-w-[210px] h-10 px-4 rounded-full bg-zinc-900/90 border border-zinc-700/80 hover:border-[#ccff00]/60 flex items-center justify-center gap-2 text-white font-bold text-xs tracking-wide active:scale-95 transition shadow-inner">
+      <!-- Center Action Pill: Pergunte ao Assistente -->
+      <button onclick="openAssistenteActionsModal()" class="flex-1 max-w-[210px] h-10 px-4 rounded-full bg-zinc-900/90 border border-zinc-700/80 hover:border-[#ccff00]/60 flex items-center justify-center gap-2 text-white font-bold text-xs tracking-wide active:scale-95 transition shadow-inner">
         <i data-lucide="scan" class="w-4 h-4 text-[#ccff00]"></i>
-        <span class="truncate">Pergunte ao Pierre</span>
+        <span class="truncate">Pergunte ao Assistente</span>
       </button>
 
       <!-- Cool Cat Mascot Icon Button -->
-      <button onclick="openPierreActionsModal()" title="Assistente IA" class="w-10 h-10 rounded-full flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-800/50 transition">
+      <button onclick="openAssistenteActionsModal()" title="Assistente IA" class="w-10 h-10 rounded-full flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-800/50 transition">
         <!-- Cute Cat with Sunglasses SVG -->
         <svg class="w-7 h-7" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M7 11L12 17H24L29 11L27 24C27 29 23 32 18 32C13 32 9 29 9 24L7 11Z" fill="#18181b" stroke="#ffffff" stroke-width="1.8" stroke-linejoin="round"/>
@@ -503,9 +503,9 @@
   </div>
 
   <!-- ============================================================ -->
-  <!-- MODAL: AÇÕES RÁPIDAS / PERGUNTE AO PIERRE                    -->
+  <!-- MODAL: AÇÕES RÁPIDAS / PERGUNTE AO ASSISTENTE               -->
   <!-- ============================================================ -->
-  <div id="pierreActionsModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
+  <div id="assistenteActionsModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-end sm:items-center justify-center p-0 sm:p-4">
     <div class="bg-[#141416] border border-zinc-800 w-full max-w-md rounded-t-[32px] sm:rounded-[32px] p-6 space-y-4 shadow-2xl">
       <div class="flex items-center justify-between pb-3 border-b border-zinc-800">
         <div class="flex items-center gap-2.5">
@@ -513,17 +513,17 @@
             <i data-lucide="zap" class="w-5 h-5 fill-black"></i>
           </div>
           <div>
-            <h3 class="text-base font-extrabold text-white">Assistente Pierre</h3>
+            <h3 class="text-base font-extrabold text-white">Assistente Financeiro</h3>
             <p class="text-xs text-zinc-400">O que você gostaria de fazer?</p>
           </div>
         </div>
-        <button onclick="closePierreActionsModal()" class="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center">
+        <button onclick="closeAssistenteActionsModal()" class="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center">
           <i data-lucide="x" class="w-4 h-4"></i>
         </button>
       </div>
 
       <div class="grid grid-cols-2 gap-2.5">
-        <button onclick="openExpenseModal(); closePierreActionsModal();" class="p-3.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-left transition flex items-center gap-3">
+        <button onclick="openExpenseModal(); closeAssistenteActionsModal();" class="p-3.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-left transition flex items-center gap-3">
           <div class="w-8 h-8 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
             <i data-lucide="minus" class="w-4 h-4"></i>
           </div>
@@ -533,7 +533,7 @@
           </div>
         </button>
 
-        <button onclick="openIncomeModal(); closePierreActionsModal();" class="p-3.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-left transition flex items-center gap-3">
+        <button onclick="openIncomeModal(); closeAssistenteActionsModal();" class="p-3.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-left transition flex items-center gap-3">
           <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-[#ccff00] flex items-center justify-center shrink-0">
             <i data-lucide="plus" class="w-4 h-4"></i>
           </div>
@@ -543,7 +543,7 @@
           </div>
         </button>
 
-        <button onclick="openBillModal(); closePierreActionsModal();" class="p-3.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-left transition flex items-center gap-3">
+        <button onclick="openBillModal(); closeAssistenteActionsModal();" class="p-3.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-left transition flex items-center gap-3">
           <div class="w-8 h-8 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
             <i data-lucide="calendar-plus" class="w-4 h-4"></i>
           </div>
@@ -553,7 +553,7 @@
           </div>
         </button>
 
-        <button onclick="openAppointmentModal(); closePierreActionsModal();" class="p-3.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-left transition flex items-center gap-3">
+        <button onclick="openAppointmentModal(); closeAssistenteActionsModal();" class="p-3.5 rounded-2xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-left transition flex items-center gap-3">
           <div class="w-8 h-8 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
             <i data-lucide="calendar" class="w-4 h-4"></i>
           </div>
@@ -567,7 +567,7 @@
       <!-- Falar no WhatsApp -->
       <a id="btnOpenWhatsAppDirect" href="https://wa.me/" target="_blank" class="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition">
         <i data-lucide="message-circle" class="w-5 h-5"></i>
-        <span>Conversar com Pierre no WhatsApp</span>
+        <span>Conversar com o Assistente no WhatsApp</span>
       </a>
 
       <!-- Links secundários -->
@@ -797,7 +797,7 @@
         <i data-lucide="crown" class="w-6 h-6 fill-black"></i>
       </div>
       <div>
-        <h3 class="text-lg font-black text-white">Assinar Pierre Pro ⭐</h3>
+        <h3 class="text-lg font-black text-white">Assinar Assistente Pro ⭐</h3>
         <p class="text-xs text-zinc-400 mt-1">Inteligência artificial financeira completa, lembretes pontuais e controle vitalício por apenas <b class="text-[#ccff00]">R$ 29,00/mês</b>.</p>
       </div>
       <div class="p-3 bg-zinc-900 rounded-2xl border border-zinc-800 text-left text-xs space-y-1.5">
@@ -898,7 +898,7 @@
               🔒
             </div>
             <h2 class="text-2xl font-extrabold mb-2">Acesso Exclusivo WhatsApp</h2>
-            <p class="text-zinc-400 mb-6 text-sm">Para acessar o seu painel financeiro seguro, abra a conversa com o Pierre no WhatsApp e solicite o link de acesso.</p>
+            <p class="text-zinc-400 mb-6 text-sm">Para acessar o seu painel financeiro seguro, abra a conversa com o Assistente no WhatsApp e solicite o link de acesso.</p>
             <div class="text-xs text-zinc-300 bg-zinc-900 p-4 rounded-2xl border border-zinc-800 text-left">
               👉 Envie a palavra <b>"Painel"</b> ou <b>"Dashboard"</b> no WhatsApp para receber seu link imediato.
             </div>
@@ -920,7 +920,7 @@
 
     // Privacy Mode (Persisted in localStorage)
     try {
-      isPrivacyActive = localStorage.getItem('pierre_privacy') === '1';
+      isPrivacyActive = (localStorage.getItem('assistente_privacy') || localStorage.getItem('pierre_privacy')) === '1';
     } catch (e) {}
 
     function updatePrivacyUI() {
@@ -939,7 +939,9 @@
 
     function togglePrivacyMode() {
       isPrivacyActive = !isPrivacyActive;
-      try { localStorage.setItem('pierre_privacy', isPrivacyActive ? '1' : '0'); } catch (e) {}
+      try {
+        localStorage.setItem('assistente_privacy', isPrivacyActive ? '1' : '0');
+      } catch (e) {}
       updatePrivacyUI();
     }
 
@@ -1511,8 +1513,10 @@
     }
 
     // Modals Control
-    function openPierreActionsModal() { document.getElementById('pierreActionsModal').classList.remove('hidden'); }
-    function closePierreActionsModal() { document.getElementById('pierreActionsModal').classList.add('hidden'); }
+    function openAssistenteActionsModal() { document.getElementById('assistenteActionsModal').classList.remove('hidden'); }
+    function closeAssistenteActionsModal() { document.getElementById('assistenteActionsModal').classList.add('hidden'); }
+    function openPierreActionsModal() { openAssistenteActionsModal(); }
+    function closePierreActionsModal() { closeAssistenteActionsModal(); }
     function openExpenseModal() { document.getElementById('expenseModal').classList.remove('hidden'); }
     function closeExpenseModal() { document.getElementById('expenseModal').classList.add('hidden'); }
     function openIncomeModal() { document.getElementById('incomeModal').classList.remove('hidden'); }
@@ -1534,7 +1538,7 @@
     function closePixModal() { document.getElementById('pixModal').classList.add('hidden'); }
     function openAdminModal() { document.getElementById('adminModal').classList.remove('hidden'); loadAdminUsers(); }
     function closeAdminModal() { document.getElementById('adminModal').classList.add('hidden'); }
-    function openSyncBanksModal() { openPierreActionsModal(); }
+    function openSyncBanksModal() { openAssistenteActionsModal(); }
     function openLimitModal() { openBillModal(); }
     function openParcelasModal() { openBillModal(); }
     function openAssinaturasModal() { openBillModal(); }
