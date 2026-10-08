@@ -232,6 +232,20 @@ app.put('/api/admin/users/:id/plan', authMiddleware, (req, res) => {
   res.json({ success: true, data: updated });
 });
 
+app.post('/api/admin/users/:id/extend-trial', authMiddleware, (req, res) => {
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
+  }
+  const { id } = req.params;
+  const { days } = req.body;
+  try {
+    const result = userService.extendUserTrial(id, days || 7);
+    res.json({ success: true, data: result });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 app.delete('/api/admin/users/:id', authMiddleware, (req, res) => {
   if (req.user.role !== 'ADMIN') {
     return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });

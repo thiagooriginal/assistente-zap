@@ -270,6 +270,17 @@ As intenções possíveis são:
 15. "ADMIN_STATS": O administrador quer saber quantos clientes estão cadastrados, faturamento ou métricas.
    Exemplos: "quantos clientes temos?", "quantos assinantes?", "faturamento saas".
 
+16. "ADMIN_EXTEND_TRIAL": O usuário (administrador) quer conceder, liberar, estender ou adicionar mais dias de teste grátis para um número de WhatsApp ou cliente específico.
+   Exemplos:
+   - "Liberar mais 20 dias de teste para o numero 11999998888"
+   - "libera 15 dias de teste pro 5511988887777"
+   - "dar mais 30 dias de teste para o numero (11) 98765-4321"
+   - "adiciona 10 dias de teste para 11999999999"
+   - "liberar mais 7 dias de teste para o cliente 11988887777"
+   - Extraia no campo "adminExtendTrial":
+     * days: número inteiro de dias adicionais (ex: 20, 15, 30, 7). Se não especificado, use 7.
+     * phone: string com o número de telefone citado (apenas dígitos ou formato digitado, ex: "11999998888", "5511988887777").
+
 REGRA CRÍTICA DE DISTINÇÃO ENTRE DOMÍNIOS:
 1. ENTRADAS / RECEITAS / RECEBIMENTOS ("INCOME_*"):
    - Refere-se a DINHEIRO RECEBIDO, salário, pagamento recebido de cliente, pix recebido, vendas, comissões, honorários, depósitos que entraram na conta.
@@ -310,8 +321,8 @@ REGRA FUNDAMENTAL SOBRE VALORES MONETÁRIOS:
 Você DEVE responder APENAS com um objeto JSON válido, sem blocos de markdown adicionais como \`\`\`json.
 Estrutura do JSON:
 {
-  "intents": ["EXPENSE_REGISTER" | "EXPENSE_QUERY" | "EXPENSE_UPDATE" | "EXPENSE_DELETE" | "INCOME_REGISTER" | "INCOME_QUERY" | "INCOME_DELETE" | "BALANCE_QUERY" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "CALENDAR_QUERY" | "DELETE_LAST_EXPENSE" | "SCHEDULE_PAYMENT" | "UPDATE_BILL" | "PAYMENT_PAID" | "QUERY_SCHEDULED_PAYMENTS" | "ADMIN_GENERATE_INVITE" | "ADMIN_STATS" | "GENERAL_CHAT"],
-  "intent": "EXPENSE_REGISTER" | "EXPENSE_QUERY" | "EXPENSE_UPDATE" | "EXPENSE_DELETE" | "INCOME_REGISTER" | "INCOME_QUERY" | "INCOME_DELETE" | "BALANCE_QUERY" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "CALENDAR_QUERY" | "DELETE_LAST_EXPENSE" | "SCHEDULE_PAYMENT" | "UPDATE_BILL" | "PAYMENT_PAID" | "QUERY_SCHEDULED_PAYMENTS" | "ADMIN_GENERATE_INVITE" | "ADMIN_STATS" | "GENERAL_CHAT",
+  "intents": ["EXPENSE_REGISTER" | "EXPENSE_QUERY" | "EXPENSE_UPDATE" | "EXPENSE_DELETE" | "INCOME_REGISTER" | "INCOME_QUERY" | "INCOME_DELETE" | "BALANCE_QUERY" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "CALENDAR_QUERY" | "DELETE_LAST_EXPENSE" | "SCHEDULE_PAYMENT" | "UPDATE_BILL" | "PAYMENT_PAID" | "QUERY_SCHEDULED_PAYMENTS" | "ADMIN_GENERATE_INVITE" | "ADMIN_STATS" | "ADMIN_EXTEND_TRIAL" | "GENERAL_CHAT"],
+  "intent": "EXPENSE_REGISTER" | "EXPENSE_QUERY" | "EXPENSE_UPDATE" | "EXPENSE_DELETE" | "INCOME_REGISTER" | "INCOME_QUERY" | "INCOME_DELETE" | "BALANCE_QUERY" | "CALENDAR_CREATE" | "CALENDAR_UPDATE" | "CALENDAR_DELETE" | "CALENDAR_QUERY" | "DELETE_LAST_EXPENSE" | "SCHEDULE_PAYMENT" | "UPDATE_BILL" | "PAYMENT_PAID" | "QUERY_SCHEDULED_PAYMENTS" | "ADMIN_GENERATE_INVITE" | "ADMIN_STATS" | "ADMIN_EXTEND_TRIAL" | "GENERAL_CHAT",
 
   "hasCalendarQuery": boolean,
   "hasExpenseQuery": boolean,
@@ -407,6 +418,10 @@ Estrutura do JSON:
     "title": string,
     "month": number | null,
     "amount": number | null
+  },
+  "adminExtendTrial": {
+    "days": number,
+    "phone": string
   },
   "replyMessage": "Texto amigável, gentil e acolhedor em português para o usuário. NUNCA deixe vazio quando for GENERAL_CHAT ou quando o usuário falar de assuntos fora do seu papel!"
 }`;

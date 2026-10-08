@@ -484,6 +484,141 @@ async function sendAdminInviteCode(sock, targetJid, userId) {
   });
 }
 
+/**
+ * Parse Admin request to extend / grant free trial days
+ * e.g. "Liberar mais 20 dias de teste para o numero 11999998888"
+ */
+function parseAdminExtendTrial(text) {
+  if (!text) return null;
+  const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+  // Guard: Must relate to test/trial or time extension
+  const hasTrialKeyword = /(?:teste|testes|trial|periodo|dias?)\b/i.test(norm);
+  const hasActionKeyword = /(?:libera|liberar|da|dar|adiciona|adicionar|estende|estender|mais|conceder|aumenta|aumentar|renova|renovar)\b/i.test(norm);
+
+  if (!hasTrialKeyword || !hasActionKeyword) {
+    return null;
+  }
+
+  // Must not be confused with expense or bill commands
+  if (/(?:gastei|gasto|despesa|almoco|gasolina|paguei|boleto|conta de luz)\b/i.test(norm)) {
+    return null;
+  }
+
+  // Extract days: "20 dias", "mais 20 dias", "15 dias de teste", "em 20 dias"
+  const daysMatch = norm.match(/(?:mais\s+|em\s+)?(\d+)\s*dias?/i);
+  const days = daysMatch ? parseInt(daysMatch[1], 10) : 7;
+
+  // Extract phone number:
+  let phone = null;
+
+  // 1. Keyword before phone: "numero", "num", "pro", "para o", "para", "ao", "cliente", "contato", "zap", "whatsapp"
+  const keywordMatch = text.match(/(?:numero|num|n°|n[ºo]|pro|para\s+o|para|ao|cliente|contato|zap|whatsapp)\s*:?\s*(\+?[\d\s\-\(\)\.]{8,}\d)/i);
+  if (keywordMatch) {
+    phone = keywordMatch[1].trim();
+  } else {
+    // 2. Trailing phone or phone anywhere in text (with DDD, spaces, hyphens, etc.)
+    const anyPhone = text.match(/(\+?55\s*)?(?:\(?\d{2}\)?\s*)?(?:9\s*)?\d{4}[\s\-]?\d{4}/);
+    if (anyPhone) {
+      phone = anyPhone[0].trim();
+    } else {
+      const anyDigits = text.match(/\d[\d\s\-\(\)\.]{7,}\d/);
+      if (anyDigits) {
+        phone = anyDigits[0].trim();
+      }
+    }
+  }
+
+  if (phone) {
+    const cleanDigits = phone.replace(/\D/g, '');
+    if (cleanDigits.length >= 8) {
+      return { days, phone: cleanDigits, missingPhone: false };
+    }
+  }
+
+  // If clearly an extension command but no valid digits provided (e.g. placeholder "x" or omitted)
+  if (/(?:libera|liberar|estende|estender|dar|da)\s+(?:mais\s+)?(?:\d+\s+)?dias/i.test(norm) ||
+      /(?:libera|liberar|estende|estender).*(?:teste)/i.test(norm)) {
+    return { days, phone: null, missingPhone: true };
+  }
+
+  return null;
+}
+
+/**
+ * Handle Admin trial extension request, notify target client and confirm to admin
+ */
+async function handleAdminExtendTrial(extendReq, sock, targetJid, adminUser) {
+  if (!extendReq) return;
+
+  if (extendReq.missingPhone || !extendReq.phone) {
+    await sock.sendMessage(targetJid, {
+      text: `⚠️ *Por favor, informe o número de telefone com DDD!*\n\n` +
+            `Exemplo de comando:\n` +
+            `• _"Liberar mais 20 dias de teste para o número 11999998888"_`,
+    });
+    return;
+  }
+
+  try {
+    const result = userService.extendUserTrial(extendReq.phone, extendReq.days || 7);
+    const { user: targetUser, isNewUser, daysAdded, newTrialEndsAt, daysRemaining } = result;
+
+    const endsDate = new Date(newTrialEndsAt);
+    const dateFormatted = endsDate.toLocaleDateString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+    const formattedPhone = userService.formatPhone(targetUser.phone_number);
+    const cleanTargetDigits = (targetUser.phone_number || '').replace(/\D/g, '');
+    const clientJid = `${cleanTargetDigits}@s.whatsapp.net`;
+
+    // 1. Notify the target user on WhatsApp
+    let clientNotified = false;
+    try {
+      const clientMsg = isNewUser
+        ? `🎁 *Acesso de Teste Liberado!*\n\n` +
+          `Olá! O Administrador liberou *${daysAdded} dias de teste gratuito* para o seu WhatsApp no Assistente! 🚀\n\n` +
+          `⏳ *Seu período de teste é válido até*: *${dateFormatted}* (*${daysRemaining} ${daysRemaining === 1 ? 'dia restante' : 'dias restantes'}*).\n\n` +
+          `💡 *Veja como você pode aproveitar:*\n` +
+          `• 💰 *Gastos*: Mande áudios, textos ou comprovantes (ex: _"Gastei 45 no almoço"_)\n` +
+          `• ⏰ *Agenda*: Agende compromissos (ex: _"Dentista amanhã às 14h"_)\n` +
+          `• 💳 *Contas*: Anote boletos (ex: _"Conta de luz vence dia 10"_)\n` +
+          `• 📊 *Painel*: Digite *painel* para abrir seus relatórios no celular!\n\n` +
+          `_Como posso te ajudar agora? Mande uma mensagem ou áudio para começar!_ ✨`
+        : `🎁 *Período de Teste Estendido!*\n\n` +
+          `Olá! O Administrador liberou mais *${daysAdded} dias de teste gratuito* para você no Assistente! 🚀\n\n` +
+          `⏳ *Seu novo período é válido até*: *${dateFormatted}* (*${daysRemaining} ${daysRemaining === 1 ? 'dia restante' : 'dias restantes'}*).\n\n` +
+          `💡 O assistente já está ativo e a contagem de dias foi reiniciada. Continue enviando seus gastos, contas e compromissos normalmente!\n\n` +
+          `_Aproveite ao máximo seu assistente pessoal!_ ✨`;
+
+      await sock.sendMessage(clientJid, { text: clientMsg });
+      clientNotified = true;
+    } catch (errSend) {
+      console.warn(`[Admin Extend Trial] Falha ao enviar WhatsApp direto para ${clientJid}:`, errSend.message);
+    }
+
+    // 2. Send confirmation to Admin
+    const adminMsg = `✅ *Período de Testes Liberado com Sucesso!*\n\n` +
+      `👤 *Cliente*: ${targetUser.name || 'Cliente'} (${formattedPhone})\n` +
+      `➕ *Dias Concedidos*: *+${daysAdded} dias*\n` +
+      `⏳ *Dias Restantes*: *${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'}*\n` +
+      `📅 *Novo Vencimento*: *${dateFormatted}*\n` +
+      `📊 *Status do Plano*: Em Teste Grátis (Ativo)\n` +
+      `📲 *Aviso ao Cliente*: ${clientNotified ? '✅ Entregue no WhatsApp do cliente com sucesso!' : '⚠️ Mensagem direta não pôde ser entregue (verifique se o número possui WhatsApp).'}\n\n` +
+      `_A contagem diária de teste foi reiniciada e o cliente já pode continuar usando o Assistente!_ 🚀`;
+
+    await sock.sendMessage(targetJid, { text: adminMsg });
+  } catch (err) {
+    console.error('[Admin Extend Trial] Erro:', err);
+    await sock.sendMessage(targetJid, {
+      text: `❌ *Não foi possível liberar o teste:*\n${err.message}\n\n_Verifique se o número informado possui DDD e dígitos válidos._`,
+    });
+  }
+}
+
 const pendingDisambiguations = new Map();
 
 async function tryResolveDisambiguation(senderCleanNumber, inputText, sock, targetJid) {
@@ -871,8 +1006,16 @@ async function handleIncomingMessage(sock, msg) {
   }
 
   // Admin Commands (Only for Admin 5511951364159)
-  if (user.role === 'ADMIN' && text) {
+  const isAdminUser = userService.isUserAdmin ? userService.isUserAdmin(user) : (user.role === 'ADMIN' || user.id === 1);
+  if (isAdminUser && text) {
     const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+    // 0. Extend / Grant Trial Days ("liberar mais 20 dias de teste para o numero x")
+    const extendTrialReq = parseAdminExtendTrial(text);
+    if (extendTrialReq) {
+      await handleAdminExtendTrial(extendTrialReq, sock, targetJid, user);
+      return;
+    }
 
     // 1. Generate Invite Code via WhatsApp ("gerar um codigo", "me gera um codigo", "criar convite", etc.)
     if (isAdminInviteRequest(text)) {
@@ -1235,6 +1378,7 @@ async function handleIncomingMessage(sock, msg) {
       scheduledPayment,
       updateBill,
       paymentPaid,
+      adminExtendTrial,
       transcription,
       replyMessage,
     } = aiResult;
@@ -1243,6 +1387,20 @@ async function handleIncomingMessage(sock, msg) {
 
     console.log(`[AI Interpretation] Intent: ${intent} | Transcription: "${transcription || ''}"`);
     console.log('[AI Result Data]:', JSON.stringify(aiResult, null, 2));
+
+    // Admin Audio or AI-classified trial extension command
+    const isAdminUserForTrial = userService.isUserAdmin ? userService.isUserAdmin(user) : (user.role === 'ADMIN' || user.id === 1);
+    if (isAdminUserForTrial && (intent === 'ADMIN_EXTEND_TRIAL' || (transcription && parseAdminExtendTrial(transcription)))) {
+      const extendData = adminExtendTrial || aiResult.adminExtendTrial || {};
+      const parsedFromAudio = transcription ? parseAdminExtendTrial(transcription) : null;
+      const combinedReq = {
+        days: extendData.days || parsedFromAudio?.days || 7,
+        phone: extendData.phone || parsedFromAudio?.phone || null,
+        missingPhone: !extendData.phone && !parsedFromAudio?.phone,
+      };
+      await handleAdminExtendTrial(combinedReq, sock, targetJid, user);
+      return;
+    }
 
     // Admin Audio or AI-classified invite command
     if (user.role === 'ADMIN' && (intent === 'ADMIN_GENERATE_INVITE' || (transcription && isAdminInviteRequest(transcription)))) {

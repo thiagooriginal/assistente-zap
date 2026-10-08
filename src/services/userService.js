@@ -339,6 +339,93 @@ function isUserAdmin(user) {
   return false;
 }
 
+/**
+ * Find user by flexible phone formatting (exact, without DDI 55, with DDI 55, or suffix)
+ */
+function findUserByFlexiblePhone(rawPhone) {
+  if (!rawPhone) return null;
+  const digits = String(rawPhone).replace(/\D/g, '');
+  if (!digits || digits.length < 8) return null;
+
+  // 1. Direct match
+  let user = getUserByPhone(digits);
+  if (user) return user;
+
+  // 2. With 55 prefix if missing
+  if (!digits.startsWith('55')) {
+    user = getUserByPhone('55' + digits);
+    if (user) return user;
+  }
+
+  // 3. Search in all users
+  const all = getAllUsers();
+  user = all.find((u) => {
+    const uDigits = (u.phone_number || '').replace(/\D/g, '');
+    return uDigits === digits || uDigits === ('55' + digits) || ('55' + uDigits) === digits;
+  });
+  if (user) return user;
+
+  // 4. Suffix match (last 8 digits)
+  const last8 = digits.slice(-8);
+  user = all.find((u) => {
+    const uDigits = (u.phone_number || '').replace(/\D/g, '');
+    return uDigits.endsWith(last8);
+  });
+  return user || null;
+}
+
+/**
+ * Extend or grant free trial days for a user by phone or ID
+ */
+function extendUserTrial(targetPhoneOrId, days = 7) {
+  const numDays = Math.max(1, parseInt(days, 10) || 7);
+  let user = findUserByFlexiblePhone(targetPhoneOrId);
+  const now = new Date();
+
+  let isNewUser = false;
+  if (!user) {
+    let clean = (String(targetPhoneOrId) || '').replace(/\D/g, '');
+    if (!clean.startsWith('55') && clean.length <= 11) {
+      clean = '55' + clean;
+    }
+    if (clean.length < 10) {
+      throw new Error(`Número de telefone incompleto (${targetPhoneOrId}). Forneça DDD e número.`);
+    }
+
+    const trialEnds = new Date(now.getTime() + numDays * 24 * 60 * 60 * 1000).toISOString();
+    const insert = db.prepare(`
+      INSERT INTO users (phone_number, name, role, plan, trial_ends_at)
+      VALUES (?, NULL, 'USER', 'FREE_TRIAL', ?)
+    `).run(clean, trialEnds);
+    user = getUserById(insert.lastInsertRowid);
+    isNewUser = true;
+  } else {
+    // Existing user: extend trial
+    const currentEnd = user.trial_ends_at ? new Date(user.trial_ends_at) : null;
+    const baseTime = (currentEnd && currentEnd > now) ? currentEnd.getTime() : now.getTime();
+    const newEndsAt = new Date(baseTime + numDays * 24 * 60 * 60 * 1000).toISOString();
+
+    db.prepare(`
+      UPDATE users 
+      SET plan = 'FREE_TRIAL', trial_ends_at = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(newEndsAt, user.id);
+    user = getUserById(user.id);
+  }
+
+  const diffMs = new Date(user.trial_ends_at).getTime() - Date.now();
+  const daysRemaining = Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+
+  return {
+    success: true,
+    user,
+    isNewUser,
+    daysAdded: numDays,
+    newTrialEndsAt: user.trial_ends_at,
+    daysRemaining,
+  };
+}
+
 module.exports = {
   cleanPhone,
   formatPhone,
@@ -356,4 +443,6 @@ module.exports = {
   redeemInviteCode,
   getAllInvites,
   deleteUser,
+  findUserByFlexiblePhone,
+  extendUserTrial,
 };
