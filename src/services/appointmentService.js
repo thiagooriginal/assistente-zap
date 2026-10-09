@@ -8,6 +8,8 @@ function norm(s) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+    .replace(/[.,:;!?]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -128,28 +130,33 @@ function findAppointmentToModify(userId = 1, searchTerm) {
 /**
  * Update an appointment
  */
-function updateAppointment(id, userId, { title, startDateTime, endDateTime, location }) {
+function updateAppointment(id, userId, { title, description, startDateTime, endDateTime, location }) {
   const existing = db.prepare('SELECT * FROM appointments WHERE id = ? AND user_id = ?').get(id, userId);
   if (!existing) {
     throw new Error('Compromisso não encontrado para atualização.');
   }
 
-  const newTitle = title !== undefined ? title.trim() : existing.title;
+  const newTitle = (title && typeof title === 'string' && title.trim()) ? title.trim() : existing.title;
   const newStart = startDateTime || existing.start_datetime;
   const newEnd = endDateTime || existing.end_datetime;
-  const newLoc = location !== undefined ? location : existing.location;
+  const newLoc = (location !== undefined && location !== null && typeof location === 'string' && location.trim()) 
+    ? location.trim() 
+    : (location === null ? null : existing.location);
+  const newDesc = (description !== undefined && description !== null && typeof description === 'string' && description.trim()) 
+    ? description.trim() 
+    : (description === null ? null : existing.description);
 
   // If time changed, reset reminder notification flags so user receives alerts for the new time!
   const timeChanged = startDateTime && startDateTime !== existing.start_datetime;
 
   db.prepare(`
     UPDATE appointments
-    SET title = ?, start_datetime = ?, end_datetime = ?, location = ?,
+    SET title = ?, description = ?, start_datetime = ?, end_datetime = ?, location = ?,
         notified_24h = CASE WHEN ? = 1 THEN 0 ELSE notified_24h END,
         notified_3h  = CASE WHEN ? = 1 THEN 0 ELSE notified_3h END,
         notified_1h  = CASE WHEN ? = 1 THEN 0 ELSE notified_1h END
     WHERE id = ? AND user_id = ?
-  `).run(newTitle, newStart, newEnd, newLoc, timeChanged ? 1 : 0, timeChanged ? 1 : 0, timeChanged ? 1 : 0, id, userId);
+  `).run(newTitle, newDesc, newStart, newEnd, newLoc, timeChanged ? 1 : 0, timeChanged ? 1 : 0, timeChanged ? 1 : 0, id, userId);
 
   return db.prepare('SELECT * FROM appointments WHERE id = ?').get(id);
 }

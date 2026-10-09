@@ -62,6 +62,7 @@ async function checkAndSendReminders(sendWhatsAppMessage, targetJid) {
       const timeStr = eventStart.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       const dateStr = eventStart.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
       const locationStr = event.location ? `\n📍 *Local*: ${event.location}` : '';
+      const descStr = (event.description && !event.description.includes('Criado via')) ? `\n📝 *Detalhes*: ${event.description}` : '';
 
       // 1. Lembrete: 1 dia antes (entre 24h e 3h)
       if (diffMin <= 24 * 60 && diffMin > 3 * 60) {
@@ -69,7 +70,7 @@ async function checkAndSendReminders(sendWhatsAppMessage, targetJid) {
           const msg = `🔔 *Lembrete de Compromisso (Amanhã)*\n\n` +
                       `📌 *${eventTitle}*\n` +
                       `🗓️ *Data*: ${dateStr}\n` +
-                      `⏰ *Horário*: ${timeStr}${locationStr}\n\n` +
+                      `⏰ *Horário*: ${timeStr}${locationStr}${descStr}\n\n` +
                       `_Este compromisso está agendado no seu Google Calendar para daqui a cerca de 24 horas._`;
 
           await sendWhatsAppMessage(targetJid, msg);
@@ -83,7 +84,7 @@ async function checkAndSendReminders(sendWhatsAppMessage, targetJid) {
         if (!hasReminderBeenSent(event.id, '3h')) {
           const msg = `⏰ *Lembrete de Compromisso (Em 3 Horas)*\n\n` +
                       `📌 *${eventTitle}*\n` +
-                      `⏰ *Horário*: ${timeStr}${locationStr}\n\n` +
+                      `⏰ *Horário*: ${timeStr}${locationStr}${descStr}\n\n` +
                       `_Faltam menos de 3 horas para o seu compromisso!_`;
 
           await sendWhatsAppMessage(targetJid, msg);
@@ -97,7 +98,7 @@ async function checkAndSendReminders(sendWhatsAppMessage, targetJid) {
         if (!hasReminderBeenSent(event.id, '1h')) {
           const msg = `🚨 *Lembrete Urgente (Em 1 Hora)*\n\n` +
                       `📌 *${eventTitle}*\n` +
-                      `⏰ *Início às*: ${timeStr}${locationStr}\n\n` +
+                      `⏰ *Início às*: ${timeStr}${locationStr}${descStr}\n\n` +
                       `_Seu compromisso começa em breve!_`;
 
           await sendWhatsAppMessage(targetJid, msg);
@@ -137,13 +138,14 @@ async function checkAndSendAppointmentReminders(sendWhatsAppMessage) {
       const dateStr = startObj.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
       const timeStr = startObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       const locationStr = apt.location ? `\n📍 *Local*: ${apt.location}` : '';
+      const descStr = apt.description ? `\n📝 *Detalhes*: ${apt.description}` : '';
 
       // 1. Lembrete: 1 dia antes (entre 24h e 3h)
       if (diffMin <= 24 * 60 && diffMin > 3 * 60 && !apt.notified_24h) {
         const msg = `🔔 *Lembrete de Compromisso (Amanhã)*\n\n` +
                     `📌 *${apt.title}*\n` +
                     `🗓️ *Data*: ${dateStr}\n` +
-                    `⏰ *Horário*: ${timeStr}${locationStr}\n\n` +
+                    `⏰ *Horário*: ${timeStr}${locationStr}${descStr}\n\n` +
                     `_Lembrete automático do seu Assistente Pessoal._`;
 
         await sendWhatsAppMessage(targetJid, msg);
@@ -155,7 +157,7 @@ async function checkAndSendAppointmentReminders(sendWhatsAppMessage) {
       if (diffMin <= 3 * 60 && diffMin > 60 && !apt.notified_3h) {
         const msg = `⏰ *Lembrete de Compromisso (Em 3 Horas)*\n\n` +
                     `📌 *${apt.title}*\n` +
-                    `⏰ *Horário*: ${timeStr}${locationStr}\n\n` +
+                    `⏰ *Horário*: ${timeStr}${locationStr}${descStr}\n\n` +
                     `_Faltam menos de 3 horas para o seu compromisso!_`;
 
         await sendWhatsAppMessage(targetJid, msg);
@@ -167,7 +169,7 @@ async function checkAndSendAppointmentReminders(sendWhatsAppMessage) {
       if (diffMin <= 60 && diffMin > 0 && !apt.notified_1h) {
         const msg = `🚨 *Lembrete Urgente (Em 1 Hora)*\n\n` +
                     `📌 *${apt.title}*\n` +
-                    `⏰ *Início às*: ${timeStr}${locationStr}\n\n` +
+                    `⏰ *Início às*: ${timeStr}${locationStr}${descStr}\n\n` +
                     `_Seu compromisso começa em breve!_`;
 
         await sendWhatsAppMessage(targetJid, msg);

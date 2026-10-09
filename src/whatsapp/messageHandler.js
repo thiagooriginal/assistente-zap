@@ -2002,7 +2002,10 @@ async function handleIncomingMessage(sock, msg) {
         let targetSummary = calendarUpdate.targetSummary;
         if (!targetSummary && quotedText && (/compromisso agendado/i.test(quotedText) || /t[ií]tulo:/i.test(quotedText) || /agenda/i.test(quotedText))) {
           const titleMatch = quotedText.match(/t[ií]tulo:\s*([^\n\r]+)/i);
-          if (titleMatch) targetSummary = titleMatch[1].trim();
+          if (titleMatch) targetSummary = titleMatch[1].replace(/\.{2,}$/, '').trim();
+        }
+        if (targetSummary) {
+          targetSummary = targetSummary.replace(/\.{2,}$/, '').trim();
         }
 
         const targetApt = appointmentService.findAppointmentToModify(user.id, targetSummary);
@@ -2011,6 +2014,7 @@ async function handleIncomingMessage(sock, msg) {
         let finalEndDateTime = calendarUpdate.newEndDateTime;
 
         const rawInput = (text || transcription || caption || '').toLowerCase();
+        const rawMsg = text || transcription || caption || '';
 
         if (finalStartDateTime && targetApt?.start_datetime) {
           const origDate = targetApt.start_datetime.slice(0, 10);
@@ -2039,18 +2043,44 @@ async function handleIncomingMessage(sock, msg) {
           }
         }
 
+        // Support updating or appending notes/phone to description
+        let newDescription = calendarUpdate.newDescription || null;
+
+        // Auto-extract phone number if user asked to include it
+        if (!newDescription) {
+          const phoneRegex = /(\+?55\s*)?(?:\(?\d{2}\)?\s*)?(?:9\s*)?\d{4}[\s\-]?\d{4}/;
+          const phoneFound = rawMsg.match(phoneRegex);
+          if (phoneFound && /(?:inclua|incluir|coloca|colocar|adiciona|adicionar|bota|botar|salva|salvar|anota|anotar|com\s+o|telefone|numero|contato|zap|whatsapp|celular)/i.test(rawMsg)) {
+            newDescription = `Telefone: ${phoneFound[0].trim()}`;
+          }
+        }
+
+        if (!newDescription && /(?:observacao|obs|nota|detalhe|anotacao|lembrar\s+de)\s*:?\s*(.+)/i.test(rawMsg)) {
+          const obsMatch = rawMsg.match(/(?:observacao|obs|nota|detalhe|anotacao|lembrar\s+de)\s*:?\s*(.+)/i);
+          if (obsMatch) newDescription = obsMatch[1].trim();
+        }
+
+        if (newDescription && targetApt?.description && !targetApt.description.includes(newDescription)) {
+          if (/(?:inclua|incluir|adiciona|adicionar|acrescenta|acrescentar|junto)/i.test(rawMsg)) {
+            newDescription = `${targetApt.description} | ${newDescription}`;
+          }
+        }
+
         let updatedSummary = calendarUpdate.newSummary;
         let updatedLoc = calendarUpdate.newLocation;
+        let updatedDesc = newDescription;
 
         if (targetApt) {
           const updated = appointmentService.updateAppointment(targetApt.id, user.id, {
             title: calendarUpdate.newSummary,
+            description: newDescription !== null ? newDescription : undefined,
             startDateTime: finalStartDateTime,
             endDateTime: finalEndDateTime,
             location: calendarUpdate.newLocation,
           });
           updatedSummary = updated.title;
           updatedLoc = updated.location;
+          updatedDesc = updated.description;
         }
 
         // If User 1 (Admin/Owner) and Google Calendar is connected, also update in Google Calendar
@@ -2061,10 +2091,11 @@ async function handleIncomingMessage(sock, msg) {
             const targetEvent = await calendarService.findEventToModify(searchForGoogle);
             if (targetEvent) {
               await calendarService.updateCalendarEvent(targetEvent.id, {
-                summary: calendarUpdate.newSummary,
+                summary: calendarUpdate.newSummary || undefined,
+                description: updatedDesc || undefined,
                 startDateTime: finalStartDateTime,
                 endDateTime: finalEndDateTime,
-                location: calendarUpdate.newLocation,
+                location: calendarUpdate.newLocation || undefined,
               });
             }
           } catch (calErr) {
@@ -2083,11 +2114,12 @@ async function handleIncomingMessage(sock, msg) {
         const dateStr = newStart.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
         const timeStr = newStart.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
-        const responseText = `✏️ *Compromisso Alterado com Sucesso!*\n\n` +
+        const responseText = `✏️ *Compromisso Atualizado com Sucesso!*\n\n` +
                              `📌 *Compromisso*: ${updatedSummary || targetApt?.title || 'Compromisso'}\n` +
-                             `📅 *Nova Data*: ${dateStr}\n` +
-                             `⏰ *Novo Horário*: ${timeStr}\n` +
+                             `📅 *Data*: ${dateStr}\n` +
+                             `⏰ *Horário*: ${timeStr}\n` +
                              `${updatedLoc ? `📍 *Local*: ${updatedLoc}\n` : ''}` +
+                             `${updatedDesc ? `📝 *Observação / Detalhes*: ${updatedDesc}\n` : ''}` +
                              `\n🔔 *Lembretes Proativos Atualizados Automaticamente!*`;
 
         await sock.sendMessage(targetJid, { text: responseText });
