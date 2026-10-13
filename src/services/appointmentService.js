@@ -92,39 +92,85 @@ function getUpcomingAppointments(userId = 1, limit = 10) {
 }
 
 /**
- * Find an upcoming appointment to modify or cancel
+ * Find an upcoming or recent appointment to modify or cancel
  */
 function findAppointmentToModify(userId = 1, searchTerm) {
-  let list = getUpcomingAppointments(userId, 20);
-  if (list.length === 0) {
-    list = getAppointments({ userId, status: 'SCHEDULED', limit: 20 });
-  }
-  if (list.length === 0) return null;
+  const genericTerms = [
+    'esse', 'este', 'esse compromisso', 'este compromisso', 'o compromisso',
+    'meu compromisso', 'o ultimo', 'ultimo', 'recente', 'agendamento',
+    'proximo', 'o proximo', 'esse agendamento', 'este agendamento'
+  ];
+  const isGeneric = !searchTerm || !String(searchTerm).trim() || genericTerms.includes(norm(searchTerm));
 
-  const genericTerms = ['esse', 'este', 'esse compromisso', 'este compromisso', 'o compromisso', 'meu compromisso', 'o ultimo', 'ultimo', 'recente', 'agendamento'];
-  if (!searchTerm || !searchTerm.trim() || genericTerms.includes(norm(searchTerm))) {
-    return list[0];
-  }
+  if (!isGeneric) {
+    const cleanSearch = norm(searchTerm);
 
-  const cleanSearch = norm(searchTerm);
+    // 1. Fetch appointments: upcoming and recent from the last 72 hours forward
+    const allRecentAndUpcoming = db.prepare(`
+      SELECT * FROM appointments
+      WHERE user_id = ? AND status = 'SCHEDULED' AND datetime(start_datetime) >= datetime('now', '-72 hours')
+      ORDER BY ABS(strftime('%s', start_datetime) - strftime('%s', 'now')) ASC
+      LIMIT 50
+    `).all(userId);
 
-  // 1. Direct includes
-  const direct = list.find(
-    (ev) => norm(ev.title).includes(cleanSearch) || cleanSearch.includes(norm(ev.title))
-  );
-  if (direct) return direct;
+    const allScheduled = db.prepare(`
+      SELECT * FROM appointments
+      WHERE user_id = ? AND status = 'SCHEDULED'
+      ORDER BY id DESC
+      LIMIT 50
+    `).all(userId);
 
-  // 2. Word by word match
-  const searchWords = cleanSearch.split(/\s+/).filter((w) => w.length > 2);
-  for (const ev of list) {
-    const evNorm = norm(ev.title);
-    if (searchWords.some((w) => evNorm.includes(w))) {
-      return ev;
+    const candidates = [...allRecentAndUpcoming];
+    for (const a of allScheduled) {
+      if (!candidates.some((c) => c.id === a.id)) {
+        candidates.push(a);
+      }
     }
+
+    if (candidates.length === 0) {
+      const anyStatus = db.prepare(`
+        SELECT * FROM appointments
+        WHERE user_id = ?
+        ORDER BY id DESC
+        LIMIT 20
+      `).all(userId);
+      candidates.push(...anyStatus);
+    }
+
+    // A. Direct exact or substring match
+    const direct = candidates.find(
+      (ev) => norm(ev.title).includes(cleanSearch) || cleanSearch.includes(norm(ev.title))
+    );
+    if (direct) return direct;
+
+    // B. Word-by-word token overlap
+    const searchWords = cleanSearch.split(/\s+/).filter((w) => w.length > 2);
+    if (searchWords.length > 0) {
+      let bestMatch = null;
+      let maxMatches = 0;
+      for (const ev of candidates) {
+        const evNorm = norm(ev.title);
+        const matches = searchWords.filter((w) => evNorm.includes(w)).length;
+        if (matches > maxMatches) {
+          maxMatches = matches;
+          bestMatch = ev;
+        }
+      }
+      if (bestMatch && maxMatches >= 1) {
+        return bestMatch;
+      }
+    }
+
+    // Specific search term was given and no match found -> DO NOT return a random appointment!
+    return null;
   }
 
-  // 3. Fallback to earliest upcoming
-  return list[0];
+  // Generic request ("esse compromisso", "o próximo") -> return nearest upcoming appointment
+  const upcoming = getUpcomingAppointments(userId, 10);
+  if (upcoming.length > 0) return upcoming[0];
+
+  const anyScheduled = getAppointments({ userId, status: 'SCHEDULED', limit: 1 });
+  return anyScheduled[0] || null;
 }
 
 /**
@@ -152,6 +198,7 @@ function updateAppointment(id, userId, { title, description, startDateTime, endD
   db.prepare(`
     UPDATE appointments
     SET title = ?, description = ?, start_datetime = ?, end_datetime = ?, location = ?,
+        status = 'SCHEDULED',
         notified_24h = CASE WHEN ? = 1 THEN 0 ELSE notified_24h END,
         notified_3h  = CASE WHEN ? = 1 THEN 0 ELSE notified_3h END,
         notified_1h  = CASE WHEN ? = 1 THEN 0 ELSE notified_1h END

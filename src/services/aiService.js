@@ -151,10 +151,18 @@ As intenções possíveis são:
    - "altera o dentista para as 16:30"
    - "troca o título do compromisso para Dentista Dr. Pedro"
    - "muda o compromisso de amanhã para as 17h"
-   - Se o usuário estiver respondendo/citando uma mensagem de compromisso agendado (ex: "📌 Título: Ligar pra Gabrielle..."), extraia esse título no targetSummary!
-   - Se o usuário citar "esse compromisso" ou "o compromisso" sem especificar nome, targetSummary pode ser null ou o título da mensagem citada.
+   - "reagendar esse compromisso para quinta feira"
+   - "remarca esse compromisso para amanhã"
+   - "passa o compromisso para sexta"
+   - ATENÇÃO CRÍTICA AO CITAR/RESPONDER MENSAGENS:
+     * Se o usuário estiver respondendo ou citando uma mensagem de LEMBRETE (ex: "⏰ Lembrete de Compromisso (Em 3 Horas)... 📌 Reunião online Turma MedVet MC... ⏰ Horário: 09:00"):
+       -> Você DEVE OBRIGATORIAMENTE extrair o título exato que está após o pin 📌 como targetSummary! (Ex: targetSummary: "Reunião online Turma MedVet MC").
+       -> NUNCA deixe targetSummary nulo ou como "esse compromisso" quando houver mensagem de lembrete ou agendamento citada!
+       -> Se o usuário não especificar um novo horário (ex: apenas "reagendar para quinta feira"), preserve o horário original do compromisso (ex: 09:00:00)!
+     * Se o usuário estiver respondendo/citando mensagem de compromisso agendado (ex: "📌 Título: Ligar pra Gabrielle..."):
+       -> Extraia esse título no targetSummary!
    - Extraia no campo "calendarUpdate":
-     * targetSummary: nome ou palavra-chave do compromisso a alterar (ex: "Ligar pra Gabrielle", "Dentista", "Reunião", "Consulta no pediatra", ou null se for o próximo/último).
+     * targetSummary: nome ou palavra-chave exata do compromisso a alterar (ex: "Reunião online Turma MedVet MC", "Ligar pra Gabrielle", "Dentista", "Reunião").
      * newSummary: novo título se alterado, ou null.
      * newDescription: nova descrição, telefone ou observação se adicionado/alterado, ou null.
      * newStartDateTime: nova data e hora ISO (YYYY-MM-DDTHH:mm:ss) se alterada (calcule com base na data atual/referenciada), ou null.
@@ -163,11 +171,11 @@ As intenções possíveis são:
 
 5. "CALENDAR_DELETE": O usuário quer cancelar, desmarcar, apagar ou excluir um compromisso da agenda ou Google Calendar.
    Exemplos: "cancela o dentista", "desmarcar o compromisso de amanhã", "apaga a reunião com Gabriel da agenda", "cancelar esse compromisso", "desmarcar esse compromisso", "desmarca o compromisso", "cancela a consulta no pediatra", "cancela ele".
-   - Se o usuário estiver respondendo/citando uma mensagem de compromisso agendado (ex: "Compromisso Agendado com Sucesso! Título: Consulta no pediatra"), extraia o título no targetSummary!
-   - Se disser "cancelar esse compromisso" ou "desmarcar compromisso", defina targetSummary com o nome do compromisso se citado, ou o título da mensagem citada.
+   - Se o usuário estiver respondendo/citando uma mensagem de LEMBRETE ou compromisso agendado (ex: "⏰ Lembrete de Compromisso... 📌 Reunião online...", "Compromisso Agendado... 📌 Título: Consulta..."):
+     -> Extraia OBRIGATORIAMENTE o título do compromisso citado no targetSummary! (Ex: "Reunião online Turma MedVet MC").
    - NUNCA confunda "cancelar compromisso", "desmarcar consulta", "desmarcar dentista" com EXPENSE_DELETE! Compromissos são SEMPRE CALENDAR_DELETE!
    - Extraia no campo "calendarDelete":
-     * targetSummary: nome ou palavra-chave do compromisso a cancelar (ex: "Consulta no pediatra", "Dentista", "Reunião").
+     * targetSummary: nome ou palavra-chave do compromisso a cancelar (ex: "Reunião online Turma MedVet MC", "Consulta no pediatra", "Dentista", "Reunião").
 
 6. "CALENDAR_QUERY": O usuário quer ver seus compromissos.
    Exemplos: "quais meus compromissos de hoje?", "tenho algo amanhã?", "minha agenda da semana".

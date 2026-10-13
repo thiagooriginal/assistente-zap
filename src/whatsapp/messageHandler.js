@@ -48,20 +48,84 @@ function isAdminInviteRequest(text) {
   return false;
 }
 
+/**
+ * Robust extractor for appointment details from any quoted message
+ * (reminders, confirmations, updates, appointment lists)
+ */
+function extractAppointmentFromQuotedText(quotedText) {
+  if (!quotedText) return null;
+  const clean = quotedText.trim();
+
+  // Pattern 1: Look for pin 📌 line
+  // Matches: 
+  // 📌 Reunião online Turma MedVet MC
+  // 📌 *Reunião online Turma MedVet MC*
+  // 📌 *Título*: Reunião online Turma MedVet MC
+  // 📌 Título: Reunião online Turma MedVet MC
+  // 📌 *Compromisso*: Reunião online Turma MedVet MC
+  const pinMatch = clean.match(/📌\s*(?:\*?(?:t[ií]tulo|compromisso)\*?:\s*)?\*?([^\n\r*]+)\*?/i);
+  if (pinMatch && pinMatch[1]) {
+    const candidate = pinMatch[1].replace(/\.{2,}$/, '').trim();
+    if (candidate.length >= 2 && !['titulo', 'título', 'compromisso', 'lembrete'].includes(candidate.toLowerCase())) {
+      const timeMatch = clean.match(/(?:⏰|hor[aá]rio|in[ií]cio\s+[aà]s)\*?:\s*\*?(\d{1,2}:\d{2})/i);
+      const originalTime = timeMatch ? timeMatch[1] : null;
+
+      const dateMatch = clean.match(/(?:📅|🗓️|data)\*?:\s*\*?(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/i);
+      const originalDate = dateMatch ? dateMatch[1] : null;
+
+      return {
+        title: candidate,
+        originalTime,
+        originalDate,
+      };
+    }
+  }
+
+  // Pattern 2: Bullet point (• *Nome do compromisso*)
+  const bulletMatch = clean.match(/•\s*\*?([^\n\r*]+)\*?/);
+  if (bulletMatch && bulletMatch[1]) {
+    const candidate = bulletMatch[1].replace(/\.{2,}$/, '').trim();
+    if (candidate.length >= 2) {
+      const timeMatch = clean.match(/(?:às|as)\s+(\d{1,2}:\d{2})/i);
+      return {
+        title: candidate,
+        originalTime: timeMatch ? timeMatch[1] : null,
+        originalDate: null,
+      };
+    }
+  }
+
+  // Pattern 3: Explicit Título: or Compromisso:
+  const explicitMatch = clean.match(/(?:t[ií]tulo|compromisso)\s*:\s*\*?([^\n\r*]+)\*?/i);
+  if (explicitMatch && explicitMatch[1]) {
+    return {
+      title: explicitMatch[1].replace(/\.{2,}$/, '').trim(),
+      originalTime: null,
+      originalDate: null,
+    };
+  }
+
+  return null;
+}
+
 function parseCalendarDelete(text, quotedText = null) {
   if (!text) return null;
   const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
   const cancelVerbs = '(?:cancela|cancelar|cancele|desmarca|desmarcar|desmarque|apaga|apagar|apague|remove|remover|remova|exclui|excluir|exclua|deleta|deletar|tira|tirar|tire)';
 
-  // Pattern A: Quoting an appointment confirmation or calendar message
-  if (quotedText && (/compromisso agendado/i.test(quotedText) || /t[ií]tulo:/i.test(quotedText) || /agenda/i.test(quotedText))) {
+  // Pattern A: Quoting an appointment confirmation, reminder, or calendar message
+  if (quotedText) {
     const isCancelWord = new RegExp(`^${cancelVerbs}`, 'i').test(norm) ||
                          norm.includes('cancelar') || norm.includes('desmarcar') || norm.includes('nao vai dar') || norm.includes('apagar');
     if (isCancelWord) {
+      const extracted = extractAppointmentFromQuotedText(quotedText);
+      if (extracted && extracted.title) {
+        return { targetSummary: extracted.title };
+      }
       const titleMatch = quotedText.match(/t[ií]tulo:\s*([^\n\r]+)/i);
       const title = titleMatch ? titleMatch[1].trim() : null;
-      return { targetSummary: title };
+      if (title) return { targetSummary: title };
     }
   }
 
@@ -1999,11 +2063,26 @@ async function handleIncomingMessage(sock, msg) {
     // 5. ALTERAR/REMARCAR COMPROMISSO
     if (intent === 'CALENDAR_UPDATE' && calendarUpdate) {
       try {
+        const extractedFromQuoted = quotedText ? extractAppointmentFromQuotedText(quotedText) : null;
         let targetSummary = calendarUpdate.targetSummary;
-        if (!targetSummary && quotedText && (/compromisso agendado/i.test(quotedText) || /t[ií]tulo:/i.test(quotedText) || /agenda/i.test(quotedText))) {
+
+        const genericTerms = [
+          'esse', 'este', 'esse compromisso', 'este compromisso', 'o compromisso',
+          'meu compromisso', 'o ultimo', 'ultimo', 'recente', 'agendamento',
+          'proximo', 'o proximo', 'esse agendamento', 'este agendamento'
+        ];
+        const isGenericAiSummary = !targetSummary || genericTerms.includes(targetSummary.toLowerCase().trim());
+
+        // Priority: If user quoted an appointment message, always prioritize the appointment title from the quote!
+        if (extractedFromQuoted && extractedFromQuoted.title) {
+          if (isGenericAiSummary || !targetSummary) {
+            targetSummary = extractedFromQuoted.title;
+          }
+        } else if (!targetSummary && quotedText && (/compromisso agendado/i.test(quotedText) || /t[ií]tulo:/i.test(quotedText) || /agenda/i.test(quotedText))) {
           const titleMatch = quotedText.match(/t[ií]tulo:\s*([^\n\r]+)/i);
           if (titleMatch) targetSummary = titleMatch[1].replace(/\.{2,}$/, '').trim();
         }
+
         if (targetSummary) {
           targetSummary = targetSummary.replace(/\.{2,}$/, '').trim();
         }
@@ -2035,7 +2114,10 @@ async function handleIncomingMessage(sock, msg) {
 
           // If user changed ONLY the date (didn't specify any new time), preserve the original appointment time
           if (mentionsNewDate && !mentionsNewTime) {
-            finalStartDateTime = `${aiDatePart}T${origTime}`;
+            const preserveTime = (origTime && origTime.length >= 5)
+              ? origTime
+              : (extractedFromQuoted?.originalTime ? `${extractedFromQuoted.originalTime}:00` : '09:00:00');
+            finalStartDateTime = `${aiDatePart}T${preserveTime}`;
             if (finalEndDateTime && targetApt.end_datetime) {
               const origEndTime = targetApt.end_datetime.slice(11);
               finalEndDateTime = `${aiDatePart}T${origEndTime}`;

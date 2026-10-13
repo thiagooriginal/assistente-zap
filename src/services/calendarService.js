@@ -257,8 +257,12 @@ async function findEventToModify(targetSummary) {
   const upcoming = await listUpcomingEvents({ maxResults: 30 });
   if (!upcoming || upcoming.length === 0) return null;
 
-  const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  const genericTerms = ['esse', 'este', 'esse compromisso', 'este compromisso', 'o compromisso', 'meu compromisso', 'o ultimo', 'ultimo', 'recente', 'agendamento'];
+  const norm = (s) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[.,:;!?]/g, ' ').replace(/\s+/g, ' ').trim();
+  const genericTerms = [
+    'esse', 'este', 'esse compromisso', 'este compromisso', 'o compromisso',
+    'meu compromisso', 'o ultimo', 'ultimo', 'recente', 'agendamento',
+    'proximo', 'o proximo', 'esse agendamento', 'este agendamento'
+  ];
 
   if (!targetSummary || genericTerms.includes(norm(targetSummary))) {
     // Return the nearest upcoming event
@@ -281,7 +285,7 @@ async function findEventToModify(targetSummary) {
     return tokens.some((t) => sum.includes(t));
   });
 
-  return bestByToken || upcoming[0];
+  return bestByToken || null;
 }
 
 /**
