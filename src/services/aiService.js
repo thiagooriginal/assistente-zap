@@ -276,7 +276,9 @@ As intenções possíveis são:
    - Preencha SEMPRE o campo "replyMessage" com uma resposta gentil, fluida, humana e amigável em português brasileiro.
 
 14. "ADMIN_GENERATE_INVITE": O usuário (administrador) quer gerar ou criar um novo código de convite / ativação para enviar a um cliente.
-   Exemplos: "gerar um código", "me gera um código", "cria um código", "novo convite", "preciso de um código de acesso", "manda um código para eu mandar para o cliente".
+   Exemplos: "gerar um código", "me gera um código", "cria um código", "novo convite", "preciso de um código de acesso", "manda um código para eu mandar para o cliente", "libere um codigo de 30 dias", "codigo de 30 dias", "convite de 15 dias".
+   - Extraia no campo "adminGenerateInvite":
+     * trialDays: número inteiro de dias de teste para o código (ex: se "código de 30 dias", trialDays = 30; se não especificado, use 7).
 
 15. "ADMIN_STATS": O administrador quer saber quantos clientes estão cadastrados, faturamento ou métricas.
    Exemplos: "quantos clientes temos?", "quantos assinantes?", "faturamento saas".
@@ -430,6 +432,9 @@ Estrutura do JSON:
     "title": string,
     "month": number | null,
     "amount": number | null
+  },
+  "adminGenerateInvite": {
+    "trialDays": number
   },
   "adminExtendTrial": {
     "days": number,

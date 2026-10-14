@@ -28,24 +28,42 @@ function getCleanNumber(jid) {
   return clean;
 }
 
-function isAdminInviteRequest(text) {
-  if (!text) return false;
+function parseAdminInviteRequest(text) {
+  if (!text) return null;
   const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  
-  // Exact single words
-  if (/^(codigo|convite|token|novo convite|gerar codigo|novo codigo)$/i.test(norm)) return true;
-  
-  // Natural requests for codes/invites
-  if (/(gerar|gera|cria|criar|manda|mandar|passa|passar|preciso|novo|mais|outro|solicitar|quero|me da|da)\s+.*(codigo|convite|acesso)/i.test(norm)) {
-    return true;
+
+  // If message specifies a target phone number (e.g. "para o numero 11999998888"), it belongs to extend trial
+  if (/(?:para\s+o|pro|ao|numero|contato|cliente)\s*:?\s*\+?\d[\d\s\-\(\)\.]{7,}\d/i.test(norm)) {
+    return null;
   }
-  if (/codigo\s+(de\s+)?(ativacao|convite|acesso|teste|cliente)/i.test(norm)) {
-    return true;
+
+  // Exact single words or short patterns
+  if (/^(?:codigo|convite|token|novo\s+convite|gerar\s+codigo|novo\s+codigo|gerar\s+convite)$/i.test(norm)) {
+    return { isInvite: true, trialDays: 7 };
   }
-  if (/(novo|novos)\s+clientes?/i.test(norm)) {
-    return true;
-  }
-  return false;
+
+  const isInviteWord = /(?:codigo|convite|token|link\s+de\s+acesso|acesso\s+para\s+cliente)/i.test(norm);
+  const hasActionVerb = /(?:gerar|gera|gere|cria|criar|crie|manda|mandar|mande|passa|passar|passe|preciso|novo|mais|outro|solicitar|solicito|quero|me\s+da|da|de|libera|liberar|libere)\b/i.test(norm);
+
+  const isInviteRequest =
+    (isInviteWord && (hasActionVerb || /(?:de\s+ativacao|de\s+convite|de\s+acesso|de\s+teste|para\s+cliente|de\s+\d+\s*dias?|com\s+\d+\s*dias?)/i.test(norm))) ||
+    (hasActionVerb && /(?:codigo|convite|token|acesso)/i.test(norm)) ||
+    /(?:novo|novos)\s+clientes?/i.test(norm);
+
+  if (!isInviteRequest) return null;
+
+  // Extract requested trial days, default to 7 if not specified
+  const daysMatch = norm.match(/(?:de\s+|com\s+|para\s+)?(\d+)\s*dias?/i);
+  const trialDays = daysMatch ? parseInt(daysMatch[1], 10) : 7;
+
+  return {
+    isInvite: true,
+    trialDays: Math.max(1, trialDays)
+  };
+}
+
+function isAdminInviteRequest(text) {
+  return Boolean(parseAdminInviteRequest(text));
 }
 
 /**
@@ -528,8 +546,9 @@ function parsePaymentMethodUpdate(text, quotedText = null) {
   return null;
 }
 
-async function sendAdminInviteCode(sock, targetJid, userId) {
-  const invite = userService.createInviteCode({ createdBy: userId, trialDays: 7 });
+async function sendAdminInviteCode(sock, targetJid, userId, trialDays = 7) {
+  const days = Math.max(1, parseInt(trialDays, 10) || 7);
+  const invite = userService.createInviteCode({ createdBy: userId, trialDays: days });
   const botPhone = sock.user?.id ? getCleanNumber(sock.user.id) : '5511966619866';
   const botFormatted = '+55 (11) 96661-9866';
   const botLink = `https://wa.me/${botPhone}?text=${encodeURIComponent(invite.code)}`;
@@ -539,7 +558,7 @@ async function sendAdminInviteCode(sock, targetJid, userId) {
     text: `Olá! Aqui está o seu acesso exclusivo ao Assistente Pessoal com Inteligência Artificial 🚀\n\n` +
           `👉 *Toque no link abaixo para começar* (o código já vai preenchido, é só apertar enviar):\n${botLink}\n\n` +
           `📱 *WhatsApp do Assistente*: ${botFormatted}\n` +
-          `🎟️ *Código de Ativação*: *${invite.code}* (7 dias grátis)`,
+          `🎟️ *Código de Ativação*: *${invite.code}* (${days} dias grátis)`,
   });
 
   // Mensagem 2: Apenas o código solto (para copiar com 1 toque)
@@ -556,9 +575,14 @@ function parseAdminExtendTrial(text) {
   if (!text) return null;
   const norm = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 
+  // Guard: If it explicitly asks for a code/invite/token, it's NOT an existing user trial extension
+  if (/(?:codigo|convite|token)/i.test(norm)) {
+    return null;
+  }
+
   // Guard: Must relate to test/trial or time extension
   const hasTrialKeyword = /(?:teste|testes|trial|periodo|dias?)\b/i.test(norm);
-  const hasActionKeyword = /(?:libera|liberar|da|dar|adiciona|adicionar|estende|estender|mais|conceder|aumenta|aumentar|renova|renovar)\b/i.test(norm);
+  const hasActionKeyword = /(?:libera|liberar|libere|da|dar|adiciona|adicionar|estende|estender|mais|conceder|aumenta|aumentar|renova|renovar)\b/i.test(norm);
 
   if (!hasTrialKeyword || !hasActionKeyword) {
     return null;
@@ -1081,9 +1105,10 @@ async function handleIncomingMessage(sock, msg) {
       return;
     }
 
-    // 1. Generate Invite Code via WhatsApp ("gerar um codigo", "me gera um codigo", "criar convite", etc.)
-    if (isAdminInviteRequest(text)) {
-      await sendAdminInviteCode(sock, targetJid, user.id);
+    // 1. Generate Invite Code via WhatsApp ("gerar um codigo", "me gera um codigo", "libere um codigo de 30 dias", etc.)
+    const inviteReq = parseAdminInviteRequest(text);
+    if (inviteReq) {
+      await sendAdminInviteCode(sock, targetJid, user.id, inviteReq.trialDays);
       return;
     }
 
@@ -1443,6 +1468,7 @@ async function handleIncomingMessage(sock, msg) {
       updateBill,
       paymentPaid,
       adminExtendTrial,
+      adminGenerateInvite,
       transcription,
       replyMessage,
     } = aiResult;
@@ -1467,13 +1493,16 @@ async function handleIncomingMessage(sock, msg) {
     }
 
     // Admin Audio or AI-classified invite command
-    if (user.role === 'ADMIN' && (intent === 'ADMIN_GENERATE_INVITE' || (transcription && isAdminInviteRequest(transcription)))) {
-      await sendAdminInviteCode(sock, targetJid, user.id);
+    if (isAdminUserForTrial && (intent === 'ADMIN_GENERATE_INVITE' || (transcription && isAdminInviteRequest(transcription)))) {
+      const inviteData = adminGenerateInvite || aiResult.adminGenerateInvite || {};
+      const parsedFromAudio = transcription ? parseAdminInviteRequest(transcription) : null;
+      const trialDays = inviteData.trialDays || parsedFromAudio?.trialDays || 7;
+      await sendAdminInviteCode(sock, targetJid, user.id, trialDays);
       return;
     }
 
     // Admin Audio or AI-classified stats command
-    if (user.role === 'ADMIN' && intent === 'ADMIN_STATS') {
+    if (isAdminUserForTrial && intent === 'ADMIN_STATS') {
       const allUsers = userService.getAllUsers();
       const allInvites = userService.getAllInvites();
       const proUsers = allUsers.filter(u => u.plan === 'PRO').length;
@@ -1485,7 +1514,7 @@ async function handleIncomingMessage(sock, msg) {
         text: `👑 *Visão Geral SaaS do Administrador:*\n\n` +
               `👥 *Total de Clientes*: ${allUsers.length}\n` +
               `💎 *Assinantes PRO*: ${proUsers} (Faturamento: ${financeService.formatCurrency(mrr)}/mês)\n` +
-              `⏳ *Em Teste Grátis (7d)*: ${trialUsers}\n` +
+              `⏳ *Em Teste Grátis*: ${trialUsers}\n` +
               `🎟️ *Convites Pendentes*: ${pendingInvites}\n\n` +
               `_Para gerar um novo convite, basta enviar: "gerar um código"!_`,
       });
