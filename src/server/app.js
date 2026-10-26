@@ -481,6 +481,113 @@ app.post('/api/admin/marketing/generate-script', authMiddleware, async (req, res
 });
 
 // ==========================================
+// AVATAR VIDEO GENERATION (D-ID / HEYGEN)
+// ==========================================
+app.post('/api/admin/marketing/generate-avatar-video', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
+  }
+
+  const { text, avatarUrl, voiceId, apiKey } = req.body || {};
+  const cleanText = (text || '').trim();
+
+  if (!cleanText) {
+    return res.status(400).json({ success: false, error: 'O texto da fala é obrigatório.' });
+  }
+
+  const didKey = (apiKey || process.env.DID_API_KEY || '').trim();
+
+  if (!didKey) {
+    return res.status(400).json({
+      success: false,
+      error: 'Chave de API da D-ID não informada. Crie uma conta gratuita em d-id.com para obter seus créditos grátis de vídeo.',
+      needApiKey: true
+    });
+  }
+
+  try {
+    const authHeader = didKey.startsWith('Basic ') ? didKey : `Basic ${Buffer.from(didKey).toString('base64')}`;
+    const defaultAvatar = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80';
+    const source = avatarUrl || defaultAvatar;
+
+    const payload = {
+      script: {
+        type: 'text',
+        subtitles: false,
+        provider: {
+          type: 'microsoft',
+          voice_id: voiceId || 'pt-BR-AntonioNeural'
+        },
+        input: cleanText.substring(0, 500)
+      },
+      source_url: source,
+      config: {
+        fluent: true,
+        pad_audio: 0
+      }
+    };
+
+    const createRes = await fetch('https://api.d-id.com/talks', {
+      method: 'POST',
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const createJson = await createRes.json();
+    if (!createRes.ok || !createJson.id) {
+      return res.status(createRes.status).json({
+        success: false,
+        error: createJson.description || createJson.message || 'Erro ao conectar com API da D-ID'
+      });
+    }
+
+    const talkId = createJson.id;
+
+    // Poll up to 25 seconds for completion
+    let attempts = 0;
+    while (attempts < 10) {
+      await new Promise(r => setTimeout(r, 2500));
+      attempts++;
+
+      const checkRes = await fetch(`https://api.d-id.com/talks/${talkId}`, {
+        headers: { 'Authorization': authHeader }
+      });
+      const checkJson = await checkRes.json();
+
+      if (checkJson.status === 'done' && checkJson.result_url) {
+        return res.json({
+          success: true,
+          videoUrl: checkJson.result_url,
+          id: talkId,
+          duration: checkJson.duration
+        });
+      }
+
+      if (checkJson.status === 'error') {
+        return res.status(500).json({
+          success: false,
+          error: checkJson.error?.description || 'Falha na renderização do avatar.'
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      inProgress: true,
+      talkId,
+      message: 'Vídeo em processamento pela D-ID. Aguarde alguns instantes.'
+    });
+
+  } catch (err) {
+    console.error('Erro /api/admin/marketing/generate-avatar-video:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
 // GOOGLE CALENDAR SETUP & SYNC API
 // ==========================================
 app.post('/api/admin/calendar/setup', async (req, res) => {

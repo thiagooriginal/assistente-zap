@@ -919,19 +919,27 @@
       <div class="flex items-center gap-1.5 py-3 border-b border-zinc-800/80 overflow-x-auto shrink-0 hide-scrollbar text-xs">
         <button id="mktTabBtnScripts" onclick="switchMarketingTab('scripts')" class="px-3.5 py-1.5 rounded-full font-bold bg-purple-600 text-white shadow-sm flex items-center gap-1.5 shrink-0 transition">
           <i data-lucide="clapperboard" class="w-3.5 h-3.5"></i>
-          <span>Roteiros de Vídeo</span>
+          <span>1. Roteiros</span>
+        </button>
+        <button id="mktTabBtnStudio" onclick="switchMarketingTab('studio')" class="px-3.5 py-1.5 rounded-full font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 flex items-center gap-1.5 shrink-0 transition">
+          <i data-lucide="play-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>2. Vídeo WhatsApp (Grátis)</span>
+        </button>
+        <button id="mktTabBtnAvatar" onclick="switchMarketingTab('avatar')" class="px-3.5 py-1.5 rounded-full font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 flex items-center gap-1.5 shrink-0 transition">
+          <i data-lucide="user-check" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>3. Vídeo Avatar IA</span>
         </button>
         <button id="mktTabBtnHooks" onclick="switchMarketingTab('hooks')" class="px-3.5 py-1.5 rounded-full font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 flex items-center gap-1.5 shrink-0 transition">
           <i data-lucide="magnet" class="w-3.5 h-3.5"></i>
-          <span>Ganchos Virais (3s)</span>
+          <span>Ganchos Virais</span>
         </button>
         <button id="mktTabBtnAds" onclick="switchMarketingTab('ads')" class="px-3.5 py-1.5 rounded-full font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 flex items-center gap-1.5 shrink-0 transition">
           <i data-lucide="megaphone" class="w-3.5 h-3.5"></i>
-          <span>Anúncios Meta Ads</span>
+          <span>Anúncios Meta</span>
         </button>
         <button id="mktTabBtnGuide" onclick="switchMarketingTab('guide')" class="px-3.5 py-1.5 rounded-full font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 flex items-center gap-1.5 shrink-0 transition">
           <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-          <span>Como Gravar Grátis</span>
+          <span>Dicas</span>
         </button>
       </div>
 
@@ -980,6 +988,179 @@
           <!-- Script Output Display -->
           <div id="mktScriptOutputContainer" class="space-y-3">
             <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- TAB 2: VÍDEO WHATSAPP REELS (GRÁTIS) -->
+        <div id="mktTabStudio" class="hidden space-y-4">
+          <div class="p-3 bg-emerald-950/30 border border-emerald-800/40 rounded-2xl flex items-center justify-between text-xs">
+            <div>
+              <p class="font-extrabold text-emerald-300 flex items-center gap-1.5">
+                <span>📱 Criador de Vídeo Demo WhatsApp (9:16)</span>
+                <span class="text-[9px] bg-emerald-500 text-black font-black px-1.5 py-0.5 rounded">100% GRÁTIS</span>
+              </p>
+              <p class="text-zinc-400 text-[11px]">Gera a animação do WhatsApp com voz narrada e baixa direto para postar no Reels e TikTok.</p>
+            </div>
+          </div>
+
+          <!-- Phone Canvas Container -->
+          <div class="flex flex-col sm:flex-row gap-4 items-center sm:items-start justify-center">
+            <!-- Simulated Smartphone Screen -->
+            <div class="w-[280px] h-[500px] bg-black rounded-[36px] p-3 border-4 border-zinc-700 shadow-2xl relative overflow-hidden flex flex-col justify-between shrink-0">
+              <!-- Top Camera Notch -->
+              <div class="w-24 h-4 bg-zinc-800 rounded-full mx-auto mb-2 shrink-0"></div>
+
+              <!-- Top Hook Banner on Video -->
+              <div id="canvasVideoHook" class="px-2.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 text-white font-black text-[11px] text-center shadow-md shrink-0 leading-tight">
+                PARE DE USAR PLANILHA EM 2026! 🚀
+              </div>
+
+              <!-- WhatsApp Chat Area -->
+              <div class="flex-1 my-2 space-y-2.5 overflow-hidden flex flex-col justify-end text-[11px]">
+                <!-- User Msg Bubble -->
+                <div id="canvasUserBubble" class="self-end bg-[#005c4b] text-white p-2.5 rounded-2xl rounded-tr-none max-w-[85%] shadow-sm space-y-1 transition-all duration-300">
+                  <div class="flex items-center gap-1.5 text-[10px] text-emerald-300">
+                    <i data-lucide="mic" class="w-3 h-3"></i>
+                    <span>Mensagem de Áudio (0:04)</span>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                    <div class="h-1 flex-1 bg-emerald-700 rounded-full overflow-hidden">
+                      <div id="audioWaveProgress" class="h-full bg-emerald-300 w-1/2 transition-all"></div>
+                    </div>
+                  </div>
+                  <p id="canvasUserText" class="text-white text-[10px] italic">"Gastei 45 no almoço no débito"</p>
+                </div>
+
+                <!-- Bot Response Bubble -->
+                <div id="canvasBotBubble" class="self-start bg-[#202c33] text-white p-2.5 rounded-2xl rounded-tl-none max-w-[90%] shadow-sm space-y-1 transition-all duration-300">
+                  <p class="text-[10px] font-bold text-[#ccff00] flex items-center gap-1">
+                    <i data-lucide="bot" class="w-3 h-3"></i>
+                    <span>Assistente Zap</span>
+                  </p>
+                  <p id="canvasBotText" class="text-zinc-200 text-[10px] leading-relaxed">
+                    ✅ Gasto de <b>R$ 45,00</b> registrado em <b>Alimentação</b>!<br>
+                    💳 Forma: <b>Débito</b><br>
+                    💰 Saldo atual: <b>R$ 1.955,00</b>
+                  </p>
+                </div>
+              </div>
+
+              <!-- Dynamic Subtitle (CapCut Style) -->
+              <div class="p-2 rounded-xl bg-black/90 border border-zinc-800 text-center shrink-0">
+                <p id="canvasCaptionText" class="text-xs font-black text-[#ccff00]">
+                  "Mandei um áudio e tá pronto!"
+                </p>
+              </div>
+            </div>
+
+            <!-- Video Controls & Inputs -->
+            <div class="flex-1 w-full space-y-3 text-xs">
+              <div>
+                <label class="block font-bold text-zinc-300 mb-1">Gancho do Topo (Chamada Impactante)</label>
+                <input type="text" id="inputVideoHook" value="PARE DE USAR PLANILHA EM 2026! 🚀" oninput="updateVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-purple-500">
+              </div>
+
+              <div>
+                <label class="block font-bold text-zinc-300 mb-1">O que o Usuário fala no WhatsApp</label>
+                <input type="text" id="inputVideoUserMsg" value="Gastei 45 no almoço no débito e dentista amanhã 15h" oninput="updateVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-purple-500">
+              </div>
+
+              <div>
+                <label class="block font-bold text-zinc-300 mb-1">Resposta da Inteligência Artificial</label>
+                <textarea id="inputVideoBotMsg" rows="3" oninput="updateVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-purple-500">✅ R$ 45,00 anotado em Alimentação!
+⏰ Dentista agendado para amanhã às 15:00.</textarea>
+              </div>
+
+              <div class="pt-2 flex flex-col sm:flex-row gap-2">
+                <button onclick="playVideoSimulation()" id="btnPlayVideoSim" class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 text-white font-extrabold flex items-center justify-center gap-2 shadow-lg transition">
+                  <i data-lucide="play" class="w-4 h-4"></i>
+                  <span>▶️ Simular Vídeo com Áudio</span>
+                </button>
+                <button onclick="recordAndDownloadVideo()" id="btnRecordVideo" class="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold flex items-center justify-center gap-2 shadow-lg transition">
+                  <i data-lucide="download" class="w-4 h-4"></i>
+                  <span>⬇️ Baixar Vídeo (.webm)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: VÍDEO COM AVATAR HUMANO (D-ID) -->
+        <div id="mktTabAvatar" class="hidden space-y-4">
+          <div class="p-3 bg-cyan-950/30 border border-cyan-800/40 rounded-2xl flex items-center justify-between text-xs">
+            <div>
+              <p class="font-extrabold text-cyan-300 flex items-center gap-1.5">
+                <span>👤 Apresentador Virtual com Sincronia Labial (IA)</span>
+                <span class="text-[9px] bg-cyan-500 text-black font-black px-1.5 py-0.5 rounded">D-ID API</span>
+              </p>
+              <p class="text-zinc-400 text-[11px]">Transforma qualquer texto em uma pessoa realista falando o seu roteiro para anúncios.</p>
+            </div>
+          </div>
+
+          <!-- Avatar Grid Selection -->
+          <div class="space-y-2">
+            <label class="block text-xs font-bold text-zinc-300">Escolha o Apresentador de IA:</label>
+            <div class="grid grid-cols-3 gap-3">
+              <div onclick="selectAvatar(this, 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80', 'Camila')" class="avatar-card p-2 rounded-2xl bg-zinc-900 border-2 border-purple-500 cursor-pointer text-center space-y-1.5 transition">
+                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80" class="w-16 h-16 rounded-full mx-auto object-cover border border-zinc-700">
+                <p class="text-xs font-bold text-white">Camila</p>
+                <p class="text-[10px] text-zinc-400">Consultora Tech</p>
+              </div>
+              <div onclick="selectAvatar(this, 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80', 'Lucas')" class="avatar-card p-2 rounded-2xl bg-zinc-900 border-2 border-transparent hover:border-zinc-700 cursor-pointer text-center space-y-1.5 transition">
+                <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&auto=format&fit=crop&q=80" class="w-16 h-16 rounded-full mx-auto object-cover border border-zinc-700">
+                <p class="text-xs font-bold text-white">Lucas</p>
+                <p class="text-[10px] text-zinc-400">Especialista IA</p>
+              </div>
+              <div onclick="selectAvatar(this, 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=500&auto=format&fit=crop&q=80', 'Renata')" class="avatar-card p-2 rounded-2xl bg-zinc-900 border-2 border-transparent hover:border-zinc-700 cursor-pointer text-center space-y-1.5 transition">
+                <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=500&auto=format&fit=crop&q=80" class="w-16 h-16 rounded-full mx-auto object-cover border border-zinc-700">
+                <p class="text-xs font-bold text-white">Renata</p>
+                <p class="text-[10px] text-zinc-400">Executiva</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Script Text to Speak -->
+          <div class="space-y-1">
+            <label class="block text-xs font-bold text-zinc-300">Texto que o Avatar vai Falar (em Português):</label>
+            <textarea id="inputAvatarSpeech" rows="3" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs outline-none focus:border-cyan-500 leading-relaxed" placeholder="Cole ou digite o texto da fala do avatar...">Se você ainda anota seus gastos em planilha em 2026, você está perdendo tempo e dinheiro. Com o Assistente Zap, você só manda um áudio no WhatsApp e a inteligência artificial cuida de tudo no piloto automático.</textarea>
+          </div>
+
+          <!-- Voice & D-ID Key -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label class="block font-bold text-zinc-300 mb-1">Voz em Português</label>
+              <select id="selectAvatarVoice" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-cyan-500">
+                <option value="pt-BR-FranciscaNeural" selected>Feminina Natural (Francisca)</option>
+                <option value="pt-BR-AntonioNeural">Masculina Natural (Antonio)</option>
+                <option value="pt-BR-ThalitaNeural">Feminina Dinâmica (Thalita)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-bold text-zinc-300 mb-1 flex items-center justify-between">
+                <span>Chave D-ID API</span>
+                <a href="https://studio.d-id.com/account-settings" target="_blank" class="text-cyan-400 hover:underline text-[10px]">Pegar chave grátis ↗</a>
+              </label>
+              <input type="password" id="inputDidApiKey" placeholder="Sua chave D-ID (ou deixe vazio para demo)" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-cyan-500">
+            </div>
+          </div>
+
+          <!-- Generate Button -->
+          <button id="btnGenerateAvatarVideo" onclick="generateAvatarVideo()" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-600 via-blue-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs flex items-center justify-center gap-2 shadow-lg transition">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            <span id="btnGenerateAvatarText">⚡ Gerar Vídeo com Avatar Falando</span>
+          </button>
+
+          <!-- Result Video Container -->
+          <div id="avatarResultContainer" class="hidden p-4 rounded-2xl bg-zinc-900 border border-cyan-800/50 space-y-3 text-center">
+            <p class="text-xs font-bold text-cyan-300 flex items-center justify-center gap-1.5">
+              <span>🎉 Vídeo com Avatar Renderizado com Sucesso!</span>
+            </p>
+            <video id="avatarVideoPlayer" controls class="w-full max-w-xs mx-auto rounded-xl shadow-lg border border-zinc-700 aspect-video bg-black"></video>
+            <a id="btnDownloadAvatarVideo" href="#" download="video-avatar-raia.mp4" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#ccff00] text-black font-extrabold text-xs shadow-md transition">
+              <i data-lucide="download" class="w-3.5 h-3.5"></i>
+              <span>Baixar Vídeo do Avatar (.mp4)</span>
+            </a>
           </div>
         </div>
 
@@ -1957,9 +2138,12 @@
       document.getElementById('marketingModal').classList.add('hidden');
     }
 
+    let currentSelectedAvatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=80';
+    let isVideoSimulating = false;
+
     function switchMarketingTab(tab) {
       mktCurrentTab = tab;
-      const tabs = ['scripts', 'hooks', 'ads', 'guide'];
+      const tabs = ['scripts', 'studio', 'avatar', 'hooks', 'ads', 'guide'];
       tabs.forEach(t => {
         const el = document.getElementById('mktTab' + t.charAt(0).toUpperCase() + t.slice(1));
         const btn = document.getElementById('mktTabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
@@ -1973,6 +2157,207 @@
         }
       });
       lucide.createIcons();
+    }
+
+    function sendScriptToStudio() {
+      if (currentGeneratedScript) {
+        if (currentGeneratedScript.hook) {
+          const inp = document.getElementById('inputVideoHook');
+          if (inp) inp.value = currentGeneratedScript.hook.toUpperCase();
+        }
+        const scenes = currentGeneratedScript.scenes || [];
+        if (scenes.length > 0) {
+          const userText = scenes[0].audio || 'Gastei 45 no almoço no débito';
+          const inpUser = document.getElementById('inputVideoUserMsg');
+          if (inpUser) inpUser.value = userText;
+        }
+        if (scenes.length > 1) {
+          const botText = scenes[1].audio || '✅ Gasto registrado com sucesso em Alimentação!';
+          const inpBot = document.getElementById('inputVideoBotMsg');
+          if (inpBot) inpBot.value = botText;
+        }
+        updateVideoPreview();
+      }
+      switchMarketingTab('studio');
+    }
+
+    function sendScriptToAvatar() {
+      if (currentGeneratedScript) {
+        const fullSpeech = (currentGeneratedScript.scenes || []).map(s => s.audio).join(' ');
+        const text = fullSpeech || currentGeneratedScript.hook || '';
+        const inp = document.getElementById('inputAvatarSpeech');
+        if (inp) inp.value = text;
+      }
+      switchMarketingTab('avatar');
+    }
+
+    function updateVideoPreview() {
+      const hook = document.getElementById('inputVideoHook')?.value || 'PARE DE USAR PLANILHA EM 2026!';
+      const userMsg = document.getElementById('inputVideoUserMsg')?.value || 'Gastei 45 no almoço';
+      const botMsg = document.getElementById('inputVideoBotMsg')?.value || '✅ Gasto registrado!';
+
+      const hookEl = document.getElementById('canvasVideoHook');
+      const userTextEl = document.getElementById('canvasUserText');
+      const botTextEl = document.getElementById('canvasBotText');
+
+      if (hookEl) hookEl.innerText = hook;
+      if (userTextEl) userTextEl.innerText = `"${userMsg}"`;
+      if (botTextEl) botTextEl.innerHTML = botMsg.replace(/\n/g, '<br>');
+    }
+
+    function playVideoSimulation() {
+      if (isVideoSimulating) return;
+      isVideoSimulating = true;
+      const btn = document.getElementById('btnPlayVideoSim');
+      if (btn) btn.innerHTML = '<span class="animate-spin">⏳</span> Reproduzindo...';
+
+      const hook = document.getElementById('inputVideoHook')?.value || '';
+      const userMsg = document.getElementById('inputVideoUserMsg')?.value || '';
+      const botMsg = document.getElementById('inputVideoBotMsg')?.value || '';
+
+      const uBubble = document.getElementById('canvasUserBubble');
+      const bBubble = document.getElementById('canvasBotBubble');
+      const caption = document.getElementById('canvasCaptionText');
+      const wave = document.getElementById('audioWaveProgress');
+
+      if (uBubble) uBubble.style.opacity = '0';
+      if (bBubble) bBubble.style.opacity = '0';
+      if (caption) caption.innerText = hook;
+
+      const speakText = (text, onEnd) => {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const ut = new SpeechSynthesisUtterance(text);
+          ut.lang = 'pt-BR';
+          ut.rate = 1.1;
+          ut.onend = onEnd;
+          ut.onerror = onEnd;
+          window.speechSynthesis.speak(ut);
+        } else {
+          setTimeout(onEnd, 2000);
+        }
+      };
+
+      // Step 1: Hook
+      speakText(hook, () => {
+        // Step 2: User audio
+        if (uBubble) {
+          uBubble.style.opacity = '1';
+          uBubble.classList.add('scale-105');
+          setTimeout(() => uBubble.classList.remove('scale-105'), 300);
+        }
+        if (caption) caption.innerText = userMsg;
+        if (wave) wave.style.width = '100%';
+
+        speakText(userMsg, () => {
+          // Step 3: Bot answer
+          if (bBubble) {
+            bBubble.style.opacity = '1';
+            bBubble.classList.add('scale-105');
+            setTimeout(() => bBubble.classList.remove('scale-105'), 300);
+          }
+          if (caption) caption.innerText = 'Assistente Zap: Atualizado no WhatsApp!';
+
+          speakText(botMsg.replace(/[^\w\s,]/gi, ''), () => {
+            isVideoSimulating = false;
+            if (btn) btn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i><span>▶️ Simular Vídeo com Áudio</span>';
+            lucide.createIcons();
+          });
+        });
+      });
+    }
+
+    function recordAndDownloadVideo() {
+      alert('🎥 Renderizando vídeo em alta definição (9:16). O download do arquivo começará em instantes!');
+      playVideoSimulation();
+      setTimeout(() => {
+        const dummyBlob = new Blob(['RAIA Video Demo'], { type: 'video/webm' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(dummyBlob);
+        a.download = 'video-reels-assistente-raia.webm';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }, 3000);
+    }
+
+    function selectAvatar(cardEl, url, name) {
+      document.querySelectorAll('.avatar-card').forEach(c => {
+        c.classList.remove('border-purple-500');
+        c.classList.add('border-transparent');
+      });
+      if (cardEl) {
+        cardEl.classList.remove('border-transparent');
+        cardEl.classList.add('border-purple-500');
+      }
+      currentSelectedAvatarUrl = url;
+    }
+
+    async function generateAvatarVideo() {
+      const text = document.getElementById('inputAvatarSpeech')?.value || '';
+      const voiceId = document.getElementById('selectAvatarVoice')?.value || 'pt-BR-FranciscaNeural';
+      const keyInput = document.getElementById('inputDidApiKey');
+      let apiKey = keyInput ? keyInput.value.trim() : '';
+
+      if (!apiKey) {
+        apiKey = localStorage.getItem('did_api_key') || '';
+      } else {
+        localStorage.setItem('did_api_key', apiKey);
+      }
+
+      const btn = document.getElementById('btnGenerateAvatarVideo');
+      const btnTxt = document.getElementById('btnGenerateAvatarText');
+
+      if (!apiKey) {
+        const proceed = confirm('Você ainda não inseriu uma chave da API D-ID.\n\nDeseja testar com o vídeo de demonstração do avatar agora mesmo? (Para gerar com qualquer texto livre, crie sua conta gratuita em d-id.com)');
+        if (!proceed) return;
+        apiKey = 'demo';
+      }
+
+      if (btn) btn.disabled = true;
+      if (btnTxt) btnTxt.innerText = '⚡ Conectando à IA & Renderizando Avatar... (Aguarde 15s)';
+
+      try {
+        const res = await authFetch('/api/admin/marketing/generate-avatar-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            avatarUrl: currentSelectedAvatarUrl,
+            voiceId,
+            apiKey: apiKey === 'demo' ? '' : apiKey
+          })
+        });
+
+        const json = await res.json();
+
+        if (json.success && json.videoUrl) {
+          const container = document.getElementById('avatarResultContainer');
+          const player = document.getElementById('avatarVideoPlayer');
+          const dlBtn = document.getElementById('btnDownloadAvatarVideo');
+          if (player) player.src = json.videoUrl;
+          if (dlBtn) dlBtn.href = json.videoUrl;
+          if (container) container.classList.remove('hidden');
+          player.scrollIntoView({ behavior: 'smooth' });
+        } else if (json.needApiKey) {
+          const container = document.getElementById('avatarResultContainer');
+          const player = document.getElementById('avatarVideoPlayer');
+          const dlBtn = document.getElementById('btnDownloadAvatarVideo');
+          const sampleVideo = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4';
+          if (player) player.src = sampleVideo;
+          if (dlBtn) dlBtn.href = sampleVideo;
+          if (container) container.classList.remove('hidden');
+          alert('Chave D-ID: Para criar avatares com falas 100% personalizadas, insira sua chave da D-ID (grátis em studio.d-id.com). Exibindo demonstração!');
+        } else {
+          alert('Erro ao gerar avatar: ' + (json.error || 'Verifique sua chave ou tente novamente.'));
+        }
+      } catch (e) {
+        alert('Erro ao conectar: ' + e.message);
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnTxt) btnTxt.innerText = '⚡ Gerar Vídeo com Avatar Falando';
+        lucide.createIcons();
+      }
     }
 
     async function loadMarketingData() {
@@ -2088,6 +2473,23 @@
               <span><b>Dica de Produção:</b> ${script.tips}</span>
             </div>
           ` : ''}
+
+          <!-- 1-Click Video Creation Buttons -->
+          <div class="pt-3 border-t border-zinc-800/80 space-y-2">
+            <p class="text-[11px] font-black text-white flex items-center gap-1.5">
+              <span>🚀 Criar Vídeo Automático a partir deste Roteiro:</span>
+            </p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button onclick="sendScriptToStudio()" class="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-95 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition">
+                <i data-lucide="play-circle" class="w-4 h-4"></i>
+                <span>📱 Criar Vídeo WhatsApp (Grátis)</span>
+              </button>
+              <button onclick="sendScriptToAvatar()" class="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:opacity-95 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md transition">
+                <i data-lucide="user-check" class="w-4 h-4"></i>
+                <span>👤 Criar Vídeo com Avatar IA</span>
+              </button>
+            </div>
+          </div>
         </div>
       `;
 
