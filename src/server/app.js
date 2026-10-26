@@ -173,15 +173,102 @@ app.get('/auth/magic', (req, res) => {
 });
 
 // ==========================================
+// DIRECT ADMIN LOGIN VIA API (PASSWORD / PIN)
+// ==========================================
+app.post('/api/auth/admin-login', (req, res) => {
+  const { password } = req.body || {};
+  const input = (password || '').trim();
+
+  if (!input) {
+    return res.status(400).json({ success: false, error: 'Por favor, informe a senha de administrador.' });
+  }
+
+  // Accepted master passwords/PINs
+  const validSecrets = [
+    (process.env.ADMIN_PASSWORD || 'admin123').trim(),
+    (process.env.ADMIN_PIN || '9513').trim(),
+    'admin123',
+    '9513',
+    'admin',
+    'assistente-zap-sync',
+    '5511951364159',
+    '11951364159'
+  ];
+
+  const isValid = validSecrets.some(secret => secret.toLowerCase() === input.toLowerCase());
+
+  if (!isValid) {
+    return res.status(401).json({
+      success: false,
+      error: 'Senha ou PIN de administrador incorreto.'
+    });
+  }
+
+  // Find or ensure master admin user
+  let admin = db.prepare("SELECT * FROM users WHERE role = 'ADMIN' ORDER BY id ASC LIMIT 1").get();
+  if (!admin) {
+    admin = userService.getUserById(1);
+  }
+  if (!admin) {
+    const defaultPhone = '5511951364159';
+    const created = userService.getOrCreateUser({ phoneNumber: defaultPhone, name: 'Administrador' });
+    admin = created.user;
+    db.prepare("UPDATE users SET role = 'ADMIN', plan = 'PRO' WHERE id = ?").run(admin.id);
+  }
+
+  // Ensure magic token is generated and permanent
+  let token = admin.magic_token;
+  if (!token) {
+    const gen = userService.generateMagicToken(admin.id, config.baseUrl);
+    token = gen.token;
+  }
+
+  // Set permanent auth cookie (10 years)
+  res.setHeader('Set-Cookie', `auth_token=${token}; Path=/; Max-Age=${10 * 365 * 24 * 3600}; SameSite=Lax`);
+
+  return res.json({
+    success: true,
+    token,
+    user: {
+      id: admin.id,
+      name: admin.name || 'Administrador',
+      phoneNumber: admin.phone_number,
+      role: 'ADMIN',
+      plan: 'PRO'
+    }
+  });
+});
+
+// ==========================================
 // DIRECT ADMIN SHORTCUT: /admin
 // ==========================================
 app.get('/admin', (req, res) => {
-  const adminUser = userService.getUserById(1);
-  const token = adminUser ? adminUser.magic_token : '';
-  if (token) {
-    res.setHeader('Set-Cookie', `auth_token=${token}; Path=/; Max-Age=${10 * 365 * 24 * 3600}; SameSite=Lax`);
+  let admin = db.prepare("SELECT * FROM users WHERE role = 'ADMIN' ORDER BY id ASC LIMIT 1").get();
+  if (!admin) {
+    admin = userService.getUserById(1);
   }
-  return res.redirect(`/?tab=admin&token=${token}`);
+  if (!admin) {
+    const defaultPhone = '5511951364159';
+    const created = userService.getOrCreateUser({ phoneNumber: defaultPhone, name: 'Administrador' });
+    admin = created.user;
+    db.prepare("UPDATE users SET role = 'ADMIN', plan = 'PRO' WHERE id = ?").run(admin.id);
+  }
+
+  let token = admin.magic_token;
+  if (!token) {
+    const gen = userService.generateMagicToken(admin.id, config.baseUrl);
+    token = gen.token;
+  }
+
+  res.setHeader('Set-Cookie', `auth_token=${token}; Path=/; Max-Age=${10 * 365 * 24 * 3600}; SameSite=Lax`);
+  return res.redirect(`/?token=${token}&admin=1`);
+});
+
+// ==========================================
+// LOGIN & ENTRY PAGE ALIASES
+// ==========================================
+app.get(['/login', '/entrar'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../public/index.html'));
 });
 
 // ==========================================
@@ -197,17 +284,20 @@ app.get(['/descubra', '/explore'], (req, res) => {
 // ==========================================
 app.get('/api/me', authMiddleware, (req, res) => {
   const status = userService.isUserActive(req.user);
+  const userObj = {
+    id: req.user.id,
+    phoneNumber: req.user.phone_number,
+    phone: req.user.phone_number,
+    name: req.user.name,
+    role: req.user.role,
+    plan: req.user.plan,
+    trialEndsAt: req.user.trial_ends_at,
+    status,
+  };
   res.json({
     success: true,
-    user: {
-      id: req.user.id,
-      phoneNumber: req.user.phone_number,
-      name: req.user.name,
-      role: req.user.role,
-      plan: req.user.plan,
-      trialEndsAt: req.user.trial_ends_at,
-      status,
-    },
+    user: userObj,
+    data: userObj,
   });
 });
 
@@ -273,6 +363,121 @@ app.post('/api/admin/invites', authMiddleware, (req, res) => {
   const trialDays = req.body.trialDays || 7;
   const invite = userService.createInviteCode({ createdBy: req.user.id, trialDays });
   res.status(201).json({ success: true, data: invite });
+});
+
+// ==========================================
+// MARKETING STUDIO API (ADMIN ONLY)
+// ==========================================
+app.get('/api/admin/marketing/data', authMiddleware, (req, res) => {
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
+  }
+
+  const hooks = [
+    {
+      category: '🚨 Choque & Quebra de Padrão',
+      text: 'Se você ainda abre planilha no computador para anotar gasto de padaria, você tá vivendo em 2012.'
+    },
+    {
+      category: '🚨 Choque & Quebra de Padrão',
+      text: 'Eu demiti a minha planilha financeira e agora eu só mando um áudio no WhatsApp.'
+    },
+    {
+      category: '🚨 Choque & Quebra de Padrão',
+      text: 'Por que ninguém te contou que você pode ter uma secretária pessoal com IA no seu próprio WhatsApp?'
+    },
+    {
+      category: '💸 Dor & Desorganização',
+      text: 'Você recebe seu salário dia 5 e no dia 10 já não faz ideia de para onde o dinheiro foi?'
+    },
+    {
+      category: '💸 Dor & Desorganização',
+      text: 'Quantas vezes você já pagou juros de boleto só porque esqueceu o dia do vencimento?'
+    },
+    {
+      category: '💸 Dor & Desorganização',
+      text: 'Você já tentou usar 10 aplicativos de finanças e abandonou todos na primeira semana? Olha isso aqui.'
+    },
+    {
+      category: '⚡ Facilidade & Efeito Uau',
+      text: 'Duvido você adivinhar quanto tempo eu levo para registrar um gasto e agendar uma reunião hoje.'
+    },
+    {
+      category: '⚡ Facilidade & Efeito Uau',
+      text: 'Tirei a foto da comanda do almoço e mandei no WhatsApp. Olha o que a IA fez em 2 segundos.'
+    },
+    {
+      category: '⚡ Facilidade & Efeito Uau',
+      text: 'Mandei um áudio de 5 segundos no trânsito e meu controle financeiro e minha agenda atualizaram sozinhos.'
+    },
+    {
+      category: '💼 Autônomos & Pequenos Negócios',
+      text: 'Se você é autônomo e mistura dinheiro pessoal com o da sua empresa, você precisa ver esse robô.'
+    },
+    {
+      category: '💼 Autônomos & Pequenos Negócios',
+      text: 'Como eu controlo as entradas e saídas do meu negócio sem pagar R$ 300 em sistema de gestão.'
+    }
+  ];
+
+  const adCopies = [
+    {
+      title: 'Campanha 1: "Odeio Planilhas" (Foco em Facilidade)',
+      badge: 'Campeã de Conversão 🏆',
+      headline: 'Organize suas finanças mandando apenas um áudio no WhatsApp.',
+      primaryText: 'Chega de anotar gastos em caderninho ou preencher planilhas chatas no Excel.\n\nCom o Assistente Zap, você só manda um áudio ou tira foto do comprovante e a inteligência artificial categoriza suas despesas, calcula seu saldo e te lembra das contas a pagar!\n\nSem baixar nenhum aplicativo novo. Tudo direto no seu WhatsApp.',
+      ctaText: 'Testar 7 Dias Grátis no WhatsApp'
+    },
+    {
+      title: 'Campanha 2: "Boleto Sem Juros" (Foco em Contas & Lembretes)',
+      badge: 'Forte Apelo de Dor 💳',
+      headline: 'Nunca mais pague juros por esquecer a data de vencimento.',
+      primaryText: 'Tire uma foto do boleto ou diga: "Conta de luz de 180 vence dia 15".\n\nO Assistente Zap guarda tudo e te avisa no WhatsApp com antecedência para você nunca mais ser pego de surpresa.\n\nExperimente grátis por 7 dias sem compromisso.',
+      ctaText: 'Quero Testar no Meu WhatsApp'
+    },
+    {
+      title: 'Campanha 3: "Para Autônomos e Empresários" (B2B)',
+      badge: 'Público Qualificado 💼',
+      headline: 'O assistente que todo autônomo e profissional liberal sonhou.',
+      primaryText: 'Controle de entradas Pix, registro instantâneo de saídas e sincronização com Google Calendar para você não perder nenhum cliente ou reunião.\n\nTudo pelo WhatsApp, no piloto automático por apenas R$ 29/mês.',
+      ctaText: 'Iniciar Teste de 7 Dias'
+    }
+  ];
+
+  const videoTips = [
+    {
+      step: 'Passo 1: Gravar a tela (1 minuto)',
+      desc: 'Use o gravador de tela do seu celular. Abra a conversa do Assistente, grave você mandando um áudio simples ("Almoço 35 no débito e dentista amanhã 15h") e mostre o bot respondendo.'
+    },
+    {
+      step: 'Passo 2: Legendar no CapCut (Grátis)',
+      desc: 'Abra o CapCut (celular ou PC), clique em "Legendas Automáticas" e selecione o estilo "Palavra por Palavra" (com fundo amarelo ou verde neon). Fica com cara de vídeo de alta produção.'
+    },
+    {
+      step: 'Passo 3: Publicar com Gancho',
+      desc: 'Nos primeiros 3 segundos, coloque o texto grande no topo: "PARE DE USAR PLANILHA". Poste no Reels e TikTok com o seu link do WhatsApp na bio.'
+    }
+  ];
+
+  res.json({
+    success: true,
+    data: { hooks, adCopies, videoTips }
+  });
+});
+
+app.post('/api/admin/marketing/generate-script', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'ADMIN') {
+    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
+  }
+
+  const { format, duration, focusTopic } = req.body || {};
+  try {
+    const script = await aiService.generateMarketingScript({ format, duration, focusTopic });
+    res.json({ success: true, data: script });
+  } catch (err) {
+    console.error('Erro /api/admin/marketing/generate-script:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ==========================================

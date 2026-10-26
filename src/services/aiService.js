@@ -579,6 +579,98 @@ Preencha a descrição resumida no campo "transcription".`;
   return await callGemini(contents, userContext);
 }
 
+/**
+ * Fallback script templates in case Gemini is offline or experiencing latency
+ */
+function getFallbackScript(format = 'SCREEN_DEMO', duration = '30s', focusTopic = 'FINANCE') {
+  return {
+    title: 'POV: Você demitiu a planilha chata do Excel',
+    hook: 'Se você ainda perde tempo anotando gastos em planilha, você está fazendo tudo errado.',
+    duration: duration,
+    format: format,
+    scenes: [
+      {
+        time: '0s - 3s',
+        visual: 'Pessoa com cara de desânimo olhando para uma planilha do Excel cheia de abas no computador.',
+        audio: 'Se você ainda perde tempo abrindo planilha para anotar cada cafezinho, para tudo.',
+        onScreenText: '🚨 PARE DE USAR PLANILHA AGORA'
+      },
+      {
+        time: '3s - 15s',
+        visual: 'Câmera foca na tela do celular abrindo o WhatsApp do Assistente e você mandando um áudio: "Gastei 45 no almoço no débito e amanhã tenho reunião às 14h".',
+        audio: 'Hoje eu só mando um áudio de 3 segundos no meu WhatsApp... e olha o que acontece.',
+        onScreenText: '🎙️ Só mandar um áudio de 3s no WhatsApp'
+      },
+      {
+        time: '15s - 24s',
+        visual: 'O Assistente responde instantaneamente: "✅ Gasto de R$ 45,00 registrado em Alimentação (Débito) e 📅 Reunião agendada na sua agenda!". Mostra o painel escuro com gráficos atualizados.',
+        audio: 'Ele categoriza tudo sozinho, calcula meu saldo, avisa das minhas contas a pagar e ainda atualiza minha agenda do Google.',
+        onScreenText: '⚡ IA organiza gastos e agenda na hora'
+      },
+      {
+        time: '24s - 30s',
+        visual: 'Pessoa sorrindo e apontando para o link na bio com o celular na mão.',
+        audio: 'Toca no link da minha bio agora e teste por 7 dias grátis no seu próprio WhatsApp.',
+        onScreenText: '👉 Teste 7 dias grátis no link da bio'
+      }
+    ],
+    caption: 'Chega de esquecer onde foi o seu dinheiro no final do mês ou passar horas alimentando planilhas chatas. 🤯\n\nAgora você só manda um áudio ou foto de comprovante no WhatsApp e o Assistente organiza suas finanças, seus boletos e sua agenda automaticamente!\n\n👇 Toque no link da bio e ative seu teste de 7 dias grátis agora mesmo!',
+    hashtags: '#financas #whatsapp #inteligenciaartificial #produtividade #organizacaofinanceira #rendaextra #microempreendedor #dicasdegestao',
+    tips: 'Grave a tela do seu celular com o WhatsApp aberto. Use o CapCut para gerar as legendas automáticas animadas em 1 minuto sem custo.'
+  };
+}
+
+async function generateMarketingScript({ format = 'SCREEN_DEMO', duration = '30s', focusTopic = 'FINANCE' } = {}) {
+  try {
+    const ai = getGenAI();
+    const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+    const prompt = `Você é um Diretor de Criação de Vídeos Virais e Estrategista de Marketing para SaaS e Micro-SaaS no Brasil.
+O produto promovido é o "Assistente Zap": um assistente pessoal inteligente no WhatsApp brasileiro que organiza finanças pessoais e empresariais por áudio e fotos de comprovantes, gerencia boletos/contas com lembretes pontuais e agenda reuniões no Google Calendar.
+Preço: R$ 29,00/mês com 7 dias grátis de teste.
+
+Crie um ROTEIRO DE VÍDEO CURTO DE ALTA RETENÇÃO E CONVERSÃO (estilo Reels, TikTok e YouTube Shorts).
+- Formato solicitado: ${format} (SCREEN_DEMO - tela gravando o WhatsApp, TALKING_AVATAR - pessoa falando, PAIN_RELIEF - dor vs alívio, VS_SPREADSHEET - demitindo a planilha)
+- Duração: ${duration} (15s, 30s ou 45s)
+- Tema/Foco: ${focusTopic}
+
+Requisitos:
+- Gancho (Hook) irresistível nos primeiros 3 segundos.
+- Linguagem dinâmica, natural e persuasiva em português do Brasil.
+- Cenas detalhadas com tempo, o que mostrar na tela, fala/áudio sugerido e texto em destaque na tela.
+- Chamada para Ação (CTA) clara para testar 7 dias grátis no link da bio / WhatsApp.
+
+Retorne EXCLUSIVAMENTE um objeto JSON válido:
+{
+  "title": "...",
+  "hook": "...",
+  "duration": "${duration}",
+  "format": "${format}",
+  "scenes": [
+    {
+      "time": "0s - 3s",
+      "visual": "...",
+      "audio": "...",
+      "onScreenText": "..."
+    }
+  ],
+  "caption": "...",
+  "hashtags": "...",
+  "tips": "..."
+}`;
+
+    const res = await model.generateContent(prompt);
+    const text = res.response.text();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0]);
+    }
+    return getFallbackScript(format, duration, focusTopic);
+  } catch (err) {
+    console.error('[Marketing Studio AI Error]:', err.message);
+    return getFallbackScript(format, duration, focusTopic);
+  }
+}
 
 module.exports = {
   setApiKey,
@@ -586,4 +678,6 @@ module.exports = {
   processAudioMessage,
   processImageMessage,
   processDocumentMessage,
+  generateMarketingScript,
+  getFallbackScript,
 };

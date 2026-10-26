@@ -111,10 +111,17 @@
         <button id="adminQuickBtn" onclick="openAdminModal()" class="hidden px-2.5 py-1 text-xs font-bold bg-zinc-800 text-zinc-300 hover:text-white rounded-full border border-zinc-700 transition">
           Admin
         </button>
+        <button id="marketingQuickBtn" onclick="openMarketingModal()" class="hidden px-2.5 py-1 text-xs font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:opacity-90 rounded-full border border-purple-400/30 transition flex items-center gap-1 shadow-sm">
+          <i data-lucide="video" class="w-3.5 h-3.5"></i>
+          <span>Marketing</span>
+        </button>
         <div id="assistenteProBadge" class="px-3.5 py-1.5 rounded-full bg-[#ccff00] text-black font-extrabold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition cursor-pointer" onclick="openPixModal()">
           <span>Assistente Pro</span>
           <i data-lucide="sparkles" class="w-3.5 h-3.5 fill-black stroke-black"></i>
         </div>
+        <button id="logoutBtn" onclick="handleLogout()" title="Sair do painel" class="w-8 h-8 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-rose-400 flex items-center justify-center transition border border-zinc-800 shrink-0">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+        </button>
       </div>
     </header>
 
@@ -562,6 +569,21 @@
             <p class="text-[10px] text-zinc-400">Google Calendar</p>
           </div>
         </button>
+
+        <!-- Admin Marketing Studio Button -->
+        <button id="adminMarketingActionBtn" onclick="openMarketingModal(); closeAssistenteActionsModal();" class="hidden p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/60 to-pink-950/60 hover:from-purple-900/80 hover:to-pink-900/80 border border-purple-700/50 text-left transition col-span-2 flex items-center gap-3">
+          <div class="w-8 h-8 rounded-full bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0">
+            <i data-lucide="video" class="w-4 h-4"></i>
+          </div>
+          <div class="flex-1">
+            <p class="text-xs font-bold text-white flex items-center gap-1.5">
+              <span>Estúdio de Marketing</span>
+              <span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/30 text-purple-200">Admin</span>
+            </p>
+            <p class="text-[10px] text-zinc-400">Roteiros de vídeo, ganchos virais e copys para bombar</p>
+          </div>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-purple-400"></i>
+        </button>
       </div>
 
       <!-- Falar no WhatsApp -->
@@ -791,8 +813,11 @@
   <!-- ============================================================ -->
   <!-- MODAL: ASSINAR PIX / PIERRE PRO                              -->
   <!-- ============================================================ -->
-  <div id="pixModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
-    <div class="bg-[#141416] border border-zinc-800 w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl text-center">
+  <div id="pixModal" onclick="if(event.target===this) closePixModal()" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-[#141416] border border-zinc-800 w-full max-w-sm rounded-[32px] p-6 space-y-4 shadow-2xl text-center relative">
+      <button onclick="closePixModal()" class="absolute right-4 top-4 w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
       <div class="w-12 h-12 rounded-full bg-[#ccff00] text-black flex items-center justify-center font-black mx-auto">
         <i data-lucide="crown" class="w-6 h-6 fill-black"></i>
       </div>
@@ -848,6 +873,132 @@
   </div>
 
   <!-- ============================================================ -->
+  <!-- MODAL: ESTÚDIO DE MARKETING (ADMIN INTERNO)                  -->
+  <!-- ============================================================ -->
+  <div id="marketingModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-[#141416] border border-zinc-800 w-full max-w-2xl max-h-[90vh] rounded-[32px] p-5 sm:p-6 flex flex-col shadow-2xl">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-zinc-800 shrink-0">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 text-white flex items-center justify-center shadow-md">
+            <i data-lucide="video" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-extrabold text-white">Estúdio de Marketing</h3>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">Interno Admin</span>
+            </div>
+            <p class="text-xs text-zinc-400">Roteiros de vídeo, ganchos virais e copys para bombar o Assistente</p>
+          </div>
+        </div>
+        <button onclick="closeMarketingModal()" class="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Segmented Tabs -->
+      <div class="flex items-center gap-1.5 py-3 border-b border-zinc-800/80 overflow-x-auto shrink-0 hide-scrollbar text-xs">
+        <button id="mktTabBtnScripts" onclick="switchMarketingTab('scripts')" class="px-3.5 py-1.5 rounded-full font-bold bg-purple-600 text-white shadow-sm flex items-center gap-1.5 shrink-0 transition">
+          <i data-lucide="clapperboard" class="w-3.5 h-3.5"></i>
+          <span>Roteiros de Vídeo</span>
+        </button>
+        <button id="mktTabBtnHooks" onclick="switchMarketingTab('hooks')" class="px-3.5 py-1.5 rounded-full font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 flex items-center gap-1.5 shrink-0 transition">
+          <i data-lucide="magnet" class="w-3.5 h-3.5"></i>
+          <span>Ganchos Virais (3s)</span>
+        </button>
+        <button id="mktTabBtnAds" onclick="switchMarketingTab('ads')" class="px-3.5 py-1.5 rounded-full font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 flex items-center gap-1.5 shrink-0 transition">
+          <i data-lucide="megaphone" class="w-3.5 h-3.5"></i>
+          <span>Anúncios Meta Ads</span>
+        </button>
+        <button id="mktTabBtnGuide" onclick="switchMarketingTab('guide')" class="px-3.5 py-1.5 rounded-full font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 flex items-center gap-1.5 shrink-0 transition">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          <span>Como Gravar Grátis</span>
+        </button>
+      </div>
+
+      <!-- Scrollable Tab Content Container -->
+      <div class="flex-1 overflow-y-auto py-3 space-y-4 pr-1 hide-scrollbar">
+
+        <!-- TAB 1: ROTEIROS DE VÍDEO -->
+        <div id="mktTabScripts" class="space-y-4">
+          <!-- Generator Form -->
+          <div class="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div>
+                <label class="block text-[11px] font-bold text-zinc-400 mb-1">Formato do Vídeo</label>
+                <select id="mktScriptFormat" class="w-full px-3 py-2 bg-zinc-800/90 border border-zinc-700/80 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500">
+                  <option value="SCREEN_DEMO">📱 Gravação de Tela (WhatsApp)</option>
+                  <option value="TALKING_AVATAR">👤 Pessoa / Avatar Falando</option>
+                  <option value="VS_SPREADSHEET">📊 Demitindo a Planilha</option>
+                  <option value="PAIN_RELIEF">⚡ Dor vs Alívio Rápido</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-zinc-400 mb-1">Duração</label>
+                <select id="mktScriptDuration" class="w-full px-3 py-2 bg-zinc-800/90 border border-zinc-700/80 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500">
+                  <option value="15s">15 segundos (Rápido / Dinâmico)</option>
+                  <option value="30s" selected>30 segundos (Ideal Reels/TikTok)</option>
+                  <option value="45s">45 segundos (Aprofundado)</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-zinc-400 mb-1">Foco / Tema</label>
+                <select id="mktScriptTopic" class="w-full px-3 py-2 bg-zinc-800/90 border border-zinc-700/80 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500">
+                  <option value="FINANCE">💰 Gastos por Áudio & Foto</option>
+                  <option value="BILLS">💳 Boletos & Contas Sem Juros</option>
+                  <option value="CALENDAR">⏰ Agenda & Compromissos</option>
+                  <option value="ALL_IN_ONE" selected>🚀 Visão Geral / Tudo em Um</option>
+                </select>
+              </div>
+            </div>
+
+            <button id="btnGenerateScript" onclick="generateScriptWithAI()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:opacity-95 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md active:scale-98 transition">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span id="btnGenerateScriptText">⚡ Gerar Novo Roteiro com IA</span>
+            </button>
+          </div>
+
+          <!-- Script Output Display -->
+          <div id="mktScriptOutputContainer" class="space-y-3">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- TAB 2: GANCHOS VIRAIS (HOOKS) -->
+        <div id="mktTabHooks" class="hidden space-y-3">
+          <p class="text-xs text-zinc-400">Os primeiros 3 segundos decidem se o público continua assistindo ou rola o feed. Copie qualquer gancho abaixo para abrir seus vídeos:</p>
+          <div id="mktHooksList" class="space-y-2">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
+
+        <!-- TAB 3: ANÚNCIOS META ADS -->
+        <div id="mktTabAds" class="hidden space-y-3">
+          <p class="text-xs text-zinc-400">Copys prontas para criar anúncios no Gerenciador de Anúncios do Meta (Instagram/Facebook) apontando direto para o WhatsApp do Assistente:</p>
+          <div id="mktAdsList" class="space-y-3">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
+
+        <!-- TAB 4: GUIA COMO GRAVAR GRÁTIS -->
+        <div id="mktTabGuide" class="hidden space-y-3">
+          <div class="p-4 rounded-2xl bg-purple-950/30 border border-purple-800/40 text-xs space-y-2">
+            <h4 class="font-extrabold text-purple-300 text-sm flex items-center gap-1.5">
+              <span>🚀 A Fórmula dos Vídeos Sem Custo (Zero Reais)</span>
+            </h4>
+            <p class="text-zinc-300">Você não precisa de câmera cara, iluminação de estúdio nem pagar R$ 500 por mês em ferramentas de IA. Vídeos autênticos gravados direto na tela do celular vendem até 5x mais!</p>
+          </div>
+
+          <div id="mktGuideSteps" class="space-y-2.5">
+            <!-- Loaded dynamically -->
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
   <!-- LOGIC & SCRIPTS (Pierre Financial Engine)                    -->
   <!-- ============================================================ -->
   <script>
@@ -862,12 +1013,27 @@
       }
     } catch (e) {}
 
+    function getCookieToken() {
+      try {
+        const match = document.cookie.match(/(?:^|;\s*)auth_token=([^;]*)/);
+        return match ? decodeURIComponent(match[1]) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
     function getActiveToken() {
       if (memoryToken) return memoryToken;
       try {
         const stored = localStorage.getItem('auth_token');
         if (stored) return stored;
       } catch (e) {}
+      const cookieTok = getCookieToken();
+      if (cookieTok) {
+        memoryToken = cookieTok;
+        try { localStorage.setItem('auth_token', cookieTok); } catch (e) {}
+        return cookieTok;
+      }
       return null;
     }
 
@@ -892,19 +1058,178 @@
 
     function showUnauthorizedScreen() {
       document.body.innerHTML = `
-        <div class="min-h-screen bg-black text-white flex items-center justify-center p-4 text-center font-sans">
-          <div class="max-w-md bg-[#141416] p-8 rounded-3xl border border-zinc-800 shadow-2xl">
-            <div class="w-16 h-16 mx-auto mb-4 bg-[#ccff00]/10 rounded-full flex items-center justify-center text-[#ccff00] text-3xl">
-              🔒
+        <div class="min-h-screen bg-black text-white flex items-center justify-center p-4 font-sans select-none">
+          <div class="w-full max-w-md bg-[#141416] p-6 sm:p-8 rounded-[32px] border border-zinc-800 shadow-2xl space-y-6">
+            
+            <!-- Brand / Logo Header -->
+            <div class="text-center space-y-2">
+              <div class="w-14 h-14 mx-auto bg-gradient-to-tr from-purple-600 via-pink-600 to-[#ccff00] rounded-2xl p-[2px] shadow-lg shadow-purple-500/20">
+                <div class="w-full h-full bg-[#141416] rounded-2xl flex items-center justify-center text-2xl">
+                  ⚡
+                </div>
+              </div>
+              <h2 class="text-xl sm:text-2xl font-black text-white">Assistente Zap</h2>
+              <p class="text-xs text-zinc-400">Painel de Gestão & Estúdio Financeiro</p>
             </div>
-            <h2 class="text-2xl font-extrabold mb-2">Acesso Exclusivo WhatsApp</h2>
-            <p class="text-zinc-400 mb-6 text-sm">Para acessar o seu painel financeiro seguro, abra a conversa com o Assistente no WhatsApp e solicite o link de acesso.</p>
-            <div class="text-xs text-zinc-300 bg-zinc-900 p-4 rounded-2xl border border-zinc-800 text-left">
-              👉 Envie a palavra <b>"Painel"</b> ou <b>"Dashboard"</b> no WhatsApp para receber seu link imediato.
+
+            <!-- Login Selector Tabs -->
+            <div class="flex items-center p-1 bg-zinc-900 rounded-2xl border border-zinc-800 text-xs font-bold">
+              <button id="tabBtnAdminLogin" onclick="switchLoginMode('admin')" class="flex-1 py-2 rounded-xl bg-purple-600 text-white shadow-sm flex items-center justify-center gap-1.5 transition">
+                <span>🔑 Acesso Admin</span>
+              </button>
+              <button id="tabBtnWaLogin" onclick="switchLoginMode('wa')" class="flex-1 py-2 rounded-xl text-zinc-400 hover:text-white flex items-center justify-center gap-1.5 transition">
+                <span>💬 Usuário WhatsApp</span>
+              </button>
             </div>
+
+            <!-- TAB 1: ADMIN LOGIN -->
+            <div id="loginSectionAdmin" class="space-y-4">
+              <div class="text-left space-y-1.5">
+                <label class="text-xs font-bold text-zinc-300">Senha do Administrador</label>
+                <div class="relative">
+                  <input 
+                    type="password" 
+                    id="adminLoginInput" 
+                    placeholder="Digite sua senha de Admin" 
+                    onkeydown="if(event.key==='Enter') submitAdminLogin()"
+                    class="w-full px-4 py-3 bg-zinc-900/90 border border-zinc-700/80 rounded-2xl text-white text-sm focus:outline-none focus:border-purple-500 transition pr-10"
+                    autofocus
+                  >
+                  <button type="button" onclick="toggleAdminPassVisibility()" class="absolute right-3 top-3.5 text-zinc-400 hover:text-white text-sm">
+                    <span id="passEyeIcon">👁️</span>
+                  </button>
+                </div>
+                <p class="text-[11px] text-zinc-500 pt-0.5">💡 Senha padrão: <b class="text-zinc-400 font-mono">admin123</b> ou PIN <b class="text-zinc-400 font-mono">9513</b></p>
+              </div>
+
+              <div id="adminLoginError" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs text-left">
+              </div>
+
+              <button id="btnSubmitAdminLogin" onclick="submitAdminLogin()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:opacity-95 text-white font-black text-sm shadow-lg shadow-purple-600/30 active:scale-98 transition flex items-center justify-center gap-2">
+                <span id="btnAdminLoginText">Entrar no Painel Admin</span>
+                <span>🚀</span>
+              </button>
+
+              <div class="pt-1 text-center">
+                <a href="/admin" class="text-[11px] text-zinc-500 hover:text-purple-400 transition underline underline-offset-4">
+                  Ou acessar via atalho direto (/admin)
+                </a>
+              </div>
+            </div>
+
+            <!-- TAB 2: WHATSAPP ACCESS (FOR CLIENTS) -->
+            <div id="loginSectionWa" class="space-y-4 hidden text-left">
+              <div class="p-4 bg-zinc-900/90 border border-zinc-800 rounded-2xl space-y-2">
+                <p class="text-xs font-bold text-white flex items-center gap-1.5">
+                  <span>🔒 Acesso Seguro para Usuários</span>
+                </p>
+                <p class="text-xs text-zinc-400 leading-relaxed">
+                  Para acessar suas contas, extratos e relatórios, abra a conversa com o Assistente no WhatsApp e envie a palavra <b>"Painel"</b>.
+                </p>
+              </div>
+
+              <a href="https://wa.me/5511966619866?text=Painel" target="_blank" class="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm shadow-lg shadow-emerald-600/20 active:scale-98 transition flex items-center justify-center gap-2 text-center">
+                <span>📲 Pedir Link no WhatsApp</span>
+              </a>
+            </div>
+
           </div>
         </div>
       `;
+    }
+
+    function switchLoginMode(mode) {
+      const secAdmin = document.getElementById('loginSectionAdmin');
+      const secWa = document.getElementById('loginSectionWa');
+      const btnAdmin = document.getElementById('tabBtnAdminLogin');
+      const btnWa = document.getElementById('tabBtnWaLogin');
+      if (mode === 'admin') {
+        if (secAdmin) secAdmin.classList.remove('hidden');
+        if (secWa) secWa.classList.add('hidden');
+        if (btnAdmin) btnAdmin.className = 'flex-1 py-2 rounded-xl bg-purple-600 text-white shadow-sm flex items-center justify-center gap-1.5 transition';
+        if (btnWa) btnWa.className = 'flex-1 py-2 rounded-xl text-zinc-400 hover:text-white flex items-center justify-center gap-1.5 transition';
+        const inp = document.getElementById('adminLoginInput');
+        if (inp) inp.focus();
+      } else {
+        if (secAdmin) secAdmin.classList.add('hidden');
+        if (secWa) secWa.classList.remove('hidden');
+        if (btnAdmin) btnAdmin.className = 'flex-1 py-2 rounded-xl text-zinc-400 hover:text-white flex items-center justify-center gap-1.5 transition';
+        if (btnWa) btnWa.className = 'flex-1 py-2 rounded-xl bg-emerald-600 text-white shadow-sm flex items-center justify-center gap-1.5 transition';
+      }
+    }
+
+    function toggleAdminPassVisibility() {
+      const inp = document.getElementById('adminLoginInput');
+      const icon = document.getElementById('passEyeIcon');
+      if (!inp) return;
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        if (icon) icon.innerText = '🙈';
+      } else {
+        inp.type = 'password';
+        if (icon) icon.innerText = '👁️';
+      }
+    }
+
+    async function submitAdminLogin() {
+      const inp = document.getElementById('adminLoginInput');
+      const errBox = document.getElementById('adminLoginError');
+      const btn = document.getElementById('btnSubmitAdminLogin');
+      const btnText = document.getElementById('btnAdminLoginText');
+
+      const password = inp ? inp.value.trim() : '';
+      if (!password) {
+        if (errBox) {
+          errBox.innerText = 'Digite a senha de administrador.';
+          errBox.classList.remove('hidden');
+        }
+        return;
+      }
+
+      if (errBox) errBox.classList.add('hidden');
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.innerText = 'Autenticando...';
+
+      try {
+        const res = await fetch('/api/auth/admin-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        const json = await res.json();
+
+        if (json.success && json.token) {
+          try {
+            localStorage.setItem('auth_token', json.token);
+          } catch (e) {}
+          window.location.href = `/?token=${encodeURIComponent(json.token)}`;
+        } else {
+          if (errBox) {
+            errBox.innerText = json.error || 'Senha incorreta. Tente "admin123" ou o PIN de admin.';
+            errBox.classList.remove('hidden');
+          }
+          if (btn) btn.disabled = false;
+          if (btnText) btnText.innerText = 'Entrar no Painel Admin';
+        }
+      } catch (err) {
+        if (errBox) {
+          errBox.innerText = 'Erro ao conectar ao servidor. Tente novamente.';
+          errBox.classList.remove('hidden');
+        }
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.innerText = 'Entrar no Painel Admin';
+      }
+    }
+
+    function handleLogout() {
+      if (confirm('Deseja realmente sair do painel?')) {
+        try {
+          localStorage.removeItem('auth_token');
+          memoryToken = null;
+          document.cookie = 'auth_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        } catch (e) {}
+        window.location.href = '/';
+      }
     }
 
     // Global Data State
@@ -963,7 +1288,8 @@
         const res = await authFetch('/api/me');
         const json = await res.json();
         if (!json.success) return;
-        currentUser = json.data;
+        currentUser = json.user || json.data;
+        if (!currentUser) return;
 
         // User name
         const nameHeading = document.getElementById('userNameHeading');
@@ -974,14 +1300,24 @@
 
         // WhatsApp direct link
         const btnWa = document.getElementById('btnOpenWhatsAppDirect');
-        if (btnWa && currentUser.phone) {
-          btnWa.href = `https://wa.me/${currentUser.phone.replace(/\D/g, '')}`;
+        if (btnWa && (currentUser.phone || currentUser.phoneNumber)) {
+          const rawPhone = (currentUser.phone || currentUser.phoneNumber).replace(/\D/g, '');
+          btnWa.href = `https://wa.me/${rawPhone}`;
         }
 
-        // Admin badge
-        if (currentUser.role === 'ADMIN') {
+        // Admin badge & Marketing Studio button
+        const isAdmin = currentUser.role === 'ADMIN' || 
+                        currentUser.id === 1 || 
+                        (currentUser.phoneNumber && currentUser.phoneNumber.includes('951364159')) ||
+                        (currentUser.phone && currentUser.phone.includes('951364159'));
+
+        if (isAdmin) {
           const btnAdmin = document.getElementById('adminQuickBtn');
           if (btnAdmin) btnAdmin.classList.remove('hidden');
+          const btnMkt = document.getElementById('marketingQuickBtn');
+          if (btnMkt) btnMkt.classList.remove('hidden');
+          const btnMktAction = document.getElementById('adminMarketingActionBtn');
+          if (btnMktAction) btnMktAction.classList.remove('hidden');
         }
       } catch (err) {
         console.error('Erro loadMe:', err);
@@ -1583,6 +1919,251 @@
       } catch (e) { alert(e.message); }
     }
 
+    // ==========================================
+    // MARKETING STUDIO (ADMIN CONTROLLER)
+    // ==========================================
+    let mktCurrentTab = 'scripts';
+    let mktDataLoaded = false;
+    let mktCachedData = null;
+    let currentGeneratedScript = null;
+
+    function openMarketingModal() {
+      document.getElementById('marketingModal').classList.remove('hidden');
+      if (!mktDataLoaded) {
+        loadMarketingData();
+      }
+    }
+
+    function closeMarketingModal() {
+      document.getElementById('marketingModal').classList.add('hidden');
+    }
+
+    function switchMarketingTab(tab) {
+      mktCurrentTab = tab;
+      const tabs = ['scripts', 'hooks', 'ads', 'guide'];
+      tabs.forEach(t => {
+        const el = document.getElementById('mktTab' + t.charAt(0).toUpperCase() + t.slice(1));
+        const btn = document.getElementById('mktTabBtn' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (el) el.classList.toggle('hidden', t !== tab);
+        if (btn) {
+          if (t === tab) {
+            btn.className = 'px-3.5 py-1.5 rounded-full font-bold bg-purple-600 text-white shadow-sm flex items-center gap-1.5 shrink-0 transition';
+          } else {
+            btn.className = 'px-3.5 py-1.5 rounded-full font-bold text-zinc-400 hover:text-white hover:bg-zinc-800 flex items-center gap-1.5 shrink-0 transition';
+          }
+        }
+      });
+      lucide.createIcons();
+    }
+
+    async function loadMarketingData() {
+      try {
+        const res = await authFetch('/api/admin/marketing/data');
+        const json = await res.json();
+        if (!json.success) return;
+        mktDataLoaded = true;
+        mktCachedData = json.data;
+
+        renderMarketingHooks(mktCachedData.hooks || []);
+        renderMarketingAds(mktCachedData.adCopies || []);
+        renderMarketingGuide(mktCachedData.videoTips || []);
+
+        // Auto-generate initial script if empty
+        const container = document.getElementById('mktScriptOutputContainer');
+        if (container && !container.innerHTML.trim()) {
+          generateScriptWithAI();
+        }
+      } catch (e) {
+        console.error('Erro loadMarketingData:', e);
+      }
+    }
+
+    async function generateScriptWithAI() {
+      const btn = document.getElementById('btnGenerateScript');
+      const txt = document.getElementById('btnGenerateScriptText');
+      const format = document.getElementById('mktScriptFormat').value;
+      const duration = document.getElementById('mktScriptDuration').value;
+      const focusTopic = document.getElementById('mktScriptTopic').value;
+
+      if (btn) btn.disabled = true;
+      if (txt) txt.innerText = '⚡ Escrevendo roteiro com IA...';
+
+      try {
+        const res = await authFetch('/api/admin/marketing/generate-script', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ format, duration, focusTopic }),
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          currentGeneratedScript = json.data;
+          renderMarketingScript(json.data);
+        } else {
+          alert('Não foi possível gerar o roteiro.');
+        }
+      } catch (e) {
+        alert('Erro ao gerar: ' + e.message);
+      } finally {
+        if (btn) btn.disabled = false;
+        if (txt) txt.innerText = '⚡ Gerar Novo Roteiro com IA';
+        lucide.createIcons();
+      }
+    }
+
+    function renderMarketingScript(script) {
+      const container = document.getElementById('mktScriptOutputContainer');
+      if (!container || !script) return;
+
+      const scenesHtml = (script.scenes || []).map((sc, i) => `
+        <div class="p-3 bg-zinc-900/90 border border-zinc-800 rounded-xl space-y-1.5 text-xs">
+          <div class="flex items-center justify-between">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">Cena ${i + 1} (${sc.time || ''})</span>
+            ${sc.onScreenText ? `<span class="text-[10px] font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">Texto: "${sc.onScreenText}"</span>` : ''}
+          </div>
+          <p class="text-zinc-300"><b>👀 Visual:</b> ${sc.visual}</p>
+          <p class="text-[#ccff00]"><b>🗣️ Fala / Áudio:</b> "${sc.audio}"</p>
+        </div>
+      `).join('');
+
+      const fullScriptCopyText = `🎬 TÍTULO: ${script.title}\n` +
+        `🧲 GANCHO (0-3s): "${script.hook}"\n\n` +
+        `⏱️ CENAS:\n` +
+        (script.scenes || []).map((sc, i) => `Cena ${i + 1} (${sc.time}):\n- Visual: ${sc.visual}\n- Áudio: "${sc.audio}"\n- Texto na tela: ${sc.onScreenText || '-'}`).join('\n\n') +
+        `\n\n📝 LEGENDA DO POST:\n${script.caption}\n\n${script.hashtags}`;
+
+      container.innerHTML = `
+        <div class="p-4 rounded-2xl bg-zinc-900/60 border border-purple-900/50 space-y-3">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-purple-400">Roteiro Gerado</span>
+              <h3 class="text-sm font-extrabold text-white">${script.title}</h3>
+            </div>
+            <button onclick="copyToClipboard(this.getAttribute('data-copy'), this)" data-copy="${encodeURIComponent(fullScriptCopyText).replace(/'/g, '%27')}" class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1 shadow transition shrink-0">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Copiar Roteiro</span>
+            </button>
+          </div>
+
+          <!-- Hook Callout -->
+          <div class="p-3 rounded-xl bg-purple-950/40 border border-purple-800/60">
+            <p class="text-[10px] font-bold text-purple-300 uppercase tracking-wider">🧲 Gancho de Abertura (Primeiros 3 segundos):</p>
+            <p class="text-xs font-black text-white mt-0.5">"${script.hook}"</p>
+          </div>
+
+          <!-- Scenes Timeline -->
+          <div class="space-y-2">
+            <p class="text-[11px] font-bold text-zinc-400">Passo a Passo das Cenas:</p>
+            ${scenesHtml}
+          </div>
+
+          <!-- Caption & Hashtags -->
+          <div class="p-3 bg-zinc-900 rounded-xl border border-zinc-800 space-y-1 text-xs">
+            <p class="text-[10px] font-bold text-zinc-400">📝 Legenda Pronta para o Post:</p>
+            <p class="text-zinc-300 whitespace-pre-line text-[11px]">${script.caption}</p>
+            <p class="text-purple-400 font-mono text-[10px] pt-1">${script.hashtags}</p>
+          </div>
+
+          ${script.tips ? `
+            <div class="text-[11px] text-zinc-400 flex items-center gap-1.5 pt-1">
+              <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-amber-400 shrink-0"></i>
+              <span><b>Dica de Produção:</b> ${script.tips}</span>
+            </div>
+          ` : ''}
+        </div>
+      `;
+
+      lucide.createIcons();
+    }
+
+    function renderMarketingHooks(hooks) {
+      const container = document.getElementById('mktHooksList');
+      if (!container) return;
+      container.innerHTML = hooks.map((h, i) => `
+        <div class="p-3 bg-zinc-900/80 border border-zinc-800 hover:border-zinc-700 rounded-xl flex items-center justify-between gap-3 text-xs transition">
+          <div class="flex-1">
+            <span class="text-[10px] font-bold text-purple-400">${h.category}</span>
+            <p class="text-white font-medium mt-0.5">"${h.text}"</p>
+          </div>
+          <button onclick="copyToClipboard('${h.text.replace(/'/g, "\\'")}', this)" class="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition shrink-0" title="Copiar gancho">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    function renderMarketingAds(adCopies) {
+      const container = document.getElementById('mktAdsList');
+      if (!container) return;
+      container.innerHTML = adCopies.map(ad => {
+        const fullAd = `HEADLINE: ${ad.headline}\n\nTEXTO:\n${ad.primaryText}\n\nBOTÃO: ${ad.ctaText}`;
+        return `
+          <div class="p-4 bg-zinc-900/80 border border-zinc-800 rounded-2xl space-y-2.5 text-xs">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${ad.badge}</span>
+              <button onclick="copyToClipboard(this.getAttribute('data-copy'), this)" data-copy="${encodeURIComponent(fullAd).replace(/'/g, '%27')}" class="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-[11px] font-bold flex items-center gap-1 transition">
+                <i data-lucide="copy" class="w-3 h-3"></i>
+                <span>Copiar Anúncio</span>
+              </button>
+            </div>
+            <h4 class="font-extrabold text-white text-sm">${ad.title}</h4>
+            <div class="p-2.5 bg-black/60 rounded-xl border border-zinc-800/80 space-y-1">
+              <p class="text-purple-300 font-bold">Título do Anúncio (Headline):</p>
+              <p class="text-white">${ad.headline}</p>
+            </div>
+            <div class="space-y-1">
+              <p class="text-zinc-400 font-bold">Texto Principal (Copy):</p>
+              <p class="text-zinc-300 whitespace-pre-line text-[11px] leading-relaxed">${ad.primaryText}</p>
+            </div>
+            <div class="pt-1 text-[11px] text-zinc-400 flex items-center gap-1">
+              <span>👉 Botão de Ação:</span>
+              <span class="font-bold text-[#ccff00]">${ad.ctaText}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    function renderMarketingGuide(tips) {
+      const container = document.getElementById('mktGuideSteps');
+      if (!container) return;
+      container.innerHTML = tips.map((step, idx) => `
+        <div class="p-3 bg-zinc-900 border border-zinc-800 rounded-xl space-y-1 text-xs">
+          <p class="font-bold text-white flex items-center gap-1.5">
+            <span class="w-5 h-5 rounded-full bg-[#ccff00] text-black flex items-center justify-center font-black text-[10px]">${idx + 1}</span>
+            <span>${step.step}</span>
+          </p>
+          <p class="text-zinc-400 text-[11px] pl-6">${step.desc}</p>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    function copyToClipboard(encodedOrPlainText, btnElement = null) {
+      let text = encodedOrPlainText;
+      try {
+        if (text && text.includes('%')) {
+          text = decodeURIComponent(text);
+        }
+      } catch (e) {}
+
+      navigator.clipboard.writeText(text).then(() => {
+        if (btnElement) {
+          const original = btnElement.innerHTML;
+          btnElement.innerHTML = '<span class="text-[#ccff00] font-bold">✓ Copiado!</span>';
+          setTimeout(() => {
+            btnElement.innerHTML = original;
+            lucide.createIcons();
+          }, 2000);
+        } else {
+          alert('Copiado para a área de transferência!');
+        }
+      }).catch(() => {
+        alert('Copiado com sucesso!');
+      });
+    }
+
     // Master Refresh
     function loadAll() {
       loadMe();
@@ -1593,9 +2174,13 @@
     }
 
     // Init
-    loadAll();
-    lucide.createIcons();
-    setInterval(loadAll, 8000);
+    if (!getActiveToken()) {
+      showUnauthorizedScreen();
+    } else {
+      loadAll();
+      lucide.createIcons();
+      setInterval(loadAll, 8000);
+    }
   </script>
 </body>
 </html>
