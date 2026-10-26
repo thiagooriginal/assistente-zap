@@ -580,83 +580,170 @@ Preencha a descrição resumida no campo "transcription".`;
 }
 
 /**
+ * Niche profiles for high-converting marketing video scripts
+ */
+const NICHE_PROFILES = {
+  SALON: {
+    name: 'Salão de Beleza, Cabeleireira & Barbearia',
+    pain: 'Clientes que marcam horário e não comparecem (furos na agenda), perder horas do dia respondendo "qual o valor da escova?" no WhatsApp e agenda desorganizada.',
+    solution: 'Assistente de IA no WhatsApp que responde em 3 segundos, fecha horários na agenda, envia confirmação automática 24h antes e recupera clientes sumidos.',
+    hookSample: 'Quantos clientes marcaram horário no seu salão essa semana e simplesmente não apareceram?',
+    userMsgSample: 'Oi, tem horário pra corte e mechas no sábado às 14h?',
+    botMsgSample: '✅ Horário confirmado para sábado às 14h com a Jéssica! Te esperamos! 💇‍♀️'
+  },
+  CLINIC: {
+    name: 'Clínica & Consultório (Odontologia, Médica, Estética)',
+    pain: 'Consultas perdidas por falta de confirmação, cadeira vazia dando prejuízo, recepcionista sobrecarregada sem tempo de atender quem está na sala de espera.',
+    solution: 'Assistente de IA que envia lembrete de confirmação de consulta no WhatsApp, permite remarcar com 1 clique e faz a triagem inicial do paciente.',
+    hookSample: 'Cada paciente que falta na sua clínica custa pelo menos R$ 200 para o seu bolso. Olha como acabar com isso.',
+    userMsgSample: 'Gostaria de agendar uma avaliação com o dentista essa semana.',
+    botMsgSample: '🩺 Olá! Temos vaga na quinta às 10h ou sexta às 15h. Qual horário fica melhor para você?'
+  },
+  RESTAURANT: {
+    name: 'Restaurante, Hamburgueria & Delivery',
+    pain: 'Cliente com fome esperando 15 minutos para receber o cardápio no WhatsApp e desistindo de comprar para pedir no concorrente.',
+    solution: 'Atendimento instantâneo com envio de cardápio digital, tira-dúvidas de ingredientes e pedidos automáticos pelo WhatsApp.',
+    hookSample: 'Se você demora mais de 2 minutos para responder um cliente no delivery, você está jogando vendas no lixo.',
+    userMsgSample: 'Boa noite! Quero pedir 2 smash burgers e uma batata frita.',
+    botMsgSample: '🍔 Pedido anotado! Deseja adicionar refrigerante por apenas R$ 5,00? Qual seu endereço para entrega?'
+  },
+  LEGAL: {
+    name: 'Advocacia & Escritórios Jurídicos',
+    pain: 'Leads curiosos tomando o tempo do advogado, perder clientes que mandam mensagem à noite ou no final de semana quando o escritório está fechado.',
+    solution: 'Triagem jurídica 24h por dia no WhatsApp, qualificação do tipo de processo e agendamento da reunião direto na agenda.',
+    hookSample: 'Advogado, pare de perder tempo atendendo curioso que não tem dinheiro para pagar seus honorários.',
+    userMsgSample: 'Preciso de orientação sobre rescisão de contrato de trabalho.',
+    botMsgSample: '⚖️ Olá! Para direcionar seu caso ao especialista correto, por favor me informe: o contrato era CLT ou PJ?'
+  },
+  REAL_ESTATE: {
+    name: 'Imobiliária & Corretores de Imóveis',
+    pain: 'Demora para enviar fotos e fichas de imóveis, leads de portais esfriando e visitas desmarcadas em cima da hora.',
+    solution: 'IA que filtra o orçamento e bairro desejado, envia fotos em segundos e agenda visitas presenciais no calendário do corretor.',
+    hookSample: 'O corretor que responde o lead em menos de 1 minuto fecha até 4x mais vendas. Veja como.',
+    userMsgSample: 'Procuro apartamento de 2 quartos no Jardins até R$ 800 mil.',
+    botMsgSample: '🏢 Encontrei 3 opções perfeitas no seu perfil! Deseja ver as fotos ou agendar uma visita amanhã?'
+  },
+  MECHANIC: {
+    name: 'Oficina Mecânica & Estética Automotiva',
+    pain: 'Cliente ligando o dia inteiro para saber se o carro está pronto e falta de controle nos avisos de troca de óleo e revisão preventiva.',
+    solution: 'Avisos automáticos de status do veículo ("Seu carro está pronto!"), envio de orçamentos e lembretes de revisão periódica.',
+    hookSample: 'Como tripliquei o retorno de clientes na minha oficina sem gastar 1 real em anúncios.',
+    userMsgSample: 'Boa tarde, o Uno preto da placa final 42 já finalizou a revisão?',
+    botMsgSample: '🚗 Olá! Sim, a revisão foi concluída com sucesso e seu carro já está pronto para retirada!'
+  },
+  FITNESS: {
+    name: 'Academia, Personal Trainer & Pilates',
+    pain: 'Alunos matriculados que desistem após o primeiro mês, agendas de aulas experimentais desorganizadas e cobrança manual de mensalidade.',
+    solution: 'Agendamento de aulas experimentais, lembretes motivacionais de frequência e renovação de planos.',
+    hookSample: 'Como as academias modernas estão acabando com o cancelamento de alunos usando IA no WhatsApp.',
+    userMsgSample: 'Quero fazer uma aula experimental de Pilates amanhã.',
+    botMsgSample: '💪 Excelente escolha! Reservei sua vaga para a aula das 18h com a professora Ana. Leve uma toalha e garrafinha!'
+  },
+  FINANCE: {
+    name: 'Finanças Pessoais & Autônomos (Assistente Zap)',
+    pain: 'Perder tempo preenchendo planilha, esquecer de pagar boleto no vencimento e pagar juros sem necessidade.',
+    solution: 'Registro instantâneo de entradas e gastos por áudio ou foto de comprovante no WhatsApp e alertas de contas a pagar.',
+    hookSample: 'Se você ainda perde tempo anotando gastos em planilha em 2026, você tá fazendo tudo errado.',
+    userMsgSample: 'Gastei 45 no almoço no débito e conta de luz de 180 vence sexta',
+    botMsgSample: '✅ R$ 45,00 em Alimentação registrado! 💳 Boleto de R$ 180,00 agendado para sexta com alerta 24h antes.'
+  },
+  GENERAL: {
+    name: 'Negócios em Geral & Prestadores de Serviços (RAIA)',
+    pain: 'Perder clientes por demora no atendimento e trabalhar até tarde respondendo WhatsApp em vez de focar no crescimento.',
+    solution: 'Colaborador de Inteligência Artificial treinado para o seu negócio, atendendo clientes 24h por dia pelo WhatsApp.',
+    hookSample: 'Você não precisa contratar mais funcionários para dobrar o atendimento da sua empresa.',
+    userMsgSample: 'Olá, gostaria de saber como funciona o serviço de vocês.',
+    botMsgSample: '👋 Olá! Atendemos com colaboradores de Inteligência Artificial prontos para automatizar seu WhatsApp. Qual seu segmento?'
+  }
+};
+
+/**
  * Fallback script templates in case Gemini is offline or experiencing latency
  */
-function getFallbackScript(format = 'SCREEN_DEMO', duration = '30s', focusTopic = 'FINANCE') {
+function getFallbackScript(format = 'SCREEN_DEMO', duration = '30s', niche = 'SALON', customPrompt = '') {
+  const profile = NICHE_PROFILES[niche] || NICHE_PROFILES.SALON;
   return {
-    title: 'POV: Você demitiu a planilha chata do Excel',
-    hook: 'Se você ainda perde tempo anotando gastos em planilha, você está fazendo tudo errado.',
+    title: `Vídeo para ${profile.name}: Automatizando o WhatsApp`,
+    hook: profile.hookSample,
     duration: duration,
     format: format,
     scenes: [
       {
         time: '0s - 3s',
-        visual: 'Pessoa com cara de desânimo olhando para uma planilha do Excel cheia de abas no computador.',
-        audio: 'Se você ainda perde tempo abrindo planilha para anotar cada cafezinho, para tudo.',
-        onScreenText: '🚨 PARE DE USAR PLANILHA AGORA'
+        visual: `Pessoa dona de ${profile.name.toLowerCase()} frustrada com celular na mão recebendo dezenas de mensagens acumuladas.`,
+        audio: profile.hookSample,
+        onScreenText: `🚨 ATENÇÃO: DONOS DE ${profile.name.toUpperCase().split(',')[0]}`
       },
       {
         time: '3s - 15s',
-        visual: 'Câmera foca na tela do celular abrindo o WhatsApp do Assistente e você mandando um áudio: "Gastei 45 no almoço no débito e amanhã tenho reunião às 14h".',
-        audio: 'Hoje eu só mando um áudio de 3 segundos no meu WhatsApp... e olha o que acontece.',
-        onScreenText: '🎙️ Só mandar um áudio de 3s no WhatsApp'
+        visual: `Mostra a tela do celular abrindo o WhatsApp com a IA respondendo o cliente na velocidade da luz. Cliente: "${profile.userMsgSample}"`,
+        audio: `Enquanto você está trabalhando, a Inteligência Artificial atende o cliente na hora, tira as dúvidas e fecha o agendamento em segundos.`,
+        onScreenText: '⚡ Resposta automática em 3 segundos'
       },
       {
         time: '15s - 24s',
-        visual: 'O Assistente responde instantaneamente: "✅ Gasto de R$ 45,00 registrado em Alimentação (Débito) e 📅 Reunião agendada na sua agenda!". Mostra o painel escuro com gráficos atualizados.',
-        audio: 'Ele categoriza tudo sozinho, calcula meu saldo, avisa das minhas contas a pagar e ainda atualiza minha agenda do Google.',
-        onScreenText: '⚡ IA organiza gastos e agenda na hora'
+        visual: `A IA responde: "${profile.botMsgSample}". Mostra a agenda do Google atualizando e a confirmação enviada.`,
+        audio: `Ela confirma o horário, lembra o cliente antes para você nunca mais levar bolo e ainda mantém seu negócio funcionando 24h por dia.`,
+        onScreenText: '📅 Confirmação automática e zero faltas'
       },
       {
         time: '24s - 30s',
-        visual: 'Pessoa sorrindo e apontando para o link na bio com o celular na mão.',
-        audio: 'Toca no link da minha bio agora e teste por 7 dias grátis no seu próprio WhatsApp.',
-        onScreenText: '👉 Teste 7 dias grátis no link da bio'
+        visual: 'Dono do negócio sorrindo com a agenda cheia e apontando para o link na bio.',
+        audio: 'Quer ter esse assistente de IA trabalhando no WhatsApp da sua empresa? Toque no link da bio e faça seu teste grátis.',
+        onScreenText: '👉 Teste grátis no link da bio'
       }
     ],
-    caption: 'Chega de esquecer onde foi o seu dinheiro no final do mês ou passar horas alimentando planilhas chatas. 🤯\n\nAgora você só manda um áudio ou foto de comprovante no WhatsApp e o Assistente organiza suas finanças, seus boletos e sua agenda automaticamente!\n\n👇 Toque no link da bio e ative seu teste de 7 dias grátis agora mesmo!',
-    hashtags: '#financas #whatsapp #inteligenciaartificial #produtividade #organizacaofinanceira #rendaextra #microempreendedor #dicasdegestao',
-    tips: 'Grave a tela do seu celular com o WhatsApp aberto. Use o CapCut para gerar as legendas automáticas animadas em 1 minuto sem custo.'
+    caption: `Você sabia que a cada 10 clientes que chamam no WhatsApp, 6 desistem se demorarem mais de 5 minutos para receber resposta? 🤯\n\nCom o nosso Assistente de IA para ${profile.name}, você tem um colaborador virtual que atende em segundos, confirma horários e fecha clientes 24h por dia!\n\n👇 Toque no link da bio e ative seu teste agora!`,
+    hashtags: `#${niche.toLowerCase()} #inteligenciaartificial #atendimento #whatsapp #produtividade #vendas #gestaoempresarial #raia`,
+    tips: customPrompt ? `Foco solicitado: ${customPrompt}` : 'Grave a tela do WhatsApp mostrando a agilidade da resposta da IA. Use o CapCut para gerar as legendas automáticas em amarelo neon.'
   };
 }
 
-async function generateMarketingScript({ format = 'SCREEN_DEMO', duration = '30s', focusTopic = 'FINANCE' } = {}) {
+async function generateMarketingScript({ format = 'SCREEN_DEMO', duration = '30s', focusTopic = 'SALON', niche = 'SALON', customPrompt = '' } = {}) {
+  const chosenNiche = niche || focusTopic || 'SALON';
+  const profile = NICHE_PROFILES[chosenNiche] || NICHE_PROFILES.SALON;
+
   try {
     const ai = getGenAI();
     const model = ai.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
-    const prompt = `Você é um Diretor de Criação de Vídeos Virais e Estrategista de Marketing para SaaS e Micro-SaaS no Brasil.
-O produto promovido é o "Assistente Zap": um assistente pessoal inteligente no WhatsApp brasileiro que organiza finanças pessoais e empresariais por áudio e fotos de comprovantes, gerencia boletos/contas com lembretes pontuais e agenda reuniões no Google Calendar.
-Preço: R$ 29,00/mês com 7 dias grátis de teste.
+    const prompt = `Você é um Diretor de Criação de Vídeos Virais e Estrategista de Marketing para a plataforma "RAIA" (RH dos Assistentes de Inteligência Artificial).
+A RAIA entrega assistentes e colaboradores digitais inteligentes no WhatsApp para empresas e profissionais autônomos.
 
-Crie um ROTEIRO DE VÍDEO CURTO DE ALTA RETENÇÃO E CONVERSÃO (estilo Reels, TikTok e YouTube Shorts).
-- Formato solicitado: ${format} (SCREEN_DEMO - tela gravando o WhatsApp, TALKING_AVATAR - pessoa falando, PAIN_RELIEF - dor vs alívio, VS_SPREADSHEET - demitindo a planilha)
+SEGMENTO ESCOLHIDO PARA ESTE VÍDEO:
+- Nicho / Mercado: ${profile.name}
+- Principal Dor do Nicho: ${profile.pain}
+- Como o Assistente de IA resolve: ${profile.solution}
+${customPrompt ? `\n[INSTRUÇÃO PERSONALIZADA DO USUÁRIO]:\n"${customPrompt}"\nUse esta instrução com PRIORIDADE MÁXIMA para moldar o tema, os exemplos, as dores e a proposta do vídeo!\n` : ''}
+
+PARÂMETROS DO VÍDEO:
+- Formato: ${format} (SCREEN_DEMO - tela gravando o WhatsApp, TALKING_AVATAR - pessoa ou avatar falando, PAIN_RELIEF - dor vs alívio, VS_SPREADSHEET - demitindo o método antigo)
 - Duração: ${duration} (15s, 30s ou 45s)
-- Tema/Foco: ${focusTopic}
 
-Requisitos:
-- Gancho (Hook) irresistível nos primeiros 3 segundos.
-- Linguagem dinâmica, natural e persuasiva em português do Brasil.
-- Cenas detalhadas com tempo, o que mostrar na tela, fala/áudio sugerido e texto em destaque na tela.
-- Chamada para Ação (CTA) clara para testar 7 dias grátis no link da bio / WhatsApp.
+REQUISITOS DO ROTEIRO:
+1. Gancho (Hook) ultra-atraente nos primeiros 3 segundos direcionado diretamente para donos ou clientes de ${profile.name}.
+2. Cenas práticas e dinâmicas com marcação de tempo, descrição visual do que mostrar na tela, fala/áudio realista e texto curto para colocar em destaque na tela (estilo Reels/TikTok).
+3. Chamada para Ação (CTA) forte e irresistível para chamar no WhatsApp / link da bio para testar o assistente.
+4. Linguagem autêntica, brasileira, dinâmica e persuasiva.
 
-Retorne EXCLUSIVAMENTE um objeto JSON válido:
+Retorne EXCLUSIVAMENTE um objeto JSON válido (sem blocos markdown extras):
 {
-  "title": "...",
-  "hook": "...",
+  "title": "Título chamativo do roteiro",
+  "hook": "Frase de impacto dos primeiros 3 segundos",
   "duration": "${duration}",
   "format": "${format}",
+  "niche": "${profile.name}",
   "scenes": [
     {
       "time": "0s - 3s",
-      "visual": "...",
-      "audio": "...",
-      "onScreenText": "..."
+      "visual": "O que aparece na tela",
+      "audio": "O que a pessoa ou voz fala",
+      "onScreenText": "Texto chamativo na tela"
     }
   ],
-  "caption": "...",
-  "hashtags": "...",
-  "tips": "..."
+  "caption": "Texto completo para a legenda do Instagram/TikTok com emojis",
+  "hashtags": "#hashtags #relevantes",
+  "tips": "Dica prática de gravação e edição"
 }`;
 
     const res = await model.generateContent(prompt);
@@ -665,10 +752,10 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido:
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
     }
-    return getFallbackScript(format, duration, focusTopic);
+    return getFallbackScript(format, duration, chosenNiche, customPrompt);
   } catch (err) {
     console.error('[Marketing Studio AI Error]:', err.message);
-    return getFallbackScript(format, duration, focusTopic);
+    return getFallbackScript(format, duration, chosenNiche, customPrompt);
   }
 }
 

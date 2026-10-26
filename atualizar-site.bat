@@ -2,7 +2,7 @@
 chcp 65001 > nul
 title Atualizar Assistente Zap - GitHub e Easypanel
 echo ========================================================
-echo   ATUALIZANDO ASSISTENTE ZAP (ESTUDIO DE VIDEOS IA)
+echo   ATUALIZANDO ASSISTENTE ZAP (ESTUDIO RAIA & NICHOS IA)
 echo ========================================================
 echo.
 cd /d "c:\Users\Acer\Downloads\assistente zap"
@@ -10,8 +10,8 @@ cd /d "c:\Users\Acer\Downloads\assistente zap"
 echo [1/3] Adicionando arquivos alterados...
 git add .
 
-echo [2/3] Criando versao com Criador de Videos WhatsApp e Avatares IA...
-git commit -m "feat: adicionar criador de videos whatsapp reels e avatar IA"
+echo [2/3] Criando versao com seletor de nichos e prompt personalizado...
+git commit -m "feat: seletor de nichos de negocios (salao, clinica, etc) e prompt customizado no gerador de roteiros e videos"
 
 echo [3/3] Enviando para o GitHub...
 git push

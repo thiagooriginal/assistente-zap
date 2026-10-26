@@ -470,9 +470,9 @@ app.post('/api/admin/marketing/generate-script', authMiddleware, async (req, res
     return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
   }
 
-  const { format, duration, focusTopic } = req.body || {};
+  const { format, duration, focusTopic, niche, customPrompt } = req.body || {};
   try {
-    const script = await aiService.generateMarketingScript({ format, duration, focusTopic });
+    const script = await aiService.generateMarketingScript({ format, duration, focusTopic, niche, customPrompt });
     res.json({ success: true, data: script });
   } catch (err) {
     console.error('Erro /api/admin/marketing/generate-script:', err);

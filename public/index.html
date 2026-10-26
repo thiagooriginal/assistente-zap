@@ -951,7 +951,30 @@
           <!-- Generator Form -->
           <div class="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 space-y-3">
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              <div>
+              <!-- Nicho / Segmento do Negócio -->
+              <div class="sm:col-span-3">
+                <label class="block text-[11px] font-bold text-purple-300 mb-1 flex items-center justify-between">
+                  <span class="flex items-center gap-1.5">
+                    <i data-lucide="briefcase" class="w-3.5 h-3.5 text-purple-400"></i>
+                    <span>Nicho / Segmento do Assistente IA (RAIA)</span>
+                  </span>
+                  <span class="text-[9px] bg-purple-500/20 text-purple-200 px-2 py-0.5 rounded-full border border-purple-500/30">Escolha o Tema</span>
+                </label>
+                <select id="mktScriptNiche" onchange="updateNichePromptPlaceholder()" class="w-full px-3 py-2.5 bg-zinc-800/90 border border-zinc-700/80 rounded-xl text-xs text-white font-medium focus:outline-none focus:border-purple-500">
+                  <option value="SALON">💇‍♀️ Salão de Beleza, Cabeleireira & Barbearia (Agenda e confirmação 24h)</option>
+                  <option value="CLINIC">🦷 Clínicas Médicas & Odontologia (Zero furos e triagem no WhatsApp)</option>
+                  <option value="RESTAURANT">🍔 Restaurante, Hamburgueria & Delivery (Cardápio, mesa e pedidos rápidos)</option>
+                  <option value="LEGAL">⚖️ Advocacia & Escritório Jurídico (Qualificação de leads e atendimento 24h)</option>
+                  <option value="REAL_ESTATE">🏡 Imobiliária & Corretores (Envio de imóveis, filtros e agendamentos)</option>
+                  <option value="MECHANIC">🚗 Oficina Mecânica & Lava Rápido (Aviso de carro pronto e orçamento)</option>
+                  <option value="FITNESS">💪 Academia, Personal & Pilates (Renovação de planos e check-in)</option>
+                  <option value="FINANCE">💰 Finanças Pessoais & Autônomos (Jarvis Financeiro por Áudio/Foto)</option>
+                  <option value="GENERAL" selected>🏢 Negócios em Geral (RAIA - Assistente Digital Colaborador 24h)</option>
+                </select>
+              </div>
+
+              <!-- Formato do Vídeo -->
+              <div class="sm:col-span-2">
                 <label class="block text-[11px] font-bold text-zinc-400 mb-1">Formato do Vídeo</label>
                 <select id="mktScriptFormat" class="w-full px-3 py-2 bg-zinc-800/90 border border-zinc-700/80 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500">
                   <option value="SCREEN_DEMO">📱 Gravação de Tela (WhatsApp)</option>
@@ -960,23 +983,29 @@
                   <option value="PAIN_RELIEF">⚡ Dor vs Alívio Rápido</option>
                 </select>
               </div>
+
+              <!-- Duração -->
               <div>
                 <label class="block text-[11px] font-bold text-zinc-400 mb-1">Duração</label>
                 <select id="mktScriptDuration" class="w-full px-3 py-2 bg-zinc-800/90 border border-zinc-700/80 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500">
-                  <option value="15s">15 segundos (Rápido / Dinâmico)</option>
-                  <option value="30s" selected>30 segundos (Ideal Reels/TikTok)</option>
+                  <option value="15s">15 segundos (Rápido)</option>
+                  <option value="30s" selected>30 segundos (Reels/TikTok)</option>
                   <option value="45s">45 segundos (Aprofundado)</option>
                 </select>
               </div>
-              <div>
-                <label class="block text-[11px] font-bold text-zinc-400 mb-1">Foco / Tema</label>
-                <select id="mktScriptTopic" class="w-full px-3 py-2 bg-zinc-800/90 border border-zinc-700/80 rounded-xl text-xs text-white focus:outline-none focus:border-purple-500">
-                  <option value="FINANCE">💰 Gastos por Áudio & Foto</option>
-                  <option value="BILLS">💳 Boletos & Contas Sem Juros</option>
-                  <option value="CALENDAR">⏰ Agenda & Compromissos</option>
-                  <option value="ALL_IN_ONE" selected>🚀 Visão Geral / Tudo em Um</option>
-                </select>
+            </div>
+
+            <!-- Custom Prompt Field -->
+            <div>
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
+                  <i data-lucide="edit-3" class="w-3.5 h-3.5 text-purple-400"></i>
+                  <span>Instruções Personalizadas / Seu Prompt</span>
+                  <span class="text-[9px] text-zinc-500 font-normal">(Opcional)</span>
+                </label>
+                <span class="text-[10px] text-purple-400 font-medium">Refina o roteiro com IA</span>
               </div>
+              <textarea id="mktCustomPrompt" rows="2" placeholder="Ex: Focar na redução de 40% nas faltas de clientes com confirmação automática, tom descontraído e promoção de terça..." class="w-full px-3 py-2 bg-zinc-800/90 border border-zinc-700/80 rounded-xl text-xs text-white placeholder-zinc-500 outline-none focus:border-purple-500 resize-none"></textarea>
             </div>
 
             <button id="btnGenerateScript" onclick="generateScriptWithAI()" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 hover:opacity-95 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-md active:scale-98 transition">
@@ -2382,12 +2411,34 @@
       }
     }
 
+    function updateNichePromptPlaceholder() {
+      const niche = document.getElementById('mktScriptNiche')?.value || 'GENERAL';
+      const promptInput = document.getElementById('mktCustomPrompt');
+      if (!promptInput) return;
+
+      const placeholders = {
+        'SALON': 'Ex: Focar em clientes que faltam e deixam a agenda furada, confirmação automática 24h antes e encaixes rápidos...',
+        'CLINIC': 'Ex: Reduzir em 40% as faltas em consultas médicas/odonto, triagem ágil e preparo de exames direto pelo WhatsApp...',
+        'RESTAURANT': 'Ex: Envio automático de cardápio digital, reservas sem espera e vendas diretas sem pagar 30% de taxa no iFood...',
+        'LEGAL': 'Ex: Triagem 24h de novos clientes no WhatsApp, qualificação de casos e atendimento imediato sem perder lead...',
+        'REAL_ESTATE': 'Ex: Filtro automático de imóveis (bairro, quartos, valor) e agendamento de visita direto na agenda do corretor...',
+        'MECHANIC': 'Ex: Notificação de carro pronto para retirada, aprovação de orçamento por foto e lembrete de revisão...',
+        'FITNESS': 'Ex: Cobrança amigável de mensalidade no Pix, aviso de renovação e recuperação de alunos sumidos há 15 dias...',
+        'FINANCE': 'Ex: Jarvis financeiro pessoal: anotação por áudio em 3 segundos, leitura de cupom fiscal e adeus planilhas...',
+        'GENERAL': 'Ex: Apresentar a RAIA como a contratação de um assistente digital perfeito que atende clientes 24h sem faltar...'
+      };
+
+      promptInput.placeholder = placeholders[niche] || placeholders['GENERAL'];
+    }
+
     async function generateScriptWithAI() {
       const btn = document.getElementById('btnGenerateScript');
       const txt = document.getElementById('btnGenerateScriptText');
-      const format = document.getElementById('mktScriptFormat').value;
-      const duration = document.getElementById('mktScriptDuration').value;
-      const focusTopic = document.getElementById('mktScriptTopic').value;
+      const format = document.getElementById('mktScriptFormat')?.value || 'SCREEN_DEMO';
+      const duration = document.getElementById('mktScriptDuration')?.value || '30s';
+      const niche = document.getElementById('mktScriptNiche')?.value || 'GENERAL';
+      const customPrompt = document.getElementById('mktCustomPrompt')?.value?.trim() || '';
+      const focusTopic = niche; // backwards compatibility
 
       if (btn) btn.disabled = true;
       if (txt) txt.innerText = '⚡ Escrevendo roteiro com IA...';
@@ -2396,21 +2447,20 @@
         const res = await authFetch('/api/admin/marketing/generate-script', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ format, duration, focusTopic }),
+          body: JSON.stringify({ format, duration, niche, focusTopic, customPrompt }),
         });
         const json = await res.json();
         if (json.success && json.data) {
           currentGeneratedScript = json.data;
           renderMarketingScript(json.data);
         } else {
-          alert('Não foi possível gerar o roteiro.');
+          alert('Não foi possível gerar o roteiro: ' + (json.error || 'Tente novamente.'));
         }
       } catch (e) {
         alert('Erro ao gerar: ' + e.message);
       } finally {
         if (btn) btn.disabled = false;
         if (txt) txt.innerText = '⚡ Gerar Novo Roteiro com IA';
-        lucide.createIcons();
       }
     }
 
