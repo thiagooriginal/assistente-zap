@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Assistente • Dashboard Financeiro Inteligente</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>RAIA Agentes • Estúdio & Assistentes de IA</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -82,11 +85,11 @@
 </head>
 <body class="min-h-screen bg-black text-white flex flex-col items-center selection:bg-[#ccff00] selection:text-black pb-28">
 
-  <!-- APP CONTAINER (Mobile Frame centered on desktop, 100% on mobile) -->
-  <div class="w-full max-w-md sm:max-w-lg mx-auto px-4 pt-4 sm:pt-6 space-y-4">
+  <!-- APP CONTAINER (Responsive Desktop & Mobile Frame) -->
+  <div class="w-full max-w-md md:max-w-5xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6 space-y-5">
     
     <!-- 1. TOP HEADER (Avatar, User Name, Privacy Eye, Assistente Pro Badge) -->
-    <header class="flex items-center justify-between py-2">
+    <header class="flex items-center justify-between py-2 border-b border-zinc-800/80 pb-3">
       <div class="flex items-center gap-3">
         <!-- Avatar with glowing border -->
         <div class="relative w-11 h-11 rounded-full p-[2px] bg-gradient-to-tr from-[#ccff00] via-purple-500 to-indigo-500 shrink-0 shadow-md">
@@ -108,9 +111,9 @@
 
       <!-- Plan Badge: Assistente Pro ⭐ -->
       <div class="flex items-center gap-2">
-        <button id="marketingQuickBtn" onclick="openMarketingModal()" class="px-3 py-1.5 text-xs font-extrabold bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 text-white hover:opacity-95 rounded-full border border-purple-400/40 transition flex items-center gap-1.5 shadow-md shadow-purple-600/20 active:scale-95">
+        <button id="marketingQuickBtn" onclick="openMarketingModal()" class="px-3.5 py-1.5 text-xs font-extrabold bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 text-white hover:opacity-95 rounded-full border border-purple-400/40 transition flex items-center gap-1.5 shadow-md shadow-purple-600/20 active:scale-95">
           <i data-lucide="video" class="w-3.5 h-3.5"></i>
-          <span>🚀 Marketing</span>
+          <span>🚀 Estúdio Marketing</span>
         </button>
         <button id="adminQuickBtn" onclick="openAdminModal()" class="px-2.5 py-1.5 text-xs font-bold bg-zinc-800 text-zinc-300 hover:text-white rounded-full border border-zinc-700 transition">
           Admin
@@ -126,373 +129,298 @@
     </header>
 
     <!-- BANNER DE DESTAQUE: ESTÚDIO DE MARKETING & VENDAS -->
-    <div onclick="openMarketingModal()" class="cursor-pointer p-4 rounded-3xl bg-gradient-to-r from-purple-950/70 via-indigo-950/60 to-zinc-900 border border-purple-500/40 hover:border-purple-400 shadow-xl shadow-purple-950/40 flex items-center justify-between active:scale-98 transition">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center text-white shadow-md shrink-0">
-          <i data-lucide="video" class="w-5 h-5"></i>
+    <div onclick="openMarketingModal()" class="cursor-pointer p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-purple-950/80 via-indigo-950/70 to-zinc-900 border border-purple-500/50 hover:border-purple-400 shadow-xl shadow-purple-950/40 flex items-center justify-between active:scale-98 transition">
+      <div class="flex items-center gap-3.5">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center text-white shadow-md shrink-0">
+          <i data-lucide="video" class="w-6 h-6"></i>
         </div>
         <div>
-          <h3 class="text-sm font-extrabold text-white flex items-center gap-1.5">
-            <span>Estúdio de Marketing & Vídeos</span>
-            <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-[#ccff00] text-black font-black uppercase">NOVO</span>
-          </h3>
-          <p class="text-[11px] text-zinc-300">Roteiros de 15s/30s com IA, ganchos virais e anúncios</p>
+          <div class="flex items-center gap-2">
+            <h3 class="text-base sm:text-lg font-extrabold text-white">Estúdio de Marketing & Vídeos IA</h3>
+            <span class="text-[9px] px-2 py-0.5 rounded-full bg-[#ccff00] text-black font-black uppercase">NOVO</span>
+          </div>
+          <p class="text-xs text-zinc-300">Roteiros com IA, simulação de vídeos no WhatsApp e Avatares realistas para qualquer nicho de assistente</p>
         </div>
       </div>
-      <div class="w-7 h-7 rounded-full bg-purple-900/60 flex items-center justify-center text-purple-300 shrink-0">
-        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+      <div class="flex items-center gap-2">
+        <span class="hidden sm:inline-block text-xs font-bold text-purple-300">Abrir Estúdio 🚀</span>
+        <div class="w-8 h-8 rounded-full bg-purple-900/60 flex items-center justify-center text-purple-300 shrink-0">
+          <i data-lucide="chevron-right" class="w-4 h-4"></i>
+        </div>
       </div>
     </div>
 
-    <!-- 2. TOTAL EM FATURAS / CONECTAR BANCOS (CAROUSEL BANNER) -->
-    <div class="pierre-card p-5 relative overflow-hidden">
-      <div class="flex items-center justify-between">
-        <button onclick="openSyncBanksModal()" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/60 text-xs font-semibold text-zinc-200 transition">
-          <i data-lucide="plus" class="w-3.5 h-3.5 text-zinc-400"></i>
-          <span>Conectar bancos</span>
-        </button>
+    <!-- MAIN RESPONSIVE DESKTOP GRID -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+      <!-- LEFT / MAIN COLUMN (KPIs, Cashflow, Features, Transactions) -->
+      <div class="lg:col-span-7 xl:col-span-8 space-y-4">
         
-        <!-- Pagination dots -->
-        <div class="flex items-center gap-1.5">
-          <span class="w-2 h-2 rounded-full bg-white"></span>
-          <span class="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
-        </div>
-      </div>
-
-      <div class="mt-4">
-        <p class="text-xs font-medium text-zinc-400">Total em faturas</p>
-        <p id="cardTotalFaturas" class="text-2xl font-black text-white mt-0.5 money-val">R$ 0,00</p>
-      </div>
-    </div>
-
-    <!-- 3. SALDO EM CONTAS & GASTOS DO MÊS (SPARKLINE CARDS) -->
-    <div class="grid grid-cols-1 gap-3.5">
-
-      <!-- Card: Saldo em contas -->
-      <div class="pierre-card p-5 flex items-center justify-between cursor-pointer" onclick="toggleBalanceScope()">
-        <div>
-          <div class="flex items-center gap-1 text-zinc-400 text-xs font-medium">
-            <span>Saldo em contas</span>
-            <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
-          </div>
-          <p id="cardSaldoContas" class="text-2xl sm:text-3xl font-black text-white mt-1 money-val">
-            R$ 278,13
-          </p>
-          
-          <!-- Bank Icons: Nubank Pill -->
-          <div class="flex items-center gap-1.5 mt-3">
-            <div class="w-7 h-7 rounded-full bg-[#820ad1] flex items-center justify-center text-white font-black text-[10px] shadow-sm">
-              Nu
+        <!-- 3 KPI Cards Row -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          <!-- 2. TOTAL EM FATURAS / CONECTAR BANCOS (CAROUSEL BANNER) -->
+          <div class="pierre-card p-5 relative overflow-hidden flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <button onclick="openSyncBanksModal()" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700/60 text-xs font-semibold text-zinc-200 transition">
+                <i data-lucide="plus" class="w-3 h-3 text-zinc-400"></i>
+                <span>Bancos</span>
+              </button>
+              <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-white"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
+              </div>
             </div>
-            <div class="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300">
-              <i data-lucide="wallet" class="w-3.5 h-3.5"></i>
+            <div class="mt-4">
+              <p class="text-xs font-medium text-zinc-400">Total em faturas</p>
+              <p id="cardTotalFaturas" class="text-2xl font-black text-white mt-0.5 money-val">R$ 0,00</p>
             </div>
           </div>
+
+          <!-- Card: Saldo em contas -->
+          <div class="pierre-card p-5 flex flex-col justify-between cursor-pointer" onclick="toggleBalanceScope()">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-1 text-zinc-400 text-xs font-medium">
+                <span>Saldo em contas</span>
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                🟢 Em caixa
+              </span>
+            </div>
+            <div class="mt-2">
+              <p id="cardSaldoContas" class="text-2xl font-black text-white money-val">
+                R$ 278,13
+              </p>
+              <div class="flex items-center gap-1.5 mt-2">
+                <div class="w-6 h-6 rounded-full bg-[#820ad1] flex items-center justify-center text-white font-black text-[9px] shadow-sm">
+                  Nu
+                </div>
+                <div class="w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700/60 flex items-center justify-center text-zinc-300">
+                  <i data-lucide="wallet" class="w-3 h-3"></i>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Card: Gastos do mês with Glowing Lime Sparkline -->
+          <div class="pierre-card p-5 relative overflow-hidden cursor-pointer flex flex-col justify-between" onclick="openTransactionsModal('expenses')">
+            <div class="flex items-center justify-between relative z-10">
+              <div>
+                <div class="flex items-center gap-1 text-zinc-400 text-xs font-medium">
+                  <span>Gastos do mês</span>
+                  <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                </div>
+                <p id="cardGastosMes" class="text-2xl font-black text-white mt-0.5 money-val">
+                  R$ 2.129,49
+                </p>
+              </div>
+            </div>
+            <div class="w-full h-12 mt-1 relative">
+              <svg class="w-full h-full overflow-visible sparkline-glow" viewBox="0 0 300 70" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="limeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stop-color="#ccff00" stop-opacity="0.35" />
+                    <stop offset="100%" stop-color="#ccff00" stop-opacity="0.0" />
+                  </linearGradient>
+                </defs>
+                <path id="sparklineArea" d="M0,60 Q50,45 100,50 T200,35 T300,10 L300,70 L0,70 Z" fill="url(#limeGradient)" />
+                <path id="sparklineLine" d="M0,60 Q50,45 100,50 T200,35 T300,10" fill="none" stroke="#ccff00" stroke-width="3" stroke-linecap="round" />
+                <circle cx="300" cy="10" r="4.5" fill="#ccff00" />
+              </svg>
+            </div>
+          </div>
         </div>
 
-        <div class="text-right">
-          <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            🟢 Em caixa
-          </span>
-        </div>
-      </div>
-
-      <!-- Card: Gastos do mês with Glowing Lime Sparkline -->
-      <div class="pierre-card p-5 relative overflow-hidden cursor-pointer" onclick="openTransactionsModal('expenses')">
-        <div class="flex items-center justify-between relative z-10">
-          <div>
-            <div class="flex items-center gap-1 text-zinc-400 text-xs font-medium">
-              <span>Gastos do mês</span>
+        <!-- 4. FLUXO DE CAIXA NAS CONTAS • ESTE MÊS -->
+        <div class="pierre-card p-5 space-y-4">
+          <div class="flex items-center justify-between cursor-pointer" onclick="openCashflowDetail()">
+            <p class="text-xs font-semibold text-zinc-400 flex items-center gap-1">
+              <span>Fluxo de Caixa nas Contas • este mês</span>
               <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
-            </div>
-            <p id="cardGastosMes" class="text-2xl sm:text-3xl font-black text-white mt-1 money-val">
-              R$ 2.129,49
             </p>
           </div>
-        </div>
-
-        <!-- Glowing Green Area Sparkline SVG -->
-        <div class="w-full h-16 mt-2 relative">
-          <svg class="w-full h-full overflow-visible sparkline-glow" viewBox="0 0 300 70" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="limeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stop-color="#ccff00" stop-opacity="0.35" />
-                <stop offset="100%" stop-color="#ccff00" stop-opacity="0.0" />
-              </linearGradient>
-            </defs>
-            <path id="sparklineArea" d="M0,60 Q50,45 100,50 T200,35 T300,10 L300,70 L0,70 Z" fill="url(#limeGradient)" />
-            <path id="sparklineLine" d="M0,60 Q50,45 100,50 T200,35 T300,10" fill="none" stroke="#ccff00" stroke-width="3" stroke-linecap="round" />
-            <circle cx="300" cy="10" r="4.5" fill="#ccff00" />
-          </svg>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- 4. FLUXO DE CAIXA NAS CONTAS • ESTE MÊS -->
-    <div class="pierre-card p-5 space-y-4">
-      <div class="flex items-center justify-between cursor-pointer" onclick="openCashflowDetail()">
-        <p class="text-xs font-semibold text-zinc-400 flex items-center gap-1">
-          <span>Fluxo de Caixa nas Contas • este mês</span>
-          <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
-        </p>
-      </div>
-
-      <!-- Entrada -->
-      <div class="space-y-1.5">
-        <div class="flex items-center justify-between text-xs">
-          <span class="font-bold text-white">Entrada</span>
-          <span id="cashflowEntradaVal" class="font-bold text-white money-val">R$ 2.400,40</span>
-        </div>
-        <div class="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
-          <div id="cashflowEntradaBar" class="h-full bg-[#ccff00] rounded-full transition-all duration-500" style="width: 100%;"></div>
-        </div>
-      </div>
-
-      <!-- Saída -->
-      <div class="space-y-1.5">
-        <div class="flex items-center justify-between text-xs">
-          <span class="font-bold text-white">Saída</span>
-          <span id="cashflowSaidaVal" class="font-bold text-[#ff4d4f] money-val">-R$ 2.129,49</span>
-        </div>
-        <div class="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
-          <div id="cashflowSaidaBar" class="h-full bg-[#ff4d4f] rounded-full transition-all duration-500" style="width: 88%;"></div>
-        </div>
-      </div>
-
-      <!-- Fluxo de caixa líquido -->
-      <div class="pt-2 border-t border-zinc-800/80 flex items-center justify-between">
-        <span class="text-xs font-bold text-white">Fluxo de caixa</span>
-        <span id="cashflowNetVal" class="text-sm font-black text-white money-val">R$ 270,91</span>
-      </div>
-    </div>
-
-    <!-- 5. 2x2 FEATURE CARDS GRID (Fatura, Limite, Parcelamentos, Assinaturas) -->
-    <div class="grid grid-cols-2 gap-3.5">
-      
-      <!-- Card: Fatura Atual -->
-      <div class="pierre-card p-4 flex flex-col justify-between cursor-pointer min-h-[135px]" onclick="openBillModal()">
-        <div class="flex items-center justify-between">
-          <div class="w-9 h-9 rounded-full bg-zinc-800/80 flex items-center justify-center text-zinc-300">
-            <i data-lucide="credit-card" class="w-4 h-4"></i>
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-white">Entrada</span>
+              <span id="cashflowEntradaVal" class="font-bold text-white money-val">R$ 2.400,40</span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
+              <div id="cashflowEntradaBar" class="h-full bg-[#ccff00] rounded-full transition-all duration-500" style="width: 100%;"></div>
+            </div>
           </div>
-          <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-500"></i>
-        </div>
-        <div>
-          <p class="text-[11px] font-medium text-zinc-400">Fatura Atual</p>
-          <p id="gridFaturaVal" class="text-base sm:text-lg font-black text-white mt-0.5 money-val">R$ 0,00</p>
-          <p id="gridFaturaSub" class="text-[10px] text-zinc-500 mt-0.5">Sem vencimento</p>
-        </div>
-      </div>
-
-      <!-- Card: Limite Usado -->
-      <div class="pierre-card p-4 flex flex-col justify-between cursor-pointer min-h-[135px]" onclick="openLimitModal()">
-        <div class="flex items-center justify-between">
-          <div class="w-9 h-9 rounded-full bg-zinc-800/80 flex items-center justify-center text-zinc-300">
-            <i data-lucide="circle-dashed" class="w-4 h-4"></i>
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-white">Saída</span>
+              <span id="cashflowSaidaVal" class="font-bold text-[#ff4d4f] money-val">-R$ 2.129,49</span>
+            </div>
+            <div class="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
+              <div id="cashflowSaidaBar" class="h-full bg-[#ff4d4f] rounded-full transition-all duration-500" style="width: 88%;"></div>
+            </div>
           </div>
-          <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-500"></i>
-        </div>
-        <div>
-          <p class="text-[11px] font-medium text-zinc-400">Limite usado</p>
-          <p id="gridLimiteVal" class="text-base sm:text-lg font-black text-white mt-0.5 money-val">R$ 0,00</p>
-          <p id="gridLimiteSub" class="text-[10px] text-zinc-500 mt-0.5 money-val">Disp: R$ 0,00</p>
-        </div>
-      </div>
-
-      <!-- Card: Parcelamentos -->
-      <div class="pierre-card p-4 flex flex-col justify-between cursor-pointer min-h-[135px]" onclick="openParcelasModal()">
-        <div class="flex items-center justify-between">
-          <div class="w-9 h-9 rounded-full bg-zinc-800/80 flex items-center justify-center text-zinc-300">
-            <i data-lucide="layers" class="w-4 h-4"></i>
+          <div class="pt-2 border-t border-zinc-800/80 flex items-center justify-between">
+            <span class="text-xs font-bold text-white">Fluxo de caixa líquido</span>
+            <span id="cashflowNetVal" class="text-sm font-black text-white money-val">R$ 270,91</span>
           </div>
-          <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-500"></i>
         </div>
-        <div>
-          <p id="gridParcelasSub" class="text-[10px] text-zinc-500">Sem dados disponíveis</p>
-          <p class="text-[11px] font-medium text-zinc-400 mt-0.5">Parcelamentos</p>
-          <p id="gridParcelasVal" class="text-base sm:text-lg font-black text-white mt-0.5">—</p>
-        </div>
-      </div>
 
-      <!-- Card: Assinaturas -->
-      <div class="pierre-card p-4 flex flex-col justify-between cursor-pointer min-h-[135px]" onclick="openAssinaturasModal()">
-        <div class="flex items-center justify-between">
-          <!-- iFood-like brand circle -->
-          <div class="w-9 h-9 rounded-full bg-[#ea1d2c] flex items-center justify-center text-white font-bold text-xs shadow-sm">
-            🍔
-          </div>
-          <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-500"></i>
-        </div>
-        <div>
-          <p class="text-[11px] font-medium text-zinc-400">Assinaturas</p>
-          <p id="gridAssinaturasVal" class="text-base sm:text-lg font-black text-white mt-0.5 money-val">R$ 5,95</p>
-          <p id="gridAssinaturasSub" class="text-[10px] text-zinc-500 mt-0.5">Próxima em 4 dias</p>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- 6. INSIGHT CARD: SEU DINHEIRO PARADO RENDE NO CDB -->
-    <div class="pierre-card p-5 relative overflow-hidden bg-gradient-to-b from-[#18181b] to-[#121214]">
-      <!-- Flying cash illustration top right -->
-      <div class="absolute right-4 top-4 w-16 h-14 pointer-events-none">
-        <svg viewBox="0 0 100 80" class="w-full h-full drop-shadow-lg">
-          <path d="M22 42 C8 15 -2 28 8 48 C14 55 24 48 22 42 Z" fill="#d8b4fe" opacity="0.85"/>
-          <path d="M78 42 C92 15 102 28 92 48 C86 55 76 48 78 42 Z" fill="#d8b4fe" opacity="0.85"/>
-          <rect x="24" y="28" width="52" height="32" rx="4" fill="#15803d" transform="rotate(-6 50 44)"/>
-          <rect x="25" y="24" width="50" height="32" rx="4" fill="#22c55e" transform="rotate(3 50 40)"/>
-          <rect x="26" y="20" width="48" height="30" rx="4" fill="#86efac"/>
-          <circle cx="50" cy="35" r="7" fill="#166534"/>
-          <!-- Cat face inside money -->
-          <circle cx="48" cy="34" r="1.2" fill="#fff"/>
-          <circle cx="52" cy="34" r="1.2" fill="#fff"/>
-        </svg>
-      </div>
-
-      <div class="pr-16">
-        <h3 class="text-sm font-bold text-white">Seu dinheiro parado rende no CDB</h3>
-        <p id="cdbInsightText" class="text-xs text-zinc-400 mt-0.5">
-          <span class="money-val font-semibold text-zinc-300">R$ 278,13</span> parado poderia render mais
-        </p>
-      </div>
-
-      <!-- Growth chart slope -->
-      <div class="w-full h-16 mt-4 relative">
-        <svg class="w-full h-full overflow-visible" viewBox="0 0 300 60" preserveAspectRatio="none">
-          <defs>
-            <linearGradient id="cdbGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stop-color="#84cc16" stop-opacity="0.3" />
-              <stop offset="100%" stop-color="#84cc16" stop-opacity="0.0" />
-            </linearGradient>
-          </defs>
-          <path d="M0,58 L100,50 L200,32 L300,5 L300,60 L0,60 Z" fill="url(#cdbGradient)" />
-          <path d="M0,58 L100,50 L200,32 L300,5" fill="none" stroke="#84cc16" stroke-width="2.5" stroke-linecap="round" />
-        </svg>
-      </div>
-    </div>
-
-    <!-- 7. CATEGORIAS & GRUPOS SECTION -->
-    <div class="pierre-card p-5 space-y-4">
-      
-      <!-- Segmented Control: [Categorias] | [Grupos] -->
-      <div class="flex items-center gap-2">
-        <div class="inline-flex p-1 bg-zinc-900 rounded-full border border-zinc-800">
-          <button id="segBtnCategorias" onclick="switchCategorySegment('categorias')" class="px-4 py-1.5 rounded-full text-xs font-bold bg-zinc-800 text-white shadow-sm transition">
-            Categorias
-          </button>
-          <button id="segBtnGrupos" onclick="switchCategorySegment('grupos')" class="px-4 py-1.5 rounded-full text-xs font-bold text-zinc-400 hover:text-white transition">
-            Grupos
-          </button>
-        </div>
-      </div>
-
-      <!-- Total Amount -->
-      <div>
-        <p id="catTotalSpent" class="text-3xl font-black text-white tracking-tight money-val">
-          R$ 2.129,49
-        </p>
-
-        <!-- Segmented Colored Multi-Bar -->
-        <div id="catMultiBar" class="flex h-2 w-full rounded-full overflow-hidden bg-zinc-800 gap-1 mt-3">
-          <div style="width: 50%" class="bg-[#10b981] rounded-full"></div>
-          <div style="width: 22%" class="bg-[#f59e0b] rounded-full"></div>
-          <div style="width: 21%" class="bg-[#ec4899] rounded-full"></div>
-          <div style="width: 7%" class="bg-[#3b82f6] rounded-full"></div>
-        </div>
-      </div>
-
-      <!-- Categories Rows List -->
-      <div id="categoriesListContainer" class="space-y-3.5 pt-1">
-        <!-- Rendered dynamically -->
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-[#10b981] flex items-center justify-center text-black font-bold">
-              <i data-lucide="banknote" class="w-5 h-5 text-black"></i>
+        <!-- 5. 4 FEATURE CARDS GRID (Fatura, Limite, Parcelamentos, Assinaturas) -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="pierre-card p-4 flex flex-col justify-between cursor-pointer min-h-[130px]" onclick="openBillModal()">
+            <div class="flex items-center justify-between">
+              <div class="w-8 h-8 rounded-full bg-zinc-800/80 flex items-center justify-center text-zinc-300">
+                <i data-lucide="credit-card" class="w-4 h-4"></i>
+              </div>
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-500"></i>
             </div>
             <div>
-              <p class="text-sm font-bold text-white">Finanças</p>
-              <p class="text-xs text-zinc-400">50%</p>
+              <p class="text-[11px] font-medium text-zinc-400">Fatura Atual</p>
+              <p id="gridFaturaVal" class="text-base font-black text-white mt-0.5 money-val">R$ 0,00</p>
+              <p id="gridFaturaSub" class="text-[10px] text-zinc-500 mt-0.5">Sem vencimento</p>
             </div>
           </div>
-          <p class="text-sm font-bold text-white money-val">R$ 1.075,00</p>
-        </div>
 
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-[#f59e0b] flex items-center justify-center text-black">
-              <i data-lucide="car" class="w-5 h-5 text-black"></i>
+          <div class="pierre-card p-4 flex flex-col justify-between cursor-pointer min-h-[130px]" onclick="openLimitModal()">
+            <div class="flex items-center justify-between">
+              <div class="w-8 h-8 rounded-full bg-zinc-800/80 flex items-center justify-center text-zinc-300">
+                <i data-lucide="circle-dashed" class="w-4 h-4"></i>
+              </div>
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-500"></i>
             </div>
             <div>
-              <p class="text-sm font-bold text-white">Transporte</p>
-              <p class="text-xs text-zinc-400">22%</p>
+              <p class="text-[11px] font-medium text-zinc-400">Limite usado</p>
+              <p id="gridLimiteVal" class="text-base font-black text-white mt-0.5 money-val">R$ 0,00</p>
+              <p id="gridLimiteSub" class="text-[10px] text-zinc-500 mt-0.5 money-val">Disp: R$ 0,00</p>
             </div>
           </div>
-          <p class="text-sm font-bold text-white money-val">R$ 467,98</p>
-        </div>
 
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-[#ec4899] flex items-center justify-center text-white">
-              <i data-lucide="shopping-bag" class="w-5 h-5 text-white"></i>
+          <div class="pierre-card p-4 flex flex-col justify-between cursor-pointer min-h-[130px]" onclick="openParcelasModal()">
+            <div class="flex items-center justify-between">
+              <div class="w-8 h-8 rounded-full bg-zinc-800/80 flex items-center justify-center text-zinc-300">
+                <i data-lucide="layers" class="w-4 h-4"></i>
+              </div>
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-500"></i>
             </div>
             <div>
-              <p class="text-sm font-bold text-white">Compras</p>
-              <p class="text-xs text-zinc-400">21%</p>
+              <p id="gridParcelasSub" class="text-[10px] text-zinc-500">Sem dados</p>
+              <p class="text-[11px] font-medium text-zinc-400 mt-0.5">Parcelamentos</p>
+              <p id="gridParcelasVal" class="text-base font-black text-white mt-0.5">—</p>
             </div>
           </div>
-          <p class="text-sm font-bold text-white money-val">R$ 457,62</p>
-        </div>
-      </div>
 
-      <!-- Expand/Collapse Button -->
-      <div class="text-center pt-2">
-        <button id="toggleMoreCategoriesBtn" onclick="toggleMoreCategories()" class="text-xs font-semibold text-zinc-400 hover:text-white transition inline-flex items-center gap-1">
-          <span id="moreCategoriesLabel">Ver mais categorias</span>
-          <i data-lucide="chevron-down" id="moreCategoriesIcon" class="w-3.5 h-3.5"></i>
-        </button>
-      </div>
-
-    </div>
-
-    <!-- 8. TRANSAÇÕES RECENTES SECTION -->
-    <div class="pierre-card p-5 space-y-4">
-      <div class="flex items-center justify-between cursor-pointer" onclick="openTransactionsModal('all')">
-        <h3 class="text-sm font-bold text-white flex items-center gap-1">
-          <span>Transações recentes</span>
-          <i data-lucide="chevron-right" class="w-4 h-4 text-zinc-500"></i>
-        </h3>
-        <button class="text-xs text-[#ccff00] font-semibold hover:underline">
-          Ver todas
-        </button>
-      </div>
-
-      <!-- Transaction Items List -->
-      <div id="recentTransactionsList" class="space-y-3 divide-y divide-zinc-800/60">
-        <!-- Loaded dynamically -->
-        <div class="text-center py-6 text-xs text-zinc-500">
-          Carregando transações...
-        </div>
-      </div>
-    </div>
-
-    <!-- 9. COMPROMISSOS DA AGENDA -->
-    <div class="pierre-card p-5 space-y-3">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <div class="w-7 h-7 rounded-full bg-cyan-500/15 text-cyan-400 flex items-center justify-center">
-            <i data-lucide="calendar" class="w-4 h-4"></i>
+          <div class="pierre-card p-4 flex flex-col justify-between cursor-pointer min-h-[130px]" onclick="openAssinaturasModal()">
+            <div class="flex items-center justify-between">
+              <div class="w-8 h-8 rounded-full bg-[#ea1d2c] flex items-center justify-center text-white font-bold text-xs shadow-sm">
+                🍔
+              </div>
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-zinc-500"></i>
+            </div>
+            <div>
+              <p class="text-[11px] font-medium text-zinc-400">Assinaturas</p>
+              <p id="gridAssinaturasVal" class="text-base font-black text-white mt-0.5 money-val">R$ 5,95</p>
+              <p id="gridAssinaturasSub" class="text-[10px] text-zinc-500 mt-0.5">Próxima em 4 dias</p>
+            </div>
           </div>
-          <h3 class="text-sm font-bold text-white">Próximos Compromissos</h3>
         </div>
-        <button onclick="openAppointmentModal()" class="text-xs font-bold text-cyan-400 hover:underline">
-          + Agendar
-        </button>
+
+        <!-- 8. TRANSAÇÕES RECENTES SECTION -->
+        <div class="pierre-card p-5 space-y-4">
+          <div class="flex items-center justify-between cursor-pointer" onclick="openTransactionsModal('all')">
+            <h3 class="text-sm font-bold text-white flex items-center gap-1">
+              <span>Transações recentes</span>
+              <i data-lucide="chevron-right" class="w-4 h-4 text-zinc-500"></i>
+            </h3>
+            <button class="text-xs text-[#ccff00] font-semibold hover:underline">
+              Ver todas
+            </button>
+          </div>
+          <div id="recentTransactionsList" class="space-y-3 divide-y divide-zinc-800/60">
+            <div class="text-center py-6 text-xs text-zinc-500">
+              Carregando transações...
+            </div>
+          </div>
+        </div>
+
       </div>
 
-      <div id="recentAppointmentsList" class="space-y-2 pt-1">
-        <!-- Rendered dynamically -->
+      <!-- RIGHT SIDEBAR COLUMN ON PC (Categorias, Agenda, Insight CDB) -->
+      <div class="lg:col-span-5 xl:col-span-4 space-y-4">
+        
+        <!-- 7. CATEGORIAS & GRUPOS SECTION -->
+        <div class="pierre-card p-5 space-y-4">
+          <div class="flex items-center gap-2">
+            <div class="inline-flex p-1 bg-zinc-900 rounded-full border border-zinc-800">
+              <button id="segBtnCategorias" onclick="switchCategorySegment('categorias')" class="px-4 py-1.5 rounded-full text-xs font-bold bg-zinc-800 text-white shadow-sm transition">
+                Categorias
+              </button>
+              <button id="segBtnGrupos" onclick="switchCategorySegment('grupos')" class="px-4 py-1.5 rounded-full text-xs font-bold text-zinc-400 hover:text-white transition">
+                Grupos
+              </button>
+            </div>
+          </div>
+          <div>
+            <p id="catTotalSpent" class="text-3xl font-black text-white tracking-tight money-val">
+              R$ 2.129,49
+            </p>
+            <div id="catMultiBar" class="flex h-2 w-full rounded-full overflow-hidden bg-zinc-800 gap-1 mt-3">
+              <div style="width: 50%" class="bg-[#10b981] rounded-full"></div>
+              <div style="width: 22%" class="bg-[#f59e0b] rounded-full"></div>
+              <div style="width: 21%" class="bg-[#ec4899] rounded-full"></div>
+              <div style="width: 7%" class="bg-[#3b82f6] rounded-full"></div>
+            </div>
+          </div>
+          <div id="categoriesListContainer" class="space-y-3.5 pt-1">
+            <!-- Loaded dynamically -->
+          </div>
+          <div class="text-center pt-2">
+            <button id="toggleMoreCategoriesBtn" onclick="toggleMoreCategories()" class="text-xs font-semibold text-zinc-400 hover:text-white transition inline-flex items-center gap-1">
+              <span id="moreCategoriesLabel">Ver mais categorias</span>
+              <i data-lucide="chevron-down" id="moreCategoriesIcon" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- 9. COMPROMISSOS DA AGENDA -->
+        <div class="pierre-card p-5 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-full bg-cyan-500/15 text-cyan-400 flex items-center justify-center">
+                <i data-lucide="calendar" class="w-4 h-4"></i>
+              </div>
+              <h3 class="text-sm font-bold text-white">Próximos Compromissos</h3>
+            </div>
+            <button onclick="openAppointmentModal()" class="text-xs font-bold text-cyan-400 hover:underline">
+              + Agendar
+            </button>
+          </div>
+          <div id="recentAppointmentsList" class="space-y-2 pt-1">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- 6. INSIGHT CARD: SEU DINHEIRO PARADO RENDE NO CDB -->
+        <div class="pierre-card p-5 relative overflow-hidden bg-gradient-to-b from-[#18181b] to-[#121214]">
+          <div class="pr-16">
+            <h3 class="text-sm font-bold text-white">Seu dinheiro parado rende no CDB</h3>
+            <p id="cdbInsightText" class="text-xs text-zinc-400 mt-0.5">
+              <span class="money-val font-semibold text-zinc-300">R$ 278,13</span> parado poderia render mais
+            </p>
+          </div>
+          <div class="w-full h-14 mt-3 relative">
+            <svg class="w-full h-full overflow-visible" viewBox="0 0 300 60" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="cdbGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stop-color="#84cc16" stop-opacity="0.3" />
+                  <stop offset="100%" stop-color="#84cc16" stop-opacity="0.0" />
+                </linearGradient>
+              </defs>
+              <path d="M0,58 L100,50 L200,32 L300,5 L300,60 L0,60 Z" fill="url(#cdbGradient)" />
+              <path d="M0,58 L100,50 L200,32 L300,5" fill="none" stroke="#84cc16" stroke-width="2.5" stroke-linecap="round" />
+            </svg>
+          </div>
+        </div>
+
       </div>
+
     </div>
 
   </div>
@@ -894,8 +822,8 @@
   <!-- ============================================================ -->
   <!-- MODAL: ESTÚDIO DE MARKETING (ADMIN INTERNO)                  -->
   <!-- ============================================================ -->
-  <div id="marketingModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-4">
-    <div class="bg-[#141416] border border-zinc-800 w-full max-w-2xl max-h-[90vh] rounded-[32px] p-5 sm:p-6 flex flex-col shadow-2xl">
+  <div id="marketingModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-5">
+    <div class="bg-[#141416] border border-zinc-800 w-full max-w-4xl lg:max-w-5xl max-h-[92vh] rounded-[32px] p-5 sm:p-7 flex flex-col shadow-2xl">
       <!-- Modal Header -->
       <div class="flex items-center justify-between pb-3 border-b border-zinc-800 shrink-0">
         <div class="flex items-center gap-2.5">
@@ -1032,6 +960,36 @@
             </div>
           </div>
 
+          <!-- Selector of which Assistant to simulate in the video -->
+          <div class="p-3.5 bg-gradient-to-r from-purple-950/40 via-zinc-900 to-indigo-950/40 border border-purple-800/50 rounded-2xl space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-black text-purple-200 flex items-center gap-1.5">
+                <i data-lucide="bot" class="w-4 h-4 text-purple-400"></i>
+                <span>Qual Assistente de IA você quer simular no vídeo?</span>
+              </label>
+              <span class="text-[9px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30 font-bold">Escolha Aqui</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <div class="sm:col-span-2">
+                <select id="studioAssistantNiche" onchange="applyStudioAssistantPreset(this.value)" class="w-full px-3 py-2.5 bg-zinc-800/90 border border-zinc-700 rounded-xl text-xs text-white font-medium focus:border-purple-500 outline-none">
+                  <option value="SALON">💇‍♀️ Salão de Beleza & Cabeleireira (Zero Furos na Agenda)</option>
+                  <option value="CLINIC">🦷 Clínicas Médicas & Odontologia (Confirmação & Triagem)</option>
+                  <option value="RESTAURANT">🍔 Restaurante & Delivery (Cardápio & Pedidos sem taxas)</option>
+                  <option value="LEGAL">⚖️ Advocacia & Escritório Jurídico (Triagem 24h & Qualificação)</option>
+                  <option value="REAL_ESTATE">🏡 Imobiliária & Corretores (Busca de Imóveis & Visitas)</option>
+                  <option value="MECHANIC">🚗 Oficina Mecânica & Estética Auto (Carro Pronto & Revisão)</option>
+                  <option value="FITNESS">💪 Academia, Personal & Pilates (Aulas & Renovação)</option>
+                  <option value="FINANCE">💰 Finanças Pessoais & Autônomos (Jarvis Financeiro)</option>
+                  <option value="GENERAL" selected>🏢 Negócios em Geral (RAIA - Assistente Colaborador 24h)</option>
+                </select>
+              </div>
+              <button type="button" id="btnStudioAiGen" onclick="generateStudioVideoWithAI()" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow transition active:scale-98">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                <span id="btnStudioAiGenText">✨ Novo com IA</span>
+              </button>
+            </div>
+          </div>
+
           <!-- Phone Canvas Container -->
           <div class="flex flex-col sm:flex-row gap-4 items-center sm:items-start justify-center">
             <!-- Simulated Smartphone Screen -->
@@ -1041,7 +999,7 @@
 
               <!-- Top Hook Banner on Video -->
               <div id="canvasVideoHook" class="px-2.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 text-white font-black text-[11px] text-center shadow-md shrink-0 leading-tight">
-                PARE DE USAR PLANILHA EM 2026! 🚀
+                DOBRE SEU ATENDIMENTO SEM CONTRATAR MAIS! 🚀
               </div>
 
               <!-- WhatsApp Chat Area -->
@@ -1058,19 +1016,17 @@
                       <div id="audioWaveProgress" class="h-full bg-emerald-300 w-1/2 transition-all"></div>
                     </div>
                   </div>
-                  <p id="canvasUserText" class="text-white text-[10px] italic">"Gastei 45 no almoço no débito"</p>
+                  <p id="canvasUserText" class="text-white text-[10px] italic">"Olá, gostaria de saber como funciona o assistente de vocês"</p>
                 </div>
 
                 <!-- Bot Response Bubble -->
                 <div id="canvasBotBubble" class="self-start bg-[#202c33] text-white p-2.5 rounded-2xl rounded-tl-none max-w-[90%] shadow-sm space-y-1 transition-all duration-300">
                   <p class="text-[10px] font-bold text-[#ccff00] flex items-center gap-1">
                     <i data-lucide="bot" class="w-3 h-3"></i>
-                    <span>Assistente Zap</span>
+                    <span id="canvasBotName">RAIA - Assistente 24h</span>
                   </p>
                   <p id="canvasBotText" class="text-zinc-200 text-[10px] leading-relaxed">
-                    ✅ Gasto de <b>R$ 45,00</b> registrado em <b>Alimentação</b>!<br>
-                    💳 Forma: <b>Débito</b><br>
-                    💰 Saldo atual: <b>R$ 1.955,00</b>
+                    👋 Olá! Sou o colaborador digital da RAIA, pronto para atender seus clientes 24h por dia pelo WhatsApp!<br>Qual seu segmento?
                   </p>
                 </div>
               </div>
@@ -1078,7 +1034,7 @@
               <!-- Dynamic Subtitle (CapCut Style) -->
               <div class="p-2 rounded-xl bg-black/90 border border-zinc-800 text-center shrink-0">
                 <p id="canvasCaptionText" class="text-xs font-black text-[#ccff00]">
-                  "Mandei um áudio e tá pronto!"
+                  "Colaborador de IA no WhatsApp 24h!"
                 </p>
               </div>
             </div>
@@ -1086,19 +1042,24 @@
             <!-- Video Controls & Inputs -->
             <div class="flex-1 w-full space-y-3 text-xs">
               <div>
-                <label class="block font-bold text-zinc-300 mb-1">Gancho do Topo (Chamada Impactante)</label>
-                <input type="text" id="inputVideoHook" value="PARE DE USAR PLANILHA EM 2026! 🚀" oninput="updateVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-purple-500">
+                <label class="block font-bold text-zinc-300 mb-1">Nome do Assistente / Empresa (No WhatsApp)</label>
+                <input type="text" id="inputVideoBotName" value="RAIA - Assistente 24h" oninput="updateVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-purple-500">
               </div>
 
               <div>
-                <label class="block font-bold text-zinc-300 mb-1">O que o Usuário fala no WhatsApp</label>
-                <input type="text" id="inputVideoUserMsg" value="Gastei 45 no almoço no débito e dentista amanhã 15h" oninput="updateVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-purple-500">
+                <label class="block font-bold text-zinc-300 mb-1">Gancho do Topo (Chamada Impactante)</label>
+                <input type="text" id="inputVideoHook" value="DOBRE SEU ATENDIMENTO SEM CONTRATAR MAIS! 🚀" oninput="updateVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-purple-500">
+              </div>
+
+              <div>
+                <label class="block font-bold text-zinc-300 mb-1">O que o Usuário / Cliente fala no WhatsApp</label>
+                <input type="text" id="inputVideoUserMsg" value="Olá, gostaria de saber como funciona o assistente de vocês" oninput="updateVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-purple-500">
               </div>
 
               <div>
                 <label class="block font-bold text-zinc-300 mb-1">Resposta da Inteligência Artificial</label>
-                <textarea id="inputVideoBotMsg" rows="3" oninput="updateVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-purple-500">✅ R$ 45,00 anotado em Alimentação!
-⏰ Dentista agendado para amanhã às 15:00.</textarea>
+                <textarea id="inputVideoBotMsg" rows="3" oninput="updateVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-purple-500">👋 Olá! Sou o colaborador digital da RAIA, pronto para atender seus clientes 24h por dia pelo WhatsApp!
+Qual seu segmento?</textarea>
               </div>
 
               <div class="pt-2 flex flex-col sm:flex-row gap-2">
@@ -1149,10 +1110,32 @@
             </div>
           </div>
 
+          <!-- Selector of which Assistant the Avatar speaks about -->
+          <div class="p-3.5 bg-gradient-to-r from-cyan-950/40 via-zinc-900 to-blue-950/40 border border-cyan-800/50 rounded-2xl space-y-2">
+            <div class="flex items-center justify-between">
+              <label class="text-xs font-black text-cyan-200 flex items-center gap-1.5">
+                <i data-lucide="bot" class="w-4 h-4 text-cyan-400"></i>
+                <span>Qual Assistente de IA o Avatar vai apresentar?</span>
+              </label>
+              <span class="text-[9px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full border border-cyan-500/30 font-bold">Fala Pronta</span>
+            </div>
+            <select id="avatarAssistantNiche" onchange="applyAvatarAssistantPreset(this.value)" class="w-full px-3 py-2.5 bg-zinc-800/90 border border-zinc-700 rounded-xl text-xs text-white font-medium focus:border-cyan-500 outline-none">
+              <option value="SALON">💇‍♀️ Salão de Beleza & Cabeleireira (Zero Furos na Agenda)</option>
+              <option value="CLINIC">🦷 Clínicas Médicas & Odontologia (Confirmação de Consulta & Faltas)</option>
+              <option value="RESTAURANT">🍔 Restaurante & Delivery (Cardápio & Pedidos sem taxas)</option>
+              <option value="LEGAL">⚖️ Advocacia (Qualificação de Clientes 24h)</option>
+              <option value="REAL_ESTATE">🏡 Imobiliária & Corretores (Busca de Imóveis & Visitas)</option>
+              <option value="MECHANIC">🚗 Oficina Mecânica (Avisos de Carro Pronto & Revisão)</option>
+              <option value="FITNESS">💪 Academia & Personal (Renovação de Planos & Pilates)</option>
+              <option value="FINANCE">💰 Finanças Pessoais (Jarvis Financeiro sem Planilhas)</option>
+              <option value="GENERAL" selected>🏢 Negócios em Geral (RAIA - Colaborador de IA 24h)</option>
+            </select>
+          </div>
+
           <!-- Script Text to Speak -->
           <div class="space-y-1">
             <label class="block text-xs font-bold text-zinc-300">Texto que o Avatar vai Falar (em Português):</label>
-            <textarea id="inputAvatarSpeech" rows="3" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs outline-none focus:border-cyan-500 leading-relaxed" placeholder="Cole ou digite o texto da fala do avatar...">Se você ainda anota seus gastos em planilha em 2026, você está perdendo tempo e dinheiro. Com o Assistente Zap, você só manda um áudio no WhatsApp e a inteligência artificial cuida de tudo no piloto automático.</textarea>
+            <textarea id="inputAvatarSpeech" rows="3" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs outline-none focus:border-cyan-500 leading-relaxed" placeholder="Cole ou digite o texto da fala do avatar...">Você não precisa contratar mais funcionários para dobrar a capacidade de atendimento da sua empresa. A RAIA entrega colaboradores digitais de inteligência artificial que atendem no WhatsApp vinte e quatro horas por dia, sem faltar e com excelência. Toque no link da bio e ative seu teste!</textarea>
           </div>
 
           <!-- Voice & D-ID Key -->
@@ -2188,6 +2171,148 @@
       lucide.createIcons();
     }
 
+    const STUDIO_PRESETS = {
+      SALON: {
+        botName: '💇‍♀️ IA Salão & Barbearia',
+        hook: 'ZERO FUROS NA AGENDA DO SEU SALÃO! 💇‍♀️',
+        userMsg: 'Oi! Tem horário pra mechas e escova no sábado às 14h?',
+        botMsg: '✅ Horário confirmado para sábado às 14h com a Jéssica!\n📅 Enviamos um lembrete 24h antes para confirmação.\nTe esperamos! 💇‍♀️',
+        caption: 'Chega de levar bolo de cliente! Assistente 24h no WhatsApp.'
+      },
+      CLINIC: {
+        botName: '🦷 IA Clínica Médica & Odonto',
+        hook: 'ACABE COM AS FALTAS DE PACIENTES! 🦷',
+        userMsg: 'Gostaria de agendar uma avaliação com o dentista essa semana',
+        botMsg: '🩺 Olá! Temos vaga na quinta às 10h ou sexta às 15h. Qual horário fica melhor?\nEnviaremos a confirmação automática 24h antes!',
+        caption: 'Triagem e confirmação automática de consultas no WhatsApp.'
+      },
+      RESTAURANT: {
+        botName: '🍔 IA Delivery & Restaurante',
+        hook: 'NUNCA MAIS PERCA CLIENTE NO DELIVERY! 🍔',
+        userMsg: 'Boa noite! Quero pedir 2 smash burgers e uma batata frita',
+        botMsg: '🍔 Pedido anotado! Deseja adicionar refrigerante por apenas R$ 5,00?\nQual seu endereço para entrega no Pix ou Cartão?',
+        caption: 'Cardápio e pedidos automáticos no WhatsApp sem taxa de 30%!'
+      },
+      LEGAL: {
+        botName: '⚖️ IA Jurídica 24h',
+        hook: 'ADVOGADO: QUALIFIQUE LEADS NO AUTOMÁTICO! ⚖️',
+        userMsg: 'Preciso de orientação sobre rescisão de contrato de trabalho',
+        botMsg: '⚖️ Olá! Para direcionar seu caso ao especialista: o contrato era CLT ou PJ e qual foi o motivo da saída?',
+        caption: 'Triagem jurídica 24h sem perder nenhum lead qualificado.'
+      },
+      REAL_ESTATE: {
+        botName: '🏡 IA Imobiliária & Corretores',
+        hook: 'RESPONDA O LEAD EM 3s E FECHE 4X MAIS! 🏡',
+        userMsg: 'Procuro apartamento de 2 quartos no Jardins até R$ 800 mil',
+        botMsg: '🏢 Encontrei 3 opções perfeitas no seu perfil!\nDeseja ver as fotos agora ou agendar uma visita amanhã?',
+        caption: 'Filtro automático de imóveis e visitas agendadas no zap.'
+      },
+      MECHANIC: {
+        botName: '🚗 IA Oficina & Estética Auto',
+        hook: 'CARRO PRONTO E CLIENTE AVISADO NA HORA! 🚗',
+        userMsg: 'Boa tarde, o Uno preto placa final 42 já finalizou a revisão?',
+        botMsg: '🚗 Olá! A revisão foi concluída com sucesso e seu carro já está pronto para retirada!',
+        caption: 'Avisos automáticos de carro pronto e lembretes de revisão.'
+      },
+      FITNESS: {
+        botName: '💪 IA Academia & Personal',
+        hook: 'RECUPERE ALUNOS E RENOVE NO PILOTO AUTOMÁTICO! 💪',
+        userMsg: 'Quero agendar uma aula experimental de Pilates amanhã',
+        botMsg: '💪 Vaga garantida na aula das 18h com a professora Ana!\nLeve sua garrafinha. Te esperamos na recepção!',
+        caption: 'Agendamento de aulas e cobrança amigável no Pix.'
+      },
+      FINANCE: {
+        botName: '💰 Jarvis Financeiro Zap',
+        hook: 'PARE DE USAR PLANILHA EM 2026! 🚀',
+        userMsg: 'Gastei 45 no almoço no débito e boleto de 180 vence sexta',
+        botMsg: '✅ R$ 45,00 registrado em Alimentação!\n💳 Boleto de R$ 180,00 agendado para sexta com alerta 24h antes!',
+        caption: 'Controle financeiro instantâneo por áudio e foto no WhatsApp.'
+      },
+      GENERAL: {
+        botName: '🏢 RAIA - Colaborador de IA 24h',
+        hook: 'DOBRE SEU ATENDIMENTO SEM CONTRATAR MAIS! 🚀',
+        userMsg: 'Olá, gostaria de saber como funciona o assistente de vocês',
+        botMsg: '👋 Olá! Sou o colaborador digital da RAIA, pronto para atender seus clientes 24h por dia pelo WhatsApp!\nQual seu segmento?',
+        caption: 'Colaborador digital treinado para atender e vender 24h por dia.'
+      }
+    };
+
+    function applyStudioAssistantPreset(niche) {
+      const p = STUDIO_PRESETS[niche] || STUDIO_PRESETS.GENERAL;
+      const botNameInp = document.getElementById('inputVideoBotName');
+      const hookInp = document.getElementById('inputVideoHook');
+      const userInp = document.getElementById('inputVideoUserMsg');
+      const botMsgInp = document.getElementById('inputVideoBotMsg');
+      const captionInp = document.getElementById('canvasCaptionText');
+
+      if (botNameInp) botNameInp.value = p.botName;
+      if (hookInp) hookInp.value = p.hook;
+      if (userInp) userInp.value = p.userMsg;
+      if (botMsgInp) botMsgInp.value = p.botMsg;
+      if (captionInp) captionInp.innerText = p.caption;
+
+      updateVideoPreview();
+    }
+
+    async function generateStudioVideoWithAI() {
+      const niche = document.getElementById('studioAssistantNiche')?.value || 'GENERAL';
+      const btn = document.getElementById('btnStudioAiGen');
+      const txt = document.getElementById('btnStudioAiGenText');
+
+      if (btn) btn.disabled = true;
+      if (txt) txt.innerText = '⚡ Criando...';
+
+      try {
+        const res = await authFetch('/api/admin/marketing/generate-script', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ format: 'SCREEN_DEMO', duration: '30s', niche, focusTopic: niche })
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          const sc = json.data;
+          const scenes = sc.scenes || [];
+          const hookInp = document.getElementById('inputVideoHook');
+          const userInp = document.getElementById('inputVideoUserMsg');
+          const botInp = document.getElementById('inputVideoBotMsg');
+          const botNameInp = document.getElementById('inputVideoBotName');
+
+          if (sc.hook && hookInp) hookInp.value = sc.hook.toUpperCase();
+          if (scenes.length > 0 && userInp) userInp.value = scenes[0].audio || '';
+          if (scenes.length > 1 && botInp) botInp.value = scenes[1].audio || '';
+          if (botNameInp) botNameInp.value = sc.niche || 'RAIA - Assistente 24h';
+
+          updateVideoPreview();
+        } else {
+          applyStudioAssistantPreset(niche);
+        }
+      } catch (e) {
+        applyStudioAssistantPreset(niche);
+      } finally {
+        if (btn) btn.disabled = false;
+        if (txt) txt.innerText = '✨ Novo com IA';
+        lucide.createIcons();
+      }
+    }
+
+    const AVATAR_SPEECH_PRESETS = {
+      SALON: 'Você é dono de salão ou barbearia e tá cansado de cliente marcando horário e simplesmente sumindo sem avisar? Com o assistente de inteligência artificial da RAIA no WhatsApp, seu salão atende em segundos, confirma horários 24 horas antes e acaba com os furos na agenda. Toque no link da bio e faça seu teste grátis agora!',
+      CLINIC: 'Quantas consultas a sua clínica perdeu este mês porque o paciente esqueceu de comparecer? Cada cadeira vazia é dinheiro saindo do seu bolso. O nosso assistente de IA faz a confirmação automática no WhatsApp e permite que o paciente remarque na hora com um clique. Conheça agora a RAIA no link abaixo!',
+      RESTAURANT: 'Se o seu delivery demora mais de dois minutos para enviar o cardápio no WhatsApp, você está perdendo pedidos para o concorrente. Com o colaborador de inteligência artificial da RAIA, seu cliente faz o pedido em segundos e você não paga taxas abusivas de aplicativos. Teste grátis hoje mesmo!',
+      LEGAL: 'Advogado, quanto tempo você gasta todo dia respondendo curiosos que nem sequer fecham contrato? A RAIA implementa um assistente de IA no seu WhatsApp que faz a triagem jurídica vinte e quatro horas por dia e qualifica os clientes certos antes de agendar na sua mesa. Conheça a RAIA!',
+      REAL_ESTATE: 'Corretor de imóveis: quem responde o cliente primeiro, fecha a venda. Com a inteligência artificial da RAIA, seu WhatsApp envia fotos, filtra bairro e valor e agenda visitas presenciais em segundos, mesmo de madrugada. Ative seu assistente agora!',
+      MECHANIC: 'Dono de oficina: pare de interromper seu serviço para atender telefone explicando se o carro ficou pronto. Nosso assistente avisa o cliente no WhatsApp no momento exato em que o veículo estiver pronto e lembra das próximas revisões. Clique e conheça!',
+      FITNESS: 'Na sua academia ou estúdio, quantos alunos somem depois de trinta dias? A RAIA automatiza o agendamento de aulas experimentais e faz a recuperação de alunos no WhatsApp de forma natural e amigável. Descubra como funciona!',
+      FINANCE: 'Se você ainda perde horas do seu final de semana preenchendo planilhas de gastos, você está vivendo no passado. Com o Assistente Zap, você só manda um áudio no WhatsApp falando quanto gastou e a IA organiza tudo para você. Faça seu teste grátis!',
+      GENERAL: 'Você não precisa contratar mais funcionários para dobrar a capacidade de atendimento da sua empresa. A RAIA entrega colaboradores digitais de inteligência artificial que atendem no WhatsApp vinte e quatro horas por dia, sem faltar e com excelência. Toque no link da bio e ative seu teste!'
+    };
+
+    function applyAvatarAssistantPreset(niche) {
+      const speech = AVATAR_SPEECH_PRESETS[niche] || AVATAR_SPEECH_PRESETS.GENERAL;
+      const inp = document.getElementById('inputAvatarSpeech');
+      if (inp) inp.value = speech;
+    }
+
     function sendScriptToStudio() {
       if (currentGeneratedScript) {
         if (currentGeneratedScript.hook) {
@@ -2196,14 +2321,23 @@
         }
         const scenes = currentGeneratedScript.scenes || [];
         if (scenes.length > 0) {
-          const userText = scenes[0].audio || 'Gastei 45 no almoço no débito';
+          const userText = scenes[0].audio || '';
           const inpUser = document.getElementById('inputVideoUserMsg');
           if (inpUser) inpUser.value = userText;
         }
         if (scenes.length > 1) {
-          const botText = scenes[1].audio || '✅ Gasto registrado com sucesso em Alimentação!';
+          const botText = scenes[1].audio || '';
           const inpBot = document.getElementById('inputVideoBotMsg');
           if (inpBot) inpBot.value = botText;
+        }
+        if (currentGeneratedScript.niche) {
+          const botNameInp = document.getElementById('inputVideoBotName');
+          if (botNameInp) botNameInp.value = currentGeneratedScript.niche;
+        }
+        const nicheSelect = document.getElementById('studioAssistantNiche');
+        const scriptNiche = document.getElementById('mktScriptNiche')?.value;
+        if (nicheSelect && scriptNiche) {
+          nicheSelect.value = scriptNiche;
         }
         updateVideoPreview();
       }
@@ -2216,22 +2350,30 @@
         const text = fullSpeech || currentGeneratedScript.hook || '';
         const inp = document.getElementById('inputAvatarSpeech');
         if (inp) inp.value = text;
+        const nicheSelect = document.getElementById('avatarAssistantNiche');
+        const scriptNiche = document.getElementById('mktScriptNiche')?.value;
+        if (nicheSelect && scriptNiche) {
+          nicheSelect.value = scriptNiche;
+        }
       }
       switchMarketingTab('avatar');
     }
 
     function updateVideoPreview() {
-      const hook = document.getElementById('inputVideoHook')?.value || 'PARE DE USAR PLANILHA EM 2026!';
-      const userMsg = document.getElementById('inputVideoUserMsg')?.value || 'Gastei 45 no almoço';
-      const botMsg = document.getElementById('inputVideoBotMsg')?.value || '✅ Gasto registrado!';
+      const hook = document.getElementById('inputVideoHook')?.value || 'DOBRE SEU ATENDIMENTO SEM CONTRATAR MAIS! 🚀';
+      const userMsg = document.getElementById('inputVideoUserMsg')?.value || 'Olá, como funciona?';
+      const botMsg = document.getElementById('inputVideoBotMsg')?.value || '👋 Olá! Atendemos 24h.';
+      const botName = document.getElementById('inputVideoBotName')?.value || 'RAIA - Assistente 24h';
 
       const hookEl = document.getElementById('canvasVideoHook');
       const userTextEl = document.getElementById('canvasUserText');
       const botTextEl = document.getElementById('canvasBotText');
+      const botNameEl = document.getElementById('canvasBotName');
 
       if (hookEl) hookEl.innerText = hook;
       if (userTextEl) userTextEl.innerText = `"${userMsg}"`;
       if (botTextEl) botTextEl.innerHTML = botMsg.replace(/\n/g, '<br>');
+      if (botNameEl) botNameEl.innerText = botName;
     }
 
     function playVideoSimulation() {
@@ -2285,7 +2427,8 @@
             bBubble.classList.add('scale-105');
             setTimeout(() => bBubble.classList.remove('scale-105'), 300);
           }
-          if (caption) caption.innerText = 'Assistente Zap: Atualizado no WhatsApp!';
+          const bName = document.getElementById('inputVideoBotName')?.value || 'Assistente Zap';
+          if (caption) caption.innerText = `${bName}: Atendimento no WhatsApp!`;
 
           speakText(botMsg.replace(/[^\w\s,]/gi, ''), () => {
             isVideoSimulating = false;
