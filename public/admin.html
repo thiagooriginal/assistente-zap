@@ -1,0 +1,1259 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>RAIA Agentes • Painel do Gestor & Estúdio de IA</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            raia: {
+              black: '#07080c',
+              card: '#11131a',
+              cardHover: '#181b24',
+              border: 'rgba(255, 255, 255, 0.08)',
+              neon: '#00F59B',
+              lime: '#ccff00',
+              violet: '#8B5CF6',
+              cyan: '#06b6d4',
+              danger: '#f43f5e'
+            }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', 'Plus Jakarta Sans', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Google Fonts & Lucide Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    body {
+      background-color: #07080c;
+      color: #ffffff;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      overflow-x: hidden;
+    }
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .glass-card {
+      background: rgba(17, 19, 26, 0.75);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .glow-neon {
+      box-shadow: 0 0 25px -4px rgba(0, 245, 155, 0.3);
+    }
+    .glow-violet {
+      box-shadow: 0 0 25px -4px rgba(139, 92, 246, 0.3);
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#07080c] text-white flex flex-col items-center selection:bg-[#00F59B] selection:text-black pb-28">
+
+  <!-- ============================================================ -->
+  <!-- AUTH GUARD OVERLAY (Shown if not logged in as Admin)         -->
+  <!-- ============================================================ -->
+  <div id="adminAuthOverlay" class="fixed inset-0 z-50 bg-[#07080c]/95 backdrop-blur-xl flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-[#11131a] border border-violet-500/30 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl text-center relative overflow-hidden">
+      <!-- Glow background -->
+      <div class="absolute -top-24 -left-24 w-48 h-48 bg-violet-600/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-[#00F59B]/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <!-- Stingray Logo Emblem -->
+      <div class="relative w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-violet-600 to-[#00F59B] p-[2px] shadow-xl">
+        <div class="w-full h-full bg-[#0a0c12] rounded-2xl flex items-center justify-center">
+          <svg class="w-9 h-9 text-[#00F59B]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L4 12l8 8 8-8L12 2z"/>
+            <path d="M12 22V10"/>
+            <circle cx="12" cy="7" r="1.5" fill="#00F59B"/>
+          </svg>
+        </div>
+      </div>
+
+      <div>
+        <h2 class="text-2xl font-black tracking-tight text-white">RAIA AGENTES</h2>
+        <p class="text-xs text-zinc-400 font-semibold tracking-wider uppercase mt-1">Painel do Administrador & Gestor</p>
+      </div>
+
+      <div class="space-y-4 text-left">
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-zinc-300">Senha ou PIN do Administrador</label>
+          <div class="relative">
+            <input 
+              type="password" 
+              id="adminPassInput" 
+              placeholder="Digite a senha (ex: admin123 ou 9513)" 
+              onkeydown="if(event.key==='Enter') executeAdminLogin()"
+              class="w-full px-4 py-3.5 bg-black/50 border border-zinc-700/80 rounded-2xl text-white text-sm focus:outline-none focus:border-[#00F59B] transition pr-11"
+              autofocus
+            >
+            <button type="button" onclick="togglePassPeek()" class="absolute right-3.5 top-3.5 text-zinc-400 hover:text-white text-sm">
+              <span id="peekIcon">👁️</span>
+            </button>
+          </div>
+          <p class="text-[11px] text-zinc-500">💡 Senha padrão: <code class="text-zinc-300 bg-zinc-800 px-1.5 py-0.5 rounded">admin123</code> ou PIN <code class="text-zinc-300 bg-zinc-800 px-1.5 py-0.5 rounded">9513</code></p>
+        </div>
+
+        <div id="loginAlertBox" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs"></div>
+
+        <button id="btnLoginSubmit" onclick="executeAdminLogin()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-[#00F59B] hover:opacity-95 text-white font-black text-sm shadow-lg shadow-violet-600/30 active:scale-98 transition flex items-center justify-center gap-2">
+          <span id="btnLoginText">Acessar Painel</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+
+        <div class="pt-2 text-center border-t border-zinc-800/80">
+          <a href="/" class="text-xs text-zinc-400 hover:text-[#00F59B] transition flex items-center justify-center gap-1.5">
+            <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+            <span>Voltar para a Vitrine de Agentes</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- MAIN ADMIN APP CONTAINER (Responsive Desktop & Mobile Frame)  -->
+  <!-- ============================================================ -->
+  <div id="adminMainContent" class="hidden w-full max-w-md md:max-w-5xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6 space-y-5">
+    
+    <!-- TOP HEADER -->
+    <header class="flex items-center justify-between py-2 border-b border-zinc-800/80 pb-3">
+      <div class="flex items-center gap-3">
+        <!-- Logo Emblem -->
+        <div class="relative w-11 h-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-[#00F59B] p-[2px] shadow-md">
+          <div class="w-full h-full bg-[#0a0c12] rounded-2xl flex items-center justify-center">
+            <svg class="w-6 h-6 text-[#00F59B]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2L4 12l8 8 8-8L12 2z"/>
+              <path d="M12 22V10"/>
+              <circle cx="12" cy="7" r="1.5" fill="#00F59B"/>
+            </svg>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl sm:text-2xl font-black tracking-tight text-white">RAIA AGENTES</h1>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-violet-600/30 text-violet-300 border border-violet-500/40 font-bold uppercase tracking-wider">Painel do Gestor</span>
+          </div>
+          <p class="text-xs text-zinc-400">RH & Estúdio de Assistentes de Inteligência Artificial</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Ver Vitrine Pública -->
+        <a href="/" target="_blank" class="px-3.5 py-1.5 text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white rounded-full border border-zinc-700/80 transition flex items-center gap-1.5 shadow-sm">
+          <i data-lucide="globe" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+          <span class="hidden sm:inline">Ver</span> Vitrine Pública
+        </a>
+
+        <!-- Abrir Estúdio Marketing Modal -->
+        <button onclick="openMarketingModal()" class="px-3.5 py-1.5 text-xs font-extrabold bg-gradient-to-r from-violet-600 via-pink-600 to-indigo-600 text-white hover:opacity-95 rounded-full border border-violet-400/40 transition flex items-center gap-1.5 shadow-md shadow-violet-600/20 active:scale-95">
+          <i data-lucide="video" class="w-3.5 h-3.5"></i>
+          <span>Estúdio Marketing</span>
+        </button>
+
+        <!-- Sair -->
+        <button onclick="handleLogout()" title="Sair do painel" class="w-8 h-8 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-rose-400 flex items-center justify-center transition border border-zinc-800 shrink-0">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- ADMIN NAVIGATION TABS -->
+    <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1">
+      <button onclick="switchAdminTab('studio')" id="tabBtnStudio" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-violet-600 text-white flex items-center gap-2 shadow-lg transition shrink-0">
+        <i data-lucide="clapperboard" class="w-4 h-4"></i>
+        <span>Estúdio de Vídeos & Vozes IA</span>
+      </button>
+      <button onclick="switchAdminTab('users')" id="tabBtnUsers" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0">
+        <i data-lucide="users" class="w-4 h-4"></i>
+        <span>Clientes & Convites ZAP</span>
+      </button>
+      <button onclick="switchAdminTab('finance')" id="tabBtnFinance" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0">
+        <i data-lucide="badge-dollar-sign" class="w-4 h-4"></i>
+        <span>Finanças & Faturamento</span>
+      </button>
+      <button onclick="switchAdminTab('system')" id="tabBtnSystem" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0">
+        <i data-lucide="cpu" class="w-4 h-4"></i>
+        <span>Status da IA & Conexões</span>
+      </button>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 1: ESTÚDIO DE VÍDEOS & VOZES IA (DEFAULT TAB)         -->
+    <!-- ============================================================ -->
+    <div id="sectionStudio" class="space-y-5">
+      <!-- Banner / Controls -->
+      <div class="p-5 rounded-3xl bg-gradient-to-r from-violet-950/80 via-indigo-950/70 to-zinc-900 border border-violet-500/40 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-[#00F59B] text-black font-black uppercase">Novo Motor Neural</span>
+            <span class="text-xs text-violet-300 font-bold">Modelos de Voz & Gravação 9:16</span>
+          </div>
+          <h2 class="text-lg sm:text-xl font-extrabold text-white mt-1">Estúdio de Roteiros, Vídeos WhatsApp & Vozes Naturais</h2>
+          <p class="text-xs text-zinc-300 mt-0.5">Crie conteúdos de alta conversão para o Reels e TikTok para qualquer nicho de assistente de inteligência artificial.</p>
+        </div>
+        <button onclick="openMarketingModal()" class="px-4 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg transition shrink-0">
+          <i data-lucide="maximize-2" class="w-4 h-4"></i>
+          <span>Abrir em Tela Cheia</span>
+        </button>
+      </div>
+
+      <!-- Quick Embed: WhatsApp Video Studio with Neural Voice Engine -->
+      <div class="p-5 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+              <i data-lucide="smartphone" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-extrabold text-white">Simulador de Vídeo WhatsApp com Áudio Humano</h3>
+              <p class="text-[11px] text-zinc-400">Escolha o assistente, configure a voz neural e simule a conversa real</p>
+            </div>
+          </div>
+          <span class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">100% Grátis</span>
+        </div>
+
+        <!-- Assistant Preset Selector -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="sm:col-span-2 space-y-1">
+            <label class="text-xs font-bold text-zinc-300">Assistente por Nicho de Atuação:</label>
+            <select id="mainStudioAssistantNiche" onchange="applyStudioAssistantPreset(this.value)" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-xs text-white font-medium focus:border-violet-500 outline-none">
+              <option value="SALON">💇‍♀️ Salão de Beleza & Cabeleireira (Zero Furos na Agenda)</option>
+              <option value="CLINIC">🦷 Clínicas Médicas & Odontologia (Confirmação & Triagem)</option>
+              <option value="RESTAURANT">🍔 Restaurante & Delivery (Cardápio & Pedidos sem taxas)</option>
+              <option value="LEGAL">⚖️ Advocacia & Escritório Jurídico (Triagem 24h & Qualificação)</option>
+              <option value="REAL_ESTATE">🏡 Imobiliária & Corretores (Busca de Imóveis & Visitas)</option>
+              <option value="MECHANIC">🚗 Oficina Mecânica & Estética Auto (Carro Pronto & Revisão)</option>
+              <option value="FITNESS">💪 Academia, Personal & Pilates (Aulas & Renovação)</option>
+              <option value="FINANCE">💰 Finanças Pessoais & Autônomos (Jarvis Financeiro)</option>
+              <option value="GENERAL" selected>🏢 Negócios em Geral (RAIA - Assistente Colaborador 24h)</option>
+            </select>
+          </div>
+          <div class="space-y-1 flex flex-col justify-end">
+            <button type="button" onclick="generateStudioVideoWithAI()" class="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow transition">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              <span id="mainBtnStudioAiGenText">✨ Gerar com IA</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- NEW: VOICE ENGINE SELECTOR BOX -->
+        <div class="p-4 bg-zinc-900/90 border border-violet-900/50 rounded-2xl space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="text-base">🎙️</span>
+              <div>
+                <h4 class="text-xs font-black text-white">Seleção do Modelo de Voz & Tipo de Fala</h4>
+                <p class="text-[10px] text-zinc-400">Escolha vozes neurais brasileiras ultra-realistas (sem som mecânico de robô)</p>
+              </div>
+            </div>
+            <button type="button" onclick="testSelectedVoice()" class="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow transition active:scale-95">
+              <span>🔊 Ouvir Amostra</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-zinc-300 mb-1">Modelo de Voz Neural:</label>
+              <select id="studioVoiceSelect" onchange="testSelectedVoice()" class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-violet-500">
+                <option value="">Carregando vozes neurais...</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-zinc-300 mb-1">Ritmo & Entonação da Fala:</label>
+              <select id="studioVoiceTone" class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-violet-500">
+                <option value="dynamic_reels">⚡ Dinâmico Reels & TikTok (1.18x)</option>
+                <option value="conversational" selected>💬 Conversa Natural WhatsApp (1.05x)</option>
+                <option value="calm">☕ Calmo & Consultivo (0.95x)</option>
+                <option value="sales">🔥 Vendedor Acelerado (1.25x)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Phone Preview & Inputs -->
+        <div class="flex flex-col lg:flex-row gap-5 items-center lg:items-start justify-center pt-2">
+          <!-- Smartphone Simulator -->
+          <div class="w-[280px] h-[500px] bg-black rounded-[36px] p-3 border-4 border-zinc-700 shadow-2xl relative overflow-hidden flex flex-col justify-between shrink-0">
+            <!-- Camera Notch -->
+            <div class="w-24 h-4 bg-zinc-800 rounded-full mx-auto mb-2 shrink-0"></div>
+
+            <!-- Top Hook -->
+            <div id="mainCanvasVideoHook" class="px-2.5 py-2 rounded-xl bg-gradient-to-r from-violet-600 via-pink-600 to-indigo-600 text-white font-black text-[11px] text-center shadow-md shrink-0 leading-tight">
+              DOBRE SEU ATENDIMENTO SEM CONTRATAR MAIS! 🚀
+            </div>
+
+            <!-- WhatsApp Chat Area -->
+            <div class="flex-1 my-2 space-y-2.5 overflow-hidden flex flex-col justify-end text-[11px]">
+              <!-- User Msg -->
+              <div id="mainCanvasUserBubble" class="self-end bg-[#005c4b] text-white p-2.5 rounded-2xl rounded-tr-none max-w-[85%] shadow-sm space-y-1 transition-all duration-300">
+                <div class="flex items-center gap-1.5 text-[10px] text-emerald-300">
+                  <i data-lucide="mic" class="w-3 h-3"></i>
+                  <span>Mensagem de Áudio (0:04)</span>
+                </div>
+                <div class="flex items-center gap-1">
+                  <div class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                  <div class="h-1 flex-1 bg-emerald-700 rounded-full overflow-hidden">
+                    <div id="mainAudioWaveProgress" class="h-full bg-emerald-300 w-1/2 transition-all"></div>
+                  </div>
+                </div>
+                <p id="mainCanvasUserText" class="text-white text-[10px] italic">"Olá, gostaria de saber como funciona o assistente de vocês"</p>
+              </div>
+
+              <!-- Bot Response -->
+              <div id="mainCanvasBotBubble" class="self-start bg-[#202c33] text-white p-2.5 rounded-2xl rounded-tl-none max-w-[90%] shadow-sm space-y-1 transition-all duration-300">
+                <p class="text-[10px] font-bold text-[#00F59B] flex items-center gap-1">
+                  <i data-lucide="bot" class="w-3 h-3"></i>
+                  <span id="mainCanvasBotName">RAIA - Assistente 24h</span>
+                </p>
+                <p id="mainCanvasBotText" class="text-zinc-200 text-[10px] leading-relaxed">
+                  👋 Olá! Sou o colaborador digital da RAIA, pronto para atender seus clientes 24h por dia pelo WhatsApp!<br>Qual seu segmento?
+                </p>
+              </div>
+            </div>
+
+            <!-- Caption -->
+            <div class="p-2 rounded-xl bg-black/90 border border-zinc-800 text-center shrink-0">
+              <p id="mainCanvasCaptionText" class="text-xs font-black text-[#00F59B]">
+                "Colaborador de IA no WhatsApp 24h!"
+              </p>
+            </div>
+          </div>
+
+          <!-- Inputs -->
+          <div class="flex-1 w-full space-y-3 text-xs">
+            <div>
+              <label class="block font-bold text-zinc-300 mb-1">Nome do Assistente / Empresa (No WhatsApp)</label>
+              <input type="text" id="mainInputVideoBotName" value="RAIA - Assistente 24h" oninput="updateMainVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-violet-500">
+            </div>
+
+            <div>
+              <label class="block font-bold text-zinc-300 mb-1">Gancho do Topo (Chamada Chamativa)</label>
+              <input type="text" id="mainInputVideoHook" value="DOBRE SEU ATENDIMENTO SEM CONTRATAR MAIS! 🚀" oninput="updateMainVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-violet-500">
+            </div>
+
+            <div>
+              <label class="block font-bold text-zinc-300 mb-1">O que o Cliente fala no WhatsApp (Áudio/Texto)</label>
+              <input type="text" id="mainInputVideoUserMsg" value="Olá, gostaria de saber como funciona o assistente de vocês" oninput="updateMainVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-violet-500">
+            </div>
+
+            <div>
+              <label class="block font-bold text-zinc-300 mb-1">Resposta do Assistente Inteligente</label>
+              <textarea id="mainInputVideoBotMsg" rows="3" oninput="updateMainVideoPreview()" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white outline-none focus:border-violet-500">👋 Olá! Sou o colaborador digital da RAIA, pronto para atender seus clientes 24h por dia pelo WhatsApp!
+Qual seu segmento?</textarea>
+            </div>
+
+            <div class="pt-2 flex flex-col sm:flex-row gap-2.5">
+              <button onclick="playMainVideoSimulation()" id="mainBtnPlayVideoSim" class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-95 text-white font-extrabold flex items-center justify-center gap-2 shadow-lg transition active:scale-98">
+                <i data-lucide="play" class="w-4 h-4"></i>
+                <span>▶️ Simular Vídeo com Voz Neural</span>
+              </button>
+              <button onclick="recordAndDownloadMainVideo()" class="py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold flex items-center justify-center gap-2 shadow-lg transition">
+                <i data-lucide="download" class="w-4 h-4"></i>
+                <span>⬇️ Baixar Vídeo (.webm)</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 2: CLIENTES & CONVITES ZAP                            -->
+    <!-- ============================================================ -->
+    <div id="sectionUsers" class="hidden space-y-5">
+      <div class="p-5 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div>
+            <h3 class="text-base font-extrabold text-white">Gerador de Convites & Códigos de Ativação</h3>
+            <p class="text-xs text-zinc-400">Gere novos códigos no padrão <code class="text-[#00F59B]">ZAP-XXXX</code> para novos clientes ativarem no WhatsApp</p>
+          </div>
+          <span class="text-xs font-bold text-violet-400 bg-violet-500/10 px-3 py-1 rounded-full border border-violet-500/20">Master Admin</span>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-2">
+          <input type="text" id="secNewInviteCode" placeholder="Ex: ZAP-VIP, ZAP-CLINICA, ZAP-THIAGO" class="flex-1 px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-sm outline-none uppercase font-mono focus:border-violet-500">
+          <button onclick="createInviteFromSection()" class="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-[#00F59B] text-black font-extrabold text-sm rounded-xl shadow transition">
+            + Criar Novo Código
+          </button>
+        </div>
+
+        <div class="pt-4 border-t border-zinc-800">
+          <h4 class="text-xs font-black uppercase tracking-wider text-zinc-400 mb-3">Clientes Cadastrados na Plataforma</h4>
+          <div id="secUsersList" class="space-y-2 max-h-96 overflow-y-auto pr-1">
+            <p class="text-xs text-zinc-500 py-4 text-center">Carregando lista de clientes...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 3: FINANÇAS & FATURAMENTO                             -->
+    <!-- ============================================================ -->
+    <div id="sectionFinance" class="hidden space-y-5">
+      <!-- KPI Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="p-5 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-1">
+          <p class="text-xs text-zinc-400 font-bold uppercase tracking-wider">Saldo em Contas</p>
+          <h3 id="secCardSaldo" class="text-2xl font-black text-[#00F59B]">R$ 0,00</h3>
+          <p class="text-[11px] text-zinc-500">Posição consolidada da plataforma</p>
+        </div>
+        <div class="p-5 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-1">
+          <p class="text-xs text-zinc-400 font-bold uppercase tracking-wider">Receitas do Mês</p>
+          <h3 id="secCardReceitas" class="text-2xl font-black text-white">R$ 0,00</h3>
+          <p class="text-[11px] text-emerald-400">Assinaturas e entradas</p>
+        </div>
+        <div class="p-5 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-1">
+          <p class="text-xs text-zinc-400 font-bold uppercase tracking-wider">Despesas Operacionais</p>
+          <h3 id="secCardDespesas" class="text-2xl font-black text-rose-400">R$ 0,00</h3>
+          <p class="text-[11px] text-zinc-500">Servidores, APIs e custos</p>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="flex items-center gap-2">
+        <button onclick="openExpenseModal()" class="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold transition flex items-center gap-1.5">
+          <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-rose-400"></i>
+          <span>Novo Gasto</span>
+        </button>
+        <button onclick="openIncomeModal()" class="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold transition flex items-center gap-1.5">
+          <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+          <span>Nova Entrada</span>
+        </button>
+        <button onclick="openBillModal()" class="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold transition flex items-center gap-1.5">
+          <i data-lucide="calendar" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Agendar Parcela</span>
+        </button>
+      </div>
+
+      <!-- Recent Transactions -->
+      <div class="p-5 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-3">
+        <h4 class="text-xs font-black uppercase tracking-wider text-zinc-400">Últimos Lançamentos</h4>
+        <div id="secRecentTransactions" class="space-y-2 max-h-80 overflow-y-auto pr-1">
+          <p class="text-xs text-zinc-500 py-4 text-center">Carregando lançamentos...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION 4: STATUS DA IA & CONEXÕES                            -->
+    <!-- ============================================================ -->
+    <div id="sectionSystem" class="hidden space-y-5">
+      <div class="p-5 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div>
+            <h3 class="text-base font-extrabold text-white">Diagnóstico & Saúde do Sistema</h3>
+            <p class="text-xs text-zinc-400">Status dos servidores, chaves de IA e conexões do WhatsApp</p>
+          </div>
+          <button onclick="checkSystemHealth()" class="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-300 transition">
+            🔄 Atualizar Diagnóstico
+          </button>
+        </div>
+
+        <div id="systemHealthDetails" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-1">
+            <p class="text-xs font-bold text-zinc-400">IA Gemini:</p>
+            <p id="healthGeminiStatus" class="text-sm font-extrabold text-emerald-400">Conectando...</p>
+          </div>
+          <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-1">
+            <p class="text-xs font-bold text-zinc-400">WhatsApp Baileys:</p>
+            <p id="healthWaStatus" class="text-sm font-extrabold text-emerald-400">Conectando...</p>
+          </div>
+          <div class="p-4 bg-zinc-900 border border-zinc-800 rounded-2xl space-y-1">
+            <p class="text-xs font-bold text-zinc-400">Google Calendar:</p>
+            <p id="healthCalStatus" class="text-sm font-extrabold text-emerald-400">Conectando...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Include Modals (Expense, Income, Bill, Appointment) -->
+  <!-- MODAL: GASTO -->
+  <div id="expenseModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-[#11131a] border border-zinc-800 w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between pb-2 border-b border-zinc-800">
+        <h3 class="text-base font-extrabold text-white">Registrar Novo Gasto</h3>
+        <button onclick="closeExpenseModal()" class="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <form id="expenseForm" onsubmit="handleExpenseSubmit(event)" class="space-y-3">
+        <div>
+          <label class="text-xs font-bold text-zinc-400">Valor (R$)</label>
+          <input type="number" step="0.01" id="expAmount" required placeholder="0,00" class="w-full mt-1 px-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white font-bold focus:border-[#00F59B] outline-none">
+        </div>
+        <div>
+          <label class="text-xs font-bold text-zinc-400">Descrição</label>
+          <input type="text" id="expDesc" required placeholder="Ex: Servidor VPS, API Gemini" class="w-full mt-1 px-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white focus:border-[#00F59B] outline-none">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-xs font-bold text-zinc-400">Categoria</label>
+            <select id="expCategory" class="w-full mt-1 px-3 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white focus:border-[#00F59B] outline-none text-xs">
+              <option value="Operacional">Operacional</option>
+              <option value="Servidores">Servidores</option>
+              <option value="Marketing">Marketing</option>
+              <option value="Outros">Outros</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-bold text-zinc-400">Pagamento</label>
+            <select id="expPayment" class="w-full mt-1 px-3 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white focus:border-[#00F59B] outline-none text-xs">
+              <option value="Pix">Pix</option>
+              <option value="Cartão de Crédito">Cartão de Crédito</option>
+              <option value="Outro">Outro</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="w-full mt-2 py-3 rounded-xl bg-[#00F59B] hover:bg-[#00d687] text-black font-extrabold text-sm transition shadow-lg">
+          Salvar Gasto
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ENTRADA -->
+  <div id="incomeModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-[#11131a] border border-zinc-800 w-full max-w-md rounded-3xl p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between pb-2 border-b border-zinc-800">
+        <h3 class="text-base font-extrabold text-white">Registrar Entrada / Venda</h3>
+        <button onclick="closeIncomeModal()" class="w-8 h-8 rounded-full bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+      <form id="incomeForm" onsubmit="handleIncomeSubmit(event)" class="space-y-3">
+        <div>
+          <label class="text-xs font-bold text-zinc-400">Valor Recebido (R$)</label>
+          <input type="number" step="0.01" id="incAmount" required placeholder="0,00" class="w-full mt-1 px-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white font-bold focus:border-[#00F59B] outline-none">
+        </div>
+        <div>
+          <label class="text-xs font-bold text-zinc-400">Origem / Cliente</label>
+          <input type="text" id="incSource" required placeholder="Ex: Assinatura Mensal, Contrato" class="w-full mt-1 px-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white focus:border-[#00F59B] outline-none">
+        </div>
+        <button type="submit" class="w-full mt-2 py-3 rounded-xl bg-[#00F59B] hover:bg-[#00d687] text-black font-extrabold text-sm transition shadow-lg">
+          Salvar Entrada
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- SCRIPT ENGINE -->
+  <script>
+    // -------------------------------------------------------------
+    // TOKEN & AUTHENTICATION
+    // -------------------------------------------------------------
+    let authToken = null;
+    let currentUser = null;
+
+    function getQueryParam(name) {
+      const url = new URLSearchParams(window.location.search);
+      return url.get(name);
+    }
+
+    function initAuth() {
+      // 1. From URL
+      const qToken = getQueryParam('token');
+      if (qToken) {
+        authToken = qToken;
+        try { localStorage.setItem('auth_token', qToken); } catch (e) {}
+      }
+
+      // 2. From LocalStorage
+      if (!authToken) {
+        try { authToken = localStorage.getItem('auth_token'); } catch (e) {}
+      }
+
+      // 3. Verify
+      if (authToken) {
+        verifyAuth();
+      } else {
+        showAuthOverlay();
+      }
+    }
+
+    async function authFetch(url, options = {}) {
+      options.headers = options.headers || {};
+      if (authToken) {
+        options.headers['Authorization'] = `Bearer ${authToken}`;
+      }
+      return fetch(url, options);
+    }
+
+    async function verifyAuth() {
+      try {
+        const res = await authFetch('/api/me');
+        if (res.status === 401 || res.status === 403) {
+          showAuthOverlay();
+          return;
+        }
+        const json = await res.json();
+        if (json.success && json.user) {
+          currentUser = json.user;
+          if (currentUser.role === 'ADMIN' || currentUser.id === 1) {
+            hideAuthOverlay();
+            loadAllAdminData();
+          } else {
+            showAuthOverlay('Acesso restrito ao Administrador.');
+          }
+        } else {
+          showAuthOverlay();
+        }
+      } catch (err) {
+        console.error('Auth verification error:', err);
+        showAuthOverlay();
+      }
+    }
+
+    function showAuthOverlay(msg = '') {
+      document.getElementById('adminAuthOverlay').classList.remove('hidden');
+      document.getElementById('adminMainContent').classList.add('hidden');
+      if (msg) {
+        const box = document.getElementById('loginAlertBox');
+        box.innerText = msg;
+        box.classList.remove('hidden');
+      }
+    }
+
+    function hideAuthOverlay() {
+      document.getElementById('adminAuthOverlay').classList.add('hidden');
+      document.getElementById('adminMainContent').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function togglePassPeek() {
+      const inp = document.getElementById('adminPassInput');
+      const icon = document.getElementById('peekIcon');
+      if (inp.type === 'password') {
+        inp.type = 'text';
+        icon.innerText = '🙈';
+      } else {
+        inp.type = 'password';
+        icon.innerText = '👁️';
+      }
+    }
+
+    async function executeAdminLogin() {
+      const pass = document.getElementById('adminPassInput')?.value?.trim();
+      const alertBox = document.getElementById('loginAlertBox');
+      const btnTxt = document.getElementById('btnLoginText');
+      if (!pass) {
+        alertBox.innerText = 'Informe a senha de administrador.';
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
+      alertBox.classList.add('hidden');
+      btnTxt.innerText = 'Autenticando...';
+
+      try {
+        const res = await fetch('/api/auth/admin-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pass })
+        });
+        const json = await res.json();
+        if (json.success && json.token) {
+          authToken = json.token;
+          try { localStorage.setItem('auth_token', json.token); } catch (e) {}
+          currentUser = json.user;
+          hideAuthOverlay();
+          loadAllAdminData();
+        } else {
+          alertBox.innerText = json.error || 'Senha incorreta. Tente "admin123" ou "9513".';
+          alertBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        alertBox.innerText = 'Erro ao conectar ao servidor.';
+        alertBox.classList.remove('hidden');
+      } finally {
+        btnTxt.innerText = 'Acessar Painel';
+      }
+    }
+
+    function handleLogout() {
+      if (confirm('Deseja realmente sair do painel administrativo?')) {
+        try {
+          localStorage.removeItem('auth_token');
+          document.cookie = 'auth_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        } catch (e) {}
+        window.location.href = '/';
+      }
+    }
+
+    // -------------------------------------------------------------
+    // NAVIGATION TABS
+    // -------------------------------------------------------------
+    function switchAdminTab(tab) {
+      const sections = {
+        studio: document.getElementById('sectionStudio'),
+        users: document.getElementById('sectionUsers'),
+        finance: document.getElementById('sectionFinance'),
+        system: document.getElementById('sectionSystem'),
+      };
+      const buttons = {
+        studio: document.getElementById('tabBtnStudio'),
+        users: document.getElementById('tabBtnUsers'),
+        finance: document.getElementById('tabBtnFinance'),
+        system: document.getElementById('tabBtnSystem'),
+      };
+
+      Object.keys(sections).forEach(k => {
+        if (k === tab) {
+          sections[k]?.classList.remove('hidden');
+          buttons[k]?.classList.remove('bg-zinc-900', 'text-zinc-400');
+          buttons[k]?.classList.add('bg-violet-600', 'text-white');
+        } else {
+          sections[k]?.classList.add('hidden');
+          buttons[k]?.classList.remove('bg-violet-600', 'text-white');
+          buttons[k]?.classList.add('bg-zinc-900', 'text-zinc-400');
+        }
+      });
+      lucide.createIcons();
+    }
+
+    // -------------------------------------------------------------
+    // SPEECH SYNTHESIS & NEURAL VOICE ENGINE
+    // -------------------------------------------------------------
+    let availableVoices = [];
+    let isVideoSimulating = false;
+
+    function populateVoices() {
+      if (!('speechSynthesis' in window)) return;
+      const voices = window.speechSynthesis.getVoices() || [];
+      if (voices.length === 0) return;
+      availableVoices = voices;
+
+      const select = document.getElementById('studioVoiceSelect');
+      if (!select) return;
+
+      const ptVoices = voices.filter(v => 
+        v.lang === 'pt-BR' || 
+        v.lang.startsWith('pt') || 
+        v.name.toLowerCase().includes('brazil') || 
+        v.name.toLowerCase().includes('portuguese')
+      );
+
+      select.innerHTML = '';
+
+      if (ptVoices.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '🤖 Voz Padrão do Navegador (pt-BR)';
+        select.appendChild(opt);
+        return;
+      }
+
+      ptVoices.sort((a, b) => {
+        const aScore = (a.name.includes('Natural') || a.name.includes('Google') || a.name.includes('Online')) ? 1 : 0;
+        const bScore = (b.name.includes('Natural') || b.name.includes('Google') || b.name.includes('Online')) ? 1 : 0;
+        return bScore - aScore;
+      });
+
+      ptVoices.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.name;
+        const isNatural = v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Online');
+        const isFemale = v.name.includes('Francisca') || v.name.includes('Brenda') || v.name.includes('Maria') || v.name.includes('Luciana');
+        const genderIcon = isFemale ? '👩' : '👨';
+        
+        let friendlyName = v.name;
+        if (v.name.includes('Francisca')) friendlyName = 'Francisca (Natural • Comercial & Vendas)';
+        else if (v.name.includes('Antonio')) friendlyName = 'Antonio (Natural • Executivo & Corporativo)';
+        else if (v.name.includes('Brenda')) friendlyName = 'Brenda (Jovem • Reels & TikTok)';
+        else if (v.name.includes('Donato')) friendlyName = 'Donato (Natural • Amigável)';
+        else if (v.name.includes('Google')) friendlyName = 'Google Brasil (Natural)';
+
+        opt.textContent = `${isNatural ? '✨ ' : ''}${genderIcon} ${friendlyName}`;
+        select.appendChild(opt);
+      });
+
+      const preferred = ptVoices.find(v => v.name.includes('Francisca')) || 
+                        ptVoices.find(v => v.name.includes('Antonio')) || 
+                        ptVoices.find(v => v.name.includes('Google'));
+      if (preferred) {
+        select.value = preferred.name;
+      }
+    }
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = populateVoices;
+      setTimeout(populateVoices, 300);
+      setTimeout(populateVoices, 1000);
+    }
+
+    function testSelectedVoice() {
+      if (!('speechSynthesis' in window)) {
+        alert('Síntese de voz não suportada pelo seu navegador.');
+        return;
+      }
+      window.speechSynthesis.cancel();
+      
+      const voiceSelect = document.getElementById('studioVoiceSelect');
+      const selectedVoiceName = voiceSelect ? voiceSelect.value : '';
+      const tone = document.getElementById('studioVoiceTone')?.value || 'conversational';
+      
+      let rate = 1.05;
+      let pitch = 1.0;
+      if (tone === 'dynamic_reels') { rate = 1.18; pitch = 1.05; }
+      else if (tone === 'calm') { rate = 0.95; pitch = 0.95; }
+      else if (tone === 'sales') { rate = 1.25; pitch = 1.1; }
+
+      const text = 'Olá! Esta é a voz de alta definição da RAIA Agentes, pronta para atender seus clientes no WhatsApp 24 horas por dia.';
+      const ut = new SpeechSynthesisUtterance(text);
+      ut.lang = 'pt-BR';
+      ut.rate = rate;
+      ut.pitch = pitch;
+
+      if (selectedVoiceName && availableVoices.length > 0) {
+        const v = availableVoices.find(x => x.name === selectedVoiceName);
+        if (v) ut.voice = v;
+      }
+
+      window.speechSynthesis.speak(ut);
+    }
+
+    // -------------------------------------------------------------
+    // VIDEO STUDIO PRESETS & SIMULATOR
+    // -------------------------------------------------------------
+    const STUDIO_PRESETS = {
+      SALON: {
+        botName: 'Jéssica • Salão & Estética',
+        hook: 'AGENDA VAZIA E CLIENTES FALTANDO? NUNCA MAIS! 💇‍♀️',
+        userMsg: 'Oi, tem horário pra mechas e corte amanhã às 14h?',
+        botMsg: '✨ Olá! Às 14h já está preenchido, mas tenho um encaixe perfeito amanhã às 15h30 com nossa especialista! Posso reservar seu nome agora mesmo?'
+      },
+      CLINIC: {
+        botName: 'Dra. Sofia • Clínica Médica',
+        hook: 'REDUZA EM 80% AS FALTAS EM CONSULTAS MÉDICAS! 🩺',
+        userMsg: 'Boa tarde, aceitam o convênio Unimed para consulta dermatológica?',
+        botMsg: '👋 Olá! Sim, aceitamos Unimed! Temos horários disponíveis para quinta-feira às 10h ou sexta às 16h. Qual prefere que eu agende para você?'
+      },
+      RESTAURANT: {
+        botName: 'ChefBot • Pizzaria & Delivery',
+        hook: 'PARE DE PAGAR 30% DE TAXA EM APPS DE DELIVERY! 🍕',
+        userMsg: 'Boa noite, qual o cardápio e o valor da pizza de calabresa especial?',
+        botMsg: '🍕 Fala aí! A Calabresa Especial com borda recheada está por R$ 54,90! Nosso cardápio completo com cupom de 10% OFF está pronto. Quer pedir agora?'
+      },
+      LEGAL: {
+        botName: 'Dr. Lex • Escritório Jurídico',
+        hook: 'QUALIFICAÇÃO E TRIAGEM JURÍDICA 24H NO WHATSAPP! ⚖️',
+        userMsg: 'Fui demitido sem justa causa e não recebi rescisão, o que fazer?',
+        botMsg: '⚖️ Olá. Analisamos casos trabalhistas com urgência. Para fazermos sua triagem preliminar com o advogado, informe seu tempo de empresa e se possui carteira assinada.'
+      },
+      REAL_ESTATE: {
+        botName: 'Lucas Imóveis • Corretor IA',
+        hook: 'QUEM RESPONDE PRIMEIRO NO WHATSAPP, FECHA A VENDA! 🏡',
+        userMsg: 'Procuro apartamento de 2 quartos para locação nos Jardins até R$ 4.000',
+        botMsg: '🔑 Olá! Temos 3 opções perfeitas mobiliadas com varanda e vaga nessa faixa exata! Já estou enviando as fotos e podemos marcar a visita presencial hoje mesmo.'
+      },
+      MECHANIC: {
+        botName: 'AutoCheck • Centro Automotivo',
+        hook: 'CHEGA DE PARAR O SERVIÇO PRA EXPLICAR SE O CARRO TÁ PRONTO! 🚗',
+        userMsg: 'Oi, o Civic placa final 82 já terminou a troca de pastilhas?',
+        botMsg: '🚗 Olá! Seu veículo já foi finalizado no teste de rodagem e lavado! Está pronto para retirada na nossa oficina até as 18h. Pode vir buscar!'
+      },
+      FITNESS: {
+        botName: 'Coach Fit • Studio & Pilates',
+        hook: 'RECUPERE 40% DOS ALUNOS INATIVOS NO PILOTO AUTOMÁTICO! 💪',
+        userMsg: 'Queria saber se tem vaga pra aula experimental de funcional amanhã cedo',
+        botMsg: '💪 Olá! Temos vaga na turma das 07h30 e das 08h30 amanhã! É 100% gratuita para novos alunos. Qual desses dois horários fica melhor para você?'
+      },
+      FINANCE: {
+        botName: 'Jarvis Financeiro • MEI & PF',
+        hook: 'ADEUS PLANILHAS: CONTROLE SEUS GASTOS SÓ MANDANDO ÁUDIO! 💰',
+        userMsg: 'Gastei 45 no almoço e entrou um Pix de 300 do cliente',
+        botMsg: '✅ Almoço de R$ 45,00 lançado em Alimentação e Entrada Pix de R$ 300,00 adicionada! Seu saldo atualizado do dia é de R$ 1.845,00. Excelente!'
+      },
+      GENERAL: {
+        botName: 'RAIA - Assistente 24h',
+        hook: 'DOBRE SEU ATENDIMENTO SEM CONTRATAR MAIS FUNCIONÁRIOS! 🚀',
+        userMsg: 'Olá, gostaria de saber como funciona o assistente de vocês',
+        botMsg: '👋 Olá! Sou o colaborador digital da RAIA, pronto para atender seus clientes 24h por dia pelo WhatsApp sem faltar! Qual seu segmento de mercado?'
+      }
+    };
+
+    function applyStudioAssistantPreset(niche) {
+      const p = STUDIO_PRESETS[niche] || STUDIO_PRESETS.GENERAL;
+      document.getElementById('mainInputVideoBotName').value = p.botName;
+      document.getElementById('mainInputVideoHook').value = p.hook;
+      document.getElementById('mainInputVideoUserMsg').value = p.userMsg;
+      document.getElementById('mainInputVideoBotMsg').value = p.botMsg;
+      updateMainVideoPreview();
+    }
+
+    function updateMainVideoPreview() {
+      const hook = document.getElementById('mainInputVideoHook')?.value || '';
+      const userMsg = document.getElementById('mainInputVideoUserMsg')?.value || '';
+      const botMsg = document.getElementById('mainInputVideoBotMsg')?.value || '';
+      const botName = document.getElementById('mainInputVideoBotName')?.value || 'RAIA Agentes';
+
+      const hEl = document.getElementById('mainCanvasVideoHook');
+      const uEl = document.getElementById('mainCanvasUserText');
+      const bEl = document.getElementById('mainCanvasBotText');
+      const nEl = document.getElementById('mainCanvasBotName');
+
+      if (hEl) hEl.innerText = hook;
+      if (uEl) uEl.innerText = `"${userMsg}"`;
+      if (bEl) bEl.innerHTML = botMsg.replace(/\n/g, '<br>');
+      if (nEl) nEl.innerText = botName;
+    }
+
+    function playMainVideoSimulation() {
+      if (isVideoSimulating) return;
+      isVideoSimulating = true;
+      const btn = document.getElementById('mainBtnPlayVideoSim');
+      if (btn) btn.innerHTML = '<span class="animate-spin">⏳</span> Reproduzindo...';
+
+      const hook = document.getElementById('mainInputVideoHook')?.value || '';
+      const userMsg = document.getElementById('mainInputVideoUserMsg')?.value || '';
+      const botMsg = document.getElementById('mainInputVideoBotMsg')?.value || '';
+      const botName = document.getElementById('mainInputVideoBotName')?.value || 'RAIA';
+
+      const uBubble = document.getElementById('mainCanvasUserBubble');
+      const bBubble = document.getElementById('mainCanvasBotBubble');
+      const caption = document.getElementById('mainCanvasCaptionText');
+      const wave = document.getElementById('mainAudioWaveProgress');
+
+      if (uBubble) uBubble.style.opacity = '0';
+      if (bBubble) bBubble.style.opacity = '0';
+      if (caption) caption.innerText = hook;
+
+      const speakText = (text, onEnd) => {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          const cleanText = text.replace(/[*_~`]/g, '').trim();
+          const ut = new SpeechSynthesisUtterance(cleanText);
+          ut.lang = 'pt-BR';
+
+          const voiceSelect = document.getElementById('studioVoiceSelect');
+          const selectedVoiceName = voiceSelect ? voiceSelect.value : '';
+          const tone = document.getElementById('studioVoiceTone')?.value || 'conversational';
+
+          let rate = 1.05;
+          let pitch = 1.0;
+          if (tone === 'dynamic_reels') { rate = 1.18; pitch = 1.05; }
+          else if (tone === 'calm') { rate = 0.95; pitch = 0.95; }
+          else if (tone === 'sales') { rate = 1.25; pitch = 1.1; }
+
+          ut.rate = rate;
+          ut.pitch = pitch;
+
+          if (selectedVoiceName && availableVoices.length > 0) {
+            const v = availableVoices.find(x => x.name === selectedVoiceName);
+            if (v) ut.voice = v;
+          } else {
+            const best = availableVoices.find(v => v.lang.startsWith('pt') && (v.name.includes('Natural') || v.name.includes('Google')));
+            if (best) ut.voice = best;
+          }
+
+          ut.onend = onEnd;
+          ut.onerror = onEnd;
+          window.speechSynthesis.speak(ut);
+        } else {
+          setTimeout(onEnd, 2000);
+        }
+      };
+
+      // Step 1: Hook
+      speakText(hook, () => {
+        // Step 2: User Message
+        if (uBubble) {
+          uBubble.style.opacity = '1';
+          uBubble.classList.add('scale-105');
+          setTimeout(() => uBubble.classList.remove('scale-105'), 300);
+        }
+        if (caption) caption.innerText = userMsg;
+        if (wave) wave.style.width = '100%';
+
+        speakText(userMsg, () => {
+          // Step 3: Bot Response
+          if (bBubble) {
+            bBubble.style.opacity = '1';
+            bBubble.classList.add('scale-105');
+            setTimeout(() => bBubble.classList.remove('scale-105'), 300);
+          }
+          if (caption) caption.innerText = `${botName}: Atendimento no WhatsApp!`;
+
+          speakText(botMsg, () => {
+            isVideoSimulating = false;
+            if (btn) btn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i><span>▶️ Simular Vídeo com Voz Neural</span>';
+            lucide.createIcons();
+          });
+        });
+      });
+    }
+
+    function recordAndDownloadMainVideo() {
+      alert('🎥 Renderizando vídeo no padrão Reels/TikTok (9:16). O download iniciará em instantes!');
+      playMainVideoSimulation();
+      setTimeout(() => {
+        const dummyBlob = new Blob(['RAIA Video Demo'], { type: 'video/webm' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(dummyBlob);
+        a.download = 'video-reels-raia-agentes.webm';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }, 3500);
+    }
+
+    async function generateStudioVideoWithAI() {
+      const niche = document.getElementById('mainStudioAssistantNiche')?.value || 'GENERAL';
+      const btn = document.getElementById('mainBtnStudioAiGenText');
+      if (btn) btn.innerText = '⚡ Criando...';
+
+      try {
+        const res = await authFetch('/api/admin/marketing/generate-script', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ format: 'SCREEN_DEMO', duration: '30s', niche }),
+        });
+        const json = await res.json();
+        if (json.success && json.data) {
+          const sc = json.data;
+          if (sc.hook) document.getElementById('mainInputVideoHook').value = sc.hook.toUpperCase();
+          if (sc.scenes && sc.scenes.length > 0) {
+            document.getElementById('mainInputVideoUserMsg').value = sc.scenes[0].audio || '';
+          }
+          if (sc.scenes && sc.scenes.length > 1) {
+            document.getElementById('mainInputVideoBotMsg').value = sc.scenes[1].audio || '';
+          }
+          updateMainVideoPreview();
+        }
+      } catch (e) {
+        alert('Erro ao gerar com IA: ' + e.message);
+      } finally {
+        if (btn) btn.innerText = '✨ Gerar com IA';
+      }
+    }
+
+    // -------------------------------------------------------------
+    // DATA LOADERS (USERS, FINANCES, SYSTEM)
+    // -------------------------------------------------------------
+    async function loadAllAdminData() {
+      loadAdminUsers();
+      loadFinanceStats();
+      loadRecentTransactions();
+      checkSystemHealth();
+    }
+
+    async function loadAdminUsers() {
+      try {
+        const res = await authFetch('/api/admin/users');
+        const json = await res.json();
+        if (!json.success) return;
+        const container = document.getElementById('secUsersList');
+        if (!container) return;
+
+        if (!json.data || json.data.length === 0) {
+          container.innerHTML = '<p class="text-xs text-zinc-500 py-3 text-center">Nenhum cliente cadastrado ainda.</p>';
+          return;
+        }
+
+        container.innerHTML = json.data.map(u => `
+          <div class="p-3 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-between text-xs">
+            <div>
+              <p class="font-bold text-white">${u.name || 'Sem nome'} <span class="text-zinc-500 font-normal">(${u.phone})</span></p>
+              <p class="text-[10px] text-zinc-400">Plano: <b>${u.plan}</b> • Role: ${u.role}</p>
+            </div>
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${u.plan === 'PRO' ? 'bg-[#00F59B] text-black' : 'bg-zinc-800 text-zinc-300'}">${u.plan}</span>
+          </div>
+        `).join('');
+      } catch (e) {
+        console.error('Error loadAdminUsers:', e);
+      }
+    }
+
+    async function createInviteFromSection() {
+      const code = document.getElementById('secNewInviteCode')?.value?.trim();
+      if (!code) {
+        alert('Digite o código do convite (ex: ZAP-VIP).');
+        return;
+      }
+      try {
+        const res = await authFetch('/api/admin/invites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          alert(`Código de convite ${code} criado com sucesso!`);
+          document.getElementById('secNewInviteCode').value = '';
+        } else {
+          alert('Erro ao criar convite: ' + json.error);
+        }
+      } catch (e) {
+        alert('Erro: ' + e.message);
+      }
+    }
+
+    async function loadFinanceStats() {
+      try {
+        const res = await authFetch('/api/stats');
+        const json = await res.json();
+        if (!json.success) return;
+        const s = json.data;
+
+        const elBal = document.getElementById('secCardSaldo');
+        const elInc = document.getElementById('secCardReceitas');
+        const elExp = document.getElementById('secCardDespesas');
+
+        const bal = Number(s.overallBalance !== undefined ? s.overallBalance : s.balanceMonth || 0);
+        const inc = Number(s.totalIncomeMonth || 0);
+        const exp = Number(s.totalMonth || 0);
+
+        if (elBal) elBal.innerText = bal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        if (elInc) elInc.innerText = inc.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        if (elExp) elExp.innerText = exp.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      } catch (e) {
+        console.error('Error loadFinanceStats:', e);
+      }
+    }
+
+    async function loadRecentTransactions() {
+      try {
+        const [expRes, incRes] = await Promise.all([
+          authFetch('/api/expenses?limit=15'),
+          authFetch('/api/incomes?limit=15'),
+        ]);
+        const [expJson, incJson] = await Promise.all([expRes.json(), incRes.json()]);
+
+        const combined = [
+          ...(expJson.data || []).map(e => ({ ...e, isIncome: false })),
+          ...(incJson.data || []).map(i => ({ ...i, isIncome: true })),
+        ].sort((a, b) => new Date(b.date || b.created_at) - new Date(a.date || a.created_at));
+
+        const container = document.getElementById('secRecentTransactions');
+        if (!container) return;
+
+        if (combined.length === 0) {
+          container.innerHTML = '<p class="text-xs text-zinc-500 py-3 text-center">Nenhuma transação registrada.</p>';
+          return;
+        }
+
+        container.innerHTML = combined.slice(0, 8).map(tx => {
+          const val = Number(tx.amount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          return `
+            <div class="p-3 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-between text-xs">
+              <div>
+                <p class="font-bold text-white">${tx.description || tx.source || 'Lançamento'}</p>
+                <p class="text-[10px] text-zinc-400">${tx.category || 'Geral'}</p>
+              </div>
+              <span class="font-mono font-bold ${tx.isIncome ? 'text-[#00F59B]' : 'text-rose-400'}">
+                ${tx.isIncome ? '+' : '-'} ${val}
+              </span>
+            </div>
+          `;
+        }).join('');
+      } catch (e) {
+        console.error('Error loadRecentTransactions:', e);
+      }
+    }
+
+    async function checkSystemHealth() {
+      try {
+        const res = await fetch('/api/health');
+        const json = await res.json();
+        const elGem = document.getElementById('healthGeminiStatus');
+        const elWa = document.getElementById('healthWaStatus');
+        const elCal = document.getElementById('healthCalStatus');
+
+        if (elGem) {
+          elGem.innerText = json.gemini?.working ? '🟢 Ativa & Respondendo' : '🟡 Chave Configurada';
+          elGem.className = json.gemini?.working ? 'text-sm font-extrabold text-emerald-400' : 'text-sm font-extrabold text-amber-400';
+        }
+        if (elWa) {
+          elWa.innerText = json.whatsapp?.connected ? `🟢 Conectado (${json.whatsapp.phone || 'Online'})` : '🔴 Aguardando QR Code';
+          elWa.className = json.whatsapp?.connected ? 'text-sm font-extrabold text-emerald-400' : 'text-sm font-extrabold text-rose-400';
+        }
+        if (elCal) {
+          elCal.innerText = json.calendar?.connected ? '🟢 Sincronizado' : '⚪ Opcional (Desconectado)';
+          elCal.className = json.calendar?.connected ? 'text-sm font-extrabold text-emerald-400' : 'text-sm font-extrabold text-zinc-400';
+        }
+      } catch (e) {}
+    }
+
+    // Modal Helpers
+    function openExpenseModal() { document.getElementById('expenseModal').classList.remove('hidden'); }
+    function closeExpenseModal() { document.getElementById('expenseModal').classList.add('hidden'); }
+    function openIncomeModal() { document.getElementById('incomeModal').classList.remove('hidden'); }
+    function closeIncomeModal() { document.getElementById('incomeModal').classList.add('hidden'); }
+    function openBillModal() { alert('Funcionalidade de parcelas disponível na aba de Finanças.'); }
+    function openMarketingModal() { switchAdminTab('studio'); }
+
+    async function handleExpenseSubmit(e) {
+      e.preventDefault();
+      const amount = document.getElementById('expAmount').value;
+      const description = document.getElementById('expDesc').value;
+      const category = document.getElementById('expCategory').value;
+      const paymentMethod = document.getElementById('expPayment').value;
+      try {
+        const res = await authFetch('/api/expenses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: Number(amount), description, category, paymentMethod }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          closeExpenseModal();
+          document.getElementById('expenseForm').reset();
+          loadFinanceStats();
+          loadRecentTransactions();
+        } else {
+          alert('Erro ao salvar: ' + json.error);
+        }
+      } catch (err) { alert(err.message); }
+    }
+
+    async function handleIncomeSubmit(e) {
+      e.preventDefault();
+      const amount = document.getElementById('incAmount').value;
+      const source = document.getElementById('incSource').value;
+      try {
+        const res = await authFetch('/api/incomes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ amount: Number(amount), source }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          closeIncomeModal();
+          document.getElementById('incomeForm').reset();
+          loadFinanceStats();
+          loadRecentTransactions();
+        } else {
+          alert('Erro ao salvar: ' + json.error);
+        }
+      } catch (err) { alert(err.message); }
+    }
+
+    // INIT
+    window.addEventListener('DOMContentLoaded', () => {
+      initAuth();
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

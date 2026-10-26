@@ -18,6 +18,15 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.resolve(__dirname, '../../public')));
 
+// Explicit SPA routes
+app.get(['/admin', '/admin.html', '/dashboard', '/painel'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../public/admin.html'));
+});
+
+app.get(['/', '/index.html', '/vitrine'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../public/index.html'));
+});
+
 // Helper to extract cookies from request header
 function getCookie(req, name) {
   const cookieHeader = req.headers.cookie;
@@ -169,7 +178,7 @@ app.get('/auth/magic', (req, res) => {
 
   // Set auth cookie for 10 years (permanent)
   res.setHeader('Set-Cookie', `auth_token=${token}; Path=/; Max-Age=${10 * 365 * 24 * 3600}; SameSite=Lax`);
-  return res.redirect(`/?token=${token}`);
+  return res.redirect(`/admin?token=${token}`);
 });
 
 // ==========================================
