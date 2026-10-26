@@ -108,22 +108,41 @@
 
       <!-- Plan Badge: Assistente Pro ⭐ -->
       <div class="flex items-center gap-2">
-        <button id="adminQuickBtn" onclick="openAdminModal()" class="hidden px-2.5 py-1 text-xs font-bold bg-zinc-800 text-zinc-300 hover:text-white rounded-full border border-zinc-700 transition">
+        <button id="marketingQuickBtn" onclick="openMarketingModal()" class="px-3 py-1.5 text-xs font-extrabold bg-gradient-to-r from-purple-600 via-pink-600 to-indigo-600 text-white hover:opacity-95 rounded-full border border-purple-400/40 transition flex items-center gap-1.5 shadow-md shadow-purple-600/20 active:scale-95">
+          <i data-lucide="video" class="w-3.5 h-3.5"></i>
+          <span>🚀 Marketing</span>
+        </button>
+        <button id="adminQuickBtn" onclick="openAdminModal()" class="px-2.5 py-1.5 text-xs font-bold bg-zinc-800 text-zinc-300 hover:text-white rounded-full border border-zinc-700 transition">
           Admin
         </button>
-        <button id="marketingQuickBtn" onclick="openMarketingModal()" class="hidden px-2.5 py-1 text-xs font-bold bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:opacity-90 rounded-full border border-purple-400/30 transition flex items-center gap-1 shadow-sm">
-          <i data-lucide="video" class="w-3.5 h-3.5"></i>
-          <span>Marketing</span>
-        </button>
-        <div id="assistenteProBadge" class="px-3.5 py-1.5 rounded-full bg-[#ccff00] text-black font-extrabold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition cursor-pointer" onclick="openPixModal()">
-          <span>Assistente Pro</span>
-          <i data-lucide="sparkles" class="w-3.5 h-3.5 fill-black stroke-black"></i>
+        <div id="assistenteProBadge" class="px-3 py-1.5 rounded-full bg-[#ccff00] text-black font-extrabold text-xs flex items-center gap-1 shadow-sm active:scale-95 transition cursor-pointer" onclick="openPixModal()">
+          <span>Pro</span>
+          <i data-lucide="sparkles" class="w-3 h-3 fill-black stroke-black"></i>
         </div>
         <button id="logoutBtn" onclick="handleLogout()" title="Sair do painel" class="w-8 h-8 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-rose-400 flex items-center justify-center transition border border-zinc-800 shrink-0">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
         </button>
       </div>
     </header>
+
+    <!-- BANNER DE DESTAQUE: ESTÚDIO DE MARKETING & VENDAS -->
+    <div onclick="openMarketingModal()" class="cursor-pointer p-4 rounded-3xl bg-gradient-to-r from-purple-950/70 via-indigo-950/60 to-zinc-900 border border-purple-500/40 hover:border-purple-400 shadow-xl shadow-purple-950/40 flex items-center justify-between active:scale-98 transition">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-500 flex items-center justify-center text-white shadow-md shrink-0">
+          <i data-lucide="video" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-extrabold text-white flex items-center gap-1.5">
+            <span>Estúdio de Marketing & Vídeos</span>
+            <span class="text-[9px] px-1.5 py-0.5 rounded-full bg-[#ccff00] text-black font-black uppercase">NOVO</span>
+          </h3>
+          <p class="text-[11px] text-zinc-300">Roteiros de 15s/30s com IA, ganchos virais e anúncios</p>
+        </div>
+      </div>
+      <div class="w-7 h-7 rounded-full bg-purple-900/60 flex items-center justify-center text-purple-300 shrink-0">
+        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+      </div>
+    </div>
 
     <!-- 2. TOTAL EM FATURAS / CONECTAR BANCOS (CAROUSEL BANNER) -->
     <div class="pierre-card p-5 relative overflow-hidden">
