@@ -3,9 +3,10 @@ chcp 65001 > nul
 title Atualizar RAIA Agentes - GitHub e Easypanel
 echo ========================================================
 echo   ATUALIZANDO RAIA AGENTES
-echo   - Vitrine Publica dos Agentes na Raiz (raiaagentes.com.br)
-echo   - Painel do Administrador Protegido em /admin
-echo   - Motor de Vozes Neurais Naturais e Seletor de Ritmo
+echo   - Fluxo Guiado em 2 Passos:
+echo     1. Gerar Prompt e Storytelling com IA (A Historia)
+echo     2. Pegar as Informacoes e Criar o Video no WhatsApp
+echo   - Vozes Neurais de Alta Definicao (Google Studio Neural)
 echo ========================================================
 echo.
 cd /d "c:\Users\Acer\Downloads\assistente zap"
@@ -13,8 +14,8 @@ cd /d "c:\Users\Acer\Downloads\assistente zap"
 echo [1/3] Adicionando arquivos alterados...
 git add .
 
-echo [2/3] Criando versao com vitrine publica e painel admin...
-git commit -m "feat: vitrine publica dos agentes na raiz e painel administrativo protegido em /admin com vozes neurais"
+echo [2/3] Criando versao com esteira de storytelling e video...
+git commit -m "feat: esteira em 2 etapas (storytelling com IA -> criar video whatsapp) e vozes neurais google studio"
 
 echo [3/3] Enviando para o GitHub...
 git push

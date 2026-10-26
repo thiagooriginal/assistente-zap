@@ -490,6 +490,35 @@ app.post('/api/admin/marketing/generate-script', authMiddleware, async (req, res
 });
 
 // ==========================================
+// HIGH DEFINITION NEURAL TTS AUDIO STREAMING
+// ==========================================
+app.get('/api/tts', async (req, res) => {
+  try {
+    const text = (req.query.text || '').substring(0, 500).replace(/[*_~`#]/g, '').trim();
+    if (!text) return res.status(400).send('Texto não fornecido');
+
+    const googleTtsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=pt-BR&client=tw-ob`;
+    const response = await fetch(googleTtsUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google TTS status: ${response.status}`);
+    }
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const arrayBuffer = await response.arrayBuffer();
+    return res.send(Buffer.from(arrayBuffer));
+  } catch (err) {
+    console.error('Erro em /api/tts:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
 // AVATAR VIDEO GENERATION (D-ID / HEYGEN)
 // ==========================================
 app.post('/api/admin/marketing/generate-avatar-video', authMiddleware, async (req, res) => {

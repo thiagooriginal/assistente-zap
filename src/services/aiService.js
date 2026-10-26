@@ -664,9 +664,14 @@ function getFallbackScript(format = 'SCREEN_DEMO', duration = '30s', niche = 'SA
   const profile = NICHE_PROFILES[niche] || NICHE_PROFILES.SALON;
   return {
     title: `Vídeo para ${profile.name}: Automatizando o WhatsApp`,
-    hook: profile.hookSample,
+    storytelling: `História de dor e superação: O profissional de ${profile.name.toLowerCase()} perdia clientes por demorar para responder ou sofria com furos na agenda. Ao ativar a IA no WhatsApp, o atendimento passou a ser em 3 segundos, aumentando o faturamento.`,
+    hook: profile.hookSample.toUpperCase(),
+    clientQuestion: profile.userMsgSample,
+    botAnswer: profile.botMsgSample,
+    botName: `RAIA • ${profile.name.split(',')[0]}`,
     duration: duration,
     format: format,
+    niche: profile.name,
     scenes: [
       {
         time: '0s - 3s',
@@ -717,19 +722,27 @@ SEGMENTO ESCOLHIDO PARA ESTE VÍDEO:
 ${customPrompt ? `\n[INSTRUÇÃO PERSONALIZADA DO USUÁRIO]:\n"${customPrompt}"\nUse esta instrução com PRIORIDADE MÁXIMA para moldar o tema, os exemplos, as dores e a proposta do vídeo!\n` : ''}
 
 PARÂMETROS DO VÍDEO:
-- Formato: ${format} (SCREEN_DEMO - tela gravando o WhatsApp, TALKING_AVATAR - pessoa ou avatar falando, PAIN_RELIEF - dor vs alívio, VS_SPREADSHEET - demitindo o método antigo)
-- Duração: ${duration} (15s, 30s ou 45s)
+- Formato: ${format}
+- Duração: ${duration}
 
-REQUISITOS DO ROTEIRO:
-1. Gancho (Hook) ultra-atraente nos primeiros 3 segundos direcionado diretamente para donos ou clientes de ${profile.name}.
-2. Cenas práticas e dinâmicas com marcação de tempo, descrição visual do que mostrar na tela, fala/áudio realista e texto curto para colocar em destaque na tela (estilo Reels/TikTok).
-3. Chamada para Ação (CTA) forte e irresistível para chamar no WhatsApp / link da bio para testar o assistente.
-4. Linguagem autêntica, brasileira, dinâmica e persuasiva.
+REQUISITOS DO STORYTELLING E ROTEIRO:
+1. "storytelling": Descreva uma história envolvente e autêntica de dor vs superação (uma situação real do dia a dia desse nicho onde um cliente chama e a IA resolve com maestria).
+2. "hook": Frase de impacto nos primeiros 3 segundos em LETRAS MAIÚSCULAS direcionada a donos ou clientes de ${profile.name}.
+3. "clientQuestion": A fala ou áudio exato e realista que o cliente manda no WhatsApp (pergunta, dúvida ou pedido urgente).
+4. "botAnswer": A resposta imediata, cordial e humana que o assistente de IA responde no WhatsApp resolvendo tudo.
+5. "botName": Nome do assistente para esse nicho (ex: Jéssica • Salão & Estética, Dra. Sofia • Clínica Médica).
+6. Cenas práticas ("scenes") com marcação de tempo.
+7. "caption": Legenda completa pronta para o Reels/TikTok com emojis.
+8. "hashtags": Hashtags virais.
 
-Retorne EXCLUSIVAMENTE um objeto JSON válido (sem blocos markdown extras):
+Retorne EXCLUSIVAMENTE um objeto JSON válido:
 {
   "title": "Título chamativo do roteiro",
-  "hook": "Frase de impacto dos primeiros 3 segundos",
+  "storytelling": "Narrativa da história do cliente e da dor que foi resolvida",
+  "hook": "GANCHO DE IMPACTO DOS PRIMEIROS 3 SEGUNDOS EM MAIÚSCULAS",
+  "clientQuestion": "Fala ou áudio realista do cliente no WhatsApp",
+  "botAnswer": "Resposta imediata da IA no WhatsApp",
+  "botName": "Nome do Assistente (ex: Jéssica • Salão & Estética)",
   "duration": "${duration}",
   "format": "${format}",
   "niche": "${profile.name}",
@@ -750,7 +763,14 @@ Retorne EXCLUSIVAMENTE um objeto JSON válido (sem blocos markdown extras):
     const text = res.response.text();
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
-      return JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(jsonMatch[0]);
+      if (!parsed.clientQuestion && parsed.scenes && parsed.scenes[1]) {
+        parsed.clientQuestion = parsed.scenes[1].audio;
+      }
+      if (!parsed.botAnswer && parsed.scenes && parsed.scenes[2]) {
+        parsed.botAnswer = parsed.scenes[2].audio;
+      }
+      return parsed;
     }
     return getFallbackScript(format, duration, chosenNiche, customPrompt);
   } catch (err) {
