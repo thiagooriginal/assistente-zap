@@ -100,13 +100,15 @@
         496
       ],
       "parameters": {
-        "modelName": "models/gemini-2.5-flash",
-        "options": {}
+        "modelName": "models/gemini-1.5-flash",
+        "options": {
+          "temperature": 0.4
+        }
       },
       "credentials": {
         "googlePalmApi": {
-          "id": "elAZTspQT7Yvrg37",
-          "name": "Google Gemini(PaLM) Api account ( PLANO ESTUDANTE)"
+          "id": "RzhtGjHeMKx0dGUq",
+          "name": "Google Gemini Nova (Oficial)"
         }
       }
     },
