@@ -158,6 +158,26 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads(phone);
+
+  CREATE TABLE IF NOT EXISTS asaas_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    asaas_id TEXT UNIQUE,
+    customer_id TEXT,
+    customer_name TEXT,
+    customer_phone TEXT,
+    value REAL,
+    net_value REAL,
+    billing_type TEXT,
+    status TEXT,
+    description TEXT,
+    invoice_url TEXT,
+    pix_payload TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    paid_at TEXT
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_asaas_payments_id ON asaas_payments(asaas_id);
+  CREATE INDEX IF NOT EXISTS idx_asaas_payments_phone ON asaas_payments(customer_phone);
 `);
 
 // 2. Run migrations for existing databases to add user_id column if missing

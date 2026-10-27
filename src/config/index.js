@@ -20,6 +20,9 @@ const config = {
   pixCity: process.env.PIX_CITY || 'SAO PAULO',
   pixPrice: process.env.PIX_PRICE || '29.00',
   pausePersonalAssistant: process.env.PAUSE_PERSONAL_ASSISTANT !== 'false', // Pausado por padrão para não conflitar no mesmo número
+  asaasApiKey: (process.env.ASAAS_API_KEY || '').trim(),
+  asaasApiUrl: process.env.ASAAS_API_URL || 'https://api.asaas.com/v3',
+  asaasWebhookSecret: (process.env.ASAAS_WEBHOOK_SECRET || '').trim(),
 };
 
 module.exports = config;

@@ -11,6 +11,7 @@ const config = require('../config');
 const aiService = require('../services/aiService');
 const calendarService = require('../services/calendarService');
 const whatsappClient = require('../whatsapp/client');
+const asaasService = require('../services/asaasService');
 
 const app = express();
 
@@ -148,6 +149,9 @@ app.get('/api/health', async (req, res) => {
     personalAssistant: {
       paused: Boolean(config.pausePersonalAssistant),
     },
+    asaas: {
+      configured: asaasService.isConfigured(),
+    },
     calendar: {
       connected: calendarService.isCalendarConnected(),
       calendarId: config.googleCalendarId,
@@ -182,6 +186,113 @@ app.post('/api/assistant/toggle-pause', (req, res) => {
       ? 'Assistente pessoal PAUSADO com sucesso.'
       : 'Assistente pessoal REATIVADO com sucesso.'
   });
+});
+
+// ==========================================
+// ASAAS PAYMENT GATEWAY INTEGRATION
+// ==========================================
+app.get('/api/asaas/status', async (req, res) => {
+  try {
+    if (!asaasService.isConfigured()) {
+      return res.json({ success: false, configured: false, message: 'Asaas não configurado.' });
+    }
+    const [account, balance] = await Promise.all([
+      asaasService.getAccount(),
+      asaasService.getBalance().catch(() => ({ balance: 0 })),
+    ]);
+    res.json({
+      success: true,
+      configured: true,
+      account: {
+        name: account.name,
+        status: account.status,
+        cpfCnpj: account.cpfCnpj,
+        email: account.email,
+        mobilePhone: account.mobilePhone,
+      },
+      balance: balance?.balance ?? 0,
+    });
+  } catch (err) {
+    console.error('Erro em /api/asaas/status:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/asaas/create-pix', async (req, res) => {
+  try {
+    const { name, phone, email, cpfCnpj, value, description } = req.body || {};
+    if (!value || Number(value) <= 0) {
+      return res.status(400).json({ success: false, error: 'Informe um valor válido para cobrança.' });
+    }
+
+    const pixCharge = await asaasService.createPixCharge({
+      customerName: name,
+      customerPhone: phone,
+      customerEmail: email,
+      customerCpf: cpfCnpj,
+      value,
+      description,
+    });
+
+    res.json(pixCharge);
+  } catch (err) {
+    console.error('Erro em /api/asaas/create-pix:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/asaas/create-link', async (req, res) => {
+  try {
+    const { name, description, value, maxInstallmentCount } = req.body || {};
+    const link = await asaasService.createPaymentLink({
+      name,
+      description,
+      value: value || 197.00,
+      maxInstallmentCount: maxInstallmentCount || 12,
+    });
+    res.json(link);
+  } catch (err) {
+    console.error('Erro em /api/asaas/create-link:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/webhooks/asaas', async (req, res) => {
+  try {
+    const eventData = req.body || {};
+    const result = await asaasService.handleWebhookEvent(eventData);
+
+    // If payment confirmed and phone is available, notify via WhatsApp
+    if (result.isPaid) {
+      const payment = eventData.payment;
+      try {
+        const row = db.prepare('SELECT customer_name, customer_phone, value FROM asaas_payments WHERE asaas_id = ?').get(payment.id);
+        const phone = row?.customer_phone;
+        const name = row?.customer_name || 'Cliente';
+        const val = Number(payment.value || row?.value || 0).toFixed(2).replace('.', ',');
+
+        if (phone && whatsappClient.sendWhatsAppMessage) {
+          const targetJid = `${String(phone).replace(/\D/g, '')}@s.whatsapp.net`;
+          const confirmationMsg =
+            `🎉 *PAGAMENTO CONFIRMADO!* 🚀\n\n` +
+            `Olá, *${name}*! Confirmamos o recebimento do seu pagamento de *R$ ${val}* via Asaas.\n\n` +
+            `Seu Agente de Inteligência Artificial da RAIA RH foi ativado com sucesso!\n\n` +
+            `Nossa equipe de suporte técnico e engenharia de IA entrará em contato em instantes para os ajustes finais do seu fluxo de atendimento.\n\n` +
+            `Dúvidas? Basta responder esta mensagem!`;
+
+          await whatsappClient.sendWhatsAppMessage(targetJid, confirmationMsg);
+          console.log(`[Asaas Webhook] Notificação de pagamento enviada para WhatsApp ${phone}`);
+        }
+      } catch (waErr) {
+        console.warn('[Asaas Webhook] Erro ao enviar notificação WhatsApp:', waErr.message);
+      }
+    }
+
+    res.json({ success: true, received: true });
+  } catch (err) {
+    console.error('Erro em /api/webhooks/asaas:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 // ==========================================
