@@ -19,6 +19,7 @@ const config = {
   pixName: process.env.PIX_NAME || 'RAIA RH',
   pixCity: process.env.PIX_CITY || 'SAO PAULO',
   pixPrice: process.env.PIX_PRICE || '29.00',
+  pausePersonalAssistant: process.env.PAUSE_PERSONAL_ASSISTANT !== 'false', // Pausado por padrão para não conflitar no mesmo número
 };
 
 module.exports = config;

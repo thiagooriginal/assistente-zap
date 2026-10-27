@@ -145,10 +145,42 @@ app.get('/api/health', async (req, res) => {
       connected: isConnected,
       phone: waUser?.id ? waUser.id.split(':')[0] : null,
     },
+    personalAssistant: {
+      paused: Boolean(config.pausePersonalAssistant),
+    },
     calendar: {
       connected: calendarService.isCalendarConnected(),
       calendarId: config.googleCalendarId,
     },
+  });
+});
+
+// ==========================================
+// PAUSE / RESUME PERSONAL ASSISTANT
+// ==========================================
+app.get('/api/assistant/pause-status', (req, res) => {
+  const isPaused = whatsappClient.isPersonalAssistantPaused ? whatsappClient.isPersonalAssistantPaused() : true;
+  res.json({
+    success: true,
+    paused: isPaused,
+    message: isPaused
+      ? 'O assistente pessoal está PAUSADO para não conflitar no mesmo número de WhatsApp.'
+      : 'O assistente pessoal está ATIVO.'
+  });
+});
+
+app.post('/api/assistant/toggle-pause', (req, res) => {
+  const current = whatsappClient.isPersonalAssistantPaused ? whatsappClient.isPersonalAssistantPaused() : true;
+  const next = typeof req.body?.paused === 'boolean' ? req.body.paused : !current;
+  if (whatsappClient.setPersonalAssistantPaused) {
+    whatsappClient.setPersonalAssistantPaused(next);
+  }
+  res.json({
+    success: true,
+    paused: next,
+    message: next
+      ? 'Assistente pessoal PAUSADO com sucesso.'
+      : 'Assistente pessoal REATIVADO com sucesso.'
   });
 });
 

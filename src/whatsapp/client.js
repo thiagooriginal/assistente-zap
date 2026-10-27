@@ -129,8 +129,12 @@ async function startWhatsAppBot() {
         lastKnownUserJid = sock.user.id.split(':')[0] + '@s.whatsapp.net';
       }
 
-      // Start the Google Calendar reminder daemon
-      startReminderJob(sendWhatsAppMessage, getTargetJid);
+      // Start the Google Calendar reminder daemon (if not paused)
+      if (config.pausePersonalAssistant) {
+        console.log('\n⏸️ [Assistente Pessoal] Rotinas diárias e lembretes do assistente pessoal estão PAUSADOS para evitar conflito no mesmo número.');
+      } else {
+        startReminderJob(sendWhatsAppMessage, getTargetJid);
+      }
     }
   });
 
@@ -182,6 +186,13 @@ async function startWhatsAppBot() {
         }
         lastKnownUserJid = `${clean}@s.whatsapp.net`;
       }
+
+      // If personal assistant is paused, do not reply as personal finance/calendar assistant
+      if (config.pausePersonalAssistant) {
+        console.log(`[WhatsApp] ⏸️ Assistente Pessoal Pausado: ignorando mensagem recebida de ${msg.key.remoteJid} para evitar conflitos no mesmo número.`);
+        continue;
+      }
+
       console.log(`[WhatsApp] Processando mensagem (ID: ${msgId}, de: ${msg.key.remoteJid})`);
       await handleIncomingMessage(sock, msg).catch((err) => {
         console.error('Erro em handleIncomingMessage:', err.message);
@@ -198,5 +209,7 @@ module.exports = {
   getTargetJid,
   isWhatsAppConnected: () => Boolean(currentSock && currentSock.user),
   getWhatsAppUser: () => currentSock?.user || null,
+  isPersonalAssistantPaused: () => Boolean(config.pausePersonalAssistant),
+  setPersonalAssistantPaused: (val) => { config.pausePersonalAssistant = Boolean(val); },
 };
 
