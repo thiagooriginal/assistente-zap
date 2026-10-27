@@ -1,0 +1,300 @@
+{
+  "name": "🏥 RAIA RH - Secretária de Clínica com IA & Agendamento",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 📥 1. RECEBIMENTO DA MENSAGEM (WHATSAPP)\nRecebe a mensagem do paciente via Evolution API, Z-API ou Baileys.",
+        "height": 260,
+        "width": 320,
+        "color": 6
+      },
+      "id": "sticky-1",
+      "name": "Sticky Note - Entrada",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 200]
+    },
+    {
+      "parameters": {
+        "content": "## 🧠 2. CÉREBRO DA IA (SECRETÁRIA MÉDICA)\n- Identifica especialidade\n- Tira dúvidas de convênios\n- Consulta horários livres\n- Confirma agendamento",
+        "height": 380,
+        "width": 460,
+        "color": 4
+      },
+      "id": "sticky-2",
+      "name": "Sticky Note - Agente",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [40, 140]
+    },
+    {
+      "parameters": {
+        "content": "## 📅 3. FERRAMENTAS MÉDICAS\nConectadas diretamente ao Google Calendar do médico/dentista para verificar e bloquear horários sem conflito.",
+        "height": 280,
+        "width": 380,
+        "color": 5
+      },
+      "id": "sticky-3",
+      "name": "Sticky Note - Tools",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [560, 140]
+    },
+    {
+      "parameters": {
+        "content": "## 💬 4. ENVIO DE CONFIRMAÇÃO\nDevolve a mensagem humanizada pelo WhatsApp com data, hora, endereço e orientações de preparo.",
+        "height": 240,
+        "width": 320,
+        "color": 7
+      },
+      "id": "sticky-4",
+      "name": "Sticky Note - Saida",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1000, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook-whatsapp-clinica",
+        "options": {}
+      },
+      "id": "node-webhook",
+      "name": "Webhook WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-320, 280],
+      "webhookId": "clinica-webhook-entry"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.body?.key?.fromMe || false }}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "node-filter",
+      "name": "Ignorar Próprias Mensagens",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-120, 280]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body?.message?.conversation || $json.body?.message?.extendedTextMessage?.text || 'Olá' }}",
+        "options": {
+          "systemMessage": "Você é a Dra. Camila, recepcionista virtual e assistente executiva da Clínica Médica e Odontológica Viva Bem.\n\nSEU OBJETIVO:\nAtender pacientes de forma calorosa, profissional, ágil e humanizada pelo WhatsApp.\n\nINFORMAÇÕES DA CLÍNICA:\n- Endereço: Av. Paulista, 1000 - Conjunto 42, São Paulo - SP\n- Horário de atendimento: Segunda a Sexta das 08h às 19h. Sábados das 08h às 13h.\n- Convênios aceitos: Unimed, Bradesco Saúde, Amil, SulAmérica e Particular.\n- Especialidades: Odontologia (Clareamento, Limpeza, Implantes, Aparelho), Dermatologia e Nutrição.\n\nDIRETRIZES DE ATENDIMENTO:\n1. Nunca responda com textos longos ou cansativos. Use parágrafos curtos e emojis acolhedores.\n2. Quando o paciente quiser agendar consulta, pergunte o nome completo, especialidade desejada e se é convênio ou particular.\n3. Utilize a ferramenta 'ConsultarAgendaGoogle' para checar os horários livres antes de sugerir.\n4. Assim que o paciente escolher o horário, use a ferramenta 'CriarAgendamentoGoogle' para reservar imediatamente.\n5. Envie orientações de cancelamento: avisar com pelo menos 2 horas de antecedência."
+        }
+      },
+      "id": "node-agent",
+      "name": "Secretária IA (Agente Clínico)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [140, 280]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "node-openai",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [100, 480],
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENAI_CREDENTIALS",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook WhatsApp').item.json.body?.key?.remoteJid || 'paciente-default' }}",
+        "contextWindowLength": 10
+      },
+      "id": "node-memory",
+      "name": "Memória da Conversa (10 msgs)",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [240, 480]
+    },
+    {
+      "parameters": {
+        "name": "ConsultarAgendaGoogle",
+        "description": "Verifica os horários disponíveis e livres na agenda médica do Google Calendar para uma data específica.",
+        "workflowId": "",
+        "fields": {
+          "values": [
+            {
+              "name": "dataDesejada",
+              "description": "Data no formato AAAA-MM-DD para verificar disponibilidade"
+            }
+          ]
+        }
+      },
+      "id": "node-tool-check",
+      "name": "Tool: Consultar Horários",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [620, 200]
+    },
+    {
+      "parameters": {
+        "name": "CriarAgendamentoGoogle",
+        "description": "Reserva oficialmente uma consulta na agenda médica com o nome do paciente, procedimento, data e horário.",
+        "workflowId": "",
+        "fields": {
+          "values": [
+            {
+              "name": "nomePaciente",
+              "description": "Nome completo do paciente"
+            },
+            {
+              "name": "procedimento",
+              "description": "Procedimento médico ou odontológico"
+            },
+            {
+              "name": "dataHoraInicio",
+              "description": "Data e hora de início no formato ISO"
+            }
+          ]
+        }
+      },
+      "id": "node-tool-book",
+      "name": "Tool: Reservar Consulta",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [620, 340]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://localhost:8080/message/sendText/raia-clinica",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "SUA_CHAVE_API_WHATSAPP"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Webhook WhatsApp').item.json.body?.key?.remoteJid?.replace('@s.whatsapp.net', '') }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.output }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-send-whatsapp",
+      "name": "Enviar Resposta WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1060, 280]
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Ignorar Próprias Mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ignorar Próprias Mensagens": {
+      "main": [
+        [
+          {
+            "node": "Secretária IA (Agente Clínico)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Secretária IA (Agente Clínico)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memória da Conversa (10 msgs)": {
+      "ai_memory": [
+        [
+          {
+            "node": "Secretária IA (Agente Clínico)",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool: Consultar Horários": {
+      "ai_tool": [
+        [
+          {
+            "node": "Secretária IA (Agente Clínico)",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool: Reservar Consulta": {
+      "ai_tool": [
+        [
+          {
+            "node": "Secretária IA (Agente Clínico)",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Secretária IA (Agente Clínico)": {
+      "main": [
+        [
+          {
+            "node": "Enviar Resposta WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
