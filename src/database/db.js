@@ -146,6 +146,18 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_daily_broadcast ON daily_broadcast_logs(user_id, date_str);
+
+  CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT,
+    phone TEXT NOT NULL,
+    agent_key TEXT,
+    agent_name TEXT,
+    status TEXT DEFAULT 'SENT',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads(phone);
 `);
 
 // 2. Run migrations for existing databases to add user_id column if missing
