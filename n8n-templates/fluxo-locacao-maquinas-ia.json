@@ -1,0 +1,304 @@
+{
+  "name": "🏗️ RAIA RH - Atendente IA para Locação de Máquinas & Equipamentos",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 📥 1. ENTRADA WHATSAPP (LOCADORA)\nRecebe pedidos de cotação de construtoras, empreiteiros e pedreiros.",
+        "height": 260,
+        "width": 320,
+        "color": 6
+      },
+      "id": "sticky-mach-1",
+      "name": "Sticky Note - Entrada",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 200]
+    },
+    {
+      "parameters": {
+        "content": "## 🧠 2. AGENTE ESPECIALISTA EM MÁQUINAS\n- Conhece especificações técnicas (voltagem 110v/220v, peso, capacidade)\n- Pergunta tempo de locação (diária, semanal, mensal)\n- Checa endereço da obra para frete\n- Fecha a reserva com contrato",
+        "height": 380,
+        "width": 460,
+        "color": 3
+      },
+      "id": "sticky-mach-2",
+      "name": "Sticky Note - Agente",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [40, 140]
+    },
+    {
+      "parameters": {
+        "content": "## ⚙️ 3. FERRAMENTAS DO PÁTIO DE MÁQUINAS\n- Consulta se betoneira, martelete, compactador ou andaime estão no pátio\n- Calcula valor da locação com desconto por período longo\n- Calcula taxa de entrega/retirada na obra",
+        "height": 300,
+        "width": 420,
+        "color": 5
+      },
+      "id": "sticky-mach-3",
+      "name": "Sticky Note - Ferramentas",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [560, 140]
+    },
+    {
+      "parameters": {
+        "content": "## 💬 4. RESPOSTA RÁPIDA NO WHATSAPP\nEnvia o orçamento formal mastigado com dados de entrega e chave Pix para sinal de reserva.",
+        "height": 240,
+        "width": 320,
+        "color": 7
+      },
+      "id": "sticky-mach-4",
+      "name": "Sticky Note - Saida",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1040, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook-locacao-maquinas",
+        "options": {}
+      },
+      "id": "node-mach-webhook",
+      "name": "Webhook WhatsApp Locadora",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-320, 280],
+      "webhookId": "locacao-maquinas-entry"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.body?.key?.fromMe || false }}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "node-mach-filter",
+      "name": "Filtro: Ignorar Próprias",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-120, 280]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body?.message?.conversation || $json.body?.message?.extendedTextMessage?.text || 'Olá' }}",
+        "options": {
+          "systemMessage": "Você é o Marcão, consultor técnico e especialista em locação de equipamentos da LocaFácil Máquinas & Ferramentas.\n\nSEU OBJETIVO:\nAtender construtoras, mestres de obras, pedreiros e clientes residenciais com agilidade extrema, passando preços de diárias, checando voltagem (110v ou 220v) e fechando a reserva com entrega na obra.\n\nCATÁLOGO DE EQUIPAMENTOS PRINCIPAIS:\n- Betoneira 400 Litros (Motor elétrico 220v ou Gasolina): Diária R$ 60,00 | Semanal R$ 250,00 | Mensal R$ 650,00\n- Martelete Rompedor 15kg / 16kg (demolição de piso/concreto): Diária R$ 75,00 | Semanal R$ 300,00 | Mensal R$ 790,00\n- Martelete Perfurador 5kg / 8kg (furos e canaletas): Diária R$ 45,00 | Semanal R$ 180,00 | Mensal R$ 450,00\n- Compactador de Solo 'Sapo' (a gasolina): Diária R$ 110,00 | Semanal R$ 450,00 | Mensal R$ 1.150,00\n- Torre de Andaime Tubular (1,00m x 1,50m com piso e sapatas): Diária R$ 15,00 por metro | Pacote Quinzenal sob consulta\n- Furadeiras Industriais, Lavadoras de Alta Pressão e Placas Vibratórias.\n\nREGRAS E PROCEDIMENTOS:\n1. Sempre pergunte qual equipamento o cliente precisa, por quantos dias/semanas e qual o bairro da obra para calcular a entrega.\n2. Lembre sempre de alertar sobre a voltagem das tomadas na obra (110v ou 220v) para evitar queima de marteletes/betoneiras.\n3. Documentos para contrato rápido: Foto da CNH ou RG, comprovante de endereço da obra e contrato assinado digitalmente.\n4. Seja prático, direto e com linguagem profissional de obra (sem enrolação)."
+        }
+      },
+      "id": "node-mach-agent",
+      "name": "Agente IA (LocaMáquinas)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [140, 280]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "node-mach-openai",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [100, 480],
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENAI_CREDENTIALS",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook WhatsApp Locadora').item.json.body?.key?.remoteJid || 'cliente-obra-default' }}",
+        "contextWindowLength": 10
+      },
+      "id": "node-mach-memory",
+      "name": "Memória da Obra (10 msgs)",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [240, 480]
+    },
+    {
+      "parameters": {
+        "name": "ChecarEstoqueMaquinas",
+        "description": "Verifica se há unidades disponíveis de betoneiras, marteletes, andaimes ou compactadores no pátio para a data solicitada.",
+        "workflowId": "",
+        "fields": {
+          "values": [
+            {
+              "name": "tipoEquipamento",
+              "description": "Nome da máquina ou ferramenta (ex: betoneira 400L, martelete 16kg)"
+            },
+            {
+              "name": "quantidade",
+              "description": "Quantidade necessária"
+            }
+          ]
+        }
+      },
+      "id": "node-mach-tool-stock",
+      "name": "Tool: Checar Pátio & Estoque",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [620, 180]
+    },
+    {
+      "parameters": {
+        "name": "CalcularLocacaoEFrete",
+        "description": "Calcula o valor total do aluguel com base no período (diária, semanal, mensal) e calcula o frete pelo CEP ou bairro da obra.",
+        "workflowId": "",
+        "fields": {
+          "values": [
+            {
+              "name": "equipamento",
+              "description": "Equipamento desejado"
+            },
+            {
+              "name": "diasLocacao",
+              "description": "Número de dias ou período"
+            },
+            {
+              "name": "bairroObra",
+              "description": "Bairro ou cidade da obra"
+            }
+          ]
+        }
+      },
+      "id": "node-mach-tool-quote",
+      "name": "Tool: Calcular Locação & Frete",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [620, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://localhost:8080/message/sendText/raia-locadora",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "SUA_CHAVE_API_WHATSAPP"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Webhook WhatsApp Locadora').item.json.body?.key?.remoteJid?.replace('@s.whatsapp.net', '') }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.output }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-mach-send",
+      "name": "Enviar Resposta WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 280]
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp Locadora": {
+      "main": [
+        [
+          {
+            "node": "Filtro: Ignorar Próprias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro: Ignorar Próprias": {
+      "main": [
+        [
+          {
+            "node": "Agente IA (LocaMáquinas)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agente IA (LocaMáquinas)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memória da Obra (10 msgs)": {
+      "ai_memory": [
+        [
+          {
+            "node": "Agente IA (LocaMáquinas)",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool: Checar Pátio & Estoque": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente IA (LocaMáquinas)",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool: Calcular Locação & Frete": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente IA (LocaMáquinas)",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente IA (LocaMáquinas)": {
+      "main": [
+        [
+          {
+            "node": "Enviar Resposta WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

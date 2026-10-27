@@ -1,0 +1,304 @@
+{
+  "name": "🚗 RAIA RH - Consultor de Vendas para Concessionária & Agência de Carros",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 📥 1. ENTRADA DE LEADS (WHATSAPP)\nRecebe interessados vindos de anúncios da Webmotors, Instagram, Facebook ou OLX.",
+        "height": 260,
+        "width": 320,
+        "color": 6
+      },
+      "id": "sticky-car-1",
+      "name": "Sticky Note - Entrada Leads",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-380, 200]
+    },
+    {
+      "parameters": {
+        "content": "## 🧠 2. CONSULTOR DE VENDAS COM IA\n- Identifica modelo de interesse (SUV, Sedan, Hatch, Picape)\n- Filtra faixa de preço e câmbio (automático/manual)\n- Simula financiamento em até 60x\n- Avalia carro usado na troca\n- Agenda Test-Drive na loja",
+        "height": 380,
+        "width": 460,
+        "color": 2
+      },
+      "id": "sticky-car-2",
+      "name": "Sticky Note - Cérebro IA",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [40, 140]
+    },
+    {
+      "parameters": {
+        "content": "## 🏎️ 3. FERRAMENTAS DO ESTOQUE & BANCOS\n- Busca veículos no estoque em tempo real com fotos e ficha técnica\n- Simulador bancário de parcelas (Santander, BV, Itaú)\n- Agendamento de Test-Drive com vendedor de plantão",
+        "height": 300,
+        "width": 420,
+        "color": 5
+      },
+      "id": "sticky-car-3",
+      "name": "Sticky Note - Ferramentas Veículos",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [560, 140]
+    },
+    {
+      "parameters": {
+        "content": "## 💬 4. RESPOSTA DE ALTO IMPACTO\nEnvia ficha técnica do veículo, fotos, estimativa da parcela e link de localização da loja.",
+        "height": 240,
+        "width": 320,
+        "color": 7
+      },
+      "id": "sticky-car-4",
+      "name": "Sticky Note - Saida Carro",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1040, 200]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook-agencia-carros",
+        "options": {}
+      },
+      "id": "node-car-webhook",
+      "name": "Webhook WhatsApp Concessionária",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-320, 280],
+      "webhookId": "agencia-carros-entry"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.body?.key?.fromMe || false }}",
+              "value2": false
+            }
+          ]
+        }
+      },
+      "id": "node-car-filter",
+      "name": "Filtro: Ignorar Próprias Mensagens",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-120, 280]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body?.message?.conversation || $json.body?.message?.extendedTextMessage?.text || 'Olá' }}",
+        "options": {
+          "systemMessage": "Você é o Rodrigo, consultor sênior de vendas da AutoPrime Veículos (concessionária e revenda de seminovos premium).\n\nSEU OBJETIVO:\nAtender clientes interessados em comprar, financiar ou trocar de carro com entusiasmo, postura consultiva e foco em levar o cliente até a loja para fazer um Test-Drive.\n\nESTOQUE ATUAL EM DESTAQUE:\n- Jeep Compass Longitude 2022 (Flex, Aut, Couro, Teto): R$ 138.900 | Entrada R$ 30.000 + 48x de R$ 3.190\n- Toyota Corolla XEi 2021 (2.0 Aut, 45.000km, único dono): R$ 124.900 | Entrada R$ 25.000 + 48x de R$ 2.890\n- Hyundai Creta Prestige 2020 (Aut, Completo, Laudo Cautelar 100% aprovado): R$ 94.900 | Entrada R$ 20.000 + 48x de R$ 2.150\n- Chevrolet Onix Premier Turbo 2023 (Econômico, Multimídia, Câmera de ré): R$ 83.900 | Entrada R$ 15.000 + 48x de R$ 1.890\n- Volkswagen T-Cross Highline 2022 (TSI, Painel Digital): R$ 119.900 | Entrada R$ 25.000 + 48x de R$ 2.750\n\nDIRETRIZES DO ATENDIMENTO:\n1. Quando o cliente perguntar de um carro, confirme que o modelo está no showroom e destaque 2 pontos fortes (ex: quilometragem baixa, laudo cautelar 100% periciado e revisado com garantia).\n2. Avaliação de Troca: Se o cliente tem carro usado, pergunte: Ano, Modelo, Versão, Quilometragem aproximada e se tem dívida/financiamento em aberto.\n3. Financiamento: Peça CPF e data de nascimento para pré-análise sem compromisso com os melhores bancos (Santander, BV e Itaú).\n4. Conclusão da conversa: Sempre sugira o agendamento de um Test-Drive presencial na loja: 'Que tal dar uma volta nele sem compromisso hoje às 15h ou amanhã cedo? Já deixo a chave separada!'."
+        }
+      },
+      "id": "node-car-agent",
+      "name": "Consultor de Vendas IA (AutoPrime)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [140, 280]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "node-car-openai",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [100, 480],
+      "credentials": {
+        "openAiApi": {
+          "id": "OPENAI_CREDENTIALS",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Webhook WhatsApp Concessionária').item.json.body?.key?.remoteJid || 'lead-carro-default' }}",
+        "contextWindowLength": 10
+      },
+      "id": "node-car-memory",
+      "name": "Memória do Lead (10 msgs)",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [240, 480]
+    },
+    {
+      "parameters": {
+        "name": "ConsultarEstoqueVeiculos",
+        "description": "Pesquisa no estoque da concessionária veículos por faixa de valor, categoria (SUV, Sedan, Hatch), marca ou câmbio.",
+        "workflowId": "",
+        "fields": {
+          "values": [
+            {
+              "name": "categoriaOuModelo",
+              "description": "Modelo ou categoria desejada (ex: SUV, Corolla, Compass, Onix)"
+            },
+            {
+              "name": "faixaPrecoMax",
+              "description": "Valor máximo que o cliente quer pagar"
+            }
+          ]
+        }
+      },
+      "id": "node-car-tool-stock",
+      "name": "Tool: Consultar Estoque Seminovos",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [620, 180]
+    },
+    {
+      "parameters": {
+        "name": "AgendarTestDrive",
+        "description": "Reserva dia e horário para o cliente visitar a concessionária e fazer o test-drive no veículo com vendedor de plantão.",
+        "workflowId": "",
+        "fields": {
+          "values": [
+            {
+              "name": "nomeCliente",
+              "description": "Nome completo do cliente"
+            },
+            {
+              "name": "veiculoInteresse",
+              "description": "Carro que o cliente quer testar"
+            },
+            {
+              "name": "dataHora",
+              "description": "Data e horário para a visita"
+            }
+          ]
+        }
+      },
+      "id": "node-car-tool-drive",
+      "name": "Tool: Agendar Test-Drive",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 1.2,
+      "position": [620, 320]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://localhost:8080/message/sendText/raia-concessionaria",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "SUA_CHAVE_API_WHATSAPP"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $('Webhook WhatsApp Concessionária').item.json.body?.key?.remoteJid?.replace('@s.whatsapp.net', '') }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.output }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-car-send",
+      "name": "Enviar Resposta WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 280]
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp Concessionária": {
+      "main": [
+        [
+          {
+            "node": "Filtro: Ignorar Próprias Mensagens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro: Ignorar Próprias Mensagens": {
+      "main": [
+        [
+          {
+            "node": "Consultor de Vendas IA (AutoPrime)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Consultor de Vendas IA (AutoPrime)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memória do Lead (10 msgs)": {
+      "ai_memory": [
+        [
+          {
+            "node": "Consultor de Vendas IA (AutoPrime)",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool: Consultar Estoque Seminovos": {
+      "ai_tool": [
+        [
+          {
+            "node": "Consultor de Vendas IA (AutoPrime)",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tool: Agendar Test-Drive": {
+      "ai_tool": [
+        [
+          {
+            "node": "Consultor de Vendas IA (AutoPrime)",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultor de Vendas IA (AutoPrime)": {
+      "main": [
+        [
+          {
+            "node": "Enviar Resposta WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
