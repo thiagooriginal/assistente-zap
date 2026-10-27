@@ -137,7 +137,7 @@
         "name": "ConsultarAgendaSalao",
         "description": "Consulta os horários disponíveis na agenda do salão para corte, escova ou unhas na data solicitada.",
         "language": "javascript",
-        "func": "return JSON.stringify({\n  status: 'sucesso',\n  data: query,\n  profissional: 'Amanda',\n  horariosDisponiveis: ['14:00', '15:30', '17:00'],\n  aviso: 'Horários das 10h e 11h da manhã já estão ocupados no sábado.'\n});"
+        "jsCode": "return JSON.stringify({\n  status: 'sucesso',\n  data: query,\n  profissional: 'Amanda',\n  horariosDisponiveis: ['14:00', '15:30', '17:00'],\n  aviso: 'Horários das 10h e 11h da manhã já estão ocupados no sábado.'\n});"
       },
       "id": "node-salon-tool-check",
       "name": "Tool: Checar Horários Salão",
@@ -150,7 +150,7 @@
         "name": "ReservarHorarioSalao",
         "description": "Reserva oficialmente o horário da cliente na agenda com nome, procedimento e profissional.",
         "language": "javascript",
-        "func": "return JSON.stringify({\n  status: 'confirmado',\n  reserva: query,\n  codigoReserva: 'RES-' + Math.floor(1000 + Math.random() * 9000),\n  mensagem: 'Horário bloqueado com sucesso na agenda.'\n});"
+        "jsCode": "return JSON.stringify({\n  status: 'confirmado',\n  reserva: query,\n  codigoReserva: 'RES-' + Math.floor(1000 + Math.random() * 9000),\n  mensagem: 'Horário bloqueado com sucesso na agenda.'\n});"
       },
       "id": "node-salon-tool-book",
       "name": "Tool: Agendar Horário",
