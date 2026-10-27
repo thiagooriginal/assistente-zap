@@ -1,7 +1,7 @@
 {
-  "name": "assistente-zap",
+  "name": "raia-rh",
   "version": "1.0.0",
-  "description": "Assistente Pessoal do WhatsApp para Controle Financeiro e Google Calendar",
+  "description": "RAIA RH - RH dos Assistentes e Colaboradores de Inteligência Artificial no WhatsApp",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",

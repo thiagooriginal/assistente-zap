@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>RAIA Agentes • Painel do Gestor & Estúdio de IA</title>
+  <title>RAIA RH • Painel do Gestor & Estúdio de IA</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -43,15 +43,34 @@
   <style>
     * { -webkit-tap-highlight-color: transparent; }
     body {
-      background-color: #07080c;
+      background-color: #040711;
       color: #ffffff;
       font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
       overflow-x: hidden;
     }
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    /* Ambiente Tecnológico & Abismo Oceânico Sutil */
+    .ocean-abyss {
+      background: radial-gradient(circle at 50% 0%, rgba(6, 182, 212, 0.08) 0%, transparent 60%),
+                  radial-gradient(circle at 85% 20%, rgba(0, 245, 155, 0.05) 0%, transparent 50%),
+                  linear-gradient(180deg, #040711 0%, #060d1d 40%, #030610 100%);
+    }
+    .ocean-caustics {
+      background: repeating-linear-gradient(
+        125deg,
+        rgba(6, 182, 212, 0.015) 0px,
+        rgba(6, 182, 212, 0.035) 45px,
+        transparent 90px,
+        transparent 160px
+      );
+      filter: blur(6px);
+      pointer-events: none;
+    }
+
     .glass-card {
-      background: rgba(17, 19, 26, 0.75);
+      background: rgba(9, 15, 28, 0.75);
       backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 24px;
@@ -65,31 +84,33 @@
     }
   </style>
 </head>
-<body class="min-h-screen bg-[#07080c] text-white flex flex-col items-center selection:bg-[#00F59B] selection:text-black pb-28">
+<body class="min-h-screen ocean-abyss text-white flex flex-col items-center selection:bg-[#00F59B] selection:text-black pb-28 relative">
+
+  <!-- Ambiente sutil de fundo do mar / iluminação oceânica -->
+  <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+    <div class="absolute -top-10 left-0 right-0 h-[500px] ocean-caustics opacity-30"></div>
+    <div class="absolute top-1/4 -left-32 w-80 h-80 bg-cyan-600/10 rounded-full blur-[140px]"></div>
+    <div class="absolute top-1/3 -right-32 w-80 h-80 bg-[#00F59B]/10 rounded-full blur-[140px]"></div>
+  </div>
 
   <!-- ============================================================ -->
   <!-- AUTH GUARD OVERLAY (Shown if not logged in as Admin)         -->
   <!-- ============================================================ -->
-  <div id="adminAuthOverlay" class="fixed inset-0 z-50 bg-[#07080c]/95 backdrop-blur-xl flex items-center justify-center p-4">
-    <div class="w-full max-w-md bg-[#11131a] border border-violet-500/30 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl text-center relative overflow-hidden">
+  <div id="adminAuthOverlay" class="fixed inset-0 z-50 bg-[#040711]/95 backdrop-blur-xl flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-[#090f1c] border border-cyan-500/30 rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl text-center relative overflow-hidden">
       <!-- Glow background -->
-      <div class="absolute -top-24 -left-24 w-48 h-48 bg-violet-600/20 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -top-24 -left-24 w-48 h-48 bg-cyan-600/20 rounded-full blur-3xl pointer-events-none"></div>
       <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-[#00F59B]/20 rounded-full blur-3xl pointer-events-none"></div>
 
-      <!-- Stingray Logo Emblem -->
-      <div class="relative w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-violet-600 to-[#00F59B] p-[2px] shadow-xl">
-        <div class="w-full h-full bg-[#0a0c12] rounded-2xl flex items-center justify-center">
-          <svg class="w-9 h-9 text-[#00F59B]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L4 12l8 8 8-8L12 2z"/>
-            <path d="M12 22V10"/>
-            <circle cx="12" cy="7" r="1.5" fill="#00F59B"/>
-          </svg>
-        </div>
+      <!-- Official RAIA Logo Emblem -->
+      <div class="relative w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-cyan-500 via-violet-600 to-[#00F59B] p-[2px] shadow-2xl overflow-hidden glow-neon">
+        <img src="/raia-logo.jpg" alt="RAIA RH" class="w-full h-full object-cover rounded-3xl" onerror="this.onerror=null; this.src='/raia-logo.jpg';">
       </div>
 
       <div>
-        <h2 class="text-2xl font-black tracking-tight text-white">RAIA AGENTES</h2>
-        <p class="text-xs text-zinc-400 font-semibold tracking-wider uppercase mt-1">Painel do Administrador & Gestor</p>
+        <h2 class="text-2xl font-black tracking-tight text-white">RAIA RH</h2>
+        <p class="text-xs text-cyan-300 font-bold tracking-wider mt-1">RAIA, um oceano de possibilidades</p>
+        <p class="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">Painel do Administrador & Gestor</p>
       </div>
 
       <div class="space-y-4 text-left">
@@ -113,15 +134,15 @@
 
         <div id="loginAlertBox" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs"></div>
 
-        <button id="btnLoginSubmit" onclick="executeAdminLogin()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-[#00F59B] hover:opacity-95 text-white font-black text-sm shadow-lg shadow-violet-600/30 active:scale-98 transition flex items-center justify-center gap-2">
+        <button id="btnLoginSubmit" onclick="executeAdminLogin()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 via-violet-600 to-[#00F59B] hover:opacity-95 text-black font-black text-sm shadow-lg shadow-cyan-500/30 active:scale-98 transition flex items-center justify-center gap-2">
           <span id="btnLoginText">Acessar Painel</span>
-          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          <i data-lucide="arrow-right" class="w-4 h-4 text-black"></i>
         </button>
 
         <div class="pt-2 text-center border-t border-zinc-800/80">
           <a href="/" class="text-xs text-zinc-400 hover:text-[#00F59B] transition flex items-center justify-center gap-1.5">
             <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
-            <span>Voltar para a Vitrine de Agentes</span>
+            <span>Voltar para a Vitrine</span>
           </a>
         </div>
       </div>
@@ -131,28 +152,22 @@
   <!-- ============================================================ -->
   <!-- MAIN ADMIN APP CONTAINER (Responsive Desktop & Mobile Frame)  -->
   <!-- ============================================================ -->
-  <div id="adminMainContent" class="hidden w-full max-w-md md:max-w-5xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6 space-y-5">
+  <div id="adminMainContent" class="hidden w-full max-w-md md:max-w-5xl lg:max-w-6xl xl:max-w-7xl mx-auto px-4 sm:px-6 pt-4 sm:pt-6 space-y-5 relative z-10">
     
     <!-- TOP HEADER -->
-    <header class="flex items-center justify-between py-2 border-b border-zinc-800/80 pb-3">
+    <header class="flex items-center justify-between py-2 border-b border-cyan-950/80 pb-3">
       <div class="flex items-center gap-3">
-        <!-- Logo Emblem -->
-        <div class="relative w-11 h-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-[#00F59B] p-[2px] shadow-md">
-          <div class="w-full h-full bg-[#0a0c12] rounded-2xl flex items-center justify-center">
-            <svg class="w-6 h-6 text-[#00F59B]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2L4 12l8 8 8-8L12 2z"/>
-              <path d="M12 22V10"/>
-              <circle cx="12" cy="7" r="1.5" fill="#00F59B"/>
-            </svg>
-          </div>
+        <!-- Logo Emblem Oficial -->
+        <div class="relative w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 via-violet-600 to-[#00F59B] p-[2px] shadow-md overflow-hidden">
+          <img src="/raia-logo.jpg" alt="RAIA RH" class="w-full h-full object-cover rounded-2xl" onerror="this.onerror=null; this.src='/raia-logo.jpg';">
         </div>
 
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-xl sm:text-2xl font-black tracking-tight text-white">RAIA AGENTES</h1>
-            <span class="text-[10px] px-2 py-0.5 rounded-full bg-violet-600/30 text-violet-300 border border-violet-500/40 font-bold uppercase tracking-wider">Painel do Gestor</span>
+            <h1 class="text-xl sm:text-2xl font-black tracking-tight text-white">RAIA RH</h1>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold uppercase tracking-wider">Painel do Gestor</span>
           </div>
-          <p class="text-xs text-zinc-400">RH & Estúdio de Assistentes de Inteligência Artificial</p>
+          <p class="text-xs text-cyan-300/90 font-medium">Um oceano de possibilidades</p>
         </div>
       </div>
 
@@ -419,8 +434,15 @@
         <div class="flex flex-col lg:flex-row gap-6 items-center lg:items-start justify-center pt-2">
           <!-- Smartphone Simulator 9:16 -->
           <div class="w-[280px] h-[500px] bg-black rounded-[36px] p-3 border-4 border-zinc-700 shadow-2xl relative overflow-hidden flex flex-col justify-between shrink-0">
-            <!-- Camera Notch -->
-            <div class="w-24 h-4 bg-zinc-800 rounded-full mx-auto mb-2 shrink-0"></div>
+            <!-- Camera Notch & RAIA Watermark -->
+            <div class="flex items-center justify-between px-2 mb-1 shrink-0">
+              <span class="text-[9px] font-extrabold text-cyan-300 flex items-center gap-1">
+                <img src="/raia-logo.jpg" class="w-3.5 h-3.5 rounded object-cover" onerror="this.style.display='none'">
+                <span>RAIA</span>
+              </span>
+              <div class="w-20 h-3.5 bg-zinc-800 rounded-full"></div>
+              <span class="text-[8px] text-zinc-500 font-mono">9:41</span>
+            </div>
 
             <!-- Top Hook -->
             <div id="mainCanvasVideoHook" class="px-2.5 py-2 rounded-xl bg-gradient-to-r from-violet-600 via-pink-600 to-indigo-600 text-white font-black text-[11px] text-center shadow-md shrink-0 leading-tight">
@@ -456,11 +478,12 @@
               </div>
             </div>
 
-            <!-- Caption -->
-            <div class="p-2 rounded-xl bg-black/90 border border-zinc-800 text-center shrink-0">
+            <!-- Caption & Slogan Footer -->
+            <div class="p-2 rounded-xl bg-black/95 border border-cyan-900/40 text-center shrink-0 space-y-0.5">
               <p id="mainCanvasCaptionText" class="text-xs font-black text-[#00F59B]">
                 "Colaborador de IA no WhatsApp 24h!"
               </p>
+              <p class="text-[9px] text-cyan-300/80 font-semibold tracking-wide">RAIA, um oceano de possibilidades</p>
             </div>
           </div>
 
@@ -1106,7 +1129,7 @@
     }
 
     function testSelectedVoice() {
-      const text = 'Olá! Esta é a voz de alta definição da RAIA Agentes, pronta para atender seus clientes no WhatsApp 24 horas por dia.';
+      const text = 'Olá! Esta é a voz de alta definição da RAIA RH, pronta para atender seus clientes no WhatsApp 24 horas por dia.';
       playTtsAudio(text, () => {});
     }
 
@@ -1114,7 +1137,7 @@
       const hook = document.getElementById('mainInputVideoHook')?.value || '';
       const userMsg = document.getElementById('mainInputVideoUserMsg')?.value || '';
       const botMsg = document.getElementById('mainInputVideoBotMsg')?.value || '';
-      const botName = document.getElementById('mainInputVideoBotName')?.value || 'RAIA Agentes';
+      const botName = document.getElementById('mainInputVideoBotName')?.value || 'RAIA RH';
 
       const hEl = document.getElementById('mainCanvasVideoHook');
       const uEl = document.getElementById('mainCanvasUserText');

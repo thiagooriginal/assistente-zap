@@ -6,8 +6,8 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>RAIA AGENTES • Contrate Colaboradores de Inteligência Artificial no WhatsApp</title>
-  <meta name="description" content="A primeira agência de contratação de Agentes de IA do Brasil. Assistentes treinados para Salões, Clínicas, Restaurantes, Advogados e Imobiliárias. Atendimento 24h no WhatsApp.">
+  <title>RAIA RH • Contrate Colaboradores de Inteligência Artificial no WhatsApp</title>
+  <meta name="description" content="A primeira agência de contratação e RH de Agentes de IA do Brasil. Colaboradores treinados para Salões, Clínicas, Restaurantes, Advogados e Imobiliárias. Atendimento 24h no WhatsApp.">
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -47,28 +47,48 @@
   <style>
     * { -webkit-tap-highlight-color: transparent; }
     body {
-      background-color: #07080c;
+      background-color: #040711;
       color: #ffffff;
       font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
       overflow-x: hidden;
     }
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    /* Ambiente Tecnológico & Abismo Oceânico Sutil */
+    .ocean-abyss {
+      background: radial-gradient(circle at 50% 0%, rgba(6, 182, 212, 0.09) 0%, transparent 60%),
+                  radial-gradient(circle at 85% 20%, rgba(0, 245, 155, 0.06) 0%, transparent 50%),
+                  radial-gradient(circle at 15% 45%, rgba(14, 165, 233, 0.05) 0%, transparent 50%),
+                  linear-gradient(180deg, #040711 0%, #060d1d 40%, #030610 100%);
+    }
+    .ocean-caustics {
+      background: repeating-linear-gradient(
+        125deg,
+        rgba(6, 182, 212, 0.015) 0px,
+        rgba(6, 182, 212, 0.035) 45px,
+        transparent 90px,
+        transparent 160px
+      );
+      filter: blur(6px);
+      pointer-events: none;
+    }
+
     .glass-nav {
-      background: rgba(7, 8, 12, 0.85);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      background: rgba(4, 7, 17, 0.88);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(6, 182, 212, 0.12);
     }
     .glass-card {
-      background: rgba(17, 20, 31, 0.7);
+      background: rgba(9, 15, 28, 0.75);
       backdrop-filter: blur(16px);
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 28px;
       transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .glass-card:hover {
-      border-color: rgba(0, 245, 155, 0.3);
+      border-color: rgba(0, 245, 155, 0.35);
       transform: translateY(-4px);
     }
     .glow-neon {
@@ -87,32 +107,47 @@
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
+    @keyframes float-subtle {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-8px); }
+    }
+    .animate-float-subtle {
+      animation: float-subtle 6s ease-in-out infinite;
+    }
   </style>
 </head>
-<body class="min-h-screen bg-[#07080c] text-white selection:bg-[#00F59B] selection:text-black">
+<body class="min-h-screen ocean-abyss text-white selection:bg-[#00F59B] selection:text-black relative">
+
+  <!-- ============================================================ -->
+  <!-- OCEANO TECNOLÓGICO DISCRETO ANIMADO (CYBER OCEAN CANVAS)     -->
+  <!-- ============================================================ -->
+  <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+    <!-- Canvas de Ondas Fluidas e Partículas Bioluminescentes -->
+    <canvas id="cyberOceanCanvas" class="absolute inset-0 w-full h-full opacity-45 pointer-events-none"></canvas>
+    <!-- Luzes cáusticas sutis de superfície marítima -->
+    <div class="absolute -top-10 left-0 right-0 h-[650px] ocean-caustics opacity-40 pointer-events-none"></div>
+    <!-- Focos bioluminescentes oceânicos -->
+    <div class="absolute top-1/4 -left-32 w-96 h-96 bg-cyan-600/10 rounded-full blur-[140px] pointer-events-none"></div>
+    <div class="absolute top-1/3 -right-32 w-96 h-96 bg-[#00F59B]/10 rounded-full blur-[140px] pointer-events-none"></div>
+    <div class="absolute bottom-1/4 left-1/3 w-[500px] h-[500px] bg-blue-900/10 rounded-full blur-[160px] pointer-events-none"></div>
+  </div>
 
   <!-- ============================================================ -->
   <!-- 1. STICKY NAVBAR                                             -->
   <!-- ============================================================ -->
   <header class="fixed top-0 left-0 right-0 z-50 glass-nav">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
-      <!-- Logo Branding -->
+      <!-- Logo Branding Oficial -->
       <a href="/" class="flex items-center gap-3 group">
-        <div class="relative w-11 h-11 rounded-2xl bg-gradient-to-tr from-violet-600 to-[#00F59B] p-[2px] shadow-lg group-hover:glow-neon transition">
-          <div class="w-full h-full bg-[#0a0c12] rounded-2xl flex items-center justify-center">
-            <svg class="w-6 h-6 text-[#00F59B] transition group-hover:scale-110" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2L4 12l8 8 8-8L12 2z"/>
-              <path d="M12 22V10"/>
-              <circle cx="12" cy="7" r="1.5" fill="#00F59B"/>
-            </svg>
-          </div>
+        <div class="relative w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 via-violet-600 to-[#00F59B] p-[2px] shadow-lg shadow-cyan-500/20 group-hover:glow-neon transition overflow-hidden">
+          <img src="/raia-logo.jpg" alt="RAIA RH" class="w-full h-full object-cover rounded-2xl transition group-hover:scale-105" onerror="this.onerror=null; this.src='/raia-logo.jpg';">
         </div>
         <div>
           <div class="flex items-center gap-2">
             <span class="text-xl font-black tracking-tight text-white">RAIA</span>
-            <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30 font-bold uppercase tracking-wider">AGENTES</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30 font-bold uppercase tracking-wider">RH</span>
           </div>
-          <p class="text-[10px] text-zinc-400 font-semibold tracking-wider uppercase">RH de Inteligência Artificial</p>
+          <p class="text-[10px] text-cyan-300 font-semibold tracking-wider">Um oceano de possibilidades</p>
         </div>
       </a>
 
@@ -134,7 +169,7 @@
         </a>
 
         <!-- WhatsApp Primary CTA -->
-        <a href="https://wa.me/5511951364159?text=Ol%C3%A1%2C+visitei+o+site+da+RAIA+e+gostaria+de+contratar+um+Agente+de+IA+para+minha+empresa!" target="_blank" class="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs shadow-lg shadow-[#00F59B]/20 hover:shadow-[#00F59B]/40 hover:scale-105 active:scale-95 transition flex items-center gap-2">
+        <a href="https://wa.me/5511951364159?text=Ol%C3%A1%2C+visitei+o+site+da+RAIA+RH+e+gostaria+de+contratar+um+Agente+de+IA+para+minha+empresa!" target="_blank" class="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs shadow-lg shadow-[#00F59B]/20 hover:shadow-[#00F59B]/40 hover:scale-105 active:scale-95 transition flex items-center gap-2">
           <i data-lucide="message-circle" class="w-4 h-4"></i>
           <span>Falar no WhatsApp</span>
         </a>
@@ -147,13 +182,50 @@
   <!-- ============================================================ -->
   <section class="relative pt-36 pb-20 sm:pt-44 sm:pb-28 overflow-hidden">
     <!-- Glow backdrops -->
-    <div class="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-violet-600/20 via-[#00F59B]/15 to-cyan-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+    <div class="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-cyan-600/20 via-[#00F59B]/15 to-violet-500/10 rounded-full blur-[130px] pointer-events-none"></div>
 
     <div class="max-w-6xl mx-auto px-4 sm:px-6 text-center space-y-6 relative z-10">
-      <!-- Badge -->
-      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-950/60 border border-violet-500/40 text-violet-300 text-xs font-extrabold shadow-lg">
+      <!-- Oceanic Slogan Badge -->
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-950/60 border border-cyan-500/35 text-cyan-300 text-xs font-extrabold shadow-xl backdrop-blur-md">
         <span class="w-2 h-2 rounded-full bg-[#00F59B] animate-ping"></span>
-        <span>A 1ª AGÊNCIA DE RECRUTAMENTO DE AGENTES DE IA DO BRASIL</span>
+        <span class="text-sm">🌊</span>
+        <span>RAIA, UM OCEANO DE POSSIBILIDADES</span>
+      </div>
+
+      <!-- LOGO OFICIAL 3D EM GRANDE EVIDÊNCIA -->
+      <div class="pt-3 pb-2 relative inline-flex flex-col items-center justify-center group">
+        <!-- Bioluminescent Deep Aura Glow -->
+        <div class="absolute -inset-8 bg-gradient-to-tr from-cyan-500/30 via-[#00F59B]/25 to-violet-600/35 rounded-full blur-3xl opacity-75 group-hover:opacity-100 transition duration-1000 animate-pulse pointer-events-none"></div>
+        
+        <!-- Logo Emblem Frame -->
+        <div class="relative w-48 h-48 sm:w-60 sm:h-60 md:w-72 md:h-72 rounded-[32px] bg-gradient-to-tr from-cyan-400 via-violet-600 to-[#00F59B] p-[3px] shadow-[0_0_60px_rgba(6,182,212,0.4)] group-hover:shadow-[0_0_90px_rgba(0,245,155,0.6)] transition duration-500 transform group-hover:scale-105 animate-float-subtle">
+          <div class="w-full h-full bg-[#040814] rounded-[30px] overflow-hidden relative flex items-center justify-center p-1">
+            <img src="/raia-logo.jpg" alt="RAIA RH - RH dos Assistentes de IA" class="w-full h-full object-cover rounded-[26px] transition duration-500 group-hover:scale-105" onerror="this.onerror=null; this.src='/raia-logo.jpg';">
+            <!-- Glassmorphic gloss shine -->
+            <div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-cyan-300/10 pointer-events-none"></div>
+          </div>
+        </div>
+
+        <!-- Floating Quick Badges below the Logo -->
+        <div class="hidden sm:flex items-center gap-3 mt-4">
+          <span class="px-3.5 py-1.5 rounded-full bg-cyan-950/70 border border-cyan-500/35 text-cyan-300 text-xs font-bold shadow-lg flex items-center gap-1.5 backdrop-blur-md">
+            <i data-lucide="bot" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+            Colaboradores de IA 24h
+          </span>
+          <span class="px-3.5 py-1.5 rounded-full bg-violet-950/70 border border-violet-500/35 text-violet-300 text-xs font-bold shadow-lg flex items-center gap-1.5 backdrop-blur-md">
+            <i data-lucide="message-circle" class="w-3.5 h-3.5 text-cyan-400"></i>
+            WhatsApp Nativo
+          </span>
+          <span class="px-3.5 py-1.5 rounded-full bg-[#00F59B]/15 border border-[#00F59B]/35 text-[#00F59B] text-xs font-bold shadow-lg flex items-center gap-1.5 backdrop-blur-md">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+            Um Oceano de Possibilidades
+          </span>
+        </div>
+      </div>
+
+      <!-- Secondary Agency Sub-Badge -->
+      <div class="block pt-1">
+        <span class="text-xs font-extrabold text-cyan-300/80 tracking-widest uppercase">RH Especializado em Colaboradores de Inteligência Artificial</span>
       </div>
 
       <!-- Main Title -->
@@ -808,21 +880,15 @@
   <!-- ============================================================ -->
   <!-- 9. FOOTER                                                    -->
   <!-- ============================================================ -->
-  <footer class="py-12 bg-black border-t border-zinc-800/80 text-xs text-zinc-500">
+  <footer class="py-12 bg-[#030610] border-t border-cyan-950/80 text-xs text-zinc-500 relative z-10">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-6">
       <div class="flex items-center gap-3">
-        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-violet-600 to-[#00F59B] p-[1.5px]">
-          <div class="w-full h-full bg-[#0a0c12] rounded-xl flex items-center justify-center">
-            <svg class="w-4 h-4 text-[#00F59B]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2L4 12l8 8 8-8L12 2z"/>
-              <path d="M12 22V10"/>
-              <circle cx="12" cy="7" r="1.5" fill="#00F59B"/>
-            </svg>
-          </div>
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-violet-600 to-[#00F59B] p-[1.5px] shadow-md overflow-hidden">
+          <img src="/raia-logo.jpg" alt="RAIA RH" class="w-full h-full object-cover rounded-xl" onerror="this.onerror=null; this.src='/raia-logo.jpg';">
         </div>
         <div>
-          <p class="font-extrabold text-white">RAIA AGENTES</p>
-          <p class="text-[10px]">RH de Assistentes de Inteligência Artificial • raiaagentes.com.br</p>
+          <p class="font-extrabold text-white text-sm">RAIA RH</p>
+          <p class="text-[11px] text-cyan-300 font-medium">RAIA, um oceano de possibilidades • raiaagentes.com.br</p>
         </div>
       </div>
 
@@ -835,7 +901,7 @@
         </a>
       </div>
 
-      <p>© 2026 RAIA Agentes. Todos os direitos reservados.</p>
+      <p>© 2026 RAIA RH. Todos os direitos reservados.</p>
     </div>
   </footer>
 
@@ -1067,6 +1133,92 @@
         });
       }, 200);
     }
+
+    // ============================================================
+    // CYBER OCEAN ENGINE (Oceano Tecnológico Discreto Animado)
+    // ============================================================
+    (function initCyberOcean() {
+      const canvas = document.getElementById('cyberOceanCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let width = canvas.width = window.innerWidth;
+      let height = canvas.height = window.innerHeight;
+
+      window.addEventListener('resize', () => {
+        width = canvas.width = window.innerWidth;
+        height = canvas.height = window.innerHeight;
+      });
+
+      // Partículas bioluminescentes marinhas (energia quântica / plâncton digital)
+      const particles = [];
+      const PARTICLE_COUNT = 40;
+      for (let i = 0; i < PARTICLE_COUNT; i++) {
+        particles.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          size: Math.random() * 2.2 + 0.8,
+          speedY: -(Math.random() * 0.45 + 0.15),
+          speedX: (Math.random() - 0.5) * 0.25,
+          alpha: Math.random() * 0.5 + 0.2,
+          hue: Math.random() > 0.45 ? '0, 245, 155' : '6, 182, 212' // Mint Neon ou Ciano
+        });
+      }
+
+      let step = 0;
+      function animate() {
+        ctx.clearRect(0, 0, width, height);
+        step += 0.018;
+
+        // 1. Ondas Tecnológicas em Perspectiva de Abismo Marítimo (Sine Ribbon Waves)
+        const waveCount = 5;
+        for (let w = 0; w < waveCount; w++) {
+          ctx.beginPath();
+          const baseY = height * 0.38 + (w * 95);
+          const waveSpeed = step * (0.8 + w * 0.18);
+          const amplitude = 16 + w * 6;
+          const freq = 0.0028 - (w * 0.00025);
+
+          ctx.moveTo(0, baseY);
+          for (let x = 0; x <= width; x += 30) {
+            const y = baseY + Math.sin(x * freq + waveSpeed) * amplitude + Math.cos(x * 0.0018 - waveSpeed * 0.5) * (amplitude * 0.45);
+            ctx.lineTo(x, y);
+          }
+
+          const grad = ctx.createLinearGradient(0, 0, width, 0);
+          grad.addColorStop(0, 'rgba(6, 182, 212, 0.04)');
+          grad.addColorStop(0.5, 'rgba(0, 245, 155, 0.09)');
+          grad.addColorStop(1, 'rgba(139, 92, 246, 0.05)');
+
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+        }
+
+        // 2. Partículas Bioluminescentes que sobem suavemente
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          p.y += p.speedY;
+          p.x += p.speedX;
+          p.alpha += Math.sin(step * 2 + i) * 0.005;
+
+          if (p.y < -10) { p.y = height + 10; p.x = Math.random() * width; }
+          if (p.x < -10) p.x = width + 10;
+          if (p.x > width + 10) p.x = -10;
+
+          const currentAlpha = Math.max(0.12, Math.min(0.65, p.alpha));
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${p.hue}, ${currentAlpha})`;
+          ctx.shadowBlur = 6;
+          ctx.shadowColor = `rgba(${p.hue}, ${currentAlpha * 0.8})`;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+
+        requestAnimationFrame(animate);
+      }
+      requestAnimationFrame(animate);
+    })();
 
     window.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
