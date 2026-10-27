@@ -114,6 +114,13 @@
     .animate-float-subtle {
       animation: float-subtle 6s ease-in-out infinite;
     }
+    @keyframes float-aquarium {
+      0%, 100% { transform: translateY(0px) scale(1) rotate(0deg); }
+      50% { transform: translateY(-16px) scale(1.04) rotate(1.5deg); }
+    }
+    .animate-float-aquarium {
+      animation: float-aquarium 12s ease-in-out infinite;
+    }
   </style>
 </head>
 <body class="min-h-screen ocean-abyss text-white selection:bg-[#00F59B] selection:text-black relative">
@@ -184,48 +191,41 @@
     <!-- Glow backdrops -->
     <div class="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-cyan-600/20 via-[#00F59B]/15 to-violet-500/10 rounded-full blur-[130px] pointer-events-none"></div>
 
+    <!-- EFEITO AQUÁRIO: Logo da RAIA Submerso no Fundo Desfocado (Discreto & Mágico) -->
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] sm:w-[560px] md:w-[720px] h-[420px] sm:h-[560px] md:h-[720px] pointer-events-none z-0 select-none">
+      <!-- Glow subaquático ao redor da raia -->
+      <div class="absolute inset-0 bg-gradient-to-tr from-cyan-500/15 via-[#00F59B]/10 to-violet-600/15 rounded-full blur-[110px] animate-pulse"></div>
+      <!-- Logo RAIA em profundidade (aquário / silhueta biomórfica brilhante) -->
+      <img src="/raia-logo.jpg" alt="RAIA no Fundo do Mar" class="w-full h-full object-contain opacity-20 filter blur-[3px] brightness-125 animate-float-aquarium">
+    </div>
+
     <div class="max-w-6xl mx-auto px-4 sm:px-6 text-center space-y-6 relative z-10">
-      <!-- Oceanic Slogan Badge -->
-      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-950/60 border border-cyan-500/35 text-cyan-300 text-xs font-extrabold shadow-xl backdrop-blur-md">
-        <span class="w-2 h-2 rounded-full bg-[#00F59B] animate-ping"></span>
-        <span class="text-sm">🌊</span>
+      <!-- Slogan Badge Centralizado -->
+      <div class="inline-flex items-center gap-2.5 px-5 py-2 rounded-full bg-cyan-950/70 border border-cyan-500/40 text-cyan-300 text-xs sm:text-sm font-extrabold shadow-2xl backdrop-blur-md">
+        <span class="w-2.5 h-2.5 rounded-full bg-[#00F59B] animate-ping"></span>
+        <span class="text-base">🌊</span>
         <span>RAIA, UM OCEANO DE POSSIBILIDADES</span>
       </div>
 
-      <!-- LOGO OFICIAL 3D EM GRANDE EVIDÊNCIA -->
-      <div class="pt-3 pb-2 relative inline-flex flex-col items-center justify-center group">
-        <!-- Bioluminescent Deep Aura Glow -->
-        <div class="absolute -inset-8 bg-gradient-to-tr from-cyan-500/30 via-[#00F59B]/25 to-violet-600/35 rounded-full blur-3xl opacity-75 group-hover:opacity-100 transition duration-1000 animate-pulse pointer-events-none"></div>
-        
-        <!-- Logo Emblem Frame -->
-        <div class="relative w-48 h-48 sm:w-60 sm:h-60 md:w-72 md:h-72 rounded-[32px] bg-gradient-to-tr from-cyan-400 via-violet-600 to-[#00F59B] p-[3px] shadow-[0_0_60px_rgba(6,182,212,0.4)] group-hover:shadow-[0_0_90px_rgba(0,245,155,0.6)] transition duration-500 transform group-hover:scale-105 animate-float-subtle">
-          <div class="w-full h-full bg-[#040814] rounded-[30px] overflow-hidden relative flex items-center justify-center p-1">
-            <img src="/raia-logo.jpg" alt="RAIA RH - RH dos Assistentes de IA" class="w-full h-full object-cover rounded-[26px] transition duration-500 group-hover:scale-105" onerror="this.onerror=null; this.src='/raia-logo.jpg';">
-            <!-- Glassmorphic gloss shine -->
-            <div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-cyan-300/10 pointer-events-none"></div>
-          </div>
-        </div>
-
-        <!-- Floating Quick Badges below the Logo -->
-        <div class="hidden sm:flex items-center gap-3 mt-4">
-          <span class="px-3.5 py-1.5 rounded-full bg-cyan-950/70 border border-cyan-500/35 text-cyan-300 text-xs font-bold shadow-lg flex items-center gap-1.5 backdrop-blur-md">
-            <i data-lucide="bot" class="w-3.5 h-3.5 text-[#00F59B]"></i>
-            Colaboradores de IA 24h
-          </span>
-          <span class="px-3.5 py-1.5 rounded-full bg-violet-950/70 border border-violet-500/35 text-violet-300 text-xs font-bold shadow-lg flex items-center gap-1.5 backdrop-blur-md">
-            <i data-lucide="message-circle" class="w-3.5 h-3.5 text-cyan-400"></i>
-            WhatsApp Nativo
-          </span>
-          <span class="px-3.5 py-1.5 rounded-full bg-[#00F59B]/15 border border-[#00F59B]/35 text-[#00F59B] text-xs font-bold shadow-lg flex items-center gap-1.5 backdrop-blur-md">
-            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-[#00F59B]"></i>
-            Um Oceano de Possibilidades
-          </span>
-        </div>
+      <!-- Quick Badges de Recursos Centralizadas -->
+      <div class="flex flex-wrap items-center justify-center gap-2.5">
+        <span class="px-3.5 py-1.5 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 text-xs font-bold shadow-md flex items-center gap-1.5 backdrop-blur-md">
+          <i data-lucide="bot" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+          Colaboradores de IA 24h
+        </span>
+        <span class="px-3.5 py-1.5 rounded-full bg-violet-950/60 border border-violet-500/30 text-violet-300 text-xs font-bold shadow-md flex items-center gap-1.5 backdrop-blur-md">
+          <i data-lucide="message-circle" class="w-3.5 h-3.5 text-cyan-400"></i>
+          WhatsApp Nativo
+        </span>
+        <span class="px-3.5 py-1.5 rounded-full bg-[#00F59B]/10 border border-[#00F59B]/30 text-[#00F59B] text-xs font-bold shadow-md flex items-center gap-1.5 backdrop-blur-md">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+          Um Oceano de Possibilidades
+        </span>
       </div>
 
       <!-- Secondary Agency Sub-Badge -->
       <div class="block pt-1">
-        <span class="text-xs font-extrabold text-cyan-300/80 tracking-widest uppercase">RH Especializado em Colaboradores de Inteligência Artificial</span>
+        <span class="text-xs font-bold text-zinc-400 tracking-widest uppercase">RH Especializado em Colaboradores de Inteligência Artificial</span>
       </div>
 
       <!-- Main Title -->
