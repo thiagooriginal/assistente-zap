@@ -146,8 +146,8 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
       <!-- Logo Branding Oficial -->
       <a href="/" class="flex items-center gap-3 group">
-        <div class="relative w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 via-violet-600 to-[#00F59B] p-[2px] shadow-lg shadow-cyan-500/20 group-hover:glow-neon transition overflow-hidden">
-          <img src="/raia-logo.jpg" alt="RAIA RH" class="w-full h-full object-cover rounded-2xl transition group-hover:scale-105" onerror="this.onerror=null; this.src='/raia-logo.jpg';">
+        <div class="relative w-11 h-11 flex items-center justify-center">
+          <img src="/raia-logo.png" alt="RAIA RH" class="w-full h-full object-contain filter drop-shadow-[0_0_12px_rgba(6,182,212,0.5)] group-hover:scale-105 transition">
         </div>
         <div>
           <div class="flex items-center gap-2">
@@ -187,45 +187,23 @@
   <!-- ============================================================ -->
   <!-- 2. HERO SECTION                                              -->
   <!-- ============================================================ -->
-  <section class="relative pt-36 pb-20 sm:pt-44 sm:pb-28 overflow-hidden">
-    <!-- Glow backdrops -->
-    <div class="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-cyan-600/20 via-[#00F59B]/15 to-violet-500/10 rounded-full blur-[130px] pointer-events-none"></div>
-
-    <!-- EFEITO AQUÁRIO: Logo da RAIA Submerso no Fundo Desfocado (Discreto & Mágico) -->
-    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[420px] sm:w-[560px] md:w-[720px] h-[420px] sm:h-[560px] md:h-[720px] pointer-events-none z-0 select-none">
-      <!-- Glow subaquático ao redor da raia -->
-      <div class="absolute inset-0 bg-gradient-to-tr from-cyan-500/15 via-[#00F59B]/10 to-violet-600/15 rounded-full blur-[110px] animate-pulse"></div>
-      <!-- Logo RAIA em profundidade (aquário / silhueta biomórfica brilhante) -->
-      <img src="/raia-logo.jpg" alt="RAIA no Fundo do Mar" class="w-full h-full object-contain opacity-20 filter blur-[3px] brightness-125 animate-float-aquarium">
-    </div>
+  <section class="relative pt-32 pb-20 sm:pt-36 sm:pb-28 overflow-hidden">
+    <!-- Glow backdrop sutil e elegante -->
+    <div class="absolute top-20 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-cyan-600/15 via-[#00F59B]/10 to-violet-500/10 rounded-full blur-[130px] pointer-events-none"></div>
 
     <div class="max-w-6xl mx-auto px-4 sm:px-6 text-center space-y-6 relative z-10">
-      <!-- Slogan Badge Centralizado -->
-      <div class="inline-flex items-center gap-2.5 px-5 py-2 rounded-full bg-cyan-950/70 border border-cyan-500/40 text-cyan-300 text-xs sm:text-sm font-extrabold shadow-2xl backdrop-blur-md">
-        <span class="w-2.5 h-2.5 rounded-full bg-[#00F59B] animate-ping"></span>
-        <span class="text-base">🌊</span>
-        <span>RAIA, UM OCEANO DE POSSIBILIDADES</span>
-      </div>
-
-      <!-- Quick Badges de Recursos Centralizadas -->
-      <div class="flex flex-wrap items-center justify-center gap-2.5">
-        <span class="px-3.5 py-1.5 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-cyan-300 text-xs font-bold shadow-md flex items-center gap-1.5 backdrop-blur-md">
-          <i data-lucide="bot" class="w-3.5 h-3.5 text-[#00F59B]"></i>
-          Colaboradores de IA 24h
-        </span>
-        <span class="px-3.5 py-1.5 rounded-full bg-violet-950/60 border border-violet-500/30 text-violet-300 text-xs font-bold shadow-md flex items-center gap-1.5 backdrop-blur-md">
-          <i data-lucide="message-circle" class="w-3.5 h-3.5 text-cyan-400"></i>
-          WhatsApp Nativo
-        </span>
-        <span class="px-3.5 py-1.5 rounded-full bg-[#00F59B]/10 border border-[#00F59B]/30 text-[#00F59B] text-xs font-bold shadow-md flex items-center gap-1.5 backdrop-blur-md">
-          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-[#00F59B]"></i>
-          Um Oceano de Possibilidades
-        </span>
-      </div>
-
-      <!-- Secondary Agency Sub-Badge -->
-      <div class="block pt-1">
-        <span class="text-xs font-bold text-zinc-400 tracking-widest uppercase">RH Especializado em Colaboradores de Inteligência Artificial</span>
+      
+      <!-- LOGO OFICIAL 3D TOTALMENTE ISOLADO: SEM FUNDO E SEM NADA EM VOLTA -->
+      <div class="flex flex-col items-center justify-center pt-2 pb-1">
+        <img 
+          src="/raia-logo.png" 
+          alt="RAIA RH" 
+          class="w-56 sm:w-72 md:w-80 h-auto object-contain filter drop-shadow-[0_0_45px_rgba(6,182,212,0.45)] hover:scale-105 transition duration-500 select-none"
+        >
+        <!-- Slogan Oficial Elegante -->
+        <p class="mt-4 text-xs sm:text-sm font-extrabold uppercase tracking-[0.25em] text-cyan-300 drop-shadow-[0_0_15px_rgba(6,182,212,0.4)]">
+          RAIA, um oceano de possibilidades
+        </p>
       </div>
 
       <!-- Main Title -->
@@ -883,8 +861,8 @@
   <footer class="py-12 bg-[#030610] border-t border-cyan-950/80 text-xs text-zinc-500 relative z-10">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-6">
       <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 via-violet-600 to-[#00F59B] p-[1.5px] shadow-md overflow-hidden">
-          <img src="/raia-logo.jpg" alt="RAIA RH" class="w-full h-full object-cover rounded-xl" onerror="this.onerror=null; this.src='/raia-logo.jpg';">
+        <div class="w-10 h-10 flex items-center justify-center">
+          <img src="/raia-logo.png" alt="RAIA RH" class="w-full h-full object-contain filter drop-shadow-[0_0_10px_rgba(6,182,212,0.4)]">
         </div>
         <div>
           <p class="font-extrabold text-white text-sm">RAIA RH</p>

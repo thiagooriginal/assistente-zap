@@ -21,14 +21,8 @@ app.use(express.static(path.resolve(__dirname, '../../public')));
 // Ensure official RAIA logo is available in public folder if present locally
 try {
   const fs = require('fs');
-  const sourceLogoNew = 'C:\\Users\\Acer\\.gemini\\antigravity\\brain\\02a81ab1-3f50-4b80-b427-db4dc205d437\\.user_uploaded\\media_1793058378790_e29fd7f4.jpg';
-  const sourceLogoOld = 'C:\\Users\\Acer\\.gemini\\antigravity\\brain\\02a81ab1-3f50-4b80-b427-db4dc205d437\\raia_logo_variation_b_1793040481330.jpg';
-  const destLogo = path.resolve(__dirname, '../../public/raia-logo.jpg');
-  const finalSource = fs.existsSync(sourceLogoNew) ? sourceLogoNew : (fs.existsSync(sourceLogoOld) ? sourceLogoOld : null);
-  if (finalSource) {
-    fs.copyFileSync(finalSource, destLogo);
-    console.log('[ASSET] Logo oficial RAIA copiado para public/raia-logo.jpg');
-  }
+  const destPng = path.resolve(__dirname, '../../public/raia-logo.png');
+  // raia-logo.png is committed to git repository
 } catch (e) {
   // Silent fallback in production/container
 }
