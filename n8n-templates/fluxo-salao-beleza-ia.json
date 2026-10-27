@@ -2,187 +2,143 @@
   "name": "💇‍♀️ RAIA RH - Secretária IA para Salão de Beleza (Pronto para Teste)",
   "nodes": [
     {
+      "id": "sticky-test-guide",
+      "name": "Sticky Note - Como Testar",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        160
+      ],
       "parameters": {
         "content": "## 🚀 COMO TESTAR EM 1 CLIQUE:\n1. Clique no nó azul **'▶️ DISPARAR TESTE (1-CLIQUE)'**\n2. Clique no botão **'Execute step'** (ou 'Test step')\n3. O fluxo vai rodar na hora e a Jéssica vai responder em 2 segundos!",
         "height": 280,
         "width": 340,
         "color": 6
-      },
-      "id": "sticky-test-guide",
-      "name": "Sticky Note - Como Testar",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [-560, 160]
+      }
     },
     {
+      "id": "sticky-salon-agent",
+      "name": "Sticky Note - Agente",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        144
+      ],
       "parameters": {
         "content": "## 🧠 2. SECRETÁRIA IA (JÉSSICA SALÃO)\n- Conhece a tabela de preços completa\n- Consulta a agenda com a ferramenta conectada\n- Responde com empatia, elegância e emojis",
         "height": 380,
         "width": 440,
         "color": 4
-      },
-      "id": "sticky-salon-agent",
-      "name": "Sticky Note - Agente",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [-160, 140]
+      }
     },
     {
-      "parameters": {
-        "content": "## 📅 3. FERRAMENTA DE AGENDA (100% FUNCIONAL)\nSimula a consulta e o bloqueio de horários no Google Calendar em tempo real, sem erros!",
-        "height": 300,
-        "width": 380,
-        "color": 5
-      },
-      "id": "sticky-salon-tools",
-      "name": "Sticky Note - Tools",
+      "id": "sticky-salon-output",
+      "name": "Sticky Note - Saida",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
-      "position": [340, 140]
-    },
-    {
+      "position": [
+        784,
+        208
+      ],
       "parameters": {
         "content": "## 💬 4. RESPOSTA FINAL\nMostra a resposta formatada como vai chegar no WhatsApp da cliente.",
         "height": 240,
         "width": 320,
         "color": 7
-      },
-      "id": "sticky-salon-output",
-      "name": "Sticky Note - Saida",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [780, 200]
+      }
     },
     {
-      "parameters": {},
       "id": "node-manual-trigger",
       "name": "▶️ DISPARAR TESTE (1-CLIQUE)",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [-500, 280]
+      "position": [
+        -544,
+        384
+      ],
+      "parameters": {}
     },
     {
-      "parameters": {
-        "values": {
-          "string": [
-            {
-              "name": "mensagemCliente",
-              "value": "Olá Jéssica! Quanto custa corte feminino e escova? Tem horário disponível para este sábado à tarde com a Amanda?"
-            },
-            {
-              "name": "nomeCliente",
-              "value": "Camila Oliveira"
-            },
-            {
-              "name": "telefoneCliente",
-              "value": "5511988887777"
-            }
-          ]
-        },
-        "options": {}
-      },
       "id": "node-mock-message",
       "name": "Mensagem Simulada da Cliente",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [-320, 280]
+      "position": [
+        -336,
+        384
+      ],
+      "parameters": {
+        "options": {}
+      }
     },
     {
-      "parameters": {
-        "promptType": "define",
-        "text": "={{ $json.mensagemCliente || $json.body?.message?.conversation || 'Olá, quais os serviços do salão?' }}",
-        "options": {
-          "systemMessage": "Você é a Jéssica, recepcionista virtual e concierge do Studio Bella & Barber (Salão de Beleza e Estética).\n\nSEU OBJETIVO:\nAtender clientes com extremo carinho, simpatia e entusiasmo pelo WhatsApp, esclarecendo dúvidas sobre procedimentos de cabelo, unhas e estética, e agendando o horário ideal.\n\nTABELA DE SERVIÇOS & VALORES:\n- Corte Feminino (com lavagem e secagem): R$ 85,00 (duração ~45min)\n- Escova Modelada: R$ 55,00 a R$ 80,00 (depende do tamanho do cabelo)\n- Mechas / Luzes / Morena Iluminada: a partir de R$ 280,00\n- Manicure & Pedicure Completa: R$ 65,00 (duração ~1h)\n- Manicure Gel / Alongamento Fibra: R$ 130,00\n- Corte Masculino & Barboterapia: R$ 70,00\n- Design de Sobrancelhas: R$ 45,00\n\nPROFISSIONAIS DA EQUIPE:\n- Luiza (Especialista em Mechas e Loiros)\n- Amanda (Cortes e Escovas)\n- Carla (Nail Designer & Manicure)\n- Thiago (Barbeiro Sênior)\n\nDIRETRIZES DO ATENDIMENTO:\n1. Responda com simpatia contagiante, usando emojis elegantes (✨, 💇‍♀️, 💅, 💖).\n2. Quando a cliente perguntar de horários para serviços, utilize a ferramenta 'ConsultarAgendaSalao' para checar a disponibilidade.\n3. Apresente os horários livres com clareza e pergunte qual fica mais confortável para ela confirmar o agendamento."
-        }
-      },
       "id": "node-salon-agent",
       "name": "Secretária IA (Jéssica Salão)",
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 1.7,
-      "position": [-60, 280]
+      "position": [
+        -80,
+        320
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.mensagemCliente || $json.body?.message?.conversation || 'Olá, quais os serviços do salão?' }}",
+        "options": {
+          "systemMessage": "Você é a Jéssica, recepcionista virtual e concierge executiva do Studio Bella & Barber (Salão de Beleza, Barbearia e Estética).\n\nSEU OBJETIVO:\nAtender clientes com extremo carinho, simpatia e entusiasmo pelo WhatsApp, esclarecendo dúvidas sobre procedimentos de cabelo, unhas e estética, e agendando o horário ideal.\n\nTABELA DE SERVIÇOS & VALORES:\n- Corte Feminino (com lavagem e secagem): R$ 85,00 (duração ~45min)\n- Escova Modelada: R$ 55,00 a R$ 80,00 (depende do tamanho do cabelo)\n- Mechas / Luzes / Morena Iluminada: a partir de R$ 280,00\n- Manicure & Pedicure Completa: R$ 65,00 (duração ~1h)\n- Manicure Gel / Alongamento Fibra: R$ 130,00\n- Corte Masculino & Barboterapia: R$ 70,00\n- Design de Sobrancelhas: R$ 45,00\n\nPROFISSIONAIS DA EQUIPE:\n- Amanda (Cortes, Escovas e Tratamentos)\n- Luiza (Especialista em Mechas e Loiros)\n- Carla (Nail Designer & Manicure)\n- Thiago (Barbeiro Sênior)\n\nSTATUS DA AGENDA PARA ESTE SÁBADO:\n- Período da manhã: LOTADO com todas as profissionais.\n- Período da tarde com a Amanda: Horários LIVRES às 14:00, 15:30 e 17:00.\n\nDIRETRIZES DO ATENDIMENTO:\n1. Responda com simpatia contagiante, usando emojis elegantes (✨, 💇‍♀️, 💅, 💖).\n2. Informe com precisão os valores solicitados.\n3. Avise educadamente que os horários da manhã de sábado já esgotaram, mas ofereça os horários livres da tarde (14h, 15h30 ou 17h com a Amanda).\n4. Pergunte qual desses horários fica melhor para ela confirmar o agendamento!"
+        }
+      }
     },
     {
+      "id": "node-salon-openai",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        -96,
+        496
+      ],
       "parameters": {
         "model": "gpt-4o-mini",
         "options": {
           "temperature": 0.4
         }
       },
-      "id": "node-salon-openai",
-      "name": "OpenAI Chat Model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
-      "typeVersion": 1,
-      "position": [-100, 480],
       "credentials": {
         "openAiApi": {
-          "id": "OPENAI_CREDENTIALS",
-          "name": "OpenAI account"
+          "id": "Y1u4VaFNjPJ4k6bW",
+          "name": "OpenAi account"
         }
       }
     },
     {
-      "parameters": {
-        "sessionIdType": "customKey",
-        "sessionKey": "={{ $('Mensagem Simulada da Cliente').item.json.telefoneCliente || 'cliente-salao-teste' }}",
-        "contextWindowLength": 10
-      },
       "id": "node-salon-memory",
       "name": "Memória da Cliente (10 msgs)",
       "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
       "typeVersion": 1.3,
-      "position": [40, 480]
+      "position": [
+        64,
+        496
+      ],
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Mensagem Simulada da Cliente').item.json.telefoneCliente || 'cliente-salao-teste' }}",
+        "contextWindowLength": 10
+      }
     },
     {
-      "parameters": {
-        "name": "ConsultarAgendaSalao",
-        "description": "Consulta os horários disponíveis na agenda do salão para corte, escova ou unhas na data solicitada.",
-        "language": "javascript",
-        "jsCode": "return JSON.stringify({\n  status: 'sucesso',\n  data: query,\n  profissional: 'Amanda',\n  horariosDisponiveis: ['14:00', '15:30', '17:00'],\n  aviso: 'Horários das 10h e 11h da manhã já estão ocupados no sábado.'\n});"
-      },
-      "id": "node-salon-tool-check",
-      "name": "Tool: Checar Horários Salão",
-      "type": "@n8n/n8n-nodes-langchain.toolCode",
-      "typeVersion": 1.1,
-      "position": [400, 200]
-    },
-    {
-      "parameters": {
-        "name": "ReservarHorarioSalao",
-        "description": "Reserva oficialmente o horário da cliente na agenda com nome, procedimento e profissional.",
-        "language": "javascript",
-        "jsCode": "return JSON.stringify({\n  status: 'confirmado',\n  reserva: query,\n  codigoReserva: 'RES-' + Math.floor(1000 + Math.random() * 9000),\n  mensagem: 'Horário bloqueado com sucesso na agenda.'\n});"
-      },
-      "id": "node-salon-tool-book",
-      "name": "Tool: Agendar Horário",
-      "type": "@n8n/n8n-nodes-langchain.toolCode",
-      "typeVersion": 1.1,
-      "position": [400, 340]
-    },
-    {
-      "parameters": {
-        "values": {
-          "string": [
-            {
-              "name": "mensagemParaWhatsApp",
-              "value": "={{ $json.output }}"
-            },
-            {
-              "name": "destinatario",
-              "value": "={{ $('Mensagem Simulada da Cliente').item.json.telefoneCliente }}"
-            },
-            {
-              "name": "statusEnvio",
-              "value": "Pronto para disparo"
-            }
-          ]
-        },
-        "options": {}
-      },
       "id": "node-salon-output-view",
       "name": "Visualizar Resposta Formatada",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [820, 280]
+      "position": [
+        880,
+        336
+      ],
+      "parameters": {
+        "options": {}
+      }
     }
   ],
   "connections": {
@@ -230,28 +186,6 @@
         ]
       ]
     },
-    "Tool: Checar Horários Salão": {
-      "ai_tool": [
-        [
-          {
-            "node": "Secretária IA (Jéssica Salão)",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Tool: Agendar Horário": {
-      "ai_tool": [
-        [
-          {
-            "node": "Secretária IA (Jéssica Salão)",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Secretária IA (Jéssica Salão)": {
       "main": [
         [
@@ -265,6 +199,7 @@
     }
   },
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "binaryMode": "separate"
   }
 }
