@@ -295,6 +295,44 @@ app.post('/api/webhooks/asaas', async (req, res) => {
   }
 });
 
+app.get('/api/asaas/payments', async (req, res) => {
+  try {
+    const localPayments = db.prepare('SELECT * FROM asaas_payments ORDER BY created_at DESC LIMIT 50').all();
+
+    let livePayments = [];
+    if (asaasService.isConfigured()) {
+      try {
+        const liveRes = await asaasService.listPayments({ limit: 30 });
+        livePayments = liveRes?.data || [];
+      } catch (e) {
+        console.warn('Erro ao listar cobranças ao vivo do Asaas:', e.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      localPayments,
+      livePayments,
+    });
+  } catch (err) {
+    console.error('Erro em /api/asaas/payments:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/admin/leads', (req, res) => {
+  try {
+    const leads = db.prepare('SELECT * FROM leads ORDER BY created_at DESC LIMIT 100').all();
+    res.json({
+      success: true,
+      leads,
+    });
+  } catch (err) {
+    console.error('Erro em /api/admin/leads:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ==========================================
 // PUBLIC LEAD TEST AGENT (LIVE DEMO ON USER'S WHATSAPP)
 // ==========================================

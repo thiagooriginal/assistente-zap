@@ -350,6 +350,24 @@ async function handleWebhookEvent(eventData) {
   };
 }
 
+/**
+ * List payments from Asaas API
+ */
+async function listPayments({ limit = 30, status = null } = {}) {
+  if (!isConfigured()) throw new Error('Chave de API do Asaas não configurada.');
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (status) query.append('status', status);
+  return await asaasRequest(`/payments?${query.toString()}`);
+}
+
+/**
+ * List customers from Asaas API
+ */
+async function listCustomers({ limit = 50 } = {}) {
+  if (!isConfigured()) throw new Error('Chave de API do Asaas não configurada.');
+  return await asaasRequest(`/customers?limit=${limit}`);
+}
+
 module.exports = {
   isConfigured,
   getAccount,
@@ -358,5 +376,7 @@ module.exports = {
   createPixCharge,
   createPaymentLink,
   getPayment,
+  listPayments,
+  listCustomers,
   handleWebhookEvent,
 };

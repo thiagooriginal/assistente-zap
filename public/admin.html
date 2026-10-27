@@ -194,19 +194,23 @@
 
     <!-- ADMIN NAVIGATION TABS -->
     <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1">
-      <button onclick="switchAdminTab('studio')" id="tabBtnStudio" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-violet-600 text-white flex items-center gap-2 shadow-lg transition shrink-0">
+      <button onclick="switchAdminTab('studio')" id="tabBtnStudio" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-violet-600 text-white flex items-center gap-2 shadow-lg transition shrink-0 cursor-pointer">
         <i data-lucide="clapperboard" class="w-4 h-4"></i>
         <span>Estúdio de Vídeos & Vozes IA</span>
       </button>
-      <button onclick="switchAdminTab('users')" id="tabBtnUsers" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0">
+      <button onclick="switchAdminTab('asaas')" id="tabBtnAsaas" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
+        <i data-lucide="credit-card" class="w-4 h-4 text-[#00F59B]"></i>
+        <span>💳 Clientes & Pagamentos Asaas</span>
+      </button>
+      <button onclick="switchAdminTab('users')" id="tabBtnUsers" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
         <i data-lucide="users" class="w-4 h-4"></i>
-        <span>Clientes & Convites ZAP</span>
+        <span>Convites ZAP</span>
       </button>
-      <button onclick="switchAdminTab('finance')" id="tabBtnFinance" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0">
+      <button onclick="switchAdminTab('finance')" id="tabBtnFinance" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
         <i data-lucide="badge-dollar-sign" class="w-4 h-4"></i>
-        <span>Finanças & Faturamento</span>
+        <span>Controle de Custos</span>
       </button>
-      <button onclick="switchAdminTab('system')" id="tabBtnSystem" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0">
+      <button onclick="switchAdminTab('system')" id="tabBtnSystem" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
         <i data-lucide="cpu" class="w-4 h-4"></i>
         <span>Status da IA & Conexões</span>
       </button>
@@ -520,6 +524,246 @@
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SECTION ASAAS: GESTÃO DE CLIENTES & PAGAMENTOS ASAAS         -->
+    <!-- ============================================================ -->
+    <div id="sectionAsaas" class="hidden space-y-6">
+      
+      <!-- ASAAS INTEGRATION STATUS BANNER -->
+      <div class="p-6 rounded-3xl bg-gradient-to-r from-[#0d1424] via-[#10192e] to-[#0d1424] border border-cyan-500/30 shadow-2xl relative overflow-hidden">
+        <div class="absolute -top-16 -right-16 w-44 h-44 bg-[#00F59B]/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <span class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-[#00F59B]/20 text-[#00F59B] border border-[#00F59B]/30 flex items-center gap-1.5 uppercase tracking-wider">
+                <span class="w-2 h-2 rounded-full bg-[#00F59B] animate-pulse"></span>
+                <span>Asaas Conectado • Produção</span>
+              </span>
+              <span class="text-xs text-zinc-400 font-bold" id="asaasAccountDoc">CPF: 325.***.***-47</span>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-black text-white" id="asaasAccountName">Thiago Rene Nunes Borba</h2>
+            <p class="text-xs text-cyan-300/80 font-medium flex items-center gap-1.5">
+              <i data-lucide="shield-check" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+              <span>Webhook oficial ativo: raiaagentes.com.br/api/webhooks/asaas</span>
+            </p>
+          </div>
+
+          <div class="flex items-center gap-3 w-full md:w-auto">
+            <div class="p-4 rounded-2xl bg-black/40 border border-zinc-700/60 text-right flex-1 md:flex-initial">
+              <p class="text-[10px] text-zinc-400 uppercase font-black tracking-widest">Saldo Disponível no Asaas</p>
+              <p class="text-2xl sm:text-3xl font-black text-[#00F59B]" id="asaasBalanceDisplay">R$ 0,00</p>
+            </div>
+            <button onclick="loadAsaasDashboard()" title="Atualizar dados do Asaas" class="p-3.5 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition border border-zinc-700/60 cursor-pointer">
+              <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUICK CHARGE GENERATORS (PIX & LINK) -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        
+        <!-- CARD A: GERAR PIX DINÂMICO IMEDIATO -->
+        <div class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-[#00F59B]">
+                <i data-lucide="qr-code" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-black text-white">Gerar Cobrança Pix Imediata</h3>
+                <p class="text-[10px] text-zinc-400">Gera QR Code + Pix Copia-e-Cola pelo Asaas</p>
+              </div>
+            </div>
+            <span class="text-[10px] font-black text-[#00F59B] bg-[#00F59B]/10 px-2 py-0.5 rounded-full">Automático</span>
+          </div>
+
+          <form onsubmit="handleCreatePixSubmit(event)" class="space-y-3">
+            <div>
+              <label class="block text-[11px] font-bold text-zinc-300 mb-1">Nome do Cliente</label>
+              <input type="text" id="pixCustName" required placeholder="Ex: Roberto Silva" class="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-[#00F59B]">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold text-zinc-300 mb-1">WhatsApp com DDD</label>
+                <input type="tel" id="pixCustPhone" required placeholder="(11) 99999-9999" class="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-[#00F59B]">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-zinc-300 mb-1">Valor da Cobrança (R$)</label>
+                <input type="number" step="0.01" min="1" id="pixCustValue" value="97.00" required class="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs font-bold text-[#00F59B] outline-none focus:border-[#00F59B]">
+              </div>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-zinc-300 mb-1">Descrição</label>
+              <input type="text" id="pixCustDesc" value="Assinatura Agente de IA RAIA RH" class="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-[#00F59B]">
+            </div>
+            <button type="submit" id="btnGenPix" class="w-full py-3 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs hover:opacity-95 transition flex items-center justify-center gap-1.5 shadow-lg shadow-[#00F59B]/20 cursor-pointer">
+              <i data-lucide="zap" class="w-3.5 h-3.5 fill-black"></i>
+              <span id="btnGenPixText">Gerar Pix no Asaas</span>
+            </button>
+          </form>
+
+          <!-- Result Pix Box (Hidden initially) -->
+          <div id="pixResultBox" class="hidden p-4 rounded-2xl bg-zinc-900 border border-[#00F59B]/40 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-[#00F59B]">✓ Pix Gerado no Asaas!</span>
+              <span id="pixResultValue" class="text-xs font-bold text-white">R$ 97,00</span>
+            </div>
+            <div class="flex items-center justify-center p-3 bg-white rounded-xl max-w-[180px] mx-auto shadow">
+              <img id="pixResultQrImg" src="" alt="QR Code Pix" class="w-full h-auto">
+            </div>
+            <div>
+              <label class="block text-[10px] font-bold text-zinc-400 mb-1">Pix Copia e Cola:</label>
+              <div class="flex gap-1.5">
+                <input type="text" id="pixResultPayload" readonly class="flex-1 px-2.5 py-1.5 bg-black border border-zinc-700 rounded-lg text-white font-mono text-[10px] select-all">
+                <button type="button" onclick="copyPixPayload()" class="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-bold transition cursor-pointer">Copiar</button>
+              </div>
+            </div>
+            <a id="pixSendWhatsAppBtn" href="#" target="_blank" class="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs transition flex items-center justify-center gap-1.5 shadow">
+              <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
+              <span>Enviar Cobrança no WhatsApp do Cliente</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- CARD B: GERAR LINK DE CHECKOUT (CARTÃO / PIX / BOLETO) -->
+        <div class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-xl bg-violet-500/10 border border-violet-500/30 flex items-center justify-center text-violet-400">
+                <i data-lucide="credit-card" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h3 class="text-sm font-black text-white">Criar Link de Pagamento / Checkout</h3>
+                <p class="text-[10px] text-zinc-400">Aceita Cartão (até 12x), Pix ou Boleto</p>
+              </div>
+            </div>
+            <span class="text-[10px] font-black text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full">Checkout</span>
+          </div>
+
+          <form onsubmit="handleCreateLinkSubmit(event)" class="space-y-3">
+            <div>
+              <label class="block text-[11px] font-bold text-zinc-300 mb-1">Nome do Plano / Agente</label>
+              <input type="text" id="linkName" required value="Assinatura Agente de IA RAIA RH" class="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-violet-500">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold text-zinc-300 mb-1">Valor (R$)</label>
+                <input type="number" step="0.01" min="1" id="linkValue" value="97.00" required class="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs font-bold text-violet-400 outline-none focus:border-violet-500">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-zinc-300 mb-1">Parcelamento no Cartão</label>
+                <select id="linkInstallments" class="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-violet-500">
+                  <option value="1">À vista (1x)</option>
+                  <option value="3">Até 3x</option>
+                  <option value="6">Até 6x</option>
+                  <option value="12" selected>Até 12x no Cartão</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-zinc-300 mb-1">Descrição</label>
+              <input type="text" id="linkDesc" value="Acesso completo ao colaborador de IA no WhatsApp com suporte 24h." class="w-full px-3 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-violet-500">
+            </div>
+            <button type="submit" id="btnGenLink" class="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-95 text-white font-black text-xs transition flex items-center justify-center gap-1.5 shadow-lg shadow-violet-600/20 cursor-pointer">
+              <i data-lucide="link" class="w-3.5 h-3.5"></i>
+              <span id="btnGenLinkText">Criar Link de Checkout Asaas</span>
+            </button>
+          </form>
+
+          <!-- Result Link Box (Hidden initially) -->
+          <div id="linkResultBox" class="hidden p-4 rounded-2xl bg-zinc-900 border border-violet-500/40 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-violet-400">✓ Link Criado com Sucesso!</span>
+              <span id="linkResultVal" class="text-xs font-bold text-white">R$ 97,00</span>
+            </div>
+            <div class="flex gap-1.5">
+              <input type="text" id="linkResultUrl" readonly class="flex-1 px-3 py-2 bg-black border border-zinc-700 rounded-xl text-cyan-300 font-mono text-xs select-all">
+              <button type="button" onclick="copyCheckoutUrl()" class="px-3.5 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-xs font-bold transition cursor-pointer">Copiar</button>
+            </div>
+            <div class="flex gap-2">
+              <a id="linkOpenUrl" href="#" target="_blank" class="flex-1 py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold text-center transition">Abrir Checkout</a>
+              <a id="linkShareWhatsApp" href="#" target="_blank" class="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold text-center transition flex items-center justify-center gap-1">
+                <i data-lucide="message-circle" class="w-3.5 h-3.5"></i>
+                <span>Mandar no WhatsApp</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- TABELA 1: COBRANÇAS & HISTÓRICO DE PAGAMENTOS ASAAS -->
+      <div class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div>
+            <h3 class="text-base font-black text-white">Cobranças & Histórico de Pagamentos Asaas</h3>
+            <p class="text-xs text-zinc-400">Todas as transações, Pix e faturas geradas na sua conta Asaas</p>
+          </div>
+          <button onclick="loadAsaasPaymentsList()" class="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>Atualizar</span>
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="border-b border-zinc-800 text-[11px] text-zinc-400 uppercase font-black tracking-wider">
+                <th class="py-2.5 px-3">Cliente / Descrição</th>
+                <th class="py-2.5 px-3">WhatsApp</th>
+                <th class="py-2.5 px-3">Valor</th>
+                <th class="py-2.5 px-3">Forma</th>
+                <th class="py-2.5 px-3">Status</th>
+                <th class="py-2.5 px-3">Data</th>
+                <th class="py-2.5 px-3 text-right">Fatura</th>
+              </tr>
+            </thead>
+            <tbody id="asaasPaymentsTableBody" class="divide-y divide-zinc-800/60">
+              <tr>
+                <td colspan="7" class="py-4 text-center text-zinc-500">Nenhum pagamento registrado ainda.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TABELA 2: CLIENTES & LEADS QUE TESTARAM O ASSISTENTE NO SITE -->
+      <div class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div>
+            <h3 class="text-base font-black text-white">Clientes & Leads do Catálogo (Testes no WhatsApp)</h3>
+            <p class="text-xs text-zinc-400">Visitantes que informaram nome e WhatsApp para testar os agentes no site</p>
+          </div>
+          <button onclick="loadLeadsList()" class="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>Atualizar</span>
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="border-b border-zinc-800 text-[11px] text-zinc-400 uppercase font-black tracking-wider">
+                <th class="py-2.5 px-3">Nome</th>
+                <th class="py-2.5 px-3">WhatsApp</th>
+                <th class="py-2.5 px-3">Agente Testado</th>
+                <th class="py-2.5 px-3">Status</th>
+                <th class="py-2.5 px-3">Data / Hora</th>
+                <th class="py-2.5 px-3 text-right">Ação Rápida</th>
+              </tr>
+            </thead>
+            <tbody id="leadsTableBody" class="divide-y divide-zinc-800/60">
+              <tr>
+                <td colspan="6" class="py-4 text-center text-zinc-500">Carregando contatos...</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -855,12 +1099,14 @@
     function switchAdminTab(tab) {
       const sections = {
         studio: document.getElementById('sectionStudio'),
+        asaas: document.getElementById('sectionAsaas'),
         users: document.getElementById('sectionUsers'),
         finance: document.getElementById('sectionFinance'),
         system: document.getElementById('sectionSystem'),
       };
       const buttons = {
         studio: document.getElementById('tabBtnStudio'),
+        asaas: document.getElementById('tabBtnAsaas'),
         users: document.getElementById('tabBtnUsers'),
         finance: document.getElementById('tabBtnFinance'),
         system: document.getElementById('tabBtnSystem'),
@@ -877,6 +1123,10 @@
           buttons[k]?.classList.add('bg-zinc-900', 'text-zinc-400');
         }
       });
+
+      if (tab === 'asaas') {
+        loadAsaasDashboard();
+      }
       lucide.createIcons();
     }
 
@@ -1221,6 +1471,7 @@
       loadFinanceStats();
       loadRecentTransactions();
       checkSystemHealth();
+      loadAsaasDashboard();
     }
 
     async function loadAdminUsers() {
@@ -1412,6 +1663,266 @@
           alert('Erro ao salvar: ' + json.error);
         }
       } catch (err) { alert(err.message); }
+    }
+
+    // -------------------------------------------------------------
+    // ASAAS & CLIENT MANAGEMENT
+    // -------------------------------------------------------------
+    async function loadAsaasDashboard() {
+      try {
+        const res = await fetch('/api/asaas/status');
+        const json = await res.json();
+        if (json.success && json.configured) {
+          const balEl = document.getElementById('asaasBalanceDisplay');
+          const nameEl = document.getElementById('asaasAccountName');
+          const docEl = document.getElementById('asaasAccountDoc');
+
+          if (balEl) balEl.innerText = 'R$ ' + Number(json.balance || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          if (nameEl && json.account?.name) nameEl.innerText = json.account.name;
+          if (docEl && json.account?.cpfCnpj) docEl.innerText = 'CPF/CNPJ: ' + json.account.cpfCnpj;
+        }
+      } catch (e) {
+        console.warn('Erro ao carregar status do Asaas:', e);
+      }
+      loadAsaasPaymentsList();
+      loadLeadsList();
+    }
+
+    async function loadAsaasPaymentsList() {
+      const tbody = document.getElementById('asaasPaymentsTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-zinc-500">Buscando pagamentos do Asaas...</td></tr>';
+
+      try {
+        const res = await fetch('/api/asaas/payments');
+        const json = await res.json();
+        const payments = (json.livePayments && json.livePayments.length > 0) ? json.livePayments : (json.localPayments || []);
+
+        if (!payments || payments.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-zinc-500">Nenhuma cobrança registrada ainda no Asaas. Crie uma acima!</td></tr>';
+          return;
+        }
+
+        const statusMap = {
+          RECEIVED: { label: 'RECEBIDO', class: 'bg-[#00F59B]/20 text-[#00F59B] border border-[#00F59B]/30' },
+          CONFIRMED: { label: 'CONFIRMADO', class: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' },
+          PENDING: { label: 'PENDENTE', class: 'bg-amber-500/20 text-amber-300 border border-amber-500/30' },
+          OVERDUE: { label: 'VENCIDO', class: 'bg-rose-500/20 text-rose-400 border border-rose-500/30' },
+          REFUNDED: { label: 'ESTORNADO', class: 'bg-zinc-700 text-zinc-300 border border-zinc-600' }
+        };
+
+        tbody.innerHTML = payments.map(p => {
+          const st = statusMap[p.status] || { label: p.status || 'PENDENTE', class: 'bg-zinc-800 text-zinc-400' };
+          const val = Number(p.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          const date = p.dateCreated || p.created_at ? new Date(p.dateCreated || p.created_at).toLocaleDateString('pt-BR') : '-';
+          const custName = p.customerName || p.customer_name || p.description || 'Cliente';
+          const custPhone = p.customerPhone || p.customer_phone || '-';
+          const invoice = p.invoiceUrl || p.bankSlipUrl;
+
+          return `
+            <tr class="hover:bg-zinc-900/50 transition">
+              <td class="py-3 px-3 font-bold text-white">${custName}</td>
+              <td class="py-3 px-3 font-mono text-zinc-400">${custPhone}</td>
+              <td class="py-3 px-3 font-black text-[#00F59B]">R$ ${val}</td>
+              <td class="py-3 px-3 font-bold text-zinc-300">${p.billingType || 'PIX'}</td>
+              <td class="py-3 px-3">
+                <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase ${st.class}">${st.label}</span>
+              </td>
+              <td class="py-3 px-3 text-zinc-400">${date}</td>
+              <td class="py-3 px-3 text-right">
+                ${invoice ? `<a href="${invoice}" target="_blank" class="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-cyan-300 font-bold text-[10px] inline-flex items-center gap-1 transition"><span>Fatura</span><i data-lucide="external-link" class="w-3 h-3"></i></a>` : '<span class="text-zinc-600">-</span>'}
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        lucide.createIcons();
+      } catch (e) {
+        console.error('Erro loadAsaasPaymentsList:', e);
+        tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-rose-400">Erro ao carregar pagamentos.</td></tr>';
+      }
+    }
+
+    async function loadLeadsList() {
+      const tbody = document.getElementById('leadsTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-zinc-500">Buscando contatos do site...</td></tr>';
+
+      try {
+        const res = await fetch('/api/admin/leads');
+        const json = await res.json();
+        const leads = json.leads || [];
+
+        if (leads.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-zinc-500">Nenhum teste solicitado no site ainda.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = leads.map(lead => {
+          const cleanPhone = String(lead.phone || '').replace(/\D/g, '');
+          const formattedPhone = cleanPhone.replace(/^55/, '').replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3') || lead.phone;
+          const date = lead.created_at ? new Date(lead.created_at).toLocaleString('pt-BR') : '-';
+          const safeName = (lead.name || 'Cliente').replace(/'/g, '');
+
+          return `
+            <tr class="hover:bg-zinc-900/50 transition">
+              <td class="py-3 px-3 font-bold text-white">${lead.name || 'Sem nome'}</td>
+              <td class="py-3 px-3 font-mono text-cyan-300 font-semibold">
+                <a href="https://wa.me/${cleanPhone}" target="_blank" class="hover:underline flex items-center gap-1">
+                  <span>${formattedPhone}</span>
+                  <i data-lucide="message-circle" class="w-3 h-3 text-emerald-400"></i>
+                </a>
+              </td>
+              <td class="py-3 px-3 font-bold text-violet-300">${lead.agent_name || lead.agent_key}</td>
+              <td class="py-3 px-3">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">TESTOU</span>
+              </td>
+              <td class="py-3 px-3 text-zinc-400 text-[11px]">${date}</td>
+              <td class="py-3 px-3 text-right">
+                <button onclick="fillPixFromLead('${safeName}', '${cleanPhone}')" class="px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 hover:opacity-90 text-black font-extrabold text-[10px] transition cursor-pointer">
+                  ⚡ Cobrar Pix
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+        lucide.createIcons();
+      } catch (e) {
+        console.error('Erro loadLeadsList:', e);
+        tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-rose-400">Erro ao carregar contatos do site.</td></tr>';
+      }
+    }
+
+    function fillPixFromLead(name, phone) {
+      const nameInput = document.getElementById('pixCustName');
+      const phoneInput = document.getElementById('pixCustPhone');
+      if (nameInput) nameInput.value = name;
+      if (phoneInput) phoneInput.value = phone;
+
+      // Scroll smoothly to Pix form
+      const formEl = document.getElementById('pixCustName');
+      if (formEl) {
+        formEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        formEl.focus();
+      }
+    }
+
+    async function handleCreatePixSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnGenPix');
+      const btnTxt = document.getElementById('btnGenPixText');
+      const name = document.getElementById('pixCustName').value.trim();
+      const phone = document.getElementById('pixCustPhone').value.trim();
+      const value = document.getElementById('pixCustValue').value;
+      const description = document.getElementById('pixCustDesc').value.trim();
+
+      if (btn) btn.disabled = true;
+      if (btnTxt) btnTxt.innerText = 'Gerando Pix no Asaas...';
+
+      try {
+        const res = await fetch('/api/asaas/create-pix', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, phone, value, description }),
+        });
+        const json = await res.json();
+
+        if (json.success && json.pixQrCode?.payload) {
+          const box = document.getElementById('pixResultBox');
+          const qrImg = document.getElementById('pixResultQrImg');
+          const payloadInput = document.getElementById('pixResultPayload');
+          const valDisplay = document.getElementById('pixResultValue');
+          const waBtn = document.getElementById('pixSendWhatsAppBtn');
+
+          if (box) box.classList.remove('hidden');
+          if (qrImg && json.pixQrCode.encodedImage) {
+            qrImg.src = 'data:image/png;base64,' + json.pixQrCode.encodedImage;
+          }
+          if (payloadInput) payloadInput.value = json.pixQrCode.payload;
+          if (valDisplay) valDisplay.innerText = 'R$ ' + Number(json.value || value).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+
+          if (waBtn) {
+            const clean = String(phone).replace(/\D/g, '');
+            const msg = `Olá, *${name}*! Aqui está o Pix oficial da RAIA RH para a ativação do seu Agente de IA:\n\n*Valor:* R$ ${Number(value).toFixed(2)}\n*Copia e Cola:*\n${json.pixQrCode.payload}\n\nAssim que você efetuar o pagamento, a ativação é confirmada automaticamente!`;
+            waBtn.href = `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
+          }
+
+          loadAsaasPaymentsList();
+        } else {
+          alert('Erro ao gerar Pix no Asaas: ' + (json.error || 'Verifique os dados informados.'));
+        }
+      } catch (err) {
+        alert('Erro ao comunicar com o Asaas: ' + err.message);
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnTxt) btnTxt.innerText = 'Gerar Pix no Asaas';
+      }
+    }
+
+    async function handleCreateLinkSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnGenLink');
+      const btnTxt = document.getElementById('btnGenLinkText');
+      const name = document.getElementById('linkName').value.trim();
+      const value = document.getElementById('linkValue').value;
+      const installments = document.getElementById('linkInstallments').value;
+      const description = document.getElementById('linkDesc').value.trim();
+
+      if (btn) btn.disabled = true;
+      if (btnTxt) btnTxt.innerText = 'Criando link no Asaas...';
+
+      try {
+        const res = await fetch('/api/asaas/create-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, value, maxInstallmentCount: installments, description }),
+        });
+        const json = await res.json();
+
+        if (json.success && json.url) {
+          const box = document.getElementById('linkResultBox');
+          const urlInput = document.getElementById('linkResultUrl');
+          const valDisplay = document.getElementById('linkResultVal');
+          const openUrl = document.getElementById('linkOpenUrl');
+          const waShare = document.getElementById('linkShareWhatsApp');
+
+          if (box) box.classList.remove('hidden');
+          if (urlInput) urlInput.value = json.url;
+          if (valDisplay) valDisplay.innerText = 'R$ ' + Number(json.value || value).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+          if (openUrl) openUrl.href = json.url;
+
+          if (waShare) {
+            const msg = `Olá! Segue o link de checkout seguro para contratar seu Agente de IA da RAIA RH (aceita Cartão de Crédito em até ${installments}x ou Pix):\n\n${json.url}`;
+            waShare.href = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+          }
+
+          loadAsaasPaymentsList();
+        } else {
+          alert('Erro ao criar link no Asaas: ' + (json.error || 'Verifique os dados informados.'));
+        }
+      } catch (err) {
+        alert('Erro ao comunicar com o Asaas: ' + err.message);
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnTxt) btnTxt.innerText = 'Criar Link de Checkout Asaas';
+      }
+    }
+
+    function copyPixPayload() {
+      const input = document.getElementById('pixResultPayload');
+      if (input && input.value) {
+        navigator.clipboard.writeText(input.value);
+        alert('Código Pix Copia e Cola copiado com sucesso!');
+      }
+    }
+
+    function copyCheckoutUrl() {
+      const input = document.getElementById('linkResultUrl');
+      if (input && input.value) {
+        navigator.clipboard.writeText(input.value);
+        alert('Link de pagamento copiado com sucesso!');
+      }
     }
 
     // INIT
