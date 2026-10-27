@@ -12,6 +12,7 @@ const aiService = require('../services/aiService');
 const calendarService = require('../services/calendarService');
 const whatsappClient = require('../whatsapp/client');
 const asaasService = require('../services/asaasService');
+const agentChatService = require('../services/agentChatService');
 
 const app = express();
 
@@ -333,6 +334,21 @@ app.get('/api/admin/leads', (req, res) => {
   }
 });
 
+app.get('/api/admin/lead-conversation/:phone', (req, res) => {
+  try {
+    const cleanPhone = String(req.params.phone || '').replace(/\D/g, '');
+    const suffix = cleanPhone.length >= 8 ? cleanPhone.slice(-8) : cleanPhone;
+    const messages = db.prepare(`
+      SELECT * FROM agent_messages
+      WHERE phone = ? OR phone LIKE ?
+      ORDER BY id ASC
+    `).all(cleanPhone, `%${suffix}`);
+    res.json({ success: true, messages });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ==========================================
 // PUBLIC LEAD TEST AGENT (LIVE DEMO ON USER'S WHATSAPP)
 // ==========================================
@@ -416,12 +432,13 @@ app.post('/api/test-agent', async (req, res) => {
     const messageText = templateFn(safeName);
     const targetJid = `${cleanPhone}@s.whatsapp.net`;
 
-    // Save lead in SQLite
+    let leadId = null;
     try {
-      db.prepare(`
+      const info = db.prepare(`
         INSERT INTO leads (name, phone, agent_key, agent_name, status)
         VALUES (?, ?, ?, ?, 'SENT')
       `).run(name.trim(), cleanPhone, agentKey || 'OTHER', agentName || 'Agente RAIA');
+      leadId = info.lastInsertRowid;
     } catch (e) {
       console.warn('Erro ao salvar lead na tabela leads:', e.message);
     }
@@ -431,6 +448,14 @@ app.post('/api/test-agent', async (req, res) => {
     if (isConnected) {
       await whatsappClient.sendWhatsAppMessage(targetJid, messageText);
       console.log(`[Lead Teste] Mensagem do agente ${agentName || agentKey} enviada para ${cleanPhone} (${name})`);
+      
+      // Register welcome message in conversation history so the agent continues naturally
+      try {
+        agentChatService.recordMessage(leadId, cleanPhone, agentKey || 'OTHER', 'assistant', messageText);
+      } catch (errRec) {
+        console.warn('Erro ao registrar mensagem inicial no histórico do agente:', errRec.message);
+      }
+
       return res.json({
         success: true,
         sent: true,

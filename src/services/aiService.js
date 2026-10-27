@@ -449,9 +449,9 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function callGemini(contents, userContext = {}) {
   const client = getGenAI();
   const modelsToTry = [
-    'gemini-3.5-flash-lite',
-    'gemini-3.5-flash',
     'gemini-3.8-flash',
+    'gemini-3.5-flash',
+    'gemini-3.5-flash-lite',
     'gemini-3-flash-preview',
     'gemini-flash-latest',
   ];

@@ -1779,9 +1779,14 @@
               </td>
               <td class="py-3 px-3 text-zinc-400 text-[11px]">${date}</td>
               <td class="py-3 px-3 text-right">
-                <button onclick="fillPixFromLead('${safeName}', '${cleanPhone}')" class="px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 hover:opacity-90 text-black font-extrabold text-[10px] transition cursor-pointer">
-                  ⚡ Cobrar Pix
-                </button>
+                <div class="flex items-center justify-end gap-1.5">
+                  <button onclick="viewLeadConversation('${cleanPhone}', '${safeName}', '${(lead.agent_name || lead.agent_key).replace(/'/g, '')}')" class="px-2.5 py-1 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-[10px] transition cursor-pointer flex items-center gap-1">
+                    💬 Diálogo
+                  </button>
+                  <button onclick="fillPixFromLead('${safeName}', '${cleanPhone}')" class="px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 hover:opacity-90 text-black font-extrabold text-[10px] transition cursor-pointer">
+                    ⚡ Cobrar Pix
+                  </button>
+                </div>
               </td>
             </tr>
           `;
@@ -1925,11 +1930,80 @@
       }
     }
 
+    async function viewLeadConversation(phone, name, agentName) {
+      const modal = document.getElementById('leadChatModal');
+      const title = document.getElementById('leadChatTitle');
+      const sub = document.getElementById('leadChatSub');
+      const body = document.getElementById('leadChatBody');
+
+      if (title) title.innerText = `💬 Diálogo com ${name || 'Lead'} • ${agentName || 'Agente'}`;
+      if (sub) sub.innerText = `WhatsApp: ${phone}`;
+      if (body) body.innerHTML = '<div class="py-8 text-center text-zinc-500">Carregando mensagens da conversa...</div>';
+      if (modal) modal.classList.remove('hidden');
+
+      try {
+        const res = await fetch(`/api/admin/lead-conversation/${phone}`);
+        const json = await res.json();
+        const msgs = json.messages || [];
+
+        if (msgs.length === 0) {
+          body.innerHTML = '<div class="py-8 text-center text-zinc-500">Nenhuma mensagem registrada ainda para este lead.</div>';
+          return;
+        }
+
+        body.innerHTML = msgs.map(m => {
+          const isBot = m.role === 'assistant';
+          const time = m.created_at ? new Date(m.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+          const bg = isBot ? 'bg-zinc-800/90 text-slate-100 border border-zinc-700/60' : 'bg-emerald-950/80 text-emerald-100 border border-emerald-600/40 ml-auto';
+          const senderLabel = isBot ? (agentName || 'Agente IA') : (name || 'Cliente');
+
+          return `
+            <div class="flex flex-col ${isBot ? 'items-start' : 'items-end'} max-w-[85%] ${isBot ? '' : 'ml-auto'}">
+              <span class="text-[10px] font-bold text-zinc-400 mb-0.5 px-1">${senderLabel}</span>
+              <div class="p-3 rounded-2xl ${bg} text-xs leading-relaxed whitespace-pre-wrap shadow-lg">
+                ${m.content}
+              </div>
+              <span class="text-[9px] text-zinc-500 mt-0.5 px-1">${time}</span>
+            </div>
+          `;
+        }).join('');
+
+        body.scrollTop = body.scrollHeight;
+      } catch (err) {
+        body.innerHTML = `<div class="py-8 text-center text-rose-400">Erro ao carregar mensagens: ${err.message}</div>`;
+      }
+    }
+
+    function closeLeadChatModal() {
+      const modal = document.getElementById('leadChatModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
     // INIT
     window.addEventListener('DOMContentLoaded', () => {
       initAuth();
       lucide.createIcons();
     });
   </script>
+
+  <!-- Lead Conversation Modal -->
+  <div id="leadChatModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-zinc-950 border border-zinc-800 rounded-3xl w-full max-w-xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
+      <div class="p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/50">
+        <div>
+          <h3 id="leadChatTitle" class="text-white font-extrabold text-sm">Conversa com Lead</h3>
+          <p id="leadChatSub" class="text-xs text-zinc-400 font-mono"></p>
+        </div>
+        <button onclick="closeLeadChatModal()" class="text-zinc-400 hover:text-white p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 transition">✕</button>
+      </div>
+      <div id="leadChatBody" class="p-4 overflow-y-auto space-y-3 flex-1 bg-[#090C15] min-h-[250px] max-h-[500px]">
+        <!-- Messages rendered here -->
+      </div>
+      <div class="p-3 border-t border-zinc-800 bg-zinc-900/40 text-center text-[11px] text-zinc-500 flex items-center justify-center gap-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        Diálogo interativo gerado pela IA da RAIA RH em tempo real
+      </div>
+    </div>
+  </div>
 </body>
 </html>

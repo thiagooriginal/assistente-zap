@@ -13,6 +13,7 @@ const config = require('../config');
 const db = require('../database/db');
 const { handleIncomingMessage } = require('./messageHandler');
 const { startReminderJob } = require('../services/reminderService');
+const agentChatService = require('../services/agentChatService');
 
 let currentSock = null;
 let lastKnownUserJid = null;
@@ -143,7 +144,33 @@ async function startWhatsAppBot() {
 
     for (const msg of messages) {
       if (!msg.message || !msg.key?.remoteJid) continue;
-      if (msg.key.fromMe) continue;
+
+      const myCleanNumber = sock.user?.id ? sock.user.id.split('@')[0].split(':')[0].replace(/[^0-9]/g, '') : '';
+      let senderClean = '';
+
+      if (msg.key.remoteJid.includes('@s.whatsapp.net') || msg.key.remoteJid.includes('@lid')) {
+        let clean = msg.key.remoteJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+        if (msg.key.remoteJid.includes('@lid')) {
+          try {
+            const mappingPath = path.resolve(config.authDir, `lid-mapping-${clean}_reverse.json`);
+            if (fs.existsSync(mappingPath)) {
+              const raw = fs.readFileSync(mappingPath, 'utf8');
+              const phone = JSON.parse(raw);
+              if (phone) clean = String(phone).replace(/[^0-9]/g, '');
+            }
+          } catch (e) {}
+        }
+        senderClean = clean;
+      }
+
+      // If message is fromMe: only process if it's a self-chat (talking to oneself)
+      if (msg.key.fromMe) {
+        const isSelfChat = myCleanNumber && senderClean && senderClean === myCleanNumber;
+        if (!isSelfChat) {
+          // User is texting someone else, never interfere
+          continue;
+        }
+      }
 
       const msgId = msg.key.id;
       if (!msgId) continue;
@@ -169,31 +196,34 @@ async function startWhatsAppBot() {
         console.error('Erro ao verificar mensagem processada:', errDb.message);
       }
 
-      if (
-        !msg.key.fromMe &&
-        (msg.key.remoteJid.includes('@s.whatsapp.net') || msg.key.remoteJid.includes('@lid'))
-      ) {
-        let clean = msg.key.remoteJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
-        if (msg.key.remoteJid.includes('@lid')) {
-          try {
-            const mappingPath = path.resolve(config.authDir, `lid-mapping-${clean}_reverse.json`);
-            if (fs.existsSync(mappingPath)) {
-              const raw = fs.readFileSync(mappingPath, 'utf8');
-              const phone = JSON.parse(raw);
-              if (phone) clean = String(phone).replace(/[^0-9]/g, '');
-            }
-          } catch (e) {}
-        }
-        lastKnownUserJid = `${clean}@s.whatsapp.net`;
+      if (senderClean) {
+        lastKnownUserJid = `${senderClean}@s.whatsapp.net`;
       }
 
-      // If personal assistant is paused, do not reply as personal finance/calendar assistant
+      // 1. PRIORIDADE MÁXIMA: Verificar se é um Lead interagindo com um Agente RAIA (Lucas Imóveis, etc.)
+      if (senderClean) {
+        const lead = agentChatService.findActiveLead(senderClean);
+        if (lead) {
+          console.log(`[WhatsApp] 🤖 Lead ativo para Agente ${lead.agent_name || lead.agent_key} (${senderClean}). Processando resposta com agentChatService...`);
+          try {
+            const handled = await agentChatService.handleLeadMessage(sock, msg, senderClean);
+            if (handled) {
+              continue; // Sucesso: mensagem respondida como o Agente de IA!
+            }
+          } catch (agentErr) {
+            console.error('[WhatsApp] Erro no agentChatService:', agentErr.message);
+          }
+        }
+      }
+
+      // 2. Se o assistente pessoal estiver pausado, ignorar para não conflitar com finanças/agenda pessoal
       if (config.pausePersonalAssistant) {
-        console.log(`[WhatsApp] ⏸️ Assistente Pessoal Pausado: ignorando mensagem recebida de ${msg.key.remoteJid} para evitar conflitos no mesmo número.`);
+        console.log(`[WhatsApp] ⏸️ Assistente Pessoal Pausado: ignorando mensagem recebida de ${msg.key.remoteJid} (não é lead de demonstração).`);
         continue;
       }
 
-      console.log(`[WhatsApp] Processando mensagem (ID: ${msgId}, de: ${msg.key.remoteJid})`);
+      // 3. Assistente pessoal legado (finanças, agenda)
+      console.log(`[WhatsApp] Processando mensagem pessoal (ID: ${msgId}, de: ${msg.key.remoteJid})`);
       await handleIncomingMessage(sock, msg).catch((err) => {
         console.error('Erro em handleIncomingMessage:', err.message);
       });
