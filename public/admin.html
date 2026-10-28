@@ -113,7 +113,7 @@
         <p class="text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">Painel do Administrador & Gestor</p>
       </div>
 
-      <div class="space-y-4 text-left">
+      <form id="adminLoginForm" onsubmit="event.preventDefault(); executeAdminLogin();" class="space-y-4 text-left">
         <div class="space-y-1.5">
           <label class="text-xs font-bold text-zinc-300">Senha ou PIN do Administrador</label>
           <div class="relative">
@@ -121,20 +121,24 @@
               type="password" 
               id="adminPassInput" 
               placeholder="Digite a senha (ex: admin123 ou 9513)" 
-              onkeydown="if(event.key==='Enter') executeAdminLogin()"
-              class="w-full px-4 py-3.5 bg-black/50 border border-zinc-700/80 rounded-2xl text-white text-sm focus:outline-none focus:border-[#00F59B] transition pr-11"
+              class="w-full px-4 py-3.5 bg-black/50 border border-zinc-700/80 rounded-2xl text-white text-sm focus:outline-none focus:border-[#00F59B] transition pr-12"
               autofocus
             >
-            <button type="button" onclick="togglePassPeek()" class="absolute right-3.5 top-3.5 text-zinc-400 hover:text-white text-sm">
+            <button type="button" onclick="togglePassPeek()" title="Mostrar/ocultar senha" class="absolute right-3 top-3 p-1.5 text-zinc-400 hover:text-white text-base cursor-pointer z-20 transition select-none flex items-center justify-center">
               <span id="peekIcon">👁️</span>
             </button>
           </div>
-          <p class="text-[11px] text-zinc-500">💡 Senha padrão: <code class="text-zinc-300 bg-zinc-800 px-1.5 py-0.5 rounded">admin123</code> ou PIN <code class="text-zinc-300 bg-zinc-800 px-1.5 py-0.5 rounded">9513</code></p>
+          <p class="text-[11px] text-zinc-500">
+            💡 Clique para preencher: 
+            <button type="button" onclick="fillAdminPass('admin123')" class="text-zinc-300 bg-zinc-800 hover:bg-zinc-700 hover:text-[#00F59B] px-1.5 py-0.5 rounded cursor-pointer transition font-mono border border-zinc-700/60 text-[10px]">admin123</button> 
+            ou PIN 
+            <button type="button" onclick="fillAdminPass('9513')" class="text-zinc-300 bg-zinc-800 hover:bg-zinc-700 hover:text-[#00F59B] px-1.5 py-0.5 rounded cursor-pointer transition font-mono border border-zinc-700/60 text-[10px]">9513</button>
+          </p>
         </div>
 
         <div id="loginAlertBox" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs"></div>
 
-        <button id="btnLoginSubmit" onclick="executeAdminLogin()" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 via-violet-600 to-[#00F59B] hover:opacity-95 text-black font-black text-sm shadow-lg shadow-cyan-500/30 active:scale-98 transition flex items-center justify-center gap-2">
+        <button type="submit" id="btnLoginSubmit" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 via-violet-600 to-[#00F59B] hover:opacity-95 text-black font-black text-sm shadow-lg shadow-cyan-500/30 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer">
           <span id="btnLoginText">Acessar Painel</span>
           <i data-lucide="arrow-right" class="w-4 h-4 text-black"></i>
         </button>
@@ -145,7 +149,7 @@
             <span>Voltar para a Vitrine</span>
           </a>
         </div>
-      </div>
+      </form>
     </div>
   </div>
 
@@ -1187,16 +1191,26 @@
       lucide.createIcons();
     }
 
+    function fillAdminPass(pass) {
+      const inp = document.getElementById('adminPassInput');
+      if (inp) {
+        inp.value = pass;
+        executeAdminLogin();
+      }
+    }
+
     function togglePassPeek() {
       const inp = document.getElementById('adminPassInput');
       const icon = document.getElementById('peekIcon');
+      if (!inp) return;
       if (inp.type === 'password') {
         inp.type = 'text';
-        icon.innerText = '🙈';
+        if (icon) icon.innerText = '🙈';
       } else {
         inp.type = 'password';
-        icon.innerText = '👁️';
+        if (icon) icon.innerText = '👁️';
       }
+      inp.focus();
     }
 
     async function executeAdminLogin() {
@@ -2204,30 +2218,30 @@
       if (tagEl) tagEl.innerText = data.tagline ? '"' + data.tagline + '"' : '';
 
       if (audEl) {
-        audEl.innerHTML = \`
-          <p><b>Avatar:</b> \${data.targetAudience?.avatar || 'Não informado'}</p>
-          <p><b>Principal Dor:</b> \${data.targetAudience?.primaryPain || 'Não informado'}</p>
-          <p><b>Desejo Central:</b> \${data.targetAudience?.coreDesire || 'Não informado'}</p>
-        \`;
+        audEl.innerHTML = `
+          <p><b>Avatar:</b> ${data.targetAudience?.avatar || 'Não informado'}</p>
+          <p><b>Principal Dor:</b> ${data.targetAudience?.primaryPain || 'Não informado'}</p>
+          <p><b>Desejo Central:</b> ${data.targetAudience?.coreDesire || 'Não informado'}</p>
+        `;
       }
 
       if (objEl) {
-        objEl.innerHTML = (data.objectionsAndAnswers || []).map(o => \`
+        objEl.innerHTML = (data.objectionsAndAnswers || []).map(o => `
           <div class="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800">
-            <p class="text-amber-300 font-bold">⚠️ \${o.objection}</p>
-            <p class="text-zinc-300 text-[10px] mt-0.5">💬 <i>\${o.answer}</i></p>
+            <p class="text-amber-300 font-bold">⚠️ ${o.objection}</p>
+            <p class="text-zinc-300 text-[10px] mt-0.5">💬 <i>${o.answer}</i></p>
           </div>
-        \`).join('') || '<p class="text-zinc-500">Sem objeções mapeadas.</p>';
+        `).join('') || '<p class="text-zinc-500">Sem objeções mapeadas.</p>';
       }
 
       if (adEl) {
-        adEl.innerHTML = (data.adAngles || []).map(a => \`
+        adEl.innerHTML = (data.adAngles || []).map(a => `
           <div class="p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800 space-y-1">
             <span class="text-[9px] font-bold text-violet-400 uppercase">Ângulo</span>
-            <p class="font-bold text-white text-[10px]">"\${a.headline}"</p>
-            <p class="text-zinc-400 text-[9px]">\${a.angle}</p>
+            <p class="font-bold text-white text-[10px]">"${a.headline}"</p>
+            <p class="text-zinc-400 text-[9px]">${a.angle}</p>
           </div>
-        \`).join('') || '<p class="text-zinc-500">Sem ideias de anúncios.</p>';
+        `).join('') || '<p class="text-zinc-500">Sem ideias de anúncios.</p>';
       }
 
       if (promptEl) {
@@ -2255,26 +2269,26 @@
           const date = item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : '-';
           const safeData = JSON.stringify(item.data || {}).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
 
-          return \`
+          return `
             <tr class="hover:bg-zinc-900/50 transition">
-              <td class="py-3 px-3 font-bold text-white">\${item.company_name || 'Sem nome'}</td>
-              <td class="py-3 px-3 font-mono text-cyan-300 text-[11px]">\${item.niche || 'Geral'}</td>
+              <td class="py-3 px-3 font-bold text-white">${item.company_name || 'Sem nome'}</td>
+              <td class="py-3 px-3 font-mono text-cyan-300 text-[11px]">${item.niche || 'Geral'}</td>
               <td class="py-3 px-3 text-zinc-400 text-[11px] truncate max-w-[180px]">
-                \${item.url ? \`<a href="\${item.url}" target="_blank" class="hover:underline text-blue-400">\${item.url}</a>\` : '-'}
+                ${item.url ? `<a href="${item.url}" target="_blank" class="hover:underline text-blue-400">${item.url}</a>` : '-'}
               </td>
-              <td class="py-3 px-3 text-zinc-500 text-[11px]">\${date}</td>
+              <td class="py-3 px-3 text-zinc-500 text-[11px]">${date}</td>
               <td class="py-3 px-3 text-right">
                 <div class="flex items-center justify-end gap-1.5">
-                  <button onclick='viewAnalysisData(\${safeData})' class="px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-bold transition cursor-pointer">
+                  <button onclick='viewAnalysisData(${safeData})' class="px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-bold transition cursor-pointer">
                     👁️ Ver
                   </button>
-                  <button onclick="deleteAnalysisRecord(\${item.id})" class="px-2 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-300 text-[10px] font-bold transition cursor-pointer">
+                  <button onclick="deleteAnalysisRecord(${item.id})" class="px-2 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-300 text-[10px] font-bold transition cursor-pointer">
                     🗑️
                   </button>
                 </div>
               </td>
             </tr>
-          \`;
+          `;
         }).join('');
 
         lucide.createIcons();
