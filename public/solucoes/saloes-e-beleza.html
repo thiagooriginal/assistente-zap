@@ -2,473 +2,778 @@
 <html lang="pt-BR" class="scroll-smooth dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jéssica • Assistente para Salões de Beleza, Barbearias & Estética | RAIA</title>
-  <meta name="description" content="A Jéssica responde dúvidas de clientes, informa valores cadastrados, horários de funcionamento e recolhe as preferências de agendamento para a recepção confirmar.">
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>Jéssica • Assistente de IA para Salões de Beleza & Estética | RAIA</title>
+  <meta name="description" content="Seu salão atendendo no WhatsApp, confirmando clientes e organizando o caixa enquanto você cuida do cabelo. Conheça a Jéssica e o Dashboard Financeiro da RAIA.">
+  <link rel="icon" type="image/png" href="/raia-emblem-small.png">
+
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
           colors: {
-            raia: { black: '#07080c', bgDark: '#0a0d14', neon: '#00F59B' }
+            brand: {
+              dark: '#080918',
+              surface: '#0F1126',
+              card: '#141632',
+              emerald: '#00F59B',
+              cyan: '#06B6D4',
+              pink: '#EC4899',
+              gold: '#F59E0B',
+            }
           }
         }
       }
     }
   </script>
-  
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
-    body { background-color: #040711; color: #ffffff; font-family: 'Plus Jakarta Sans', sans-serif; }
-    .glass-nav { background: rgba(4, 7, 17, 0.9); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
-    .glass-card { background: rgba(12, 18, 32, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; }
+    body {
+      background-color: #070814;
+      color: #E2E8F0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overflow-x: hidden;
+    }
+    .salon-hero-bg {
+      background: linear-gradient(180deg, rgba(7, 8, 20, 0.82) 0%, rgba(7, 8, 20, 0.94) 75%, #070814 100%), 
+                  url('https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+    }
+    .salon-banner-pattern {
+      background-image: radial-gradient(rgba(236, 72, 153, 0.15) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
   </style>
 </head>
-<body class="min-h-screen bg-[#040711] text-white selection:bg-[#00F59B] selection:text-black">
+<body class="min-h-screen bg-[#070814] text-slate-100 antialiased selection:bg-pink-500 selection:text-white">
 
-  <!-- Header -->
-  <header class="fixed top-0 left-0 right-0 z-50 glass-nav">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
-      <a href="/" class="flex items-center gap-3">
-        <img src="/raia-logo.png" alt="RAIA" class="w-10 h-10 object-contain">
-        <div>
-          <span class="text-xl font-black text-white">RAIA</span>
-          <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#00F59B]/10 text-[#00F59B] font-bold uppercase ml-1">Assistentes</span>
+  <!-- ============================================================ -->
+  <!-- TOP NAVIGATION BAR                                           -->
+  <!-- ============================================================ -->
+  <header class="sticky top-0 z-40 w-full backdrop-blur-xl bg-[#070814]/85 border-b border-[#1F234D]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      
+      <!-- Brand Logo Emblem -->
+      <a href="/" class="flex items-center gap-3 group shrink-0">
+        <div class="relative w-10 h-10 flex items-center justify-center rounded-xl bg-pink-500/10 border border-pink-500/30 group-hover:border-pink-400 transition p-1">
+          <img src="/raia-emblem-small.png" alt="RAIA" class="w-full h-full object-contain filter drop-shadow-[0_0_10px_rgba(236,72,153,0.5)]">
+        </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="text-xl font-black tracking-tight text-white group-hover:text-pink-400 transition">RAIA</span>
+            <span class="px-2 py-0.5 rounded-full bg-pink-500/15 border border-pink-500/30 text-[9px] font-extrabold uppercase tracking-widest text-pink-300">Salões & Estética</span>
+          </div>
+          <span class="text-[10px] text-zinc-400 -mt-0.5 font-medium">Jéssica • Assistente Inteligente</span>
         </div>
       </a>
 
-      <nav class="hidden md:flex items-center gap-7 text-xs font-bold text-zinc-300">
-        <a href="/" class="hover:text-white transition">Início</a>
-        <a href="/solucoes" class="text-[#00F59B] transition">Catálogo</a>
-        <a href="/como-funciona" class="hover:text-white transition">Como Funciona</a>
-        <a href="/planos" class="hover:text-white transition">Planos</a>
-        <a href="/contato" class="hover:text-white transition">Contato</a>
+      <!-- Desktop Nav -->
+      <nav class="hidden md:flex items-center gap-1.5 text-xs font-bold text-zinc-300">
+        <a href="/solucoes" class="px-3 py-1.5 rounded-xl hover:text-white hover:bg-white/5 transition flex items-center gap-1.5">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5 text-zinc-400"></i>
+          <span>Todos os Segmentos</span>
+        </a>
+        <a href="#problemas" class="px-3 py-1.5 rounded-xl hover:text-white hover:bg-white/5 transition">
+          Problemas & Soluções
+        </a>
+        <a href="#dashboard" class="px-3 py-1.5 rounded-xl hover:text-white hover:bg-white/5 transition text-cyan-300">
+          Controle Financeiro
+        </a>
+        <a href="#conversa" class="px-3 py-1.5 rounded-xl hover:text-white hover:bg-white/5 transition">
+          Exemplo no WhatsApp
+        </a>
+        <a href="#precos" class="px-3 py-1.5 rounded-xl hover:text-white hover:bg-white/5 transition">
+          Planos
+        </a>
       </nav>
 
-      <div class="flex items-center gap-2.5">
-        <a href="/admin" class="px-3 py-1.5 rounded-full text-xs font-bold text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800">
-          Área do Gestor
-        </a>
-        <button onclick="openTestModal()" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs shadow">
-          Testar no WhatsApp
+      <!-- Right CTAs -->
+      <div class="flex items-center gap-3 shrink-0">
+        <button onclick="openTestModal()" class="px-4 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-pink-500 via-rose-500 to-[#00F59B] text-black hover:opacity-90 shadow-lg shadow-pink-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer">
+          <i data-lucide="message-circle" class="w-4 h-4 text-black"></i>
+          <span>Testar Jéssica no WhatsApp</span>
         </button>
       </div>
+
     </div>
   </header>
 
-  <main class="pt-32 pb-24 max-w-5xl mx-auto px-4 sm:px-6 space-y-16">
-    
-    <!-- Breadcrumb -->
-    <div class="flex items-center gap-2 text-xs text-zinc-400">
-      <a href="/" class="hover:text-white">Início</a>
-      <span>/</span>
-      <a href="/solucoes" class="hover:text-white">Soluções</a>
-      <span>/</span>
-      <span class="text-pink-400 font-bold">Salões de Beleza, Barbearias & Estética</span>
-    </div>
-
-    <!-- A & B & C: Hero do Segmento -->
-    <div class="space-y-6">
-      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/30 text-pink-300 text-xs font-bold">
-        <span>💇‍♀️ Salões de Beleza, Barbearias & Estética • Assistente Jéssica</span>
-      </div>
-
-      <h1 class="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
-        Seu salão atendendo no WhatsApp, mesmo quando você está com uma cliente.
-      </h1>
-
-      <p class="text-base sm:text-lg text-zinc-300 max-w-3xl leading-relaxed">
-        A Jéssica responde dúvidas de clientes, informa valores cadastrados, horários de funcionamento e recolhe as preferências de agendamento para a recepção confirmar.
-      </p>
-
-      <div class="flex flex-col sm:flex-row gap-3 pt-2">
-        <button onclick="openTestModal()" class="px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs flex items-center justify-center gap-2 shadow-lg hover:scale-105 transition">
-          <i data-lucide="send" class="w-4 h-4"></i>
-          <span>Fazer teste gratuito deste assistente</span>
-        </button>
-        <a href="https://wa.me/5511951364159?text=Ol%C3%A1%2C+gostaria+de+saber+mais+sobre+a+solu%C3%A7%C3%A3o+de+IA+para+Sal%C3%B5es%20de%20Beleza%2C%20Barbearias%20%26%20Est%C3%A9tica" target="_blank" class="px-6 py-3.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 border border-zinc-700 transition">
-          <i data-lucide="message-circle" class="w-4 h-4 text-emerald-400"></i>
-          <span>Falar com especialista comercial</span>
-        </a>
-      </div>
-    </div>
-
-    <!-- D: Situações Comuns da Rotina -->
-    <div class="glass-card p-6 sm:p-8 space-y-4">
-      <div class="flex items-center gap-2">
-        <i data-lucide="alert-circle" class="w-5 h-5 text-amber-400"></i>
-        <h2 class="text-lg font-bold text-white">Desafios frequentes na rotina deste segmento</h2>
-      </div>
-      <ul class="space-y-2.5 text-xs sm:text-sm">
+  <!-- ============================================================ -->
+  <!-- HERO SECTION (Luxury Salon Atmosphere & Hairdresser Tools)   -->
+  <!-- ============================================================ -->
+  <section class="salon-hero-bg relative pt-12 pb-20 px-4 sm:px-6 lg:px-8 border-b border-[#1F234D]">
+    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+      
+      <!-- Left Column: Copy & Value Proposition -->
+      <div class="lg:col-span-7 space-y-6">
         
-    <li class="flex items-start gap-2.5">
-      <span class="text-pink-400 font-bold mt-0.5">•</span>
-      <span class="text-zinc-300">Cliente manda mensagem à noite ou no domingo querendo saber horários disponíveis.</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <span class="text-pink-400 font-bold mt-0.5">•</span>
-      <span class="text-zinc-300">Profissional está no meio de um procedimento (mechas, corte, unhas) e não pode pegar no celular.</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <span class="text-pink-400 font-bold mt-0.5">•</span>
-      <span class="text-zinc-300">Dúvidas repetitivas sobre tabela de preços, endereço e formas de pagamento.</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <span class="text-pink-400 font-bold mt-0.5">•</span>
-      <span class="text-zinc-300">Clientes que desistem quando aguardam mais de 30 minutos por uma resposta simples.</span>
-    </li>
-  
-      </ul>
-    </div>
-
-    <!-- E: Funcionalidades Disponíveis -->
-    <div class="glass-card p-6 sm:p-8 space-y-4 border-pink-500/20">
-      <div class="flex items-center gap-2">
-        <i data-lucide="zap" class="w-5 h-5 text-[#00F59B]"></i>
-        <h2 class="text-lg font-bold text-white">O que o assistente Jéssica faz na prática</h2>
-      </div>
-      <ul class="space-y-3 text-xs sm:text-sm">
-        
-    <li class="flex items-start gap-2.5">
-      <i data-lucide="check" class="w-4 h-4 text-pink-400 shrink-0 mt-0.5"></i>
-      <span class="text-zinc-200">Apresentação da tabela de serviços e preços cadastrados pelo salão.</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <i data-lucide="check" class="w-4 h-4 text-pink-400 shrink-0 mt-0.5"></i>
-      <span class="text-zinc-200">Informações completas de horários de funcionamento e localização.</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <i data-lucide="check" class="w-4 h-4 text-pink-400 shrink-0 mt-0.5"></i>
-      <span class="text-zinc-200">Coleta organizada de dia, horário e profissional de preferência.</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <i data-lucide="check" class="w-4 h-4 text-pink-400 shrink-0 mt-0.5"></i>
-      <span class="text-zinc-200">Encaminhamento da solicitação diretamente para a recepção humana confirmar.</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <i data-lucide="check" class="w-4 h-4 text-pink-400 shrink-0 mt-0.5"></i>
-      <span class="text-zinc-200">Possibilidade de a equipe assumir qualquer conversa no WhatsApp a qualquer momento.</span>
-    </li>
-  
-      </ul>
-    </div>
-
-    <!-- F: Conversa Ilustrativa -->
-    <div class="space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <h2 class="text-lg font-bold text-white">Exemplo ilustrativo de atendimento</h2>
-          <p class="text-xs text-zinc-400">Simulação de como o diálogo acontece de forma limpa no WhatsApp</p>
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-pink-500/20 border border-pink-400/40 text-pink-300 text-xs font-extrabold tracking-wide backdrop-blur-md">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-pink-400"></i>
+          <span>Especialmente Criado para Salões, Esmalterias & Barbearias</span>
         </div>
-        <span class="text-[10px] px-2.5 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-400">Exemplo Ilustrativo</span>
+
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
+          Seu salão atendendo no WhatsApp e organizando o caixa enquanto você cuida do cabelo.
+        </h1>
+
+        <p class="text-sm sm:text-base text-zinc-200 leading-relaxed max-w-2xl">
+          Enquanto suas mãos estão ocupadas lavando, escovando ou aplicando mechas, a <b>Jéssica</b> atende suas clientes no WhatsApp em segundos, tira dúvidas de procedimentos, recolhe preferências de horários e envia lembretes. E no painel da RAIA, você acompanha seu faturamento diário e comissões dos profissionais em tempo real.
+        </p>
+
+        <!-- CTAs -->
+        <div class="flex flex-wrap items-center gap-4 pt-2">
+          <button onclick="openTestModal()" class="px-6 py-4 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-[#00F59B] text-black font-black text-xs hover:opacity-95 shadow-xl shadow-pink-500/30 active:scale-95 transition flex items-center gap-2.5 cursor-pointer">
+            <i data-lucide="play" class="w-4 h-4 fill-black"></i>
+            <span>Fazer um Teste Grátis no Meu WhatsApp</span>
+          </button>
+          
+          <a href="#dashboard" class="px-5 py-4 rounded-2xl bg-[#141632]/90 hover:bg-white/10 text-white font-bold text-xs border border-zinc-700 transition flex items-center gap-2">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-cyan-400"></i>
+            <span>Ver Dashboard Financeiro</span>
+          </a>
+        </div>
+
+        <!-- Highlights Badges -->
+        <div class="pt-4 grid grid-cols-3 gap-3 border-t border-white/10 text-xs">
+          <div>
+            <span class="text-lg font-black text-pink-400 font-mono">24h / 7d</span>
+            <p class="text-[11px] text-zinc-400 mt-0.5">Atendimento sem pausa</p>
+          </div>
+          <div>
+            <span class="text-lg font-black text-[#00F59B] font-mono">-60%</span>
+            <p class="text-[11px] text-zinc-400 mt-0.5">Menos faltas com lembretes</p>
+          </div>
+          <div>
+            <span class="text-lg font-black text-cyan-400 font-mono">100%</span>
+            <p class="text-[11px] text-zinc-400 mt-0.5">Caixa & Comissões na mão</p>
+          </div>
+        </div>
+
       </div>
 
-      <div class="p-6 rounded-3xl bg-[#090C15] border border-zinc-800 space-y-3 max-w-xl mx-auto shadow-2xl">
-        <div class="flex items-center justify-between border-b border-zinc-800 pb-2 text-[11px] text-zinc-400">
-          <span class="font-bold flex items-center gap-1.5 text-pink-300">
-            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-            Jéssica
+      <!-- Right Column: Visual Card with Scissors, Brush & Salon Tools -->
+      <div class="lg:col-span-5 relative">
+        <div class="relative rounded-3xl overflow-hidden border-2 border-pink-500/40 shadow-2xl group bg-[#0F1126]">
+          
+          <!-- Image with Salon Tools (Scissors & Hairbrush in foreground) -->
+          <div class="relative h-80 w-full overflow-hidden">
+            <img 
+              src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80" 
+              alt="Escova de cabelo e tesoura de cabeleireiro profissional em primeiro plano" 
+              class="w-full h-full object-cover group-hover:scale-105 transition duration-700"
+            >
+            <div class="absolute inset-0 bg-gradient-to-t from-[#0F1126] via-transparent to-black/30"></div>
+            
+            <div class="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md border border-white/20 text-white text-[11px] font-extrabold flex items-center gap-1.5">
+              <span>✂️</span>
+              <span>Rotina Real do Salão</span>
+            </div>
+
+            <div class="absolute bottom-4 left-4 right-4">
+              <span class="text-[10px] uppercase font-black text-pink-400 tracking-wider">Atendimento + Gestão de Caixa</span>
+              <h3 class="text-xl font-black text-white">Jéssica • A aliada do seu salão</h3>
+            </div>
+          </div>
+
+          <!-- Card Content Body -->
+          <div class="p-5 space-y-3 bg-[#0F1126]">
+            <div class="flex items-center justify-between text-xs border-b border-zinc-800 pb-2">
+              <span class="text-zinc-400">Agendamentos & Dúvidas</span>
+              <span class="text-[#00F59B] font-bold flex items-center gap-1">
+                <span class="w-2 h-2 rounded-full bg-[#00F59B] animate-pulse"></span>
+                WhatsApp Automático
+              </span>
+            </div>
+
+            <div class="flex items-center justify-between text-xs border-b border-zinc-800 pb-2">
+              <span class="text-zinc-400">Controle de Faturamento</span>
+              <span class="text-cyan-400 font-bold">Dashboard em Tempo Real</span>
+            </div>
+
+            <div class="flex items-center justify-between text-xs">
+              <span class="text-zinc-400">Investimento Mensal</span>
+              <span class="text-white font-mono font-black text-sm text-[#00F59B]">Apenas R$ 97 / mês</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION: PROBLEMAS COMUNS VS SOLUÇÕES DA RAIA                -->
+  <!-- ============================================================ -->
+  <section id="problemas" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <div class="text-center max-w-2xl mx-auto space-y-3 mb-12">
+      <span class="px-3.5 py-1 rounded-full bg-pink-500/10 border border-pink-500/30 text-pink-300 text-xs font-extrabold uppercase">
+        Problemas da Rotina de Salão
+      </span>
+      <h2 class="text-2xl sm:text-3xl font-black text-white">
+        Você se identifica com algum desses 3 desafios diários?
+      </h2>
+      <p class="text-xs sm:text-sm text-zinc-400">
+        Ter salão de beleza exige técnica, cuidado e atenção plena à cliente. Veja como a RAIA resolve as dores que tiram o sono de quem empreende na beleza:
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      
+      <!-- Card 1: Mãos Ocupadas -->
+      <div class="p-6 rounded-3xl bg-[#0F1126] border border-[#1F234D] hover:border-pink-500/50 transition space-y-4 relative group">
+        <div class="w-12 h-12 rounded-2xl bg-pink-500/15 border border-pink-400/30 flex items-center justify-center text-pink-400 text-xl font-bold">
+          ✂️
+        </div>
+
+        <div class="space-y-2">
+          <span class="text-[10px] font-black uppercase text-rose-400 tracking-wider">O Problema Real</span>
+          <h3 class="text-base font-bold text-white leading-snug">
+            Mãos ocupadas no lavatório ou escova e mensagens acumulando no WhatsApp.
+          </h3>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Se uma cliente nova chamar para saber o valor da mecha e você demorar 2 horas para responder, ela já procurou outro salão no Instagram ou no Google.
+          </p>
+        </div>
+
+        <div class="pt-3 border-t border-zinc-800/80 space-y-1">
+          <span class="text-[10px] font-black uppercase text-[#00F59B] tracking-wider">A Solução com a Jéssica</span>
+          <p class="text-xs text-zinc-300 leading-relaxed">
+            A Jéssica acolhe a cliente no primeiro segundo, passa valores cadastrados com simpatia e anota a preferência de horário para a recepção.
+          </p>
+        </div>
+      </div>
+
+      <!-- Card 2: Cadeira Vazia -->
+      <div class="p-6 rounded-3xl bg-[#0F1126] border border-[#1F234D] hover:border-[#00F59B]/50 transition space-y-4 relative group">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-[#00F59B] text-xl font-bold">
+          📅
+        </div>
+
+        <div class="space-y-2">
+          <span class="text-[10px] font-black uppercase text-rose-400 tracking-wider">O Problema Real</span>
+          <h3 class="text-base font-bold text-white leading-snug">
+            Cliente que marca no sábado à tarde, não aparece e deixa a cadeira vazia.
+          </h3>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            O profissional fica parado 3 horas sem faturar, o produto foi separado e aquele horário poderia ter sido preenchido por outra cliente fiel.
+          </p>
+        </div>
+
+        <div class="pt-3 border-t border-zinc-800/80 space-y-1">
+          <span class="text-[10px] font-black uppercase text-[#00F59B] tracking-wider">A Solução com a Jéssica</span>
+          <p class="text-xs text-zinc-300 leading-relaxed">
+            Disparo de lembrete amigável na véspera. Se a cliente precisar reagendar, ela avisa na hora e o salão tem tempo de encaixar outra pessoa.
+          </p>
+        </div>
+      </div>
+
+      <!-- Card 3: Caixa & Comissões -->
+      <div class="p-6 rounded-3xl bg-[#0F1126] border border-[#1F234D] hover:border-cyan-500/50 transition space-y-4 relative group">
+        <div class="w-12 h-12 rounded-2xl bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-400 text-xl font-bold">
+          💰
+        </div>
+
+        <div class="space-y-2">
+          <span class="text-[10px] font-black uppercase text-rose-400 tracking-wider">O Problema Real</span>
+          <h3 class="text-base font-bold text-white leading-snug">
+            Caderninho de anotações e confusão para saber quanto faturou e quanto pagar de comissão.
+          </h3>
+          <p class="text-xs text-zinc-400 leading-relaxed">
+            Comandas em papel que somem, notas de despesas de produtos misturadas com o caixa pessoal e desentendimento com parceiros sobre porcentagens.
+          </p>
+        </div>
+
+        <div class="pt-3 border-t border-zinc-800/80 space-y-1">
+          <span class="text-[10px] font-black uppercase text-cyan-400 tracking-wider">A Solução com o Painel RAIA</span>
+          <p class="text-xs text-zinc-300 leading-relaxed">
+            Dashboard visual completo. Registre entradas e saídas por áudio no WhatsApp ou no painel e veja gráficos claros de faturamento e comissões.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION: DASHBOARD FINANCEIRO & NÚMEROS DO SALÃO (Destaque)  -->
+  <!-- ============================================================ -->
+  <section id="dashboard" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-[#1F234D]">
+    <div class="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-[#10132E] via-[#0E1026] to-[#121535] border border-cyan-500/40 shadow-2xl space-y-8">
+      
+      <!-- Header do Bloco Financeiro -->
+      <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
+        <div>
+          <span class="px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-black uppercase">
+            Não é só agendamento • É Gestão Financeira Completa
           </span>
-          <span class="text-[10px] text-zinc-500">WhatsApp Oficial</span>
+          <h2 class="text-2xl sm:text-3xl font-black text-white mt-2">
+            O Painel de Controle que mostra os números reais do seu salão.
+          </h2>
+          <p class="text-xs sm:text-sm text-zinc-300 max-w-2xl mt-1">
+            Esqueça planilhas confusas. Acompanhe entradas, comissões dos profissionais e lucratividade líquida pelo seu computador ou celular.
+          </p>
         </div>
-        <div class="space-y-2.5">
-          
-      <div class="bg-pink-950/70 border border-pink-700/40 text-pink-100 rounded-tr-none ml-auto text-right p-3 rounded-2xl max-w-[85%] text-xs leading-relaxed shadow">
-        Olá! Quanto custa mechas e escova? Tem horário para este sábado à tarde?
-      </div>
-    
-      <div class="bg-zinc-800 text-zinc-100 rounded-tl-none p-3 rounded-2xl max-w-[85%] text-xs leading-relaxed shadow">
-        Olá! No Studio Bella, as mechas completas com tratamento estão a partir de R$ 380, e a escova a partir de R$ 60. Para este sábado, temos opções às 14h com a especialista Carla ou às 16h com a Fernanda. Qual horário fica melhor para você?
-      </div>
-    
-      <div class="bg-pink-950/70 border border-pink-700/40 text-pink-100 rounded-tr-none ml-auto text-right p-3 rounded-2xl max-w-[85%] text-xs leading-relaxed shadow">
-        Com a Carla às 14h, por favor!
-      </div>
-    
-      <div class="bg-zinc-800 text-zinc-100 rounded-tl-none p-3 rounded-2xl max-w-[85%] text-xs leading-relaxed shadow">
-        Perfeito! Anotei sua solicitação com a Carla para sábado às 14h. Já enviei para nossa recepção fazer o bloqueio na agenda e te enviar a confirmação definitiva. Até breve!
-      </div>
-    
-        </div>
-      </div>
-    </div>
 
-    <!-- G & H: Fluxo Operacional & O que fornecer -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="glass-card p-6 sm:p-7 space-y-3">
         <div class="flex items-center gap-2">
-          <i data-lucide="layers" class="w-5 h-5 text-cyan-400"></i>
-          <h3 class="text-base font-bold text-white">Fluxo Operacional</h3>
-        </div>
-        <p class="text-xs text-zinc-300 leading-relaxed">
-          O cliente entra em contato pelo WhatsApp do salão. A Jéssica acolhe, esclarece dúvidas com base na sua tabela e coleta o pedido de horário. A recepção recebe o resumo organizado e confirma na agenda do salão.
-        </p>
-      </div>
-
-      <div class="glass-card p-6 sm:p-7 space-y-3">
-        <div class="flex items-center gap-2">
-          <i data-lucide="file-text" class="w-5 h-5 text-violet-400"></i>
-          <h3 class="text-base font-bold text-white">O que você precisa fornecer</h3>
-        </div>
-        <ul class="space-y-2 text-xs">
-          
-    <li class="flex items-center gap-2">
-      <i data-lucide="check-circle-2" class="w-4 h-4 text-pink-400"></i>
-      <span class="text-zinc-300">Tabela atualizada de serviços com valores praticados.</span>
-    </li>
-  
-    <li class="flex items-center gap-2">
-      <i data-lucide="check-circle-2" class="w-4 h-4 text-pink-400"></i>
-      <span class="text-zinc-300">Horários de atendimento e dias de funcionamento.</span>
-    </li>
-  
-    <li class="flex items-center gap-2">
-      <i data-lucide="check-circle-2" class="w-4 h-4 text-pink-400"></i>
-      <span class="text-zinc-300">Lista dos profissionais e especialidades de cada um.</span>
-    </li>
-  
-    <li class="flex items-center gap-2">
-      <i data-lucide="check-circle-2" class="w-4 h-4 text-pink-400"></i>
-      <span class="text-zinc-300">Endereço completo e orientações de estacionamento.</span>
-    </li>
-  
-        </ul>
-      </div>
-    </div>
-
-    <!-- I & J: Integrações & Limites de Atuação -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-2.5 text-xs text-zinc-300">
-        <div class="flex items-center gap-2 text-white font-bold text-sm">
-          <i data-lucide="link-2" class="w-4 h-4 text-emerald-400"></i>
-          <span>Integrações e Dependências</span>
-        </div>
-        <p class="leading-relaxed text-zinc-400">
-          Conexão direta ao WhatsApp via Baileys/QR Code. Integrações adicionais com softwares de agenda de salões podem ser avaliadas sob consulta técnica.
-        </p>
-      </div>
-
-      <div class="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-2.5 text-xs text-zinc-300">
-        <div class="flex items-center gap-2 text-white font-bold text-sm">
-          <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400"></i>
-          <span>Limites e Encaminhamento Humano</span>
-        </div>
-        <p class="leading-relaxed text-zinc-400">
-          A Jéssica registra a solicitação de horário; a confirmação final da vaga é feita pela recepção. Caso a cliente peça avaliação de mechas em cabelo com química anterior, a conversa é encaminhada para avaliação presencial com o profissional.
-        </p>
-      </div>
-    </div>
-
-    <!-- K: Oferta Comercial Aplicável -->
-    <div class="p-8 rounded-3xl bg-gradient-to-b from-[#11141f] to-[#090C15] border-2 border-[#00F59B]/40 space-y-4">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-4">
-        <div>
-          <span class="text-[10px] font-bold text-[#00F59B] uppercase tracking-wider">Oferta Comercial</span>
-          <h3 class="text-xl font-black text-white">Assistente para Salões de Beleza, Barbearias & Estética</h3>
-        </div>
-        <div class="sm:text-right">
-          <span class="text-xs text-zinc-400">Mensalidade</span>
-          <p class="text-2xl font-black text-white">R$ 97<span class="text-xs text-zinc-400">/mês</span></p>
+          <span class="px-3 py-1 rounded-xl bg-emerald-500/20 text-[#00F59B] text-xs font-bold border border-emerald-500/30 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-[#00F59B] animate-pulse"></span>
+            <span>Caixa do Dia Aberto</span>
+          </span>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-zinc-300">
-        <div class="flex items-center gap-2">
-          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-          <span>1 número de WhatsApp com atendimento contínuo</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-          <span>Regras personalizadas do seu negócio</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-          <span>Intervenção humana livre no celular a qualquer momento</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-          <span>Sem contrato de fidelidade (cancele quando quiser)</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- L: Perguntas Frequentes do Segmento -->
-    <div class="space-y-4">
-      <h2 class="text-xl font-bold text-white">Dúvidas frequentes sobre esta solução</h2>
-      <div class="space-y-3">
+      <!-- Mockup Realista de Dashboard do Salão (Tailwind Bento) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-    <details class="p-4 rounded-2xl bg-[#11141f] border border-zinc-800 group">
-      <summary class="font-bold text-white cursor-pointer list-none flex items-center justify-between text-xs sm:text-sm">
-        <span>O agendamento já fica confirmado direto?</span>
-        <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition"></i>
-      </summary>
-      <p class="pt-3 text-zinc-300 text-xs leading-relaxed">
-        O assistente coleta todos os dados (serviço, dia, horário e profissional) e organiza a solicitação. A confirmação final da vaga é validada pela recepção do salão para garantir que não haja conflitos de horário.
-      </p>
-    </details>
-  
-    <details class="p-4 rounded-2xl bg-[#11141f] border border-zinc-800 group">
-      <summary class="font-bold text-white cursor-pointer list-none flex items-center justify-between text-xs sm:text-sm">
-        <span>Posso responder a cliente no lugar da Jéssica?</span>
-        <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition"></i>
-      </summary>
-      <p class="pt-3 text-zinc-300 text-xs leading-relaxed">
-        Sim. Você e seus profissionais continuam usando o WhatsApp normalmente. Basta enviar uma mensagem para assumir o diálogo na mesma hora.
-      </p>
-    </details>
-  
-    <details class="p-4 rounded-2xl bg-[#11141f] border border-zinc-800 group">
-      <summary class="font-bold text-white cursor-pointer list-none flex items-center justify-between text-xs sm:text-sm">
-        <span>Se o preço do serviço variar conforme o tamanho do cabelo?</span>
-        <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition"></i>
-      </summary>
-      <p class="pt-3 text-zinc-300 text-xs leading-relaxed">
-        A Jéssica informa o valor base ("a partir de R$ X") e esclarece que o orçamento definitivo é confirmado presencialmente após avaliação do comprimento do cabelo.
-      </p>
-    </details>
-  
+        <!-- Metric 1: Faturamento do Dia -->
+        <div class="p-5 rounded-2xl bg-[#141632] border border-[#232759] space-y-2">
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span>Faturamento Hoje</span>
+            <i data-lucide="trending-up" class="w-4 h-4 text-[#00F59B]"></i>
+          </div>
+          <div class="text-2xl font-black text-white font-mono">R$ 2.450,00</div>
+          <p class="text-[11px] text-[#00F59B] flex items-center gap-1">
+            <span>▲ +18%</span>
+            <span class="text-zinc-500">em relação a ontem</span>
+          </p>
+        </div>
+
+        <!-- Metric 2: Atendimentos Realizados -->
+        <div class="p-5 rounded-2xl bg-[#141632] border border-[#232759] space-y-2">
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span>Atendimentos Concluídos</span>
+            <i data-lucide="scissors" class="w-4 h-4 text-pink-400"></i>
+          </div>
+          <div class="text-2xl font-black text-white font-mono">14 clientes</div>
+          <p class="text-[11px] text-zinc-400">3 agendamentos restantes hoje</p>
+        </div>
+
+        <!-- Metric 3: Repasse de Comissões -->
+        <div class="p-5 rounded-2xl bg-[#141632] border border-[#232759] space-y-2">
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span>Comissões a Pagar</span>
+            <i data-lucide="users" class="w-4 h-4 text-amber-400"></i>
+          </div>
+          <div class="text-2xl font-black text-amber-300 font-mono">R$ 980,00</div>
+          <p class="text-[11px] text-zinc-400">Calculado automaticamente</p>
+        </div>
+
+        <!-- Metric 4: Lucro Líquido do Salão -->
+        <div class="p-5 rounded-2xl bg-[#141632] border border-[#232759] space-y-2">
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span>Lucro Líquido do Salão</span>
+            <i data-lucide="wallet" class="w-4 h-4 text-cyan-400"></i>
+          </div>
+          <div class="text-2xl font-black text-[#00F59B] font-mono">R$ 1.470,00</div>
+          <p class="text-[11px] text-cyan-300 font-semibold">60% de margem no dia</p>
+        </div>
+
       </div>
+
+      <!-- Tabela Ilustrativa de Serviços & Comissões do Dia -->
+      <div class="p-6 rounded-2xl bg-[#090A1A] border border-[#232759] space-y-4">
+        <div class="flex items-center justify-between">
+          <h4 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+            <i data-lucide="clipboard-list" class="w-4 h-4 text-pink-400"></i>
+            <span>Detalhamento dos Procedimentos de Hoje</span>
+          </h4>
+          <span class="text-[10px] text-zinc-500 font-mono">Sincronizado via WhatsApp & Painel</span>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="text-zinc-500 border-b border-zinc-800 text-[11px]">
+                <th class="py-2.5 px-3">Cliente</th>
+                <th class="py-2.5 px-3">Procedimento</th>
+                <th class="py-2.5 px-3">Profissional</th>
+                <th class="py-2.5 px-3">Valor Total</th>
+                <th class="py-2.5 px-3">Comissão</th>
+                <th class="py-2.5 px-3">Status</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-zinc-800/60 font-medium">
+              <tr class="hover:bg-zinc-900/40 transition">
+                <td class="py-3 px-3 font-bold text-white">Carla Ribeiro</td>
+                <td class="py-3 px-3 text-pink-300">Mechas + Tratamento Kérastase</td>
+                <td class="py-3 px-3 text-zinc-300">Paulinha (Cabelo)</td>
+                <td class="py-3 px-3 font-mono font-bold text-white">R$ 580,00</td>
+                <td class="py-3 px-3 font-mono text-amber-300">R$ 232,00 (40%)</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-[#00F59B] text-[10px] font-bold">Pago (Pix)</span></td>
+              </tr>
+              <tr class="hover:bg-zinc-900/40 transition">
+                <td class="py-3 px-3 font-bold text-white">Fernanda Lima</td>
+                <td class="py-3 px-3 text-pink-300">Manicure + Esmaltação em Gel</td>
+                <td class="py-3 px-3 text-zinc-300">Jéssica (Unhas)</td>
+                <td class="py-3 px-3 font-mono font-bold text-white">R$ 110,00</td>
+                <td class="py-3 px-3 font-mono text-amber-300">R$ 55,00 (50%)</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-[#00F59B] text-[10px] font-bold">Pago (Cartão)</span></td>
+              </tr>
+              <tr class="hover:bg-zinc-900/40 transition">
+                <td class="py-3 px-3 font-bold text-white">Renata Soares</td>
+                <td class="py-3 px-3 text-pink-300">Corte Bordado + Escova Modelada</td>
+                <td class="py-3 px-3 text-zinc-300">Marcos (Cabelo)</td>
+                <td class="py-3 px-3 font-mono font-bold text-white">R$ 180,00</td>
+                <td class="py-3 px-3 font-mono text-amber-300">R$ 72,00 (40%)</td>
+                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-bold">Em Atendimento</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION: CONVERSA ILUSTRATIVA NO WHATSAPP                    -->
+  <!-- ============================================================ -->
+  <section id="conversa" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-[#1F234D]">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+      
+      <div class="lg:col-span-6 space-y-4">
+        <span class="px-3.5 py-1 rounded-full bg-pink-500/10 border border-pink-500/30 text-pink-300 text-xs font-extrabold uppercase">
+          Exemplo Real de Diálogo
+        </span>
+        <h2 class="text-2xl sm:text-3xl font-black text-white">
+          Simpatia, educação e foco em fechar o horário.
+        </h2>
+        <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+          A Jéssica não fala feito um robô mecânico. Ela usa o vocabulário carinhoso e profissional dos melhores salões de beleza, tira dúvidas com clareza e nunca deixa a cliente perdida.
+        </p>
+
+        <div class="space-y-3 pt-2 text-xs">
+          <div class="flex items-start gap-2.5">
+            <i data-lucide="check-circle" class="w-4 h-4 text-[#00F59B] shrink-0 mt-0.5"></i>
+            <span><b>Tabela de Preços Cadastrada:</b> Valores corretos sem você precisar parar o atendimento para checar.</span>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <i data-lucide="check-circle" class="w-4 h-4 text-[#00F59B] shrink-0 mt-0.5"></i>
+            <span><b>Coleta de Preferências:</b> Dia da semana, período (manhã/tarde) e profissional de preferência da cliente.</span>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <i data-lucide="check-circle" class="w-4 h-4 text-[#00F59B] shrink-0 mt-0.5"></i>
+            <span><b>Você assume a qualquer momento:</b> Basta digitar no WhatsApp do salão e o robô dá passagem para a sua equipe humana.</span>
+          </div>
+        </div>
+
+        <div class="pt-4">
+          <button onclick="openTestModal()" class="px-5 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-[#00F59B] text-black font-extrabold text-xs hover:opacity-90 transition flex items-center gap-2 cursor-pointer shadow">
+            <i data-lucide="message-square" class="w-4 h-4 text-black"></i>
+            <span>Testar essa conversa no meu WhatsApp agora</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Chat Box Simulator -->
+      <div class="lg:col-span-6">
+        <div class="p-6 rounded-3xl bg-[#0F1126] border border-pink-500/30 space-y-4 shadow-2xl relative">
+          
+          <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-pink-500/20 border border-pink-400/40 flex items-center justify-center text-pink-300 text-lg">
+                💇‍♀️
+              </div>
+              <div>
+                <h4 class="text-xs font-black text-white">Jéssica • Studio de Beleza</h4>
+                <p class="text-[10px] text-[#00F59B]">WhatsApp Comercial</p>
+              </div>
+            </div>
+            <span class="text-[10px] text-zinc-500 font-mono">Exemplo Ilustrativo</span>
+          </div>
+
+          <div class="space-y-3 text-xs">
+            <!-- Client Balloon -->
+            <div class="max-w-[85%] ml-auto p-3.5 rounded-2xl rounded-tr-none bg-cyan-950/70 border border-cyan-800/60 text-white">
+              <p>Olá! Quanto tá a escova com hidratação? Vocês atendem sábado de manhã?</p>
+              <span class="text-[9px] text-cyan-300/60 block text-right mt-1 font-mono">10:14</span>
+            </div>
+
+            <!-- Jessica Balloon -->
+            <div class="max-w-[88%] mr-auto p-3.5 rounded-2xl rounded-tl-none bg-[#141632] border border-zinc-800 text-zinc-200 space-y-1.5">
+              <p>Oi, flor! Que alegria ter você por aqui. ✨</p>
+              <p class="text-[11px] text-zinc-300 leading-relaxed">
+                Nossa <b>Escova Modelada + Hidratação Nutritiva</b> fica a partir de <b>R$ 120</b> (depende do comprimento dos fios).
+              </p>
+              <p class="text-[11px] text-pink-300 font-bold">
+                Para sábado de manhã, temos opções às 09h30 ou às 11h! Qual horário você prefere garantir?
+              </p>
+              <span class="text-[9px] text-zinc-500 block text-right mt-1 font-mono">10:14</span>
+            </div>
+
+            <!-- Client Balloon -->
+            <div class="max-w-[85%] ml-auto p-3.5 rounded-2xl rounded-tr-none bg-cyan-950/70 border border-cyan-800/60 text-white">
+              <p>Pode ser às 09h30! Meu nome é Patrícia.</p>
+              <span class="text-[9px] text-cyan-300/60 block text-right mt-1 font-mono">10:15</span>
+            </div>
+
+            <!-- Jessica Balloon -->
+            <div class="max-w-[88%] mr-auto p-3.5 rounded-2xl rounded-tl-none bg-[#141632] border border-zinc-800 text-zinc-200">
+              <p class="text-[11px] leading-relaxed">
+                Perfeito, Patrícia! Já pré-agendei seu horário para este sábado às <b>09h30</b>. Nossa recepção vai confirmar seu encaixe e na sexta-feira te mandamos um lembrete com todo carinho. Te esperamos! 💖
+              </p>
+              <span class="text-[9px] text-zinc-500 block text-right mt-1 font-mono">10:15</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION: O QUE VOCÊ PRECISA FORNECER PARA COMEÇAR            -->
+  <!-- ============================================================ -->
+  <section class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-[#1F234D]">
+    <div class="text-center max-w-2xl mx-auto space-y-3 mb-12">
+      <span class="px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-extrabold uppercase">
+        Configuração em Poucas Horas
+      </span>
+      <h2 class="text-2xl sm:text-3xl font-black text-white">
+        O que precisamos para colocar a Jéssica no ar no seu salão?
+      </h2>
+      <p class="text-xs sm:text-sm text-zinc-400">
+        Você não precisa entender de programação. Nós cuidamos de tudo, você só nos envia:
+      </p>
     </div>
 
-    <!-- M: CTA Final -->
-    <div class="p-8 rounded-3xl bg-[#090C15] border border-zinc-800 text-center space-y-4">
-      <h3 class="text-xl sm:text-2xl font-black text-white">
-        Pronto para experimentar o assistente Jéssica no seu negócio?
-      </h3>
-      <p class="text-xs sm:text-sm text-zinc-400 max-w-xl mx-auto">
-        Envie uma mensagem de demonstração para o seu celular ou converse diretamente com nossa equipe técnica.
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      
+      <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-2.5">
+        <div class="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-sm font-bold">1</div>
+        <h4 class="text-xs font-bold text-white">Tabela de Serviços</h4>
+        <p class="text-[11px] text-zinc-400 leading-relaxed">
+          Lista dos procedimentos realizados (corte, escova, mechas, manicure, sobrancelhas) e valores médios.
+        </p>
+      </div>
+
+      <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-2.5">
+        <div class="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-sm font-bold">2</div>
+        <h4 class="text-xs font-bold text-white">Horários de Funcionamento</h4>
+        <p class="text-[11px] text-zinc-400 leading-relaxed">
+          Dias da semana que o salão abre, horários de início/fechamento e política para agendamentos de sábado.
+        </p>
+      </div>
+
+      <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-2.5">
+        <div class="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-sm font-bold">3</div>
+        <h4 class="text-xs font-bold text-white">Profissionais & Equipe</h4>
+        <p class="text-[11px] text-zinc-400 leading-relaxed">
+          Nomes dos cabeleireiros, manicures e especialistas para a Jéssica direcionar as preferências das clientes.
+        </p>
+      </div>
+
+      <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-2.5">
+        <div class="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-sm font-bold">4</div>
+        <h4 class="text-xs font-bold text-white">Chave Pix ou Pagamentos</h4>
+        <p class="text-[11px] text-zinc-400 leading-relaxed">
+          Se desejar receber sinal de reserva ou pagamentos antecipados pelo WhatsApp para garantir a vaga.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION: OFERTA COMERCIAL (Transparente R$ 97/mês)           -->
+  <!-- ============================================================ -->
+  <section id="precos" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-[#1F234D]">
+    <div class="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-[#12142E] via-[#0E1026] to-[#1a1435] border-2 border-pink-500/40 text-center space-y-6 shadow-2xl relative overflow-hidden">
+      
+      <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-pink-500/20 border border-pink-500/30 text-pink-300 text-xs font-extrabold uppercase">
+        Investimento Simples e Acessível
+      </div>
+
+      <h2 class="text-3xl sm:text-4xl font-black text-white tracking-tight">
+        Apenas <span class="text-[#00F59B]">R$ 97</span> por mês.
+      </h2>
+      
+      <p class="text-xs sm:text-sm text-zinc-300 max-w-xl mx-auto leading-relaxed">
+        Com uma única escova ou manicure a mais que você fecha por mês pelo WhatsApp, a ferramenta já se paga com sobra. Sem taxa de adesão e sem fidelidade.
       </p>
-      <div class="flex flex-col sm:flex-row justify-center gap-3 pt-2">
-        <button onclick="openTestModal()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs shadow hover:scale-105 transition">
-          Testar no meu WhatsApp
+
+      <!-- Checklist -->
+      <div class="max-w-md mx-auto grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs text-left pt-2">
+        <div class="flex items-center gap-2 text-zinc-200">
+          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
+          <span>Jéssica 24h no seu WhatsApp</span>
+        </div>
+        <div class="flex items-center gap-2 text-zinc-200">
+          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
+          <span>Dashboard Financeiro do Salão</span>
+        </div>
+        <div class="flex items-center gap-2 text-zinc-200">
+          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
+          <span>Lembretes automáticos anti-falta</span>
+        </div>
+        <div class="flex items-center gap-2 text-zinc-200">
+          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
+          <span>7 dias de garantia incondicional</span>
+        </div>
+      </div>
+
+      <!-- Action -->
+      <div class="pt-4 flex flex-wrap items-center justify-center gap-3">
+        <button onclick="openTestModal()" class="px-8 py-4 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-[#00F59B] text-black font-black text-xs hover:opacity-95 shadow-xl shadow-pink-500/30 active:scale-95 transition flex items-center gap-2 cursor-pointer">
+          <i data-lucide="play" class="w-4 h-4 fill-black"></i>
+          <span>Testar Grátis Agora no WhatsApp</span>
         </button>
-        <a href="/solucoes" class="px-6 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs transition">
-          Ver outras soluções
+        <a href="/contato" class="px-6 py-4 rounded-2xl bg-[#141632] hover:bg-white/10 text-white font-bold text-xs border border-zinc-700 transition">
+          Falar com um Consultor da RAIA
         </a>
       </div>
+
     </div>
+  </section>
 
-  </main>
+  <!-- ============================================================ -->
+  <!-- MODAL: TESTAR NO WHATSAPP (Preservado e Funcional)           -->
+  <!-- ============================================================ -->
+  <div id="testModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-[#0F1126] border border-pink-500/40 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl relative">
+      
+      <button onclick="closeTestModal()" class="absolute top-4 right-4 p-1 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition cursor-pointer">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
 
-  <!-- Modal de Teste -->
-  <div id="testAgentModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
-    <div class="bg-[#0B0F19] border border-zinc-800 rounded-3xl w-full max-w-md p-6 shadow-2xl relative space-y-4">
-      <button onclick="closeTestModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-lg bg-zinc-800/80">✕</button>
-
-      <div class="flex items-center gap-3">
-        <div class="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center text-2xl">💇‍♀️</div>
-        <div>
-          <span class="text-[10px] font-bold text-[#00F59B] uppercase tracking-wider">Demonstração no seu celular</span>
-          <h3 class="text-base font-black text-white">Jéssica • Salões de Beleza, Barbearias & Estética</h3>
-        </div>
+      <div class="space-y-1">
+        <span class="text-[10px] font-black uppercase tracking-wider text-pink-400">Demonstração Interativa para Salões</span>
+        <h3 class="text-xl font-black text-white">Testar a Jéssica no seu WhatsApp</h3>
+        <p class="text-xs text-zinc-400">
+          Coloque seu nome e WhatsApp. A Jéssica vai te mandar uma mensagem agora simulando um atendimento de salão!
+        </p>
       </div>
 
-      <p class="text-xs text-zinc-300 leading-relaxed">
-        Você receberá uma mensagem deste assistente simulando o atendimento para testar a experiência real no seu WhatsApp.
-      </p>
-
-      <form onsubmit="submitTest(event)" class="space-y-3.5 pt-1">
+      <form onsubmit="handleTestSubmit(event)" class="space-y-3.5 text-left">
         <div>
-          <label class="block text-[11px] font-bold text-zinc-400 mb-1">Seu Primeiro Nome</label>
-          <input type="text" id="leadName" required placeholder="Ex: Thiago" class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs focus:border-[#00F59B] focus:outline-none">
+          <label class="block text-[11px] font-bold text-zinc-400 mb-1">Seu Nome Completo</label>
+          <input 
+            type="text" 
+            id="leadNameInput" 
+            required
+            placeholder="Ex: Amanda Silva (Studio Bela)"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-[#141632] border border-[#232759] text-white text-xs focus:outline-none focus:border-pink-400 transition"
+          >
         </div>
 
         <div>
-          <label class="block text-[11px] font-bold text-zinc-400 mb-1">Seu WhatsApp (com DDD)</label>
-          <input type="tel" id="leadPhone" required placeholder="(11) 99999-8888" class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs focus:border-[#00F59B] focus:outline-none font-mono">
+          <label class="block text-[11px] font-bold text-zinc-400 mb-1">Seu Número de WhatsApp (com DDD)</label>
+          <input 
+            type="tel" 
+            id="leadPhoneInput" 
+            required
+            placeholder="Ex: 11999998888"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-[#141632] border border-[#232759] text-white text-xs focus:outline-none focus:border-pink-400 transition"
+          >
         </div>
 
-        <div id="modalErrorMsg" class="hidden text-rose-400 text-xs p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20"></div>
+        <div id="modalAlertBox" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs"></div>
 
-        <button type="submit" id="btnSubmitTest" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs shadow-lg hover:opacity-95 transition flex items-center justify-center gap-2">
-          <span id="btnSubmitTestText">Receber Mensagem de Teste</span>
-          <i data-lucide="send" class="w-3.5 h-3.5"></i>
+        <button type="submit" id="btnSubmitTest" class="w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-[#00F59B] text-black font-black text-xs hover:opacity-90 transition flex items-center justify-center gap-2 shadow cursor-pointer">
+          <span id="btnSubmitTestText">Receber Mensagem da Jéssica Agora</span>
+          <i data-lucide="send" class="w-4 h-4 text-black"></i>
         </button>
+
+        <p class="text-[10px] text-zinc-500 text-center">
+          🔒 Teste gratuito e sem compromisso.
+        </p>
       </form>
+
     </div>
   </div>
 
-  <!-- Footer -->
-  <footer class="py-10 border-t border-zinc-800 bg-[#040711] text-xs text-zinc-500">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-      <div class="flex items-center gap-2">
-        <img src="/raia-logo.png" alt="RAIA" class="w-6 h-6 object-contain">
-        <span class="font-bold text-zinc-400">RAIA • Assistentes de IA para WhatsApp</span>
+  <!-- ============================================================ -->
+  <!-- FOOTER                                                       -->
+  <!-- ============================================================ -->
+  <footer class="border-t border-[#1F234D] bg-[#070814] pt-12 pb-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500 gap-4">
+      <div class="flex items-center gap-3">
+        <img src="/raia-emblem-small.png" alt="RAIA" class="w-7 h-7 object-contain">
+        <span class="text-white font-bold">RAIA • Jéssica para Salões</span>
       </div>
-      <div class="flex items-center gap-4 text-zinc-400">
-        <a href="/" class="hover:text-white">Início</a>
-        <a href="/solucoes" class="hover:text-white">Soluções</a>
-        <a href="/como-funciona" class="hover:text-white">Como Funciona</a>
-        <a href="/planos" class="hover:text-white">Planos</a>
-        <a href="/contato" class="hover:text-white">Contato</a>
-        <a href="/termos" class="hover:text-white">Termos</a>
-        <a href="/privacidade" class="hover:text-white">Privacidade</a>
+      <div class="flex items-center gap-4">
+        <a href="/solucoes" class="hover:text-white transition">Outras Soluções</a>
+        <a href="/termos" class="hover:text-white transition">Termos</a>
+        <a href="/privacidade" class="hover:text-white transition">Privacidade</a>
+        <a href="/contato" class="hover:text-white transition">Contato</a>
       </div>
-      <p>© 2026 RAIA. Operado por RAIA RH.</p>
     </div>
   </footer>
 
+  <!-- ============================================================ -->
+  <!-- JAVASCRIPT: MODAL HANDLERS                                   -->
+  <!-- ============================================================ -->
   <script>
     function openTestModal() {
-      document.getElementById('modalErrorMsg').classList.add('hidden');
-      document.getElementById('testAgentModal').classList.remove('hidden');
-      lucide.createIcons();
+      const modal = document.getElementById('testModal');
+      if (modal) modal.classList.remove('hidden');
     }
 
     function closeTestModal() {
-      document.getElementById('testAgentModal').classList.add('hidden');
+      const modal = document.getElementById('testModal');
+      if (modal) modal.classList.add('hidden');
     }
 
-    async function submitTest(e) {
+    async function handleTestSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('btnSubmitTest');
       const btnTxt = document.getElementById('btnSubmitTestText');
-      const errEl = document.getElementById('modalErrorMsg');
-      const name = document.getElementById('leadName').value.trim();
-      const phone = document.getElementById('leadPhone').value.trim();
+      const alertBox = document.getElementById('modalAlertBox');
+      const name = document.getElementById('leadNameInput')?.value?.trim();
+      const phone = document.getElementById('leadPhoneInput')?.value?.trim();
+      const nicheSlug = 'saloes-e-beleza';
 
-      errEl.classList.add('hidden');
+      if (!name || !phone) {
+        alertBox.innerText = 'Preencha seu nome e número de WhatsApp.';
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
       btn.disabled = true;
-      btnTxt.innerText = 'Enviando...';
+      btnTxt.innerText = 'Enviando mensagem da Jéssica...';
+      alertBox.classList.add('hidden');
 
       try {
-        const res = await fetch('/api/test-agent', {
+        const res = await fetch('/api/leads/request-test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, phone, agentKey: 'SALON', agentName: 'Jéssica' })
+          body: JSON.stringify({ name, phone, nicheSlug })
         });
-        const data = await res.json();
-        if (data.success) {
-          alert('Mensagem enviada com sucesso para o WhatsApp ' + (data.phone || phone) + '! Confira seu celular.');
+        const json = await res.json();
+        if (json.success) {
+          alert('Pronto, ' + name + '! A Jéssica acabou de te mandar uma mensagem no WhatsApp (' + phone + '). Abra seu WhatsApp agora!');
           closeTestModal();
         } else {
-          errEl.innerText = data.error || 'Erro ao enviar.';
-          errEl.classList.remove('hidden');
+          alertBox.innerText = json.error || 'Não foi possível disparar o teste no momento.';
+          alertBox.classList.remove('hidden');
         }
       } catch (err) {
-        errEl.innerText = 'Erro de conexão com o servidor.';
-        errEl.classList.remove('hidden');
+        alertBox.innerText = 'Erro ao conectar ao servidor: ' + err.message;
+        alertBox.classList.remove('hidden');
       } finally {
         btn.disabled = false;
-        btnTxt.innerText = 'Receber Mensagem de Teste';
+        btnTxt.innerText = 'Receber Mensagem da Jéssica Agora';
       }
     }
 
-    window.addEventListener('DOMContentLoaded', () => lucide.createIcons());
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+    });
   </script>
+
 </body>
 </html>

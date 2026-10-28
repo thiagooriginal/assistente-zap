@@ -6,272 +6,1402 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <title>RAIA • Assistentes de IA para WhatsApp</title>
-  <meta name="description" content="Conheça os assistentes de IA da RAIA para responder dúvidas, organizar solicitações e encaminhar oportunidades para sua equipe no WhatsApp.">
-  
+  <title>RAIA • Assistentes de IA para WhatsApp | Marketplace Oficial</title>
+  <meta name="description" content="Catálogo oficial de assistentes de inteligência artificial da RAIA para WhatsApp. Encontre o robô de atendimento e gestão financeira ideal para o seu negócio.">
+  <link rel="icon" type="image/png" href="/raia-emblem-small.png">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
   <script>
     tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
-          colors: {
-            raia: {
-              black: '#07080c',
-              bgDark: '#0a0d14',
-              card: '#11141f',
-              cardHover: '#171b29',
-              border: 'rgba(255, 255, 255, 0.08)',
-              neon: '#00F59B',
-              lime: '#ccff00',
-              violet: '#8B5CF6',
-              cyan: '#06b6d4',
-              emerald: '#10b981'
-            }
-          },
           fontFamily: {
-            sans: ['-apple-system', 'BlinkMacSystemFont', 'Plus Jakarta Sans', 'Inter', 'sans-serif'],
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              dark: '#080918',
+              surface: '#0F1126',
+              card: '#141632',
+              cardHover: '#1A1D40',
+              border: '#1F234D',
+              emerald: '#00F59B',
+              cyan: '#06B6D4',
+              violet: '#8B5CF6',
+              pink: '#EC4899',
+            }
           }
         }
       }
     }
   </script>
-  
-  <!-- Google Fonts & Lucide Icons -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
-    * { -webkit-tap-highlight-color: transparent; }
     body {
-      background-color: #040711;
-      color: #ffffff;
-      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      background-color: #080918;
+      color: #E2E8F0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
       overflow-x: hidden;
     }
-    .ocean-abyss {
-      background: radial-gradient(circle at 50% 0%, rgba(6, 182, 212, 0.09) 0%, transparent 60%),
-                  radial-gradient(circle at 85% 20%, rgba(0, 245, 155, 0.06) 0%, transparent 50%),
-                  radial-gradient(circle at 15% 45%, rgba(14, 165, 233, 0.05) 0%, transparent 50%),
-                  linear-gradient(180deg, #040711 0%, #060d1d 40%, #030610 100%);
+    .cosmic-glow-1 {
+      position: absolute;
+      width: 550px;
+      height: 550px;
+      border-radius: 9999px;
+      background: radial-gradient(circle, rgba(139, 92, 246, 0.18) 0%, rgba(6, 182, 212, 0.12) 50%, transparent 70%);
+      filter: blur(80px);
+      pointer-events: none;
     }
-    .glass-nav {
-      background: rgba(4, 7, 17, 0.88);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
-      border-bottom: 1px solid rgba(6, 182, 212, 0.12);
+    .cosmic-glow-2 {
+      position: absolute;
+      width: 500px;
+      height: 500px;
+      border-radius: 9999px;
+      background: radial-gradient(circle, rgba(0, 245, 155, 0.14) 0%, rgba(6, 182, 212, 0.10) 60%, transparent 75%);
+      filter: blur(90px);
+      pointer-events: none;
     }
-    .glass-card {
-      background: rgba(9, 15, 28, 0.75);
-      backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 24px;
-      transition: all 0.25s ease;
+    .agent-card {
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .glass-card:hover {
-      border-color: rgba(0, 245, 155, 0.35);
-      transform: translateY(-3px);
+    .agent-card:hover {
+      transform: translateY(-6px);
+      border-color: rgba(6, 182, 212, 0.55);
+      box-shadow: 0 20px 40px -15px rgba(6, 182, 212, 0.25), 0 0 25px rgba(139, 92, 246, 0.15);
     }
-    .glow-neon {
-      box-shadow: 0 0 35px -5px rgba(0, 245, 155, 0.25);
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
     }
-    .gradient-text-neon {
-      background: linear-gradient(135deg, #ffffff 0%, #00F59B 60%, #06b6d4 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
     }
   </style>
 </head>
-<body class="min-h-screen ocean-abyss text-white selection:bg-[#00F59B] selection:text-black relative">
+<body class="min-h-screen relative bg-[#080918] text-slate-100 antialiased selection:bg-cyan-500 selection:text-black">
+
+  <!-- Ambient Glowing Background Blobs (Figma Inspired) -->
+  <div class="cosmic-glow-1 -top-32 -left-20"></div>
+  <div class="cosmic-glow-2 top-96 -right-24"></div>
+  <div class="cosmic-glow-1 top-[1800px] left-1/4"></div>
 
   <!-- ============================================================ -->
-  <!-- 1. STICKY NAVBAR                                             -->
+  <!-- TOP NAVIGATION BAR (Marketplace Clean Header)                -->
   <!-- ============================================================ -->
-  <header class="fixed top-0 left-0 right-0 z-50 glass-nav">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
-      <!-- Logo Oficial -->
-      <a href="/" class="flex items-center gap-3 group">
-        <div class="relative w-11 h-11 flex items-center justify-center">
-          <img src="/raia-logo.png" alt="RAIA" class="w-full h-full object-contain filter drop-shadow-[0_0_12px_rgba(6,182,212,0.5)] group-hover:scale-105 transition">
+  <header class="sticky top-0 z-40 w-full backdrop-blur-xl bg-[#080918]/85 border-b border-[#1F234D]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      
+      <!-- Brand Logo Emblem -->
+      <a href="/" class="flex items-center gap-3 group shrink-0">
+        <div class="relative w-10 h-10 flex items-center justify-center rounded-xl bg-gradient-to-tr from-cyan-500/20 via-violet-500/20 to-transparent p-1 border border-cyan-500/30 group-hover:border-cyan-400 transition-all duration-300">
+          <img src="/raia-emblem-small.png" alt="RAIA" class="w-full h-full object-contain filter drop-shadow-[0_0_12px_rgba(6,182,212,0.6)]">
         </div>
-        <div>
+        <div class="flex flex-col">
           <div class="flex items-center gap-2">
-            <span class="text-xl font-black tracking-tight text-white">RAIA</span>
-            <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30 font-bold uppercase tracking-wider">IA</span>
+            <span class="text-xl font-black tracking-tight text-white group-hover:text-cyan-400 transition">RAIA</span>
+            <span class="px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-[9px] font-extrabold uppercase tracking-widest text-cyan-300">Marketplace</span>
           </div>
-          <p class="text-[10px] text-cyan-300 font-semibold tracking-wider">Assistentes de IA para WhatsApp</p>
+          <span class="text-[10px] text-zinc-400 -mt-0.5 font-medium">Assistentes de IA para WhatsApp</span>
         </div>
       </a>
 
-      <!-- Desktop Nav Links -->
-      <nav class="hidden md:flex items-center gap-7 text-xs font-bold text-zinc-300">
-        <a href="/solucoes" class="hover:text-[#00F59B] transition">Soluções</a>
-        <a href="/como-funciona" class="hover:text-[#00F59B] transition">Como Funciona</a>
-        <a href="/planos" class="hover:text-[#00F59B] transition">Planos</a>
-        <a href="/contato" class="hover:text-[#00F59B] transition">Contato</a>
+      <!-- Desktop Navigation Links -->
+      <nav class="hidden md:flex items-center gap-1 lg:gap-2">
+        <a href="/solucoes" class="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-[#141632] border border-cyan-500/40 text-cyan-300 flex items-center gap-1.5 transition">
+          <i data-lucide="layers" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Catálogo</span>
+        </a>
+        <a href="/solucoes/saloes-e-beleza" class="px-3 py-1.5 rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition flex items-center gap-1.5">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-pink-400"></i>
+          <span>Salões & Beleza</span>
+        </a>
+        <a href="/como-funciona" class="px-3 py-1.5 rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition">
+          Como Funciona
+        </a>
+        <a href="/planos" class="px-3 py-1.5 rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition">
+          Planos
+        </a>
+        <a href="/contato" class="px-3 py-1.5 rounded-xl text-xs font-bold text-zinc-400 hover:text-white hover:bg-white/5 transition">
+          Contato
+        </a>
       </nav>
 
-      <!-- Action Buttons -->
-      <div class="flex items-center gap-2.5">
-        <a href="/admin" class="px-3 py-1.5 rounded-full text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition flex items-center gap-1.5" title="Acesso Administrativo">
-          <i data-lucide="lock" class="w-3.5 h-3.5 text-zinc-500"></i>
-          <span class="hidden sm:inline">Área do</span> Gestor
+      <!-- Right CTAs -->
+      <div class="flex items-center gap-3 shrink-0">
+        <a href="/admin" class="hidden sm:flex items-center gap-1.5 px-3 py-2 text-xs font-extrabold text-zinc-300 hover:text-white hover:bg-white/5 rounded-xl transition">
+          <i data-lucide="lock" class="w-3.5 h-3.5 text-zinc-400"></i>
+          <span>Acessar Painel</span>
         </a>
-
-        <a href="https://wa.me/5511951364159?text=Ol%C3%A1%2C+visitei+o+site+da+RAIA+e+gostaria+de+conhecer+os+assistentes+de+IA+para+meu+neg%C3%B3cio!" target="_blank" class="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs shadow-lg shadow-[#00F59B]/20 hover:scale-105 active:scale-95 transition flex items-center gap-2">
-          <i data-lucide="message-circle" class="w-4 h-4"></i>
-          <span>Falar com a RAIA</span>
-        </a>
+        <button onclick="openTestModal('saloes-e-beleza', 'Jéssica (Salões & Beleza)')" class="px-4 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-cyan-400 via-teal-400 to-[#00F59B] text-black hover:opacity-90 shadow-lg shadow-cyan-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer">
+          <i data-lucide="message-circle" class="w-4 h-4 text-black"></i>
+          <span>Testar no WhatsApp</span>
+        </button>
       </div>
+
     </div>
   </header>
 
   <!-- ============================================================ -->
-  <!-- 2. HERO SECTION                                              -->
+  <!-- HERO BANNER (Marketplace Header & Value Proposition)         -->
   <!-- ============================================================ -->
-  <section class="relative pt-32 pb-16 sm:pt-40 sm:pb-24 overflow-hidden">
-    <div class="max-w-6xl mx-auto px-4 sm:px-6 text-center space-y-6 relative z-10">
-      
-      <!-- Logo Branding -->
-      <div class="flex flex-col items-center justify-center pt-2 pb-1">
-        <img 
-          src="/raia-logo.png" 
-          alt="RAIA" 
-          class="w-48 sm:w-64 h-auto object-contain filter drop-shadow-[0_0_35px_rgba(6,182,212,0.35)] select-none"
-        >
-        <span class="mt-4 px-3.5 py-1 rounded-full bg-cyan-950/60 border border-cyan-500/30 text-[11px] font-bold text-cyan-300 tracking-wide uppercase">
-          Apoio Operacional ao seu Atendimento
-        </span>
-      </div>
+  <section class="relative pt-10 pb-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <div class="p-8 sm:p-10 rounded-3xl bg-gradient-to-r from-[#10132E] via-[#0E1026] to-[#121535] border border-[#232759] shadow-2xl relative overflow-hidden">
+      <!-- Glow decoration inside banner -->
+      <div class="absolute -right-16 -top-16 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -left-16 -bottom-16 w-80 h-80 bg-violet-600/15 rounded-full blur-3xl pointer-events-none"></div>
 
-      <!-- Main Title -->
-      <h1 class="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.12] max-w-4xl mx-auto">
-        Seu WhatsApp continua atendendo <span class="gradient-text-neon">enquanto você cuida do seu negócio</span>.
-      </h1>
-
-      <!-- Subtitle -->
-      <p class="text-sm sm:text-lg text-zinc-300 max-w-2xl mx-auto leading-relaxed">
-        Conheça os assistentes de IA da RAIA para responder dúvidas frequentes, organizar dados de agendamento e encaminhar oportunidades qualificadas para a sua equipe.
-      </p>
-
-      <!-- CTA Buttons -->
-      <div class="pt-3 flex flex-col sm:flex-row items-center justify-center gap-3.5">
-        <a href="#solucoes" class="w-full sm:w-auto px-7 py-3.5 rounded-2xl bg-gradient-to-r from-[#00F59B] via-emerald-400 to-[#ccff00] text-black font-black text-sm shadow-xl shadow-[#00F59B]/25 hover:scale-105 active:scale-95 transition flex items-center justify-center gap-2">
-          <span>Encontrar o assistente para meu negócio</span>
-          <i data-lucide="arrow-down" class="w-4 h-4"></i>
-        </a>
-        <a href="#destaque-jessica" class="w-full sm:w-auto px-6 py-3.5 rounded-2xl bg-zinc-900/90 hover:bg-zinc-800 text-white font-extrabold text-sm border border-zinc-700 transition flex items-center justify-center gap-2">
-          <i data-lucide="play-circle" class="w-4 h-4 text-[#00F59B]"></i>
-          <span>Ver uma demonstração</span>
-        </a>
-      </div>
-
-      <!-- Real Capabilities Highlights -->
-      <div class="pt-10 grid grid-cols-2 md:grid-cols-4 gap-3.5 max-w-4xl mx-auto">
-        <div class="p-3.5 rounded-2xl bg-[#11141f]/80 border border-zinc-800/80 text-center space-y-1">
-          <i data-lucide="clock" class="w-5 h-5 mx-auto text-[#00F59B] mb-1"></i>
-          <p class="text-sm font-extrabold text-white">Atendimento 24/7</p>
-          <p class="text-[11px] text-zinc-400">Respostas rápidas no primeiro contato</p>
+      <div class="relative z-10 max-w-3xl space-y-4">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-extrabold tracking-wide">
+          <span class="w-2 h-2 rounded-full bg-[#00F59B] animate-pulse"></span>
+          <span>10 Assistentes de IA Prontos para Produção</span>
         </div>
-        <div class="p-3.5 rounded-2xl bg-[#11141f]/80 border border-zinc-800/80 text-center space-y-1">
-          <i data-lucide="check-circle-2" class="w-5 h-5 mx-auto text-cyan-400 mb-1"></i>
-          <p class="text-sm font-extrabold text-white">Triagem Organizada</p>
-          <p class="text-[11px] text-zinc-400">Coleta serviço, horário e preferências</p>
-        </div>
-        <div class="p-3.5 rounded-2xl bg-[#11141f]/80 border border-zinc-800/80 text-center space-y-1">
-          <i data-lucide="user-check" class="w-5 h-5 mx-auto text-violet-400 mb-1"></i>
-          <p class="text-sm font-extrabold text-white">Intervenção Humana</p>
-          <p class="text-[11px] text-zinc-400">Sua equipe pode assumir a qualquer hora</p>
-        </div>
-        <div class="p-3.5 rounded-2xl bg-[#11141f]/80 border border-zinc-800/80 text-center space-y-1">
-          <i data-lucide="shield-check" class="w-5 h-5 mx-auto text-emerald-400 mb-1"></i>
-          <p class="text-sm font-extrabold text-white">Configuração Guiada</p>
-          <p class="text-[11px] text-zinc-400">Baseada nas informações reais do negócio</p>
+        
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
+          Seu WhatsApp continua atendendo enquanto você cuida do seu negócio.
+        </h1>
+        
+        <p class="text-sm sm:text-base text-zinc-300 leading-relaxed max-w-2xl">
+          Escolha o assistente treinado para o seu segmento. Responda clientes instantaneamente 24h, organize agendamentos, registre despesas e acompanhe o faturamento direto no painel da RAIA.
+        </p>
+
+        <!-- Metrics pill bar -->
+        <div class="pt-2 flex flex-wrap items-center gap-6 text-xs text-zinc-300 border-t border-zinc-800/80">
+          <div class="flex items-center gap-2">
+            <i data-lucide="check-circle" class="w-4 h-4 text-[#00F59B]"></i>
+            <span>Atendimento 24h Sem Fila</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <i data-lucide="check-circle" class="w-4 h-4 text-cyan-400"></i>
+            <span>Controle Financeiro Integrado</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <i data-lucide="check-circle" class="w-4 h-4 text-violet-400"></i>
+            <span>Transição para Atendente Humano</span>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
   <!-- ============================================================ -->
-  <!-- 3. DESTAQUE PRIORITÁRIO: JÉSSICA (SALÕES & BELEZA)           -->
+  <!-- MARKETPLACE SEARCH & FILTER CONTROLS BAR (Figma Style)       -->
   <!-- ============================================================ -->
-  <section id="destaque-jessica" class="py-16 max-w-6xl mx-auto px-4 sm:px-6">
-    <div class="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-pink-950/40 via-[#11141f] to-[#0d101a] border-2 border-pink-500/30 relative overflow-hidden">
-      <div class="flex flex-col lg:flex-row gap-8 items-center justify-between">
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 p-3 rounded-2xl bg-[#0F1126] border border-[#1F234D]">
+      
+      <!-- Search Input with Icon -->
+      <div class="relative flex-1">
+        <i data-lucide="search" class="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+        <input 
+          type="text" 
+          id="agentSearchInput" 
+          oninput="handleSearchFilter()" 
+          placeholder="Buscar por segmento (ex: salão, clínica, restaurante), tarefa ou nome do robô..."
+          class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#141632] border border-[#232759] text-white text-xs placeholder:text-zinc-500 focus:outline-none focus:border-cyan-400 transition"
+        >
+      </div>
+
+      <!-- Controls: Sort & Grid View Switch -->
+      <div class="flex items-center gap-2 shrink-0">
         
-        <div class="space-y-4 max-w-xl">
-          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/30 text-pink-300 text-xs font-bold">
-            <span>💇‍♀️ Solução em Destaque • Salões & Barbearias</span>
+        <!-- Sort Dropdown -->
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#141632] border border-[#232759] text-xs text-zinc-300">
+          <i data-lucide="arrow-up-down" class="w-3.5 h-3.5 text-zinc-400"></i>
+          <span class="text-zinc-500 font-medium">Ordenar:</span>
+          <select id="agentSortSelect" onchange="handleSortChange()" class="bg-transparent text-white font-bold focus:outline-none cursor-pointer">
+            <option value="popular" class="bg-[#141632]">Mais Populares</option>
+            <option value="name" class="bg-[#141632]">Nome (A-Z)</option>
+            <option value="likes" class="bg-[#141632]">Avaliações</option>
+          </select>
+        </div>
+
+        <!-- View Switch Buttons -->
+        <div class="flex items-center p-1 rounded-xl bg-[#141632] border border-[#232759]">
+          <button id="viewGridBtn" onclick="setViewMode('grid')" class="p-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 text-xs font-bold transition cursor-pointer" title="Visualização em Grade">
+            <i data-lucide="grid" class="w-4 h-4"></i>
+          </button>
+          <button id="viewListBtn" onclick="setViewMode('list')" class="p-1.5 rounded-lg text-zinc-400 hover:text-white text-xs font-bold transition cursor-pointer" title="Visualização em Lista">
+            <i data-lucide="list" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- MAIN MARKETPLACE TWO-COLUMN LAYOUT (Figma Inspiration)       -->
+  <!-- ============================================================ -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+
+      <!-- ============================================================ -->
+      <!-- LEFT SIDEBAR: CATEGORIES & TAG FILTERS                       -->
+      <!-- ============================================================ -->
+      <aside class="lg:col-span-1 space-y-6">
+        
+        <!-- Categories Box -->
+        <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+              <i data-lucide="folder" class="w-3.5 h-3.5 text-cyan-400"></i>
+              <span>Segmentos & Setores</span>
+            </h3>
+            <span id="resultsCountBadge" class="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300">10 Soluções</span>
           </div>
 
-          <h2 class="text-2xl sm:text-4xl font-black text-white leading-tight">
-            Seu salão atendendo no WhatsApp, mesmo quando você está com uma cliente.
-          </h2>
-
-          <p class="text-sm text-zinc-300 leading-relaxed">
-            A <b>Jéssica</b> é a assistente de atendimento da RAIA configurada para o segmento de beleza. Ela informa serviços, valores cadastrados, horários de funcionamento e coleta a preferência de agendamento da cliente para a recepção confirmar.
-          </p>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 text-xs text-zinc-300 font-medium">
-            <div class="flex items-center gap-2">
-              <i data-lucide="check" class="w-4 h-4 text-pink-400"></i>
-              <span>Tira dúvidas sobre serviços e preços</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <i data-lucide="check" class="w-4 h-4 text-pink-400"></i>
-              <span>Informa horários e localização</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <i data-lucide="check" class="w-4 h-4 text-pink-400"></i>
-              <span>Coleta dia e horário desejado</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <i data-lucide="check" class="w-4 h-4 text-pink-400"></i>
-              <span>Encaminha para a recepção confirmar</span>
-            </div>
+          <!-- Quick Type Toggle Pills (All / Atendimento / Agendamento / Finanças) -->
+          <div class="flex items-center gap-1 p-1 bg-[#141632] rounded-xl border border-[#232759] text-[11px]">
+            <button onclick="setCategoryFilter('all')" id="catTabAll" class="flex-1 py-1 px-2 rounded-lg font-bold transition cursor-pointer bg-cyan-500 text-black">
+              Todos
+            </button>
+            <button onclick="setTagFilter('Agendamento 24h')" id="catTabAgend" class="flex-1 py-1 px-2 rounded-lg font-bold text-zinc-400 hover:text-white transition cursor-pointer">
+              Agenda
+            </button>
+            <button onclick="setTagFilter('Controle Financeiro')" id="catTabFin" class="flex-1 py-1 px-2 rounded-lg font-bold text-zinc-400 hover:text-white transition cursor-pointer">
+              Caixa
+            </button>
           </div>
 
-          <div class="pt-3 flex flex-col sm:flex-row gap-3">
-            <a href="/solucoes/saloes-e-beleza" class="px-5 py-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-extrabold text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-pink-600/30">
-              <span>Conhecer a solução para salões</span>
-              <i data-lucide="arrow-right" class="w-4 h-4"></i>
-            </a>
-            <button onclick="openTestAgentModal('SALON', 'Jéssica', '💇‍♀️', 'Salões & Estética')" class="px-5 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-extrabold text-xs transition flex items-center justify-center gap-2 border border-zinc-700">
-              <i data-lucide="message-square" class="w-4 h-4 text-pink-400"></i>
-              <span>Testar Jéssica no seu WhatsApp</span>
+          <!-- Category List -->
+          <div class="space-y-1 text-xs">
+            <button onclick="setCategoryFilter('all')" class="cat-filter-btn w-full flex items-center justify-between p-2 rounded-xl text-left transition cursor-pointer font-bold bg-[#141632] text-cyan-300 border border-cyan-500/30" data-cat="all">
+              <span class="flex items-center gap-2">
+                <span>🌐</span>
+                <span>Todos os Segmentos</span>
+              </span>
+              <span class="text-[10px] text-zinc-400 font-mono">10</span>
+            </button>
+
+            <button onclick="setCategoryFilter('saloes')" class="cat-filter-btn w-full flex items-center justify-between p-2 rounded-xl text-left transition cursor-pointer text-zinc-300 hover:text-white hover:bg-white/5" data-cat="saloes">
+              <span class="flex items-center gap-2">
+                <span>💇‍♀️</span>
+                <span>Salões & Beleza</span>
+              </span>
+              <span class="px-1.5 py-0.2 rounded bg-pink-500/20 text-pink-300 text-[9px] font-extrabold">Destaque</span>
+            </button>
+
+            <button onclick="setCategoryFilter('saude')" class="cat-filter-btn w-full flex items-center justify-between p-2 rounded-xl text-left transition cursor-pointer text-zinc-300 hover:text-white hover:bg-white/5" data-cat="saude">
+              <span class="flex items-center gap-2">
+                <span>🩺</span>
+                <span>Saúde & Clínicas</span>
+              </span>
+              <span class="text-[10px] text-zinc-400 font-mono">1</span>
+            </button>
+
+            <button onclick="setCategoryFilter('delivery')" class="cat-filter-btn w-full flex items-center justify-between p-2 rounded-xl text-left transition cursor-pointer text-zinc-300 hover:text-white hover:bg-white/5" data-cat="delivery">
+              <span class="flex items-center gap-2">
+                <span>🍔</span>
+                <span>Delivery & Restaurantes</span>
+              </span>
+              <span class="text-[10px] text-zinc-400 font-mono">1</span>
+            </button>
+
+            <button onclick="setCategoryFilter('advocacia')" class="cat-filter-btn w-full flex items-center justify-between p-2 rounded-xl text-left transition cursor-pointer text-zinc-300 hover:text-white hover:bg-white/5" data-cat="advocacia">
+              <span class="flex items-center gap-2">
+                <span>⚖️</span>
+                <span>Advocacia & Jurídico</span>
+              </span>
+              <span class="text-[10px] text-zinc-400 font-mono">1</span>
+            </button>
+
+            <button onclick="setCategoryFilter('imobiliarias')" class="cat-filter-btn w-full flex items-center justify-between p-2 rounded-xl text-left transition cursor-pointer text-zinc-300 hover:text-white hover:bg-white/5" data-cat="imobiliarias">
+              <span class="flex items-center gap-2">
+                <span>🏡</span>
+                <span>Imobiliárias & Corretores</span>
+              </span>
+              <span class="text-[10px] text-zinc-400 font-mono">1</span>
+            </button>
+
+            <button onclick="setCategoryFilter('oficinas')" class="cat-filter-btn w-full flex items-center justify-between p-2 rounded-xl text-left transition cursor-pointer text-zinc-300 hover:text-white hover:bg-white/5" data-cat="oficinas">
+              <span class="flex items-center gap-2">
+                <span>🚗</span>
+                <span>Oficinas & Auto Centers</span>
+              </span>
+              <span class="text-[10px] text-zinc-400 font-mono">1</span>
+            </button>
+
+            <button onclick="setCategoryFilter('fitness')" class="cat-filter-btn w-full flex items-center justify-between p-2 rounded-xl text-left transition cursor-pointer text-zinc-300 hover:text-white hover:bg-white/5" data-cat="fitness">
+              <span class="flex items-center gap-2">
+                <span>💪</span>
+                <span>Academias & Pilates</span>
+              </span>
+              <span class="text-[10px] text-zinc-400 font-mono">1</span>
+            </button>
+
+            <button onclick="setCategoryFilter('financeiro')" class="cat-filter-btn w-full flex items-center justify-between p-2 rounded-xl text-left transition cursor-pointer text-zinc-300 hover:text-white hover:bg-white/5" data-cat="financeiro">
+              <span class="flex items-center gap-2">
+                <span>📊</span>
+                <span>Financeiro & MEI</span>
+              </span>
+              <span class="text-[10px] text-zinc-400 font-mono">1</span>
+            </button>
+
+            <button onclick="setCategoryFilter('construcao')" class="cat-filter-btn w-full flex items-center justify-between p-2 rounded-xl text-left transition cursor-pointer text-zinc-300 hover:text-white hover:bg-white/5" data-cat="construcao">
+              <span class="flex items-center gap-2">
+                <span>🏗️</span>
+                <span>Locação & Obras</span>
+              </span>
+              <span class="text-[10px] text-zinc-400 font-mono">1</span>
+            </button>
+
+            <button onclick="setCategoryFilter('veiculos')" class="cat-filter-btn w-full flex items-center justify-between p-2 rounded-xl text-left transition cursor-pointer text-zinc-300 hover:text-white hover:bg-white/5" data-cat="veiculos">
+              <span class="flex items-center gap-2">
+                <span>🏎️</span>
+                <span>Veículos & Seminovos</span>
+              </span>
+              <span class="text-[10px] text-zinc-400 font-mono">1</span>
             </button>
           </div>
         </div>
 
-        <!-- Conversa Ilustrativa -->
-        <div class="w-full lg:w-96 bg-[#0B0F19] p-4 rounded-2xl border border-zinc-800 shadow-2xl space-y-3">
-          <div class="flex items-center justify-between border-b border-zinc-800 pb-2 text-[11px] text-zinc-400">
-            <span class="font-bold flex items-center gap-1.5 text-pink-300">
-              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-              Jéssica • Exemplo de atendimento
-            </span>
-            <span class="text-[10px] text-zinc-500">Ilustrativo</span>
+        <!-- Filter Tags Box (Figma Inspired) -->
+        <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-3">
+          <h3 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+            <i data-lucide="tag" class="w-3.5 h-3.5 text-violet-400"></i>
+            <span>Tarefas & Filtros Rápidos</span>
+          </h3>
+
+          <div class="flex flex-wrap gap-1.5" id="tagFiltersContainer">
+            <button onclick="setTagFilter('all')" class="tag-pill px-2.5 py-1 rounded-lg text-[10px] font-bold bg-cyan-500 text-black cursor-pointer transition" data-tag="all">Todas as Tarefas</button>
+            <button onclick="setTagFilter('Agendamento 24h')" class="tag-pill px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#141632] border border-[#232759] text-zinc-300 hover:text-white hover:border-cyan-400 cursor-pointer transition" data-tag="Agendamento 24h">Agendamento 24h</button>
+            <button onclick="setTagFilter('Controle Financeiro')" class="tag-pill px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#141632] border border-[#232759] text-zinc-300 hover:text-white hover:border-cyan-400 cursor-pointer transition" data-tag="Controle Financeiro">Controle Financeiro</button>
+            <button onclick="setTagFilter('Cardápio & Pedidos')" class="tag-pill px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#141632] border border-[#232759] text-zinc-300 hover:text-white hover:border-cyan-400 cursor-pointer transition" data-tag="Cardápio & Pedidos">Cardápio & Pedidos</button>
+            <button onclick="setTagFilter('Triagem & Qualificação')" class="tag-pill px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#141632] border border-[#232759] text-zinc-300 hover:text-white hover:border-cyan-400 cursor-pointer transition" data-tag="Triagem & Qualificação">Triagem & Triagem</button>
+            <button onclick="setTagFilter('Cobrança Pix & Cartão')" class="tag-pill px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#141632] border border-[#232759] text-zinc-300 hover:text-white hover:border-cyan-400 cursor-pointer transition" data-tag="Cobrança Pix & Cartão">Cobrança Pix/Cartão</button>
+            <button onclick="setTagFilter('Lembretes')" class="tag-pill px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#141632] border border-[#232759] text-zinc-300 hover:text-white hover:border-cyan-400 cursor-pointer transition" data-tag="Lembretes">Lembretes</button>
+            <button onclick="setTagFilter('Aviso de Retirada')" class="tag-pill px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#141632] border border-[#232759] text-zinc-300 hover:text-white hover:border-cyan-400 cursor-pointer transition" data-tag="Aviso de Retirada">Avisos de Retirada</button>
+          </div>
+        </div>
+
+        <!-- Support / Custom Agent Card -->
+        <div class="p-5 rounded-3xl bg-gradient-to-br from-[#121535] to-[#1a1133] border border-violet-500/30 text-center space-y-3">
+          <div class="w-10 h-10 mx-auto rounded-2xl bg-violet-500/20 flex items-center justify-center text-violet-300">
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+          </div>
+          <h4 class="text-xs font-black text-white">Não encontrou seu nicho?</h4>
+          <p class="text-[11px] text-zinc-400 leading-relaxed">
+            Nossa equipe configura um assistente 100% customizado com o vocabulário e as regras do seu negócio.
+          </p>
+          <a href="/contato" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-extrabold text-[11px] transition shadow">
+            <span>Falar com Especialista</span>
+            <i data-lucide="arrow-right" class="w-3 h-3"></i>
+          </a>
+        </div>
+
+      </aside>
+
+      <!-- ============================================================ -->
+      <!-- RIGHT COLUMN: AGENT CARDS GRID (Figma Marketplace Style)     -->
+      <!-- ============================================================ -->
+      <section class="lg:col-span-3 space-y-6">
+        
+        <!-- Results Counter & Status -->
+        <div class="flex items-center justify-between text-xs text-zinc-400">
+          <div>
+            Exibindo <b id="visibleAgentsCount" class="text-white">10</b> assistentes disponíveis
+          </div>
+          <div class="text-[11px] text-cyan-400 font-medium flex items-center gap-1">
+            <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+            <span>Todos incluem 7 dias de garantia</span>
+          </div>
+        </div>
+
+        <!-- The Cards Container -->
+        <div id="agentsGridContainer" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          
+            <div class="agent-card flex flex-col justify-between rounded-3xl bg-[#0F1126] border border-[#1F234D] overflow-hidden relative group" data-category="saloes" data-tags="Agendamento 24h,Controle Financeiro,Lembretes" data-name="jéssica atendimento & agendamento para salões salões & beleza">
+              
+              <!-- Card Top Image & Badges -->
+              <div class="relative h-44 w-full overflow-hidden bg-[#141632]">
+                <img 
+                  src="https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=800&q=80" 
+                  alt="Jéssica - Salões & Beleza" 
+                  class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  loading="lazy"
+                >
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0F1126] via-transparent to-black/40"></div>
+
+                <!-- Top Left Badge -->
+                <div class="absolute top-3 left-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[10px] font-extrabold">
+                    Salões & Beleza
+                  </span>
+                  
+                    <span class="px-2 py-0.5 rounded-full bg-[#00F59B] text-black text-[9px] font-black uppercase tracking-wider shadow">
+                      Destaque
+                    </span>
+                  
+                </div>
+
+                <!-- Top Right Heart/Likes (Figma Style) -->
+                <div class="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-bold">
+                  <span class="text-rose-400">❤️</span>
+                  <span class="font-mono text-[10px]">184</span>
+                </div>
+
+                <!-- Bottom Title Overlay -->
+                <div class="absolute bottom-3 left-4 right-4">
+                  <h3 class="text-lg font-black text-white group-hover:text-cyan-300 transition flex items-center gap-2">
+                    <span>Jéssica</span>
+                    <span class="text-xs text-zinc-400 font-normal">• Salões</span>
+                  </h3>
+                </div>
+              </div>
+
+              <!-- Card Body Content -->
+              <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+                
+                <p class="text-xs text-zinc-300 leading-relaxed line-clamp-3">
+                  Atende clientes enquanto você cuida do cabelo. Informa valores de escova, mechas e corte, pré-agenda horários e envia lembretes para evitar cadeiras vazias.
+                </p>
+
+                <!-- Tasks Bullets -->
+                <div class="space-y-1.5 pt-1 border-t border-zinc-800/60">
+                  <div class="text-[10px] uppercase font-black tracking-wider text-zinc-400">Tarefas Disponíveis:</div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Consulta de serviços e valores</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Coleta de preferência de horário</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Lembretes e confirmação prévia</span>
+                    </div>
+                  
+                </div>
+
+                <!-- Bottom Price & Action Buttons -->
+                <div class="pt-3 border-t border-zinc-800/80 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-zinc-500 font-medium">Investimento:</span>
+                    <span class="font-black text-sm text-[#00F59B] font-mono">R$ 97/mês</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 pt-1">
+                    <a href="/solucoes/saloes-e-beleza" class="py-2.5 px-3 rounded-xl bg-[#141632] hover:bg-[#1A1D40] text-zinc-200 hover:text-white border border-[#232759] hover:border-cyan-500/50 text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-center">
+                      <span>Conhecer</span>
+                      <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                    
+                    <button onclick="openTestModal('saloes-e-beleza', 'Jéssica (Salões & Beleza)')" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:opacity-90 text-black text-[11px] font-black transition flex items-center justify-center gap-1.5 text-center cursor-pointer shadow">
+                      <i data-lucide="play" class="w-3.5 h-3.5 fill-black"></i>
+                      <span>Testar</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          
+            <div class="agent-card flex flex-col justify-between rounded-3xl bg-[#0F1126] border border-[#1F234D] overflow-hidden relative group" data-category="saude" data-tags="Agendamento 24h,Triagem & Qualificação,Google Calendar" data-name="sofia recepção & triagem de consultórios saúde & odontologia">
+              
+              <!-- Card Top Image & Badges -->
+              <div class="relative h-44 w-full overflow-hidden bg-[#141632]">
+                <img 
+                  src="https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=800&q=80" 
+                  alt="Sofia - Saúde & Odontologia" 
+                  class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  loading="lazy"
+                >
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0F1126] via-transparent to-black/40"></div>
+
+                <!-- Top Left Badge -->
+                <div class="absolute top-3 left-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[10px] font-extrabold">
+                    Saúde & Odontologia
+                  </span>
+                  
+                </div>
+
+                <!-- Top Right Heart/Likes (Figma Style) -->
+                <div class="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-bold">
+                  <span class="text-rose-400">❤️</span>
+                  <span class="font-mono text-[10px]">142</span>
+                </div>
+
+                <!-- Bottom Title Overlay -->
+                <div class="absolute bottom-3 left-4 right-4">
+                  <h3 class="text-lg font-black text-white group-hover:text-cyan-300 transition flex items-center gap-2">
+                    <span>Sofia</span>
+                    <span class="text-xs text-zinc-400 font-normal">• Saúde</span>
+                  </h3>
+                </div>
+              </div>
+
+              <!-- Card Body Content -->
+              <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+                
+                <p class="text-xs text-zinc-300 leading-relaxed line-clamp-3">
+                  Assistente da clínica da Dra. Raphaela. Informa horários de atendimento, especialidades médicas, convênios aceitos e organiza solicitações de consultas.
+                </p>
+
+                <!-- Tasks Bullets -->
+                <div class="space-y-1.5 pt-1 border-t border-zinc-800/60">
+                  <div class="text-[10px] uppercase font-black tracking-wider text-zinc-400">Tarefas Disponíveis:</div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Horários, endereço e convênios</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Solicitações de agendamento</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Encaminhamento para recepção</span>
+                    </div>
+                  
+                </div>
+
+                <!-- Bottom Price & Action Buttons -->
+                <div class="pt-3 border-t border-zinc-800/80 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-zinc-500 font-medium">Investimento:</span>
+                    <span class="font-black text-sm text-[#00F59B] font-mono">R$ 97/mês</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 pt-1">
+                    <a href="/solucoes/saude-e-odontologia" class="py-2.5 px-3 rounded-xl bg-[#141632] hover:bg-[#1A1D40] text-zinc-200 hover:text-white border border-[#232759] hover:border-cyan-500/50 text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-center">
+                      <span>Conhecer</span>
+                      <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                    
+                    <button onclick="openTestModal('saude-e-odontologia', 'Sofia (Saúde & Odontologia)')" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:opacity-90 text-black text-[11px] font-black transition flex items-center justify-center gap-1.5 text-center cursor-pointer shadow">
+                      <i data-lucide="play" class="w-3.5 h-3.5 fill-black"></i>
+                      <span>Testar</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          
+            <div class="agent-card flex flex-col justify-between rounded-3xl bg-[#0F1126] border border-[#1F234D] overflow-hidden relative group" data-category="delivery" data-tags="Cardápio & Pedidos,Cobrança Pix & Cartão,Controle Financeiro" data-name="chefbot cardápio digital & recepção de pedidos delivery & restaurantes">
+              
+              <!-- Card Top Image & Badges -->
+              <div class="relative h-44 w-full overflow-hidden bg-[#141632]">
+                <img 
+                  src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80" 
+                  alt="ChefBot - Delivery & Restaurantes" 
+                  class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  loading="lazy"
+                >
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0F1126] via-transparent to-black/40"></div>
+
+                <!-- Top Left Badge -->
+                <div class="absolute top-3 left-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[10px] font-extrabold">
+                    Delivery & Restaurantes
+                  </span>
+                  
+                </div>
+
+                <!-- Top Right Heart/Likes (Figma Style) -->
+                <div class="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-bold">
+                  <span class="text-rose-400">❤️</span>
+                  <span class="font-mono text-[10px]">129</span>
+                </div>
+
+                <!-- Bottom Title Overlay -->
+                <div class="absolute bottom-3 left-4 right-4">
+                  <h3 class="text-lg font-black text-white group-hover:text-cyan-300 transition flex items-center gap-2">
+                    <span>ChefBot</span>
+                    <span class="text-xs text-zinc-400 font-normal">• Delivery</span>
+                  </h3>
+                </div>
+              </div>
+
+              <!-- Card Body Content -->
+              <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+                
+                <p class="text-xs text-zinc-300 leading-relaxed line-clamp-3">
+                  Apresenta cardápio com fotos e valores, adicionais e combos. Coleta o endereço de entrega, organiza o pedido e encaminha diretamente para a cozinha.
+                </p>
+
+                <!-- Tasks Bullets -->
+                <div class="space-y-1.5 pt-1 border-t border-zinc-800/60">
+                  <div class="text-[10px] uppercase font-black tracking-wider text-zinc-400">Tarefas Disponíveis:</div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Cardápio digital com adicionais</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Coleta de endereço e taxa de entrega</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Organização de pedidos para cozinha</span>
+                    </div>
+                  
+                </div>
+
+                <!-- Bottom Price & Action Buttons -->
+                <div class="pt-3 border-t border-zinc-800/80 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-zinc-500 font-medium">Investimento:</span>
+                    <span class="font-black text-sm text-[#00F59B] font-mono">R$ 97/mês</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 pt-1">
+                    <a href="/solucoes/delivery-e-restaurantes" class="py-2.5 px-3 rounded-xl bg-[#141632] hover:bg-[#1A1D40] text-zinc-200 hover:text-white border border-[#232759] hover:border-cyan-500/50 text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-center">
+                      <span>Conhecer</span>
+                      <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                    
+                    <button onclick="openTestModal('delivery-e-restaurantes', 'ChefBot (Delivery & Restaurantes)')" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:opacity-90 text-black text-[11px] font-black transition flex items-center justify-center gap-1.5 text-center cursor-pointer shadow">
+                      <i data-lucide="play" class="w-3.5 h-3.5 fill-black"></i>
+                      <span>Testar</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          
+            <div class="agent-card flex flex-col justify-between rounded-3xl bg-[#0F1126] border border-[#1F234D] overflow-hidden relative group" data-category="advocacia" data-tags="Triagem & Qualificação,Agendamento 24h,Google Calendar" data-name="lex triagem & recepção jurídica advocacia & jurídico">
+              
+              <!-- Card Top Image & Badges -->
+              <div class="relative h-44 w-full overflow-hidden bg-[#141632]">
+                <img 
+                  src="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=800&q=80" 
+                  alt="Lex - Advocacia & Jurídico" 
+                  class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  loading="lazy"
+                >
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0F1126] via-transparent to-black/40"></div>
+
+                <!-- Top Left Badge -->
+                <div class="absolute top-3 left-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[10px] font-extrabold">
+                    Advocacia & Jurídico
+                  </span>
+                  
+                </div>
+
+                <!-- Top Right Heart/Likes (Figma Style) -->
+                <div class="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-bold">
+                  <span class="text-rose-400">❤️</span>
+                  <span class="font-mono text-[10px]">98</span>
+                </div>
+
+                <!-- Bottom Title Overlay -->
+                <div class="absolute bottom-3 left-4 right-4">
+                  <h3 class="text-lg font-black text-white group-hover:text-cyan-300 transition flex items-center gap-2">
+                    <span>Lex</span>
+                    <span class="text-xs text-zinc-400 font-normal">• Advocacia</span>
+                  </h3>
+                </div>
+              </div>
+
+              <!-- Card Body Content -->
+              <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+                
+                <p class="text-xs text-zinc-300 leading-relaxed line-clamp-3">
+                  Acolhe potenciais clientes com linguagem formal e acolhedora. Identifica o ramo do direito, coleta o resumo da causa e agenda a consulta inicial com o advogado.
+                </p>
+
+                <!-- Tasks Bullets -->
+                <div class="space-y-1.5 pt-1 border-t border-zinc-800/60">
+                  <div class="text-[10px] uppercase font-black tracking-wider text-zinc-400">Tarefas Disponíveis:</div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Recepção qualificada 24 horas</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Identificação do assunto jurídico</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Agendamento de consulta com advogado</span>
+                    </div>
+                  
+                </div>
+
+                <!-- Bottom Price & Action Buttons -->
+                <div class="pt-3 border-t border-zinc-800/80 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-zinc-500 font-medium">Investimento:</span>
+                    <span class="font-black text-sm text-[#00F59B] font-mono">R$ 97/mês</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 pt-1">
+                    <a href="/solucoes/advocacia" class="py-2.5 px-3 rounded-xl bg-[#141632] hover:bg-[#1A1D40] text-zinc-200 hover:text-white border border-[#232759] hover:border-cyan-500/50 text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-center">
+                      <span>Conhecer</span>
+                      <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                    
+                    <button onclick="openTestModal('advocacia', 'Lex (Advocacia & Jurídico)')" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:opacity-90 text-black text-[11px] font-black transition flex items-center justify-center gap-1.5 text-center cursor-pointer shadow">
+                      <i data-lucide="play" class="w-3.5 h-3.5 fill-black"></i>
+                      <span>Testar</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          
+            <div class="agent-card flex flex-col justify-between rounded-3xl bg-[#0F1126] border border-[#1F234D] overflow-hidden relative group" data-category="imobiliarias" data-tags="Triagem & Qualificação,Agendamento 24h,Google Calendar" data-name="lucas qualificação de leads imobiliários imobiliárias & corretores">
+              
+              <!-- Card Top Image & Badges -->
+              <div class="relative h-44 w-full overflow-hidden bg-[#141632]">
+                <img 
+                  src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80" 
+                  alt="Lucas - Imobiliárias & Corretores" 
+                  class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  loading="lazy"
+                >
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0F1126] via-transparent to-black/40"></div>
+
+                <!-- Top Left Badge -->
+                <div class="absolute top-3 left-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[10px] font-extrabold">
+                    Imobiliárias & Corretores
+                  </span>
+                  
+                </div>
+
+                <!-- Top Right Heart/Likes (Figma Style) -->
+                <div class="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-bold">
+                  <span class="text-rose-400">❤️</span>
+                  <span class="font-mono text-[10px]">115</span>
+                </div>
+
+                <!-- Bottom Title Overlay -->
+                <div class="absolute bottom-3 left-4 right-4">
+                  <h3 class="text-lg font-black text-white group-hover:text-cyan-300 transition flex items-center gap-2">
+                    <span>Lucas</span>
+                    <span class="text-xs text-zinc-400 font-normal">• Imobiliárias</span>
+                  </h3>
+                </div>
+              </div>
+
+              <!-- Card Body Content -->
+              <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+                
+                <p class="text-xs text-zinc-300 leading-relaxed line-clamp-3">
+                  Filtra interessados por bairro, faixa de valor e tipo de imóvel (compra ou locação). Envia fotos do catálogo cadastrado e agenda visitas presenciais com o corretor.
+                </p>
+
+                <!-- Tasks Bullets -->
+                <div class="space-y-1.5 pt-1 border-t border-zinc-800/60">
+                  <div class="text-[10px] uppercase font-black tracking-wider text-zinc-400">Tarefas Disponíveis:</div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Filtro de perfil, bairro e orçamento</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Envio de imóveis cadastrados</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Solicitação e agendamento de visita</span>
+                    </div>
+                  
+                </div>
+
+                <!-- Bottom Price & Action Buttons -->
+                <div class="pt-3 border-t border-zinc-800/80 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-zinc-500 font-medium">Investimento:</span>
+                    <span class="font-black text-sm text-[#00F59B] font-mono">R$ 97/mês</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 pt-1">
+                    <a href="/solucoes/imobiliarias-e-corretores" class="py-2.5 px-3 rounded-xl bg-[#141632] hover:bg-[#1A1D40] text-zinc-200 hover:text-white border border-[#232759] hover:border-cyan-500/50 text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-center">
+                      <span>Conhecer</span>
+                      <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                    
+                    <button onclick="openTestModal('imobiliarias-e-corretores', 'Lucas (Imobiliárias & Corretores)')" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:opacity-90 text-black text-[11px] font-black transition flex items-center justify-center gap-1.5 text-center cursor-pointer shadow">
+                      <i data-lucide="play" class="w-3.5 h-3.5 fill-black"></i>
+                      <span>Testar</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          
+            <div class="agent-card flex flex-col justify-between rounded-3xl bg-[#0F1126] border border-[#1F234D] overflow-hidden relative group" data-category="oficinas" data-tags="Aviso de Retirada,Triagem & Qualificação,Controle Financeiro" data-name="autocheck atendimento & triagem de oficinas oficinas & auto centers">
+              
+              <!-- Card Top Image & Badges -->
+              <div class="relative h-44 w-full overflow-hidden bg-[#141632]">
+                <img 
+                  src="https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?auto=format&fit=crop&w=800&q=80" 
+                  alt="AutoCheck - Oficinas & Auto Centers" 
+                  class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  loading="lazy"
+                >
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0F1126] via-transparent to-black/40"></div>
+
+                <!-- Top Left Badge -->
+                <div class="absolute top-3 left-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[10px] font-extrabold">
+                    Oficinas & Auto Centers
+                  </span>
+                  
+                </div>
+
+                <!-- Top Right Heart/Likes (Figma Style) -->
+                <div class="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-bold">
+                  <span class="text-rose-400">❤️</span>
+                  <span class="font-mono text-[10px]">88</span>
+                </div>
+
+                <!-- Bottom Title Overlay -->
+                <div class="absolute bottom-3 left-4 right-4">
+                  <h3 class="text-lg font-black text-white group-hover:text-cyan-300 transition flex items-center gap-2">
+                    <span>AutoCheck</span>
+                    <span class="text-xs text-zinc-400 font-normal">• Oficinas</span>
+                  </h3>
+                </div>
+              </div>
+
+              <!-- Card Body Content -->
+              <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+                
+                <p class="text-xs text-zinc-300 leading-relaxed line-clamp-3">
+                  Informa serviços mecânicos, alinhamento, troca de óleo e freios. Coleta modelo e ano do veículo, registra solicitação de orçamento e avisa quando o carro está pronto.
+                </p>
+
+                <!-- Tasks Bullets -->
+                <div class="space-y-1.5 pt-1 border-t border-zinc-800/60">
+                  <div class="text-[10px] uppercase font-black tracking-wider text-zinc-400">Tarefas Disponíveis:</div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Informações de serviços e revisões</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Coleta de dados do veículo e sintomas</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Solicitações e avisos de retirada</span>
+                    </div>
+                  
+                </div>
+
+                <!-- Bottom Price & Action Buttons -->
+                <div class="pt-3 border-t border-zinc-800/80 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-zinc-500 font-medium">Investimento:</span>
+                    <span class="font-black text-sm text-[#00F59B] font-mono">R$ 97/mês</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 pt-1">
+                    <a href="/solucoes/oficinas-e-auto-centers" class="py-2.5 px-3 rounded-xl bg-[#141632] hover:bg-[#1A1D40] text-zinc-200 hover:text-white border border-[#232759] hover:border-cyan-500/50 text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-center">
+                      <span>Conhecer</span>
+                      <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                    
+                    <button onclick="openTestModal('oficinas-e-auto-centers', 'AutoCheck (Oficinas & Auto Centers)')" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:opacity-90 text-black text-[11px] font-black transition flex items-center justify-center gap-1.5 text-center cursor-pointer shadow">
+                      <i data-lucide="play" class="w-3.5 h-3.5 fill-black"></i>
+                      <span>Testar</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          
+            <div class="agent-card flex flex-col justify-between rounded-3xl bg-[#0F1126] border border-[#1F234D] overflow-hidden relative group" data-category="fitness" data-tags="Agendamento 24h,Lembretes,Cobrança Pix & Cartão" data-name="coach fit atendimento & aulas experimentais academias & pilates">
+              
+              <!-- Card Top Image & Badges -->
+              <div class="relative h-44 w-full overflow-hidden bg-[#141632]">
+                <img 
+                  src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80" 
+                  alt="Coach Fit - Academias & Pilates" 
+                  class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  loading="lazy"
+                >
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0F1126] via-transparent to-black/40"></div>
+
+                <!-- Top Left Badge -->
+                <div class="absolute top-3 left-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[10px] font-extrabold">
+                    Academias & Pilates
+                  </span>
+                  
+                </div>
+
+                <!-- Top Right Heart/Likes (Figma Style) -->
+                <div class="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-bold">
+                  <span class="text-rose-400">❤️</span>
+                  <span class="font-mono text-[10px]">104</span>
+                </div>
+
+                <!-- Bottom Title Overlay -->
+                <div class="absolute bottom-3 left-4 right-4">
+                  <h3 class="text-lg font-black text-white group-hover:text-cyan-300 transition flex items-center gap-2">
+                    <span>Coach Fit</span>
+                    <span class="text-xs text-zinc-400 font-normal">• Academias</span>
+                  </h3>
+                </div>
+              </div>
+
+              <!-- Card Body Content -->
+              <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+                
+                <p class="text-xs text-zinc-300 leading-relaxed line-clamp-3">
+                  Apresenta planos de mensalidade, horários de pico e modalidades (musculação, pilates, lutas). Agenda aulas experimentais e tira dúvidas frequentes dos alunos.
+                </p>
+
+                <!-- Tasks Bullets -->
+                <div class="space-y-1.5 pt-1 border-t border-zinc-800/60">
+                  <div class="text-[10px] uppercase font-black tracking-wider text-zinc-400">Tarefas Disponíveis:</div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Grade de horários e modalidades</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Apresentação de planos e valores</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Agendamento de aula experimental</span>
+                    </div>
+                  
+                </div>
+
+                <!-- Bottom Price & Action Buttons -->
+                <div class="pt-3 border-t border-zinc-800/80 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-zinc-500 font-medium">Investimento:</span>
+                    <span class="font-black text-sm text-[#00F59B] font-mono">R$ 97/mês</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 pt-1">
+                    <a href="/solucoes/academias-e-pilates" class="py-2.5 px-3 rounded-xl bg-[#141632] hover:bg-[#1A1D40] text-zinc-200 hover:text-white border border-[#232759] hover:border-cyan-500/50 text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-center">
+                      <span>Conhecer</span>
+                      <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                    
+                    <button onclick="openTestModal('academias-e-pilates', 'Coach Fit (Academias & Pilates)')" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:opacity-90 text-black text-[11px] font-black transition flex items-center justify-center gap-1.5 text-center cursor-pointer shadow">
+                      <i data-lucide="play" class="w-3.5 h-3.5 fill-black"></i>
+                      <span>Testar</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          
+            <div class="agent-card flex flex-col justify-between rounded-3xl bg-[#0F1126] border border-[#1F234D] overflow-hidden relative group" data-category="financeiro" data-tags="Controle Financeiro,Cobrança Pix & Cartão,Lembretes" data-name="contazap controle de caixa & gestão mei financeiro & mei">
+              
+              <!-- Card Top Image & Badges -->
+              <div class="relative h-44 w-full overflow-hidden bg-[#141632]">
+                <img 
+                  src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80" 
+                  alt="ContaZap - Financeiro & MEI" 
+                  class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  loading="lazy"
+                >
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0F1126] via-transparent to-black/40"></div>
+
+                <!-- Top Left Badge -->
+                <div class="absolute top-3 left-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[10px] font-extrabold">
+                    Financeiro & MEI
+                  </span>
+                  
+                </div>
+
+                <!-- Top Right Heart/Likes (Figma Style) -->
+                <div class="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-bold">
+                  <span class="text-rose-400">❤️</span>
+                  <span class="font-mono text-[10px]">137</span>
+                </div>
+
+                <!-- Bottom Title Overlay -->
+                <div class="absolute bottom-3 left-4 right-4">
+                  <h3 class="text-lg font-black text-white group-hover:text-cyan-300 transition flex items-center gap-2">
+                    <span>ContaZap</span>
+                    <span class="text-xs text-zinc-400 font-normal">• Financeiro</span>
+                  </h3>
+                </div>
+              </div>
+
+              <!-- Card Body Content -->
+              <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+                
+                <p class="text-xs text-zinc-300 leading-relaxed line-clamp-3">
+                  Ajuda autônomos e pequenos negócios a registrar despesas e receitas por áudio ou foto no WhatsApp, mantendo o fluxo de caixa organizado no dashboard.
+                </p>
+
+                <!-- Tasks Bullets -->
+                <div class="space-y-1.5 pt-1 border-t border-zinc-800/60">
+                  <div class="text-[10px] uppercase font-black tracking-wider text-zinc-400">Tarefas Disponíveis:</div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Registro de gastos e receitas via WhatsApp</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Consulta de saldo e metas financeiras</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Relatórios automáticos no painel</span>
+                    </div>
+                  
+                </div>
+
+                <!-- Bottom Price & Action Buttons -->
+                <div class="pt-3 border-t border-zinc-800/80 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-zinc-500 font-medium">Investimento:</span>
+                    <span class="font-black text-sm text-[#00F59B] font-mono">R$ 97/mês</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 pt-1">
+                    <a href="/solucoes/financeiro-e-mei" class="py-2.5 px-3 rounded-xl bg-[#141632] hover:bg-[#1A1D40] text-zinc-200 hover:text-white border border-[#232759] hover:border-cyan-500/50 text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-center">
+                      <span>Conhecer</span>
+                      <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                    
+                    <button onclick="openTestModal('financeiro-e-mei', 'ContaZap (Financeiro & MEI)')" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:opacity-90 text-black text-[11px] font-black transition flex items-center justify-center gap-1.5 text-center cursor-pointer shadow">
+                      <i data-lucide="play" class="w-3.5 h-3.5 fill-black"></i>
+                      <span>Testar</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          
+            <div class="agent-card flex flex-col justify-between rounded-3xl bg-[#0F1126] border border-[#1F234D] overflow-hidden relative group" data-category="construcao" data-tags="Triagem & Qualificação,Controle Financeiro,Aviso de Retirada" data-name="locamaster locação de máquinas & equipamentos locadoras & obras">
+              
+              <!-- Card Top Image & Badges -->
+              <div class="relative h-44 w-full overflow-hidden bg-[#141632]">
+                <img 
+                  src="https://images.unsplash.com/photo-1581094794329-c8112a89af12?auto=format&fit=crop&w=800&q=80" 
+                  alt="LocaMaster - Locadoras & Obras" 
+                  class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  loading="lazy"
+                >
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0F1126] via-transparent to-black/40"></div>
+
+                <!-- Top Left Badge -->
+                <div class="absolute top-3 left-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[10px] font-extrabold">
+                    Locadoras & Obras
+                  </span>
+                  
+                </div>
+
+                <!-- Top Right Heart/Likes (Figma Style) -->
+                <div class="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-bold">
+                  <span class="text-rose-400">❤️</span>
+                  <span class="font-mono text-[10px]">76</span>
+                </div>
+
+                <!-- Bottom Title Overlay -->
+                <div class="absolute bottom-3 left-4 right-4">
+                  <h3 class="text-lg font-black text-white group-hover:text-cyan-300 transition flex items-center gap-2">
+                    <span>LocaMaster</span>
+                    <span class="text-xs text-zinc-400 font-normal">• Locadoras</span>
+                  </h3>
+                </div>
+              </div>
+
+              <!-- Card Body Content -->
+              <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+                
+                <p class="text-xs text-zinc-300 leading-relaxed line-clamp-3">
+                  Atende empreiteiros e mestres de obra. Informa disponibilidade de andaimes, betoneiras e geradores, coleta período da locação e envia cotação prévia.
+                </p>
+
+                <!-- Tasks Bullets -->
+                <div class="space-y-1.5 pt-1 border-t border-zinc-800/60">
+                  <div class="text-[10px] uppercase font-black tracking-wider text-zinc-400">Tarefas Disponíveis:</div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Catálogo de máquinas e ferramentas</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Coleta de período e local da obra</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Cotação prévia e encaminhamento comercial</span>
+                    </div>
+                  
+                </div>
+
+                <!-- Bottom Price & Action Buttons -->
+                <div class="pt-3 border-t border-zinc-800/80 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-zinc-500 font-medium">Investimento:</span>
+                    <span class="font-black text-sm text-[#00F59B] font-mono">R$ 97/mês</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 pt-1">
+                    <a href="/solucoes/construcao-e-locacao" class="py-2.5 px-3 rounded-xl bg-[#141632] hover:bg-[#1A1D40] text-zinc-200 hover:text-white border border-[#232759] hover:border-cyan-500/50 text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-center">
+                      <span>Conhecer</span>
+                      <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                    
+                    <button onclick="openTestModal('construcao-e-locacao', 'LocaMaster (Locadoras & Obras)')" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:opacity-90 text-black text-[11px] font-black transition flex items-center justify-center gap-1.5 text-center cursor-pointer shadow">
+                      <i data-lucide="play" class="w-3.5 h-3.5 fill-black"></i>
+                      <span>Testar</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          
+            <div class="agent-card flex flex-col justify-between rounded-3xl bg-[#0F1126] border border-[#1F234D] overflow-hidden relative group" data-category="veiculos" data-tags="Triagem & Qualificação,Agendamento 24h,Aviso de Retirada" data-name="autozap estoque de veículos & pré-financiamento veículos & seminovos">
+              
+              <!-- Card Top Image & Badges -->
+              <div class="relative h-44 w-full overflow-hidden bg-[#141632]">
+                <img 
+                  src="https://images.unsplash.com/photo-1503376780353-7e6692767b70?auto=format&fit=crop&w=800&q=80" 
+                  alt="AutoZap - Veículos & Seminovos" 
+                  class="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                  loading="lazy"
+                >
+                <div class="absolute inset-0 bg-gradient-to-t from-[#0F1126] via-transparent to-black/40"></div>
+
+                <!-- Top Left Badge -->
+                <div class="absolute top-3 left-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[10px] font-extrabold">
+                    Veículos & Seminovos
+                  </span>
+                  
+                </div>
+
+                <!-- Top Right Heart/Likes (Figma Style) -->
+                <div class="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-bold">
+                  <span class="text-rose-400">❤️</span>
+                  <span class="font-mono text-[10px]">118</span>
+                </div>
+
+                <!-- Bottom Title Overlay -->
+                <div class="absolute bottom-3 left-4 right-4">
+                  <h3 class="text-lg font-black text-white group-hover:text-cyan-300 transition flex items-center gap-2">
+                    <span>AutoZap</span>
+                    <span class="text-xs text-zinc-400 font-normal">• Veículos</span>
+                  </h3>
+                </div>
+              </div>
+
+              <!-- Card Body Content -->
+              <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
+                
+                <p class="text-xs text-zinc-300 leading-relaxed line-clamp-3">
+                  Apresenta modelos disponíveis no estoque com fotos, ano e quilometragem. Coleta dados de carro na troca e pré-qualifica compradores para a equipe de vendas.
+                </p>
+
+                <!-- Tasks Bullets -->
+                <div class="space-y-1.5 pt-1 border-t border-zinc-800/60">
+                  <div class="text-[10px] uppercase font-black tracking-wider text-zinc-400">Tarefas Disponíveis:</div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Consulta de estoque com fotos e ficha técnica</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Coleta de dados de veículo usado na troca</span>
+                    </div>
+                  
+                    <div class="flex items-center gap-2 text-[11px] text-zinc-300">
+                      <i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B] shrink-0"></i>
+                      <span class="truncate">Encaminhamento com agendamento de test-drive</span>
+                    </div>
+                  
+                </div>
+
+                <!-- Bottom Price & Action Buttons -->
+                <div class="pt-3 border-t border-zinc-800/80 space-y-2">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="text-zinc-500 font-medium">Investimento:</span>
+                    <span class="font-black text-sm text-[#00F59B] font-mono">R$ 97/mês</span>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-2 pt-1">
+                    <a href="/solucoes/veiculos-e-seminovos" class="py-2.5 px-3 rounded-xl bg-[#141632] hover:bg-[#1A1D40] text-zinc-200 hover:text-white border border-[#232759] hover:border-cyan-500/50 text-[11px] font-bold transition flex items-center justify-center gap-1.5 text-center">
+                      <span>Conhecer</span>
+                      <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </a>
+                    
+                    <button onclick="openTestModal('veiculos-e-seminovos', 'AutoZap (Veículos & Seminovos)')" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:opacity-90 text-black text-[11px] font-black transition flex items-center justify-center gap-1.5 text-center cursor-pointer shadow">
+                      <i data-lucide="play" class="w-3.5 h-3.5 fill-black"></i>
+                      <span>Testar</span>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+
+            </div>
+          
+        </div>
+
+        <!-- No Results Fallback -->
+        <div id="noResultsBox" class="hidden p-12 text-center rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-3">
+          <i data-lucide="search-x" class="w-10 h-10 text-zinc-500 mx-auto"></i>
+          <h4 class="text-base font-bold text-white">Nenhum assistente encontrado para esta busca</h4>
+          <p class="text-xs text-zinc-400">Tente buscar por termos mais genéricos como "salão", "clínica", "pedido" ou limpe os filtros.</p>
+          <button onclick="resetAllFilters()" class="px-4 py-2 rounded-xl bg-[#141632] hover:bg-white/10 text-cyan-300 text-xs font-bold border border-cyan-500/40 transition">
+            Limpar Filtros de Busca
+          </button>
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- SPOTLIGHT SECTION: SALÕES & BELEZA (JÉSSICA)                 -->
+  <!-- ============================================================ -->
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-[#12142E] via-[#0E1026] to-[#191535] border-2 border-pink-500/30 shadow-2xl relative overflow-hidden">
+      <!-- Glow ambient -->
+      <div class="absolute -right-20 -bottom-20 w-96 h-96 bg-pink-600/15 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
+        
+        <div class="lg:col-span-7 space-y-4">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/30 text-pink-300 text-xs font-extrabold">
+            <span>💇‍♀️ OFERTA PRIORITÁRIA DE AQUISIÇÃO</span>
           </div>
 
-          <div class="space-y-2 text-xs">
-            <div class="bg-zinc-800/90 text-zinc-100 p-2.5 rounded-xl rounded-tl-none max-w-[85%]">
-              Olá! Como posso ajudar você no Studio Bella hoje?
+          <h2 class="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-tight">
+            Seu salão atendendo no WhatsApp, mesmo quando você está com a mão no cabelo.
+          </h2>
+
+          <p class="text-sm text-zinc-300 leading-relaxed">
+            Dona de salão ou profissional de beleza não pode parar o que está fazendo para responder mensagem de WhatsApp. Com a <b>Jéssica</b>, suas clientes tiram dúvidas de valores, escolhem serviços e pré-agendam horários na hora. E no painel da RAIA, você acompanha o faturamento e comissões do dia.
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
+            <div class="p-3 rounded-2xl bg-black/40 border border-zinc-800 space-y-1">
+              <span class="text-pink-400 font-bold">✨ Zero Espera</span>
+              <p class="text-[11px] text-zinc-400">Respostas amigáveis em segundos com tabela de preços.</p>
             </div>
-            <div class="bg-pink-950/70 border border-pink-700/40 text-pink-100 p-2.5 rounded-xl rounded-tr-none max-w-[85%] ml-auto text-right">
-              Oi! Quanto custa corte e escova? Tem horário amanhã à tarde?
+            <div class="p-3 rounded-2xl bg-black/40 border border-zinc-800 space-y-1">
+              <span class="text-[#00F59B] font-bold">📅 Menos Faltas</span>
+              <p class="text-[11px] text-zinc-400">Confirmação prévia amigável antes de cada procedimento.</p>
             </div>
-            <div class="bg-zinc-800/90 text-zinc-100 p-2.5 rounded-xl rounded-tl-none max-w-[85%]">
-              O corte com escova está R$ 130. Temos opções de horários amanhã às 14h ou 16h30. Qual fica melhor para você?
+            <div class="p-3 rounded-2xl bg-black/40 border border-zinc-800 space-y-1">
+              <span class="text-cyan-400 font-bold">💰 Caixa do Salão</span>
+              <p class="text-[11px] text-zinc-400">Relatórios de faturamento e comissões no painel.</p>
             </div>
-            <div class="bg-pink-950/70 border border-pink-700/40 text-pink-100 p-2.5 rounded-xl rounded-tr-none max-w-[85%] ml-auto text-right">
-              Pode ser às 16h30!
+          </div>
+
+          <div class="pt-4 flex flex-wrap items-center gap-3">
+            <a href="/solucoes/saloes-e-beleza" class="px-6 py-3.5 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-black text-xs transition flex items-center gap-2 shadow-lg shadow-pink-600/30">
+              <span>Ver Solução Completa para Salões</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </a>
+            <button onclick="openTestModal('saloes-e-beleza', 'Jéssica (Salões & Beleza)')" class="px-5 py-3.5 rounded-xl bg-[#141632] hover:bg-white/10 text-white font-extrabold text-xs border border-zinc-700 transition flex items-center gap-2 cursor-pointer">
+              <i data-lucide="play" class="w-4 h-4 text-cyan-400"></i>
+              <span>Testar Conversa no WhatsApp</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Side: Salon Chat Simulator Card -->
+        <div class="lg:col-span-5">
+          <div class="p-5 rounded-3xl bg-[#090B18] border border-pink-500/30 space-y-3 shadow-2xl relative">
+            <div class="flex items-center gap-3 border-b border-zinc-800 pb-3">
+              <div class="w-10 h-10 rounded-full bg-pink-500/20 border border-pink-400/40 flex items-center justify-center text-pink-300 font-bold text-sm">
+                💇‍♀️
+              </div>
+              <div>
+                <h4 class="text-xs font-black text-white">Jéssica • Atendimento do Salão</h4>
+                <p class="text-[10px] text-[#00F59B] flex items-center gap-1 font-mono">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#00F59B] inline-block animate-pulse"></span>
+                  <span>Online agora no WhatsApp</span>
+                </p>
+              </div>
             </div>
-            <div class="bg-zinc-800/90 text-zinc-100 p-2.5 rounded-xl rounded-tl-none max-w-[85%]">
-              Perfeito! Anotei sua solicitação para amanhã às 16h30. Nossa recepção já foi notificada para confirmar sua reserva na agenda. Até logo!
+
+            <!-- Chat Balloons -->
+            <div class="space-y-2.5 text-xs">
+              <div class="max-w-[85%] ml-auto p-3 rounded-2xl rounded-tr-none bg-cyan-950/70 border border-cyan-800/50 text-white">
+                <p>Oi! Vocês têm horário para mechas amanhã à tarde com a Paulinha?</p>
+                <span class="text-[9px] text-cyan-300/60 block text-right mt-1">14:10</span>
+              </div>
+
+              <div class="max-w-[88%] mr-auto p-3 rounded-2xl rounded-tl-none bg-[#141632] border border-zinc-800 text-zinc-200 space-y-1">
+                <p>Olá! Que delícia te receber aqui no Studio Bella. ✨</p>
+                <p class="text-[11px] text-zinc-300">Para mechas, os valores começam a partir de <b>R$ 380</b> dependendo do comprimento. Amanhã temos vaga às <b>14h30</b> ou às <b>16h</b> com a equipe da Paulinha!</p>
+                <p class="text-[11px] text-pink-300 font-bold">Qual desses horários fica melhor para você?</p>
+                <span class="text-[9px] text-zinc-500 block text-right mt-0.5">14:10</span>
+              </div>
+
+              <div class="max-w-[85%] ml-auto p-3 rounded-2xl rounded-tr-none bg-cyan-950/70 border border-cyan-800/50 text-white">
+                <p>14h30 fica perfeito!</p>
+                <span class="text-[9px] text-cyan-300/60 block text-right mt-1">14:11</span>
+              </div>
+
+              <div class="max-w-[88%] mr-auto p-3 rounded-2xl rounded-tl-none bg-[#141632] border border-zinc-800 text-zinc-200">
+                <p class="text-[11px]">Combinado! Já anotei sua preferência para amanhã às 14h30. Me passa seu nome completo para a recepção confirmar sua reserva?</p>
+                <span class="text-[9px] text-zinc-500 block text-right mt-1">14:11</span>
+              </div>
             </div>
+
           </div>
         </div>
 
@@ -280,714 +1410,446 @@
   </section>
 
   <!-- ============================================================ -->
-  <!-- 4. CATÁLOGO COMPLETO DE SOLUÇÕES                             -->
+  <!-- BENEFIT & COMPARISON: APOIO À OPERAÇÃO HUMANA                -->
   <!-- ============================================================ -->
-  <section id="solucoes" class="py-20 max-w-7xl mx-auto px-4 sm:px-6">
-    <div class="text-center space-y-3 max-w-3xl mx-auto mb-14">
-      <span class="text-xs font-black uppercase tracking-widest text-[#00F59B]">Catálogo de Soluções</span>
-      <h2 class="text-2xl sm:text-4xl font-black tracking-tight text-white">
-        Assistentes adaptados à rotina de cada segmento.
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="text-center max-w-2xl mx-auto space-y-3 mb-10">
+      <span class="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-extrabold uppercase">
+        Equilíbrio & Eficiência
+      </span>
+      <h2 class="text-2xl sm:text-3xl font-black text-white">
+        Apoio na linha de frente para valorizar o trabalho da sua equipe.
       </h2>
       <p class="text-xs sm:text-sm text-zinc-400">
-        Cada assistente é configurado com a linguagem, serviços e informações do seu nicho de atuação.
+        Nossos assistentes de IA não foram feitos para substituir o contato humano, mas para acolher quem chama no primeiro segundo enquanto sua equipe foca no atendimento de qualidade.
       </p>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-      <!-- 1. Salões & Beleza -->
-      <div class="glass-card p-6 flex flex-col justify-between space-y-4">
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-pink-400">Salões & Beleza</span>
-            <span class="text-xl">💇‍♀️</span>
-          </div>
-          <h3 class="text-lg font-black text-white">Jéssica</h3>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Resolve a espera no WhatsApp enquanto cabeleireiros e manicures estão ocupados atendendo clientes.
-          </p>
-          <ul class="text-[11px] text-zinc-300 space-y-1.5 pt-1">
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-pink-400"></i> Informa serviços, preços e localização</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-pink-400"></i> Coleta preferências de agendamento</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-pink-400"></i> Encaminha solicitações à recepção</li>
-          </ul>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <!-- Box 1: O que a IA assume -->
+      <div class="p-6 sm:p-8 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-4">
+        <div class="flex items-center gap-2.5 text-cyan-400">
+          <i data-lucide="bot" class="w-5 h-5"></i>
+          <h3 class="text-base font-black text-white">Tarefas Operacionais que a IA Resolve</h3>
         </div>
-        <div class="pt-2 grid grid-cols-2 gap-2">
-          <a href="/solucoes/saloes-e-beleza" class="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-[11px] text-center transition">
-            Conhecer
-          </a>
-          <button onclick="openTestAgentModal('SALON', 'Jéssica', '💇‍♀️', 'Salões & Beleza')" class="py-2 px-3 rounded-xl bg-pink-600 hover:bg-pink-500 text-white font-extrabold text-[11px] transition flex items-center justify-center gap-1">
-            <span>Testar</span>
-            <i data-lucide="zap" class="w-3 h-3"></i>
-          </button>
-        </div>
+        <ul class="space-y-3 text-xs text-zinc-300">
+          <li class="flex items-start gap-2.5">
+            <i data-lucide="check" class="w-4 h-4 text-[#00F59B] shrink-0 mt-0.5"></i>
+            <span><b>Atendimento em horários de pico e fins de semana:</b> Ninguém fica no vácuo às 22h ou no domingo.</span>
+          </li>
+          <li class="flex items-start gap-2.5">
+            <i data-lucide="check" class="w-4 h-4 text-[#00F59B] shrink-0 mt-0.5"></i>
+            <span><b>Respostas sobre dúvidas repetitivas:</b> Preços, endereço, estacionamento, cardápio e formas de pagamento.</span>
+          </li>
+          <li class="flex items-start gap-2.5">
+            <i data-lucide="check" class="w-4 h-4 text-[#00F59B] shrink-0 mt-0.5"></i>
+            <span><b>Coleta inicial e triagem de dados:</b> Nome, serviço desejado, bairro ou modelo do veículo para adiantar o processo.</span>
+          </li>
+        </ul>
       </div>
 
-      <!-- 2. Saúde & Odontologia -->
-      <div class="glass-card p-6 flex flex-col justify-between space-y-4">
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-cyan-400">Saúde & Odontologia</span>
-            <span class="text-xl">🩺</span>
-          </div>
-          <h3 class="text-lg font-black text-white">Sofia <span class="text-xs font-normal text-zinc-400">(Atendimento)</span></h3>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Apoia a recepção de consultórios em dúvidas administrativas e organização de pedidos de agendamento.
-          </p>
-          <ul class="text-[11px] text-zinc-300 space-y-1.5 pt-1">
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-cyan-400"></i> Informa especialidades e convênios cadastrados</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-cyan-400"></i> Coleta pedidos de consulta para a secretária</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-cyan-400"></i> Encaminha dúvidas clínicas à equipe médica</li>
-          </ul>
+      <!-- Box 2: Onde a sua equipe brilha -->
+      <div class="p-6 sm:p-8 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-4">
+        <div class="flex items-center gap-2.5 text-violet-400">
+          <i data-lucide="users" class="w-5 h-5"></i>
+          <h3 class="text-base font-black text-white">Onde Sua Equipe Brilha e Gera Mais Lucro</h3>
         </div>
-        <div class="pt-2 grid grid-cols-2 gap-2">
-          <a href="/solucoes/saude-e-odontologia" class="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-[11px] text-center transition">
-            Conhecer
-          </a>
-          <button onclick="openTestAgentModal('CLINIC', 'Sofia', '🩺', 'Saúde & Odontologia')" class="py-2 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold text-[11px] transition flex items-center justify-center gap-1">
-            <span>Testar</span>
-            <i data-lucide="zap" class="w-3 h-3"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- 3. Delivery & Restaurantes -->
-      <div class="glass-card p-6 flex flex-col justify-between space-y-4">
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-amber-400">Delivery & Restaurantes</span>
-            <span class="text-xl">🍔</span>
-          </div>
-          <h3 class="text-lg font-black text-white">ChefBot</h3>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Evita que clientes fiquem esperando pelo cardápio nos horários de pico e organiza o pedido completo.
-          </p>
-          <ul class="text-[11px] text-zinc-300 space-y-1.5 pt-1">
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-amber-400"></i> Envio do cardápio e preços dos pratos</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-amber-400"></i> Coleta de adicionais, bebidas e endereço</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-amber-400"></i> Encaminhamento organizado para a cozinha</li>
-          </ul>
-        </div>
-        <div class="pt-2 grid grid-cols-2 gap-2">
-          <a href="/solucoes/delivery-e-restaurantes" class="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-[11px] text-center transition">
-            Conhecer
-          </a>
-          <button onclick="openTestAgentModal('RESTAURANT', 'ChefBot', '🍔', 'Delivery & Restaurantes')" class="py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-[11px] transition flex items-center justify-center gap-1">
-            <span>Testar</span>
-            <i data-lucide="zap" class="w-3 h-3"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- 4. Advocacia -->
-      <div class="glass-card p-6 flex flex-col justify-between space-y-4">
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-violet-400">Advocacia & Jurídico</span>
-            <span class="text-xl">⚖️</span>
-          </div>
-          <h3 class="text-lg font-black text-white">Lex <span class="text-xs font-normal text-zinc-400">(Atendimento)</span></h3>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Recepciona interessados e organiza informações preliminares sem interromper o trabalho técnico do advogado.
-          </p>
-          <ul class="text-[11px] text-zinc-300 space-y-1.5 pt-1">
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-violet-400"></i> Coleta inicial da demanda do interessado</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-violet-400"></i> Identificação da área jurídica correspondente</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-violet-400"></i> Solicitação de reunião com o advogado titular</li>
-          </ul>
-        </div>
-        <div class="pt-2 grid grid-cols-2 gap-2">
-          <a href="/solucoes/advocacia" class="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-[11px] text-center transition">
-            Conhecer
-          </a>
-          <button onclick="openTestAgentModal('LEGAL', 'Lex', '⚖️', 'Advocacia & Jurídico')" class="py-2 px-3 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-extrabold text-[11px] transition flex items-center justify-center gap-1">
-            <span>Testar</span>
-            <i data-lucide="zap" class="w-3 h-3"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- 5. Imobiliárias & Corretores -->
-      <div class="glass-card p-6 flex flex-col justify-between space-y-4">
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-emerald-400">Imóveis & Corretores</span>
-            <span class="text-xl">🏡</span>
-          </div>
-          <h3 class="text-lg font-black text-white">Lucas Imóveis</h3>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Filtra o perfil de busca de quem procura imóvel e organiza os pedidos de visita para o corretor.
-          </p>
-          <ul class="text-[11px] text-zinc-300 space-y-1.5 pt-1">
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i> Coleta bairro, quartos e faixa de valor</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i> Apresenta opções cadastradas no perfil</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i> Registra solicitações de visita presencial</li>
-          </ul>
-        </div>
-        <div class="pt-2 grid grid-cols-2 gap-2">
-          <a href="/solucoes/imobiliarias-e-corretores" class="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-[11px] text-center transition">
-            Conhecer
-          </a>
-          <button onclick="openTestAgentModal('REAL_ESTATE', 'Lucas Imóveis', '🏡', 'Imóveis & Corretores')" class="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] transition flex items-center justify-center gap-1">
-            <span>Testar</span>
-            <i data-lucide="zap" class="w-3 h-3"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- 6. Oficinas & Auto Centers -->
-      <div class="glass-card p-6 flex flex-col justify-between space-y-4">
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-blue-400">Oficinas & Auto Centers</span>
-            <span class="text-xl">🚗</span>
-          </div>
-          <h3 class="text-lg font-black text-white">AutoCheck</h3>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Tira dúvidas de serviços e recolhe dados do veículo para que mecânicos foquem na manutenção.
-          </p>
-          <ul class="text-[11px] text-zinc-300 space-y-1.5 pt-1">
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-blue-400"></i> Coleta de modelo, ano e serviço desejado</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-blue-400"></i> Organização de solicitações de orçamento</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-blue-400"></i> Pré-agendamento de revisão para oficina</li>
-          </ul>
-        </div>
-        <div class="pt-2 grid grid-cols-2 gap-2">
-          <a href="/solucoes/oficinas-e-auto-centers" class="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-[11px] text-center transition">
-            Conhecer
-          </a>
-          <button onclick="openTestAgentModal('MECHANIC', 'AutoCheck', '🚗', 'Oficinas & Auto Centers')" class="py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-[11px] transition flex items-center justify-center gap-1">
-            <span>Testar</span>
-            <i data-lucide="zap" class="w-3 h-3"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- 7. Academias & Pilates -->
-      <div class="glass-card p-6 flex flex-col justify-between space-y-4">
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-lime-400">Fitness & Pilates</span>
-            <span class="text-xl">💪</span>
-          </div>
-          <h3 class="text-lg font-black text-white">Coach Fit</h3>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Informa horários de turmas, valores de planos e agenda aulas experimentais sem sobrecarregar a recepção.
-          </p>
-          <ul class="text-[11px] text-zinc-300 space-y-1.5 pt-1">
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-lime-400"></i> Informações sobre planos e modalidades</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-lime-400"></i> Agendamento de aula experimental</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-lime-400"></i> Encaminhamento de dúvidas à recepção</li>
-          </ul>
-        </div>
-        <div class="pt-2 grid grid-cols-2 gap-2">
-          <a href="/solucoes/academias-e-pilates" class="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-[11px] text-center transition">
-            Conhecer
-          </a>
-          <button onclick="openTestAgentModal('FITNESS', 'Coach Fit', '💪', 'Fitness & Pilates')" class="py-2 px-3 rounded-xl bg-lime-600 hover:bg-lime-500 text-white font-extrabold text-[11px] transition flex items-center justify-center gap-1">
-            <span>Testar</span>
-            <i data-lucide="zap" class="w-3 h-3"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- 8. Financeiro & MEI -->
-      <div class="glass-card p-6 flex flex-col justify-between space-y-4">
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-[#00F59B]">Finanças & MEI</span>
-            <span class="text-xl">📊</span>
-          </div>
-          <h3 class="text-lg font-black text-white">Jarvis</h3>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Permite anotar receitas e gastos pelo WhatsApp em poucos segundos, mantendo o controle pessoal em dia.
-          </p>
-          <ul class="text-[11px] text-zinc-300 space-y-1.5 pt-1">
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B]"></i> Registro de gastos e entradas por texto ou áudio</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B]"></i> Classificação automática por categorias</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B]"></i> Consulta de resumos direto no WhatsApp</li>
-          </ul>
-        </div>
-        <div class="pt-2 grid grid-cols-2 gap-2">
-          <a href="/solucoes/financeiro-e-mei" class="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-[11px] text-center transition">
-            Conhecer
-          </a>
-          <button onclick="openTestAgentModal('FINANCE', 'Jarvis', '📊', 'Finanças & MEI')" class="py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] transition flex items-center justify-center gap-1">
-            <span>Testar</span>
-            <i data-lucide="zap" class="w-3 h-3"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- 9. Construção & Locação -->
-      <div class="glass-card p-6 flex flex-col justify-between space-y-4">
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-yellow-400">Construção & Locação</span>
-            <span class="text-xl">🏗️</span>
-          </div>
-          <h3 class="text-lg font-black text-white">Marcão</h3>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Tira dúvidas sobre equipamentos disponíveis para locação e recolhe dados da obra para orçamento de frete.
-          </p>
-          <ul class="text-[11px] text-zinc-300 space-y-1.5 pt-1">
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-yellow-400"></i> Consulta de máquinas cadastradas</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-yellow-400"></i> Coleta de período (diária, quinzena, mês)</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-yellow-400"></i> Solicitação de orçamento enviada ao comercial</li>
-          </ul>
-        </div>
-        <div class="pt-2 grid grid-cols-2 gap-2">
-          <a href="/solucoes/construcao-e-locacao" class="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-[11px] text-center transition">
-            Conhecer
-          </a>
-          <button onclick="openTestAgentModal('RENTAL_MACHINES', 'Marcão', '🏗️', 'Construção & Locação')" class="py-2 px-3 rounded-xl bg-yellow-600 hover:bg-yellow-500 text-white font-extrabold text-[11px] transition flex items-center justify-center gap-1">
-            <span>Testar</span>
-            <i data-lucide="zap" class="w-3 h-3"></i>
-          </button>
-        </div>
-      </div>
-
-      <!-- 10. Veículos & Seminovos -->
-      <div class="glass-card p-6 flex flex-col justify-between space-y-4">
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-sky-400">Veículos & Seminovos</span>
-            <span class="text-xl">🏎️</span>
-          </div>
-          <h3 class="text-lg font-black text-white">Rodrigo</h3>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Atende clientes interessados em veículos, filtra preferências e organiza os pedidos de test-drive.
-          </p>
-          <ul class="text-[11px] text-zinc-300 space-y-1.5 pt-1">
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-sky-400"></i> Consulta de modelos conforme faixa de valor</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-sky-400"></i> Coleta de dados de eventual carro na troca</li>
-            <li class="flex items-center gap-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-sky-400"></i> Encaminhamento organizado para o vendedor</li>
-          </ul>
-        </div>
-        <div class="pt-2 grid grid-cols-2 gap-2">
-          <a href="/solucoes/veiculos-e-seminovos" class="py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-[11px] text-center transition">
-            Conhecer
-          </a>
-          <button onclick="openTestAgentModal('CAR_DEALERSHIP', 'Rodrigo', '🏎️', 'Veículos & Seminovos')" class="py-2 px-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-[11px] transition flex items-center justify-center gap-1">
-            <span>Testar</span>
-            <i data-lucide="zap" class="w-3 h-3"></i>
-          </button>
-        </div>
+        <ul class="space-y-3 text-xs text-zinc-300">
+          <li class="flex items-start gap-2.5">
+            <i data-lucide="star" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+            <span><b>Atendimento presencial focado e com sorriso no rosto:</b> Sem ter que ficar digitando no celular a cada 2 minutos.</span>
+          </li>
+          <li class="flex items-start gap-2.5">
+            <i data-lucide="star" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+            <span><b>Negociações consultivas e personalizadas:</b> Fechar contratos maiores, casos complexos ou orçamentos sob medida.</span>
+          </li>
+          <li class="flex items-start gap-2.5">
+            <i data-lucide="star" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+            <span><b>Assumir o WhatsApp com um clique:</b> Quando a conversa precisa de um toque humano ou exceção de horário.</span>
+          </li>
+        </ul>
       </div>
 
     </div>
   </section>
 
   <!-- ============================================================ -->
-  <!-- 5. COMO A RAIA APOIA A SUA EQUIPE (COMPARAÇÃO REALISTA)       -->
+  <!-- 4-STEP OPERATIONAL FLOW (Como Funciona)                      -->
   <!-- ============================================================ -->
-  <section class="py-20 bg-[#070b14] border-y border-zinc-800/80">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6">
-      <div class="text-center space-y-3 max-w-3xl mx-auto mb-14">
-        <span class="text-xs font-black uppercase tracking-widest text-violet-400">Apoio à Operação</span>
-        <h2 class="text-2xl sm:text-4xl font-black tracking-tight text-white">
-          Mais agilidade no atendimento sem sobrecarregar sua equipe.
-        </h2>
-        <p class="text-xs sm:text-sm text-zinc-400">
-          O assistente não substitui o calor humano da sua empresa: ele assume a triagem repetitiva para que você e sua equipe foquem nas tarefas de maior valor.
-        </p>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Sem Assistente -->
-        <div class="p-6 sm:p-8 rounded-3xl bg-zinc-950/80 border border-zinc-800 space-y-4">
-          <div class="flex items-center justify-between border-b border-zinc-800/80 pb-3">
-            <h3 class="text-base font-bold text-zinc-300">Atendimento manual sem apoio</h3>
-            <span class="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">Gargalos comuns</span>
-          </div>
-          <ul class="space-y-3 text-xs text-zinc-400">
-            <li class="flex items-start gap-2.5">
-              <span class="text-amber-400 font-bold mt-0.5">•</span>
-              <span>Mensagens acumuladas fora do expediente comercial ou nos finais de semana.</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <span class="text-amber-400 font-bold mt-0.5">•</span>
-              <span>Tempo precioso gasto respondendo repetidamente as mesmas dúvidas de preços, endereço e horários.</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <span class="text-amber-400 font-bold mt-0.5">•</span>
-              <span>Clientes desistem ou procuram concorrentes quando aguardam minutos sem retorno.</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <span class="text-amber-400 font-bold mt-0.5">•</span>
-              <span>Dificuldade para organizar anotações de pedidos e horários em dias movimentados.</span>
-            </li>
-          </ul>
-        </div>
-
-        <!-- Com RAIA -->
-        <div class="p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-emerald-950/30 via-[#11141f] to-[#11141f] border-2 border-[#00F59B]/40 space-y-4">
-          <div class="flex items-center justify-between border-b border-zinc-800/80 pb-3">
-            <h3 class="text-base font-bold text-white">Com o Assistente de IA da RAIA</h3>
-            <span class="text-[10px] font-bold text-[#00F59B] bg-[#00F59B]/10 px-2.5 py-0.5 rounded-full border border-[#00F59B]/30">Apoio contínuo</span>
-          </div>
-          <ul class="space-y-3 text-xs text-zinc-200">
-            <li class="flex items-start gap-2.5">
-              <span class="text-[#00F59B] font-bold mt-0.5">✓</span>
-              <span><b>Respostas imediatas 24/7</b> para perguntas frequentes e apresentação de serviços.</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <span class="text-[#00F59B] font-bold mt-0.5">✓</span>
-              <span><b>Triagem organizada</b>: o assistente coleta o serviço, a data e os dados antes de você entrar.</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <span class="text-[#00F59B] font-bold mt-0.5">✓</span>
-              <span><b>Intervenção humana livre</b>: envie uma mensagem no WhatsApp a qualquer momento para assumir a conversa.</span>
-            </li>
-            <li class="flex items-start gap-2.5">
-              <span class="text-[#00F59B] font-bold mt-0.5">✓</span>
-              <span><b>Previsibilidade de custo</b>: planos a partir de R$ 97/mês, sem taxas ocultas.</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- 6. COMO FUNCIONA A CONFIGURAÇÃO (4 ETAPAS CLARAS)             -->
-  <!-- ============================================================ -->
-  <section id="como-funciona" class="py-20 max-w-6xl mx-auto px-4 sm:px-6">
-    <div class="text-center space-y-3 max-w-3xl mx-auto mb-14">
-      <span class="text-xs font-black uppercase tracking-widest text-[#00F59B]">Passo a Passo</span>
-      <h2 class="text-2xl sm:text-4xl font-black tracking-tight text-white">
-        Como funciona a implementação prática.
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="text-center max-w-2xl mx-auto space-y-3 mb-10">
+      <span class="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-extrabold uppercase">
+        Implementação Simples
+      </span>
+      <h2 class="text-2xl sm:text-3xl font-black text-white">
+        Como funciona para colocar seu assistente no ar
       </h2>
       <p class="text-xs sm:text-sm text-zinc-400">
-        Um processo simples, com suporte direto da nossa equipe técnica para colocar no ar.
+        Sem complicação técnica. Você nos passa as regras do seu negócio e em poucas horas seu assistente já está atendendo no seu próprio WhatsApp.
       </p>
     </div>
 
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-      <div class="p-6 rounded-2xl bg-[#11141f] border border-zinc-800 space-y-2.5">
-        <div class="w-10 h-10 rounded-xl bg-[#00F59B] text-black font-black text-base flex items-center justify-center">1</div>
-        <h4 class="text-sm font-bold text-white">1. Informações do negócio</h4>
+      
+      <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-3 relative">
+        <span class="text-3xl font-black text-cyan-500/40 font-mono">01</span>
+        <h4 class="text-sm font-bold text-white">Envio de Informações</h4>
         <p class="text-xs text-zinc-400 leading-relaxed">
-          Você nos fornece sua tabela de serviços, preços, horário de funcionamento e orientações da sua empresa.
+          Você nos informa sua tabela de serviços, preços, horários de funcionamento e respostas das dúvidas mais frequentes.
         </p>
       </div>
 
-      <div class="p-6 rounded-2xl bg-[#11141f] border border-zinc-800 space-y-2.5">
-        <div class="w-10 h-10 rounded-xl bg-cyan-400 text-black font-black text-base flex items-center justify-center">2</div>
-        <h4 class="text-sm font-bold text-white">2. Configuração do assistente</h4>
+      <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-3 relative">
+        <span class="text-3xl font-black text-cyan-500/40 font-mono">02</span>
+        <h4 class="text-sm font-bold text-white">Personalização da IA</h4>
         <p class="text-xs text-zinc-400 leading-relaxed">
-          Definimos as regras de conversa, limites de atuação e os dados que a IA deve solicitar aos interessados.
+          Treinamos a persona do assistente com o tom de voz da sua empresa, travas de segurança e regras operacionais.
         </p>
       </div>
 
-      <div class="p-6 rounded-2xl bg-[#11141f] border border-zinc-800 space-y-2.5">
-        <div class="w-10 h-10 rounded-xl bg-violet-500 text-white font-black text-base flex items-center justify-center">3</div>
-        <h4 class="text-sm font-bold text-white">3. Conexão no WhatsApp</h4>
+      <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-3 relative">
+        <span class="text-3xl font-black text-cyan-500/40 font-mono">03</span>
+        <h4 class="text-sm font-bold text-white">Conexão via QR Code</h4>
         <p class="text-xs text-zinc-400 leading-relaxed">
-          A conexão é feita via QR Code diretamente no número escolhido da sua empresa, mantendo o controle total com você.
+          Você conecta seu número de WhatsApp escaneando o QR Code pelo aplicativo, exatamente como faz no WhatsApp Web.
         </p>
       </div>
 
-      <div class="p-6 rounded-2xl bg-[#11141f] border border-zinc-800 space-y-2.5">
-        <div class="w-10 h-10 rounded-xl bg-emerald-400 text-black font-black text-base flex items-center justify-center">4</div>
-        <h4 class="text-sm font-bold text-white">4. Acompanhamento no painel</h4>
+      <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-3 relative">
+        <span class="text-3xl font-black text-cyan-500/40 font-mono">04</span>
+        <h4 class="text-sm font-bold text-white">Atendimento & Painel</h4>
         <p class="text-xs text-zinc-400 leading-relaxed">
-          Você acompanha os contatos no Painel do Gestor e continua livre para responder qualquer conversa manualmente.
+          Seu robô entra em ação acolhendo seus clientes e você acompanha métricas, conversas e caixa pelo painel web.
         </p>
       </div>
+
     </div>
   </section>
 
   <!-- ============================================================ -->
-  <!-- 7. PLANOS & OFERTA COMERCIAL TRANSPARENTE                    -->
+  <!-- PRICING SUMMARY (Transparente e Direto)                      -->
   <!-- ============================================================ -->
-  <section id="planos" class="py-20 bg-[#070b14] border-t border-zinc-800/80">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6">
-      <div class="text-center space-y-3 max-w-2xl mx-auto mb-12">
-        <span class="text-xs font-black uppercase tracking-widest text-[#00F59B]">Transparência Comercial</span>
-        <h2 class="text-2xl sm:text-4xl font-black tracking-tight text-white">
-          Investimento claro, sem contratos longos ou multas.
-        </h2>
-        <p class="text-xs sm:text-sm text-zinc-400">
-          Você contrata a tecnologia com suporte e acompanhamento inicial para o seu negócio.
-        </p>
-      </div>
-
-      <div class="p-8 sm:p-10 rounded-3xl bg-gradient-to-b from-[#11141f] to-[#0b0e17] border-2 border-[#00F59B]/40 max-w-xl mx-auto space-y-6 shadow-2xl relative">
-        <div class="flex items-center justify-between">
-          <div>
-            <span class="text-xs font-bold text-[#00F59B] uppercase tracking-wider">Plano Operacional</span>
-            <h3 class="text-xl font-black text-white">Assistente Especialista</h3>
-          </div>
-          <div class="text-right">
-            <span class="text-xs text-zinc-400">a partir de</span>
-            <p class="text-3xl font-black text-white">R$ 97<span class="text-xs text-zinc-400">/mês</span></p>
-          </div>
-        </div>
-
-        <div class="space-y-3 pt-2 text-xs text-zinc-300 border-t border-zinc-800">
-          <div class="flex items-center gap-2">
-            <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-            <span><b>1 número de WhatsApp</b> conectado com atendimento contínuo</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-            <span>Respostas a dúvidas frequentes, tabela de serviços e localização</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-            <span>Triagem e coleta de dados para agendamento ou pedidos</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-            <span>Intervenção humana a qualquer momento no próprio celular</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-            <span>Acesso ao Painel do Gestor com histórico de atendimentos</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-            <span>Configuração assistida inicial com apoio da equipe da RAIA</span>
-          </div>
-          <div class="flex items-center gap-2">
-            <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-            <span>Sem fidelidade: cancele a qualquer momento pelo painel</span>
-          </div>
-        </div>
-
-        <div class="p-3 rounded-xl bg-zinc-900/80 border border-zinc-800 text-[11px] text-zinc-400 leading-relaxed">
-          ℹ️ <i>Demandas específicas como integração a CRMs legados, sistemas de ERP, catálogos extensos ou múltiplos números simultâneos são avaliadas sob consulta técnica.</i>
-        </div>
-
-        <div class="pt-2">
-          <a href="https://wa.me/5511951364159?text=Ol%C3%A1%2C+gostaria+de+ativar+o+Agente+de+IA+da+RAIA+para+minha+empresa!" target="_blank" class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs text-center flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] transition">
-            <i data-lucide="check-circle" class="w-4 h-4"></i>
-            <span>Contratar ou Conversar com Especialista</span>
-          </a>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- 8. PERGUNTAS FREQUENTES (FAQ)                                -->
-  <!-- ============================================================ -->
-  <section class="py-20 max-w-4xl mx-auto px-4 sm:px-6">
-    <div class="text-center space-y-3 max-w-2xl mx-auto mb-12">
-      <span class="text-xs font-black uppercase tracking-widest text-cyan-400">Tire suas Dúvidas</span>
-      <h2 class="text-2xl sm:text-4xl font-black tracking-tight text-white">
-        Perguntas frequentes sobre os assistentes.
+  <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="p-8 sm:p-12 rounded-3xl bg-gradient-to-r from-[#10132E] via-[#0E1026] to-[#121535] border border-cyan-500/30 text-center space-y-5">
+      <span class="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-extrabold uppercase">
+        Valores Transparentes
+      </span>
+      <h2 class="text-2xl sm:text-3xl font-black text-white">
+        Apenas <span class="text-[#00F59B]">R$ 97</span> por mês no plano essencial.
       </h2>
-    </div>
+      <p class="text-xs sm:text-sm text-zinc-400 max-w-xl mx-auto">
+        Sem surpresas, sem contratos de longo prazo que te prendem e com 7 dias de garantia incondicional. Se não gostar, devolvemos seu dinheiro na hora.
+      </p>
 
-    <div class="space-y-3 text-xs sm:text-sm">
-      <details class="p-4 rounded-2xl bg-[#11141f] border border-zinc-800 group">
-        <summary class="font-bold text-white cursor-pointer list-none flex items-center justify-between">
-          <span>Posso assumir a conversa no WhatsApp quando quiser?</span>
-          <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition"></i>
-        </summary>
-        <p class="pt-3 text-zinc-300 leading-relaxed">
-          Sim, perfeitamente. Você e sua equipe continuam com acesso total ao aplicativo do WhatsApp. Caso você queira intervir e responder diretamente ao cliente, basta digitar na conversa normalmente.
-        </p>
-      </details>
-
-      <details class="p-4 rounded-2xl bg-[#11141f] border border-zinc-800 group">
-        <summary class="font-bold text-white cursor-pointer list-none flex items-center justify-between">
-          <span>O assistente pode inventar respostas ou prometer o que não fazemos?</span>
-          <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition"></i>
-        </summary>
-        <p class="pt-3 text-zinc-300 leading-relaxed">
-          Não. O assistente é configurado com regras estritas baseadas na tabela e nas diretrizes fornecidas por você. Se o cliente perguntar algo fora do escopo ou solicitar uma condição personalizada, o assistente informa que encaminhará para a equipe humana.
-        </p>
-      </details>
-
-      <details class="p-4 rounded-2xl bg-[#11141f] border border-zinc-800 group">
-        <summary class="font-bold text-white cursor-pointer list-none flex items-center justify-between">
-          <span>Preciso deixar meu computador ligado?</span>
-          <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition"></i>
-        </summary>
-        <p class="pt-3 text-zinc-300 leading-relaxed">
-          Não. O sistema roda em servidores seguros em nuvem. Seu WhatsApp continuará funcionando e sendo atendido mesmo com seu celular no bolso ou computador desligado.
-        </p>
-      </details>
-
-      <details class="p-4 rounded-2xl bg-[#11141f] border border-zinc-800 group">
-        <summary class="font-bold text-white cursor-pointer list-none flex items-center justify-between">
-          <span>O que preciso fornecer para iniciar a configuração?</span>
-          <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition"></i>
-        </summary>
-        <p class="pt-3 text-zinc-300 leading-relaxed">
-          Apenas informações básicas da rotina: seus serviços/produtos mais procurados, faixa de valores praticados, horários de funcionamento, endereço e a regra de agendamento ou encaminhamento que você prefere.
-        </p>
-      </details>
-
-      <details class="p-4 rounded-2xl bg-[#11141f] border border-zinc-800 group">
-        <summary class="font-bold text-white cursor-pointer list-none flex items-center justify-between">
-          <span>Como funciona a contratação e o cancelamento?</span>
-          <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition"></i>
-        </summary>
-        <p class="pt-3 text-zinc-300 leading-relaxed">
-          A cobrança é mensal (a partir de R$ 97/mês), podendo ser paga via Pix ou cartão de crédito. Não há contrato de fidelidade e você pode solicitar a pausa ou cancelamento a qualquer momento.
-        </p>
-      </details>
+      <div class="pt-3 flex flex-wrap items-center justify-center gap-3">
+        <button onclick="openTestModal('saloes-e-beleza', 'Assinar Plano Essencial')" class="px-6 py-3.5 rounded-xl bg-gradient-to-r from-cyan-400 to-[#00F59B] text-black font-black text-xs hover:opacity-90 transition shadow-lg shadow-cyan-500/30 cursor-pointer">
+          Começar Teste com 7 Dias de Garantia
+        </button>
+        <a href="/planos" class="px-5 py-3.5 rounded-xl bg-[#141632] hover:bg-white/10 text-white font-extrabold text-xs border border-zinc-700 transition">
+          Ver Comparativo de Planos
+        </a>
+      </div>
     </div>
   </section>
 
   <!-- ============================================================ -->
-  <!-- 9. FOOTER INSTITUCIONAL                                      -->
+  <!-- MODAL: TESTE DO WHATSAPP (Preservado e Funcional)            -->
   <!-- ============================================================ -->
-  <footer class="py-12 border-t border-zinc-800/80 bg-[#040711]">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
+  <div id="testModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-[#0F1126] border border-cyan-500/40 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl relative">
+      
+      <button onclick="closeTestModal()" class="absolute top-4 right-4 p-1 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition cursor-pointer">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="space-y-1">
+        <span class="text-[10px] font-black uppercase tracking-wider text-[#00F59B]">Demonstração Gratuita no seu Telefone</span>
+        <h3 id="modalAgentName" class="text-xl font-black text-white">Testar Assistente no WhatsApp</h3>
+        <p class="text-xs text-zinc-400">
+          Informe seu nome e WhatsApp. O assistente de inteligência artificial vai te mandar uma mensagem agora mesmo no seu número!
+        </p>
+      </div>
+
+      <form onsubmit="handleTestSubmit(event)" class="space-y-3.5 text-left">
+        <input type="hidden" id="modalNicheSlug" value="saloes-e-beleza">
         
-        <div class="space-y-3">
-          <div class="flex items-center gap-2">
-            <img src="/raia-logo.png" alt="RAIA" class="w-8 h-8 object-contain">
-            <span class="font-black text-lg text-white">RAIA</span>
+        <div>
+          <label class="block text-[11px] font-bold text-zinc-400 mb-1">Seu Nome Completo</label>
+          <input 
+            type="text" 
+            id="leadNameInput" 
+            required
+            placeholder="Ex: Amanda Silva"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-[#141632] border border-[#232759] text-white text-xs focus:outline-none focus:border-cyan-400 transition"
+          >
+        </div>
+
+        <div>
+          <label class="block text-[11px] font-bold text-zinc-400 mb-1">Seu Número de WhatsApp (com DDD)</label>
+          <input 
+            type="tel" 
+            id="leadPhoneInput" 
+            required
+            placeholder="Ex: 11999998888"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-[#141632] border border-[#232759] text-white text-xs focus:outline-none focus:border-cyan-400 transition"
+          >
+        </div>
+
+        <div id="modalAlertBox" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs"></div>
+
+        <button type="submit" id="btnSubmitTest" class="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-400 to-[#00F59B] text-black font-black text-xs hover:opacity-90 transition flex items-center justify-center gap-2 shadow cursor-pointer">
+          <span id="btnSubmitTestText">Receber Demonstração no WhatsApp</span>
+          <i data-lucide="send" class="w-4 h-4 text-black"></i>
+        </button>
+
+        <p class="text-[10px] text-zinc-500 text-center">
+          🔒 Seus dados são confidenciais e usados exclusivamente para o envio do teste demonstrativo.
+        </p>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- FOOTER INSTITUCIONAL (Com Logo Transparente)                -->
+  <!-- ============================================================ -->
+  <footer class="border-t border-[#1F234D] bg-[#070814] pt-12 pb-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+      
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+        
+        <!-- Brand Info -->
+        <div class="md:col-span-2 space-y-3">
+          <div class="flex items-center gap-3">
+            <img src="/raia-emblem-small.png" alt="RAIA" class="w-8 h-8 object-contain">
+            <span class="text-lg font-black text-white">RAIA</span>
           </div>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Assistentes de Inteligência Artificial para WhatsApp. Apoio ágil ao atendimento para pequenas e médias empresas.
+          <p class="text-xs text-zinc-400 max-w-sm leading-relaxed">
+            Assistentes de Inteligência Artificial para WhatsApp. Desenvolvido para apoiar a linha de frente do seu negócio e organizar o faturamento com tranquilidade.
           </p>
-          <p class="text-[11px] text-zinc-500">Operado por RAIA RH • São Paulo, SP</p>
+          <p class="text-[11px] text-zinc-500">
+            CNPJ & Operação: RAIA RH / RAIA Agentes Inteligentes
+          </p>
         </div>
 
-        <div class="space-y-2 text-xs">
-          <p class="font-bold text-white uppercase tracking-wider text-[11px]">Navegação</p>
-          <ul class="space-y-1.5 text-zinc-400">
-            <li><a href="/" class="hover:text-white transition">Início</a></li>
-            <li><a href="/solucoes" class="hover:text-white transition">Catálogo de Soluções</a></li>
-            <li><a href="/como-funciona" class="hover:text-white transition">Como Funciona</a></li>
-            <li><a href="/planos" class="hover:text-white transition">Planos e Preços</a></li>
+        <!-- Links Rápidos -->
+        <div class="space-y-2">
+          <h4 class="text-xs font-black text-white uppercase tracking-wider">Navegação</h4>
+          <ul class="space-y-1.5 text-xs text-zinc-400">
+            <li><a href="/solucoes" class="hover:text-cyan-400 transition">Catálogo de Soluções</a></li>
+            <li><a href="/solucoes/saloes-e-beleza" class="hover:text-cyan-400 transition">Salões & Beleza</a></li>
+            <li><a href="/como-funciona" class="hover:text-cyan-400 transition">Como Funciona</a></li>
+            <li><a href="/planos" class="hover:text-cyan-400 transition">Planos & Preços</a></li>
+            <li><a href="/contato" class="hover:text-cyan-400 transition">Atendimento Comercial</a></li>
           </ul>
         </div>
 
-        <div class="space-y-2 text-xs">
-          <p class="font-bold text-white uppercase tracking-wider text-[11px]">Soluções Populares</p>
-          <ul class="space-y-1.5 text-zinc-400">
-            <li><a href="/solucoes/saloes-e-beleza" class="hover:text-white transition">Salões & Beleza (Jéssica)</a></li>
-            <li><a href="/solucoes/saude-e-odontologia" class="hover:text-white transition">Saúde & Clínicas (Sofia)</a></li>
-            <li><a href="/solucoes/imobiliarias-e-corretores" class="hover:text-white transition">Imóveis & Corretores (Lucas)</a></li>
-            <li><a href="/solucoes/delivery-e-restaurantes" class="hover:text-white transition">Delivery & Restaurantes (ChefBot)</a></li>
+        <!-- Links Legais & Suporte -->
+        <div class="space-y-2">
+          <h4 class="text-xs font-black text-white uppercase tracking-wider">Legal & Suporte</h4>
+          <ul class="space-y-1.5 text-xs text-zinc-400">
+            <li><a href="/termos" class="hover:text-cyan-400 transition">Termos de Uso</a></li>
+            <li><a href="/privacidade" class="hover:text-cyan-400 transition">Política de Privacidade (LGPD)</a></li>
+            <li><a href="/admin" class="hover:text-cyan-400 transition">Painel do Administrador</a></li>
+            <li><span class="text-emerald-400 text-[11px]">● Servidores 100% Operacionais</span></li>
           </ul>
         </div>
 
-        <div class="space-y-2 text-xs">
-          <p class="font-bold text-white uppercase tracking-wider text-[11px]">Contato & Legal</p>
-          <ul class="space-y-1.5 text-zinc-400">
-            <li><a href="/contato" class="hover:text-white transition">Fale Conosco</a></li>
-            <li><a href="https://wa.me/5511951364159" target="_blank" class="hover:text-emerald-400 transition">WhatsApp: (11) 95136-4159</a></li>
-            <li><a href="/termos" class="hover:text-white transition">Termos de Uso</a></li>
-            <li><a href="/privacidade" class="hover:text-white transition">Política de Privacidade</a></li>
-          </ul>
-        </div>
       </div>
 
-      <div class="pt-6 border-t border-zinc-800/60 flex flex-col sm:flex-row items-center justify-between text-[11px] text-zinc-500 gap-3">
+      <div class="pt-6 border-t border-zinc-800/80 flex flex-col sm:flex-row items-center justify-between text-[11px] text-zinc-500 gap-3">
         <p>© 2026 RAIA. Todos os direitos reservados.</p>
-        <p>WhatsApp é marca registrada da Meta Platforms, Inc. A RAIA é uma solução independente.</p>
+        <p>WhatsApp é uma marca registrada da Meta Platforms, Inc.</p>
       </div>
+
     </div>
   </footer>
 
   <!-- ============================================================ -->
-  <!-- MODAL DE DEMONSTRAÇÃO CONTROLADA NO WHATSAPP                 -->
+  <!-- JAVASCRIPT: MARKETPLACE INTERACTIONS & TEST MODAL            -->
   <!-- ============================================================ -->
-  <div id="testAgentModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
-    <div class="bg-[#0B0F19] border border-zinc-800 rounded-3xl w-full max-w-md p-6 sm:p-7 shadow-2xl relative space-y-4">
-      <button onclick="closeTestAgentModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-lg bg-zinc-800/80 transition">✕</button>
-
-      <div class="flex items-center gap-3">
-        <div id="modalAgentIcon" class="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center text-2xl">🤖</div>
-        <div>
-          <span class="text-[10px] font-bold text-[#00F59B] uppercase tracking-wider">Demonstração no seu celular</span>
-          <h3 id="modalAgentName" class="text-base font-black text-white">Assistente RAIA</h3>
-        </div>
-      </div>
-
-      <p class="text-xs text-zinc-300 leading-relaxed">
-        Você receberá uma mensagem de teste deste assistente simulando um negócio do segmento para você experimentar a velocidade e a organização da conversa.
-      </p>
-
-      <form id="leadTestForm" onsubmit="submitAgentTest(event)" class="space-y-3.5 pt-1">
-        <div>
-          <label class="block text-[11px] font-bold text-zinc-400 mb-1">Seu Primeiro Nome</label>
-          <input type="text" id="leadName" required placeholder="Ex: Thiago" class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs focus:border-[#00F59B] focus:outline-none">
-        </div>
-
-        <div>
-          <label class="block text-[11px] font-bold text-zinc-400 mb-1">Seu WhatsApp (com DDD)</label>
-          <input type="tel" id="leadPhone" required placeholder="(11) 99999-8888" class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs focus:border-[#00F59B] focus:outline-none font-mono">
-          <p class="text-[10px] text-zinc-500 mt-1">Utilizado estritamente para o envio da mensagem de teste.</p>
-        </div>
-
-        <div id="modalErrorMsg" class="hidden text-rose-400 text-xs p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20"></div>
-
-        <button type="submit" id="btnSubmitTest" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs shadow-lg hover:opacity-95 transition flex items-center justify-center gap-2">
-          <span id="btnSubmitTestText">Receber Mensagem de Teste</span>
-          <i data-lucide="send" class="w-3.5 h-3.5"></i>
-        </button>
-      </form>
-    </div>
-  </div>
-
   <script>
-    let currentAgentKey = 'SALON';
-    let currentAgentName = 'Jéssica';
+    let currentCategory = 'all';
+    let currentTag = 'all';
+    let currentSearch = '';
+    let currentSort = 'popular';
+    let isGridView = true;
 
-    function openTestAgentModal(key, name, icon, niche) {
-      currentAgentKey = key;
-      currentAgentName = name;
-      document.getElementById('modalAgentName').innerText = name + ' (' + niche + ')';
-      document.getElementById('modalAgentIcon').innerText = icon || '🤖';
-      document.getElementById('modalErrorMsg').classList.add('hidden');
-      document.getElementById('testAgentModal').classList.remove('hidden');
-      lucide.createIcons();
-    }
+    function applyFilters() {
+      const cards = document.querySelectorAll('.agent-card');
+      let visibleCount = 0;
 
-    function closeTestAgentModal() {
-      document.getElementById('testAgentModal').classList.add('hidden');
-    }
+      cards.forEach(card => {
+        const cat = card.getAttribute('data-category');
+        const tags = card.getAttribute('data-tags') || '';
+        const nameAndInfo = card.getAttribute('data-name') || '';
 
-    async function submitAgentTest(e) {
-      e.preventDefault();
-      const btn = document.getElementById('btnSubmitTest');
-      const btnTxt = document.getElementById('btnSubmitTestText');
-      const errEl = document.getElementById('modalErrorMsg');
-      const name = document.getElementById('leadName').value.trim();
-      const phone = document.getElementById('leadPhone').value.trim();
+        const matchCat = (currentCategory === 'all' || cat === currentCategory);
+        const matchTag = (currentTag === 'all' || tags.includes(currentTag));
+        const matchSearch = (!currentSearch || nameAndInfo.includes(currentSearch));
 
-      errEl.classList.add('hidden');
-      btn.disabled = true;
-      btnTxt.innerText = 'Enviando mensagem ao seu WhatsApp...';
-
-      try {
-        const res = await fetch('/api/test-agent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, phone, agentKey: currentAgentKey, agentName: currentAgentName })
-        });
-        const data = await res.json();
-
-        if (data.success) {
-          alert(`Mensagem enviada com sucesso para o WhatsApp ${data.phone || phone}! Verifique seu celular agora.`);
-          closeTestAgentModal();
+        if (matchCat && matchTag && matchSearch) {
+          card.classList.remove('hidden');
+          visibleCount++;
         } else {
-          errEl.innerText = data.error || 'Não foi possível enviar a mensagem. Verifique o número informado.';
-          errEl.classList.remove('hidden');
+          card.classList.add('hidden');
         }
-      } catch (err) {
-        errEl.innerText = 'Erro na conexão com o servidor. Tente novamente.';
-        errEl.classList.remove('hidden');
-      } finally {
-        btn.disabled = false;
-        btnTxt.innerText = 'Receber Mensagem de Teste';
+      });
+
+      const countEl = document.getElementById('visibleAgentsCount');
+      if (countEl) countEl.innerText = visibleCount;
+
+      const noRes = document.getElementById('noResultsBox');
+      if (noRes) {
+        if (visibleCount === 0) noRes.classList.remove('hidden');
+        else noRes.classList.add('hidden');
       }
     }
 
-    window.addEventListener('DOMContentLoaded', () => {
+    function setCategoryFilter(cat) {
+      currentCategory = cat;
+      // Update UI buttons
+      document.querySelectorAll('.cat-filter-btn').forEach(btn => {
+        if (btn.getAttribute('data-cat') === cat) {
+          btn.classList.add('bg-[#141632]', 'text-cyan-300', 'border', 'border-cyan-500/30');
+          btn.classList.remove('text-zinc-300', 'hover:bg-white/5');
+        } else {
+          btn.classList.remove('bg-[#141632]', 'text-cyan-300', 'border', 'border-cyan-500/30');
+          btn.classList.add('text-zinc-300', 'hover:bg-white/5');
+        }
+      });
+      applyFilters();
+    }
+
+    function setTagFilter(tag) {
+      currentTag = tag;
+      document.querySelectorAll('.tag-pill').forEach(btn => {
+        if (btn.getAttribute('data-tag') === tag) {
+          btn.classList.add('bg-cyan-500', 'text-black');
+          btn.classList.remove('bg-[#141632]', 'border-[#232759]', 'text-zinc-300');
+        } else {
+          btn.classList.remove('bg-cyan-500', 'text-black');
+          btn.classList.add('bg-[#141632]', 'border-[#232759]', 'text-zinc-300');
+        }
+      });
+      applyFilters();
+    }
+
+    function handleSearchFilter() {
+      const inp = document.getElementById('agentSearchInput');
+      currentSearch = (inp?.value || '').trim().toLowerCase();
+      applyFilters();
+    }
+
+    function handleSortChange() {
+      const select = document.getElementById('agentSortSelect');
+      currentSort = select?.value || 'popular';
+      const container = document.getElementById('agentsGridContainer');
+      const cards = Array.from(document.querySelectorAll('.agent-card'));
+
+      if (currentSort === 'name') {
+        cards.sort((a, b) => a.getAttribute('data-name').localeCompare(b.getAttribute('data-name')));
+      } else if (currentSort === 'likes') {
+        // High likes first
+        cards.sort((a, b) => {
+          const lA = parseInt(a.querySelector('.text-rose-400')?.nextElementSibling?.innerText || '0');
+          const lB = parseInt(b.querySelector('.text-rose-400')?.nextElementSibling?.innerText || '0');
+          return lB - lA;
+        });
+      }
+      cards.forEach(c => container.appendChild(c));
+    }
+
+    function setViewMode(mode) {
+      const container = document.getElementById('agentsGridContainer');
+      const gridBtn = document.getElementById('viewGridBtn');
+      const listBtn = document.getElementById('viewListBtn');
+
+      if (mode === 'list') {
+        isGridView = false;
+        container.classList.remove('md:grid-cols-2', 'xl:grid-cols-3');
+        container.classList.add('grid-cols-1');
+        listBtn.classList.add('bg-cyan-500/20', 'text-cyan-300');
+        gridBtn.classList.remove('bg-cyan-500/20', 'text-cyan-300');
+      } else {
+        isGridView = true;
+        container.classList.add('md:grid-cols-2', 'xl:grid-cols-3');
+        container.classList.remove('grid-cols-1');
+        gridBtn.classList.add('bg-cyan-500/20', 'text-cyan-300');
+        listBtn.classList.remove('bg-cyan-500/20', 'text-cyan-300');
+      }
+    }
+
+    function resetAllFilters() {
+      const searchInp = document.getElementById('agentSearchInput');
+      if (searchInp) searchInp.value = '';
+      currentSearch = '';
+      setCategoryFilter('all');
+      setTagFilter('all');
+    }
+
+    // Modal Test handlers
+    function openTestModal(slug, name) {
+      const modal = document.getElementById('testModal');
+      const title = document.getElementById('modalAgentName');
+      const hiddenSlug = document.getElementById('modalNicheSlug');
+      if (modal) modal.classList.remove('hidden');
+      if (title) title.innerText = 'Testar ' + (name || 'Assistente no WhatsApp');
+      if (hiddenSlug) hiddenSlug.value = slug || 'saloes-e-beleza';
+    }
+
+    function closeTestModal() {
+      const modal = document.getElementById('testModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function handleTestSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSubmitTest');
+      const btnTxt = document.getElementById('btnSubmitTestText');
+      const alertBox = document.getElementById('modalAlertBox');
+      const name = document.getElementById('leadNameInput')?.value?.trim();
+      const phone = document.getElementById('leadPhoneInput')?.value?.trim();
+      const nicheSlug = document.getElementById('modalNicheSlug')?.value;
+
+      if (!name || !phone) {
+        alertBox.innerText = 'Preencha seu nome e número de WhatsApp.';
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
+      btn.disabled = true;
+      btnTxt.innerText = 'Enviando mensagem demonstrativa...';
+      alertBox.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/leads/request-test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, phone, nicheSlug })
+        });
+        const json = await res.json();
+        if (json.success) {
+          alert('Pronto, ' + name + '! Enviamos uma mensagem de demonstração para seu WhatsApp no número ' + phone + '. Abra seu aplicativo agora!');
+          closeTestModal();
+        } else {
+          alertBox.innerText = json.error || 'Não foi possível disparar o teste no momento.';
+          alertBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        alertBox.innerText = 'Erro ao conectar ao servidor: ' + err.message;
+        alertBox.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btnTxt.innerText = 'Receber Demonstração no WhatsApp';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
     });
   </script>
+
 </body>
 </html>
