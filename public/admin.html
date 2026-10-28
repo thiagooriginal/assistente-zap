@@ -214,6 +214,10 @@
         <i data-lucide="cpu" class="w-4 h-4"></i>
         <span>Status da IA & Conexões</span>
       </button>
+      <button onclick="switchAdminTab('analyzer')" id="tabBtnAnalyzer" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
+        <i data-lucide="brain-circuit" class="w-4 h-4 text-cyan-400"></i>
+        <span>🧠 Análise de Oferta & IA</span>
+      </button>
     </div>
 
     <!-- ============================================================ -->
@@ -849,6 +853,156 @@
     <!-- ============================================================ -->
     <!-- SECTION 4: STATUS DA IA & CONEXÕES                            -->
     <!-- ============================================================ -->
+    <!-- ============================================================ -->
+    <!-- SECTION 5: ANALISADOR DE NEGÓCIO & OFERTA (ESTILO WISER)     -->
+    <!-- ============================================================ -->
+    <div id="sectionAnalyzer" class="hidden space-y-6">
+      
+      <!-- Top Banner -->
+      <div class="p-6 rounded-3xl bg-gradient-to-r from-cyan-950/80 via-blue-950/60 to-zinc-900 border border-cyan-500/40 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-extrabold text-[10px] uppercase tracking-wider border border-cyan-500/30">Inteligência Estratégica</span>
+            <span class="text-xs text-zinc-400 font-mono">Motor Wiser Style</span>
+          </div>
+          <h2 class="text-xl font-black text-white">Analisador de Negócio & Gerador de Prompt</h2>
+          <p class="text-xs text-zinc-300 max-w-2xl leading-relaxed">
+            Cole a URL do site ou Instagram do cliente. A IA da RAIA faz uma varredura aprofundada, extrai dores, público-alvo, objeções, ganchos de anúncios e <b>escreve o prompt personalizado do robô de WhatsApp</b> na hora!
+          </p>
+        </div>
+        <button onclick="loadBusinessAnalyses()" class="px-3.5 py-2 rounded-2xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 border border-zinc-700 transition flex items-center gap-1.5 shrink-0 cursor-pointer">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Atualizar Histórico</span>
+        </button>
+      </div>
+
+      <!-- Formulário de Análise -->
+      <div class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+        <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+          <i data-lucide="globe" class="w-4 h-4 text-cyan-400"></i>
+          <span>Dados para Análise do Negócio</span>
+        </h3>
+
+        <form onsubmit="handleAnalyzeSubmit(event)" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="sm:col-span-2">
+              <label class="block text-[11px] font-bold text-zinc-400 mb-1">URL do Site ou Landing Page do Cliente</label>
+              <input type="url" id="bizUrl" placeholder="https://exemplo.com.br ou página da empresa" class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs focus:border-cyan-400 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-zinc-400 mb-1">Nome da Empresa / Cliente</label>
+              <input type="text" id="bizName" placeholder="Ex: Studio Bella, Clínica Raphaela" class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs focus:border-cyan-400 focus:outline-none">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-zinc-400 mb-1">Segmento / Nicho</label>
+              <select id="bizNiche" class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs focus:border-cyan-400 focus:outline-none">
+                <option value="SALON">💇‍♀️ Salões de Beleza & Estética</option>
+                <option value="CLINIC">🩺 Clínicas Médicas & Consultórios</option>
+                <option value="REAL_ESTATE">🏡 Imobiliárias & Corretores</option>
+                <option value="RESTAURANT">🍔 Delivery & Restaurantes</option>
+                <option value="LEGAL">⚖️ Advocacia & Jurídico</option>
+                <option value="MECHANIC">🚗 Oficinas Mecânicas & Auto Centers</option>
+                <option value="FITNESS">💪 Academias & Studios de Pilates</option>
+                <option value="RENTAL_MACHINES">🏗️ Locadoras de Máquinas & Obras</option>
+                <option value="CAR_DEALERSHIP">🏎️ Lojas de Veículos & Seminovos</option>
+                <option value="FINANCE">📊 Finanças Pessoais & MEI</option>
+                <option value="OTHER">🏢 Outro Negócio / Serviços</option>
+              </select>
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-[11px] font-bold text-zinc-400 mb-1">Descrição / Notas Adicionais (opcional se houver URL)</label>
+              <input type="text" id="bizDesc" placeholder="Ex: Especialistas em estética facial e mechas, atendem em Pinheiros" class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-white text-xs focus:border-cyan-400 focus:outline-none">
+            </div>
+          </div>
+
+          <button type="submit" id="btnRunAnalysis" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:opacity-90 text-white font-extrabold text-xs transition flex items-center justify-center gap-2 shadow-lg cursor-pointer">
+            <span id="btnRunAnalysisText">⚡ Realizar Análise Estratégica com IA</span>
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+          </button>
+        </form>
+      </div>
+
+      <!-- Caixa de Resultado da Análise -->
+      <div id="bizAnalysisResultBox" class="hidden p-6 rounded-3xl bg-[#090C15] border-2 border-cyan-500/40 space-y-5 shadow-2xl">
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-zinc-800 pb-3">
+          <div>
+            <span class="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">Diagnóstico Estratégico Concluído</span>
+            <h3 id="resBizName" class="text-lg font-black text-white">Nome da Empresa</h3>
+            <p id="resBizTagline" class="text-xs text-zinc-400 italic mt-0.5"></p>
+          </div>
+          <button onclick="copyGeneratedPrompt()" class="px-3.5 py-2 rounded-xl bg-[#00F59B] hover:bg-emerald-400 text-black font-extrabold text-xs flex items-center gap-1.5 shadow transition cursor-pointer">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span>Copiar Prompt do Agente</span>
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <div class="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 space-y-2">
+            <h4 class="font-bold text-white flex items-center gap-1.5">
+              <i data-lucide="target" class="w-4 h-4 text-cyan-400"></i>
+              <span>Público-Alvo & Dores Centrais</span>
+            </h4>
+            <div id="resBizAudience" class="text-zinc-300 space-y-1 text-[11px] leading-relaxed"></div>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 space-y-2">
+            <h4 class="font-bold text-white flex items-center gap-1.5">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400"></i>
+              <span>Top Objeções & Como Contornar</span>
+            </h4>
+            <div id="resBizObjections" class="text-zinc-300 space-y-1.5 text-[11px] leading-relaxed"></div>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800 space-y-2">
+          <h4 class="font-bold text-white text-xs flex items-center gap-1.5">
+            <i data-lucide="megaphone" class="w-4 h-4 text-violet-400"></i>
+            <span>Ganchos & Ideias de Anúncios (Google/Meta Ads)</span>
+          </h4>
+          <div id="resBizAdAngles" class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px]"></div>
+        </div>
+
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <h4 class="font-bold text-white text-xs flex items-center gap-1.5">
+              <i data-lucide="bot" class="w-4 h-4 text-[#00F59B]"></i>
+              <span>Prompt do WhatsApp Gerado para Este Cliente</span>
+            </h4>
+            <button onclick="copyGeneratedPrompt()" class="text-xs text-cyan-400 hover:underline cursor-pointer">Copiar código</button>
+          </div>
+          <textarea id="resBizPrompt" readonly rows="6" class="w-full p-3 bg-zinc-950 border border-zinc-800 rounded-xl font-mono text-[11px] text-emerald-300 focus:outline-none"></textarea>
+        </div>
+      </div>
+
+      <!-- Tabela de Histórico de Análises -->
+      <div class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+        <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+          <i data-lucide="history" class="w-4 h-4 text-zinc-400"></i>
+          <span>Empresas Analisadas Anteriormente</span>
+        </h3>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="text-zinc-500 border-b border-zinc-800 text-[11px]">
+                <th class="py-2.5 px-3">Empresa</th>
+                <th class="py-2.5 px-3">Nicho</th>
+                <th class="py-2.5 px-3">URL</th>
+                <th class="py-2.5 px-3">Data</th>
+                <th class="py-2.5 px-3 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="analysesHistoryTableBody" class="divide-y divide-zinc-800/60">
+              <tr><td colspan="5" class="py-4 text-center text-zinc-500">Nenhuma análise realizada ainda.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
     <div id="sectionSystem" class="hidden space-y-5">
       <div class="p-5 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
         <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
@@ -1103,6 +1257,7 @@
         users: document.getElementById('sectionUsers'),
         finance: document.getElementById('sectionFinance'),
         system: document.getElementById('sectionSystem'),
+        analyzer: document.getElementById('sectionAnalyzer'),
       };
       const buttons = {
         studio: document.getElementById('tabBtnStudio'),
@@ -1110,6 +1265,7 @@
         users: document.getElementById('tabBtnUsers'),
         finance: document.getElementById('tabBtnFinance'),
         system: document.getElementById('tabBtnSystem'),
+        analyzer: document.getElementById('tabBtnAnalyzer'),
       };
 
       Object.keys(sections).forEach(k => {
@@ -1126,6 +1282,8 @@
 
       if (tab === 'asaas') {
         loadAsaasDashboard();
+      } else if (tab === 'analyzer') {
+        loadBusinessAnalyses();
       }
       lucide.createIcons();
     }
@@ -1984,7 +2142,172 @@
       initAuth();
       lucide.createIcons();
     });
-  </script>
+  
+
+    // -------------------------------------------------------------
+    // BUSINESS & OFFER ANALYZER (WISER STYLE)
+    // -------------------------------------------------------------
+    let currentAnalysisData = null;
+
+    async function handleAnalyzeSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnRunAnalysis');
+      const btnTxt = document.getElementById('btnRunAnalysisText');
+      const url = document.getElementById('bizUrl').value.trim();
+      const companyName = document.getElementById('bizName').value.trim();
+      const niche = document.getElementById('bizNiche').value;
+      const description = document.getElementById('bizDesc').value.trim();
+
+      if (!url && !description) {
+        alert('Por favor, informe ao menos a URL do site ou uma descrição do negócio.');
+        return;
+      }
+
+      btn.disabled = true;
+      btnTxt.innerText = 'Varrendo página e analisando com IA (pode levar 10s)...';
+
+      try {
+        const res = await fetch('/api/admin/analyze-business', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, companyName, niche, description })
+        });
+        const json = await res.json();
+
+        if (json.success && json.data) {
+          renderAnalysisResult(json.data);
+          loadBusinessAnalyses();
+          document.getElementById('bizAnalysisResultBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          alert('Erro ao analisar: ' + (json.error || 'Tente novamente.'));
+        }
+      } catch (err) {
+        alert('Erro ao conectar com servidor de IA: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btnTxt.innerText = '⚡ Realizar Análise Estratégica com IA';
+      }
+    }
+
+    function renderAnalysisResult(data) {
+      currentAnalysisData = data;
+      const box = document.getElementById('bizAnalysisResultBox');
+      const nameEl = document.getElementById('resBizName');
+      const tagEl = document.getElementById('resBizTagline');
+      const audEl = document.getElementById('resBizAudience');
+      const objEl = document.getElementById('resBizObjections');
+      const adEl = document.getElementById('resBizAdAngles');
+      const promptEl = document.getElementById('resBizPrompt');
+
+      if (box) box.classList.remove('hidden');
+      if (nameEl) nameEl.innerText = data.companyName || 'Empresa Analisada';
+      if (tagEl) tagEl.innerText = data.tagline ? '"' + data.tagline + '"' : '';
+
+      if (audEl) {
+        audEl.innerHTML = \`
+          <p><b>Avatar:</b> \${data.targetAudience?.avatar || 'Não informado'}</p>
+          <p><b>Principal Dor:</b> \${data.targetAudience?.primaryPain || 'Não informado'}</p>
+          <p><b>Desejo Central:</b> \${data.targetAudience?.coreDesire || 'Não informado'}</p>
+        \`;
+      }
+
+      if (objEl) {
+        objEl.innerHTML = (data.objectionsAndAnswers || []).map(o => \`
+          <div class="p-2 rounded-lg bg-zinc-950/60 border border-zinc-800">
+            <p class="text-amber-300 font-bold">⚠️ \${o.objection}</p>
+            <p class="text-zinc-300 text-[10px] mt-0.5">💬 <i>\${o.answer}</i></p>
+          </div>
+        \`).join('') || '<p class="text-zinc-500">Sem objeções mapeadas.</p>';
+      }
+
+      if (adEl) {
+        adEl.innerHTML = (data.adAngles || []).map(a => \`
+          <div class="p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800 space-y-1">
+            <span class="text-[9px] font-bold text-violet-400 uppercase">Ângulo</span>
+            <p class="font-bold text-white text-[10px]">"\${a.headline}"</p>
+            <p class="text-zinc-400 text-[9px]">\${a.angle}</p>
+          </div>
+        \`).join('') || '<p class="text-zinc-500">Sem ideias de anúncios.</p>';
+      }
+
+      if (promptEl) {
+        promptEl.value = data.customWhatsAppPrompt || '';
+      }
+
+      lucide.createIcons();
+    }
+
+    async function loadBusinessAnalyses() {
+      const tbody = document.getElementById('analysesHistoryTableBody');
+      if (!tbody) return;
+
+      try {
+        const res = await fetch('/api/admin/business-analyses');
+        const json = await res.json();
+        const list = json.analyses || [];
+
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-zinc-500">Nenhuma empresa analisada ainda. Cole um site acima para começar!</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = list.map(item => {
+          const date = item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : '-';
+          const safeData = JSON.stringify(item.data || {}).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+
+          return \`
+            <tr class="hover:bg-zinc-900/50 transition">
+              <td class="py-3 px-3 font-bold text-white">\${item.company_name || 'Sem nome'}</td>
+              <td class="py-3 px-3 font-mono text-cyan-300 text-[11px]">\${item.niche || 'Geral'}</td>
+              <td class="py-3 px-3 text-zinc-400 text-[11px] truncate max-w-[180px]">
+                \${item.url ? \`<a href="\${item.url}" target="_blank" class="hover:underline text-blue-400">\${item.url}</a>\` : '-'}
+              </td>
+              <td class="py-3 px-3 text-zinc-500 text-[11px]">\${date}</td>
+              <td class="py-3 px-3 text-right">
+                <div class="flex items-center justify-end gap-1.5">
+                  <button onclick='viewAnalysisData(\${safeData})' class="px-2 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-bold transition cursor-pointer">
+                    👁️ Ver
+                  </button>
+                  <button onclick="deleteAnalysisRecord(\${item.id})" class="px-2 py-1 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-300 text-[10px] font-bold transition cursor-pointer">
+                    🗑️
+                  </button>
+                </div>
+              </td>
+            </tr>
+          \`;
+        }).join('');
+
+        lucide.createIcons();
+      } catch (err) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-rose-400">Erro ao carregar histórico.</td></tr>';
+      }
+    }
+
+    function viewAnalysisData(data) {
+      if (!data) return;
+      renderAnalysisResult(data);
+      document.getElementById('bizAnalysisResultBox').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    async function deleteAnalysisRecord(id) {
+      if (!confirm('Deseja excluir esta análise?')) return;
+      try {
+        await fetch('/api/admin/business-analyses/' + id, { method: 'DELETE' });
+        loadBusinessAnalyses();
+      } catch (e) {
+        alert('Erro ao excluir: ' + e.message);
+      }
+    }
+
+    function copyGeneratedPrompt() {
+      const el = document.getElementById('resBizPrompt');
+      if (el && el.value) {
+        navigator.clipboard.writeText(el.value);
+        alert('Prompt copiado para a área de transferência! Você pode aplicá-lo no assistente do cliente.');
+      }
+    }
+
+</script>
 
   <!-- Lead Conversation Modal -->
   <div id="leadChatModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">

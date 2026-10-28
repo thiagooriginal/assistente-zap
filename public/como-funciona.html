@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Como Funciona • RAIA Assistentes de IA para WhatsApp</title>
+  <meta name="description" content="Entenda como funciona a implementação, conexão e o dia a dia dos assistentes de inteligência artificial da RAIA no seu WhatsApp.">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: { raia: { black: '#07080c', bgDark: '#0a0d14', neon: '#00F59B' } }
+        }
+      }
+    }
+  </script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body { background-color: #040711; color: #ffffff; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .glass-nav { background: rgba(4, 7, 17, 0.9); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+    .glass-card { background: rgba(12, 18, 32, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; }
+  </style>
+</head>
+<body class="min-h-screen bg-[#040711] text-white selection:bg-[#00F59B] selection:text-black">
+
+  <!-- Header -->
+  <header class="fixed top-0 left-0 right-0 z-50 glass-nav">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <img src="/raia-logo.png" alt="RAIA" class="w-10 h-10 object-contain">
+        <div>
+          <span class="text-xl font-black text-white">RAIA</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#00F59B]/10 text-[#00F59B] font-bold uppercase ml-1">Processo</span>
+        </div>
+      </a>
+
+      <nav class="hidden md:flex items-center gap-7 text-xs font-bold text-zinc-300">
+        <a href="/" class="hover:text-white transition">Início</a>
+        <a href="/solucoes" class="hover:text-white transition">Soluções</a>
+        <a href="/como-funciona" class="text-[#00F59B]">Como Funciona</a>
+        <a href="/planos" class="hover:text-white transition">Planos</a>
+        <a href="/contato" class="hover:text-white transition">Contato</a>
+      </nav>
+
+      <div class="flex items-center gap-2.5">
+        <a href="/admin" class="px-3 py-1.5 rounded-full text-xs font-bold text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800">
+          Área do Gestor
+        </a>
+        <a href="https://wa.me/5511951364159" target="_blank" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs">
+          Falar com Suporte
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="pt-36 pb-24 max-w-5xl mx-auto px-4 sm:px-6 space-y-16">
+    <div class="text-center space-y-4 max-w-3xl mx-auto">
+      <span class="text-xs font-black uppercase tracking-widest text-[#00F59B]">Funcionamento na Prática</span>
+      <h1 class="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
+        Como a RAIA funciona no dia a dia da sua empresa.
+      </h1>
+      <p class="text-sm sm:text-base text-zinc-400 max-w-2xl mx-auto leading-relaxed">
+        Uma visão clara e realista de como o assistente é configurado, como ele atende seus clientes e como sua equipe mantém o controle absoluto.
+      </p>
+    </div>
+
+    <!-- Etapas Detalhadas -->
+    <div class="space-y-6">
+      
+      <!-- Passo 1 -->
+      <div class="glass-card p-8 flex flex-col md:flex-row gap-6 items-start">
+        <div class="w-14 h-14 rounded-2xl bg-[#00F59B] text-black font-black text-2xl flex items-center justify-center shrink-0">
+          1
+        </div>
+        <div class="space-y-2">
+          <h2 class="text-xl font-bold text-white">Etapa 1: Diagnóstico e regras de atendimento</h2>
+          <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+            Reunimos as informações reais do seu negócio: lista de serviços ou produtos, tabela de preços, horários de atendimento, políticas de entrega/agendamento e respostas para as 10 dúvidas mais comuns que seus clientes fazem.
+          </p>
+          <div class="pt-2 text-xs text-zinc-400 flex items-center gap-2">
+            <i data-lucide="info" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+            <span>Nossa equipe te auxilia a estruturar tudo isso sem termos técnicos complicados.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Passo 2 -->
+      <div class="glass-card p-8 flex flex-col md:flex-row gap-6 items-start">
+        <div class="w-14 h-14 rounded-2xl bg-cyan-400 text-black font-black text-2xl flex items-center justify-center shrink-0">
+          2
+        </div>
+        <div class="space-y-2">
+          <h2 class="text-xl font-bold text-white">Etapa 2: Conexão segura no WhatsApp</h2>
+          <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+            A conexão é feita diretamente pelo WhatsApp do seu negócio através do escaneamento de um QR Code seguro. Você pode usar seu número atual ou um chip dedicado para a empresa. Não é necessário comprar computadores adicionais ou manter equipamentos ligados.
+          </p>
+          <div class="pt-2 text-xs text-zinc-400 flex items-center gap-2">
+            <i data-lucide="check" class="w-4 h-4 text-[#00F59B] shrink-0"></i>
+            <span>A infraestrutura roda 24h por dia em servidores em nuvem com alta disponibilidade.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Passo 3 -->
+      <div class="glass-card p-8 flex flex-col md:flex-row gap-6 items-start">
+        <div class="w-14 h-14 rounded-2xl bg-violet-500 text-white font-black text-2xl flex items-center justify-center shrink-0">
+          3
+        </div>
+        <div class="space-y-2">
+          <h2 class="text-xl font-bold text-white">Etapa 3: Atendimento contínuo com intervenção humana</h2>
+          <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+            Quando um cliente envia mensagem, o assistente responde na hora com linguagem natural, acolhedora e precisa. Ele tira as dúvidas, apresenta serviços e recolhe os dados para agendamento ou pedido.
+          </p>
+          <div class="p-3.5 rounded-xl bg-violet-950/40 border border-violet-500/30 text-xs text-violet-200 leading-relaxed">
+            <b>Você no controle:</b> A qualquer momento, você ou um funcionário pode abrir o WhatsApp no celular e digitar normalmente. O assistente pausa e dá espaço para o atendimento humano fluir.
+          </div>
+        </div>
+      </div>
+
+      <!-- Passo 4 -->
+      <div class="glass-card p-8 flex flex-col md:flex-row gap-6 items-start">
+        <div class="w-14 h-14 rounded-2xl bg-emerald-400 text-black font-black text-2xl flex items-center justify-center shrink-0">
+          4
+        </div>
+        <div class="space-y-2">
+          <h2 class="text-xl font-bold text-white">Etapa 4: Painel de gestão e evolução contínua</h2>
+          <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+            Pelo Painel do Gestor da RAIA, você visualiza a lista de pessoas que entraram em contato, o histórico completo dos diálogos e solicitações pendentes. Periodicamente, ajustamos respostas para que o assistente fique cada vez mais afinado com a sua empresa.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Seção de Garantias Operacionais -->
+    <div class="p-8 rounded-3xl bg-[#090C15] border border-zinc-800 space-y-4">
+      <h3 class="text-lg font-bold text-white">O que a RAIA NÃO faz (Transparência Operacional)</h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-zinc-400">
+        <div class="flex items-start gap-2">
+          <span class="text-rose-400 font-bold">✕</span>
+          <span>Não faz promessas ou ofertas fora das regras que você cadastrou.</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="text-rose-400 font-bold">✕</span>
+          <span>Não emite diagnósticos médicos, laudos ou pareceres jurídicos.</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="text-rose-400 font-bold">✕</span>
+          <span>Não confirma pedidos complexos sem validação da sua equipe quando configurado.</span>
+        </div>
+        <div class="flex items-start gap-2">
+          <span class="text-rose-400 font-bold">✕</span>
+          <span>Não bloqueia seu WhatsApp: você continua utilizando o aplicativo livremente.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div class="text-center pt-4">
+      <a href="/solucoes" class="px-8 py-4 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs shadow-lg hover:scale-105 transition inline-flex items-center gap-2">
+        <span>Ver todas as soluções disponíveis</span>
+        <i data-lucide="arrow-right" class="w-4 h-4"></i>
+      </a>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="py-10 border-t border-zinc-800 bg-[#040711] text-xs text-zinc-500">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <img src="/raia-logo.png" alt="RAIA" class="w-6 h-6 object-contain">
+        <span class="font-bold text-zinc-400">RAIA • Assistentes de IA para WhatsApp</span>
+      </div>
+      <div class="flex items-center gap-4 text-zinc-400">
+        <a href="/" class="hover:text-white">Início</a>
+        <a href="/solucoes" class="hover:text-white">Soluções</a>
+        <a href="/planos" class="hover:text-white">Planos</a>
+        <a href="/contato" class="hover:text-white">Contato</a>
+        <a href="/termos" class="hover:text-white">Termos</a>
+        <a href="/privacidade" class="hover:text-white">Privacidade</a>
+      </div>
+      <p>© 2026 RAIA. Operado por RAIA RH.</p>
+    </div>
+  </footer>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => lucide.createIcons());
+  </script>
+</body>
+</html>

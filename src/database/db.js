@@ -191,6 +191,19 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_agent_messages_phone ON agent_messages(phone);
   CREATE INDEX IF NOT EXISTS idx_agent_messages_lead ON agent_messages(lead_id);
+
+  CREATE TABLE IF NOT EXISTS business_analyses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    company_name TEXT,
+    url TEXT,
+    niche TEXT,
+    analysis_data TEXT,
+    notes TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_business_analyses_niche ON business_analyses(niche);
 `);
 
 // 2. Run migrations for existing databases to add user_id column if missing

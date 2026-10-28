@@ -13,6 +13,7 @@ const calendarService = require('../services/calendarService');
 const whatsappClient = require('../whatsapp/client');
 const asaasService = require('../services/asaasService');
 const agentChatService = require('../services/agentChatService');
+const businessAnalyzerService = require('../services/businessAnalyzerService');
 
 const app = express();
 
@@ -29,6 +30,40 @@ try {
   // Silent fallback in production/container
 }
 
+// Clean Public Solution & Content Routes
+app.get(['/solucoes', '/solucoes.html'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../public/solucoes.html'));
+});
+
+app.get('/solucoes/:niche', (req, res) => {
+  const fs = require('fs');
+  const niche = req.params.niche.replace(/\.html$/, '');
+  const filePath = path.resolve(__dirname, `../../public/solucoes/${niche}.html`);
+  if (fs.existsSync(filePath)) {
+    return res.sendFile(filePath);
+  }
+  return res.redirect('/solucoes');
+});
+
+app.get(['/como-funciona', '/como-funciona.html'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../public/como-funciona.html'));
+});
+
+app.get(['/planos', '/planos.html'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../public/planos.html'));
+});
+
+app.get(['/contato', '/contato.html'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../public/contato.html'));
+});
+
+app.get(['/termos', '/termos.html'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../public/termos.html'));
+});
+
+app.get(['/privacidade', '/privacidade.html'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../public/privacidade.html'));
+});
 
 // Explicit SPA routes
 app.get(['/admin', '/admin.html', '/dashboard', '/painel'], (req, res) => {
@@ -350,59 +385,96 @@ app.get('/api/admin/lead-conversation/:phone', (req, res) => {
 });
 
 // ==========================================
+// BUSINESS & OFFER ANALYZER (WISER STYLE)
+// ==========================================
+app.post('/api/admin/analyze-business', async (req, res) => {
+  try {
+    const { url, description, niche, companyName } = req.body || {};
+    if (!url && !description) {
+      return res.status(400).json({ success: false, error: 'Por favor, informe a URL do site ou uma descrição da empresa.' });
+    }
+    const result = await businessAnalyzerService.analyzeBusiness({ url, description, niche, companyName });
+    res.json(result);
+  } catch (err) {
+    console.error('Erro em /api/admin/analyze-business:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/admin/business-analyses', (req, res) => {
+  try {
+    const list = businessAnalyzerService.listAnalyses(50);
+    res.json({ success: true, analyses: list });
+  } catch (err) {
+    console.error('Erro em /api/admin/business-analyses:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/admin/business-analyses/:id', (req, res) => {
+  try {
+    const success = businessAnalyzerService.deleteAnalysis(req.params.id);
+    res.json({ success });
+  } catch (err) {
+    console.error('Erro ao deletar análise:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
 // PUBLIC LEAD TEST AGENT (LIVE DEMO ON USER'S WHATSAPP)
 // ==========================================
 const AGENT_MESSAGES = {
   SALON: (name) =>
-    `✨ Olá, *${name}*! Aqui é a *Jéssica*, especialista em atendimento da RAIA para Salões de Beleza e Estética! 💇‍♀️💅\n\n` +
+    `✨ Olá, *${name}*! Aqui é a *Jéssica*, assistente de atendimento da RAIA para Salões de Beleza e Estética! 💇‍♀️💅\n\n` +
     `Recebi sua solicitação no nosso site e já estou aqui no seu WhatsApp para você ver como funciona na prática!\n\n` +
-    `Eu atendo suas clientes 24 horas por dia, tiro dúvidas sobre procedimentos, agendo serviços na sua agenda e confirmo o comparecimento automaticamente para acabar com os furos de horário!\n\n` +
-    `👉 *Diga um serviço que você gostaria de agendar como teste* (por exemplo: _"Quero agendar corte e escova para amanhã às 14h"_)?`,
+    `Eu respondo dúvidas sobre procedimentos, valores informados pelo salão, horários de funcionamento e organizo as preferências de agendamento das clientes para facilitar o dia a dia da sua equipe.\n\n` +
+    `👉 *Diga um serviço que você gostaria de consultar como teste* (por exemplo: _"Quero ver horários para corte e escova amanhã às 14h"_)?`,
 
   CLINIC: (name) =>
-    `👋 Olá, *${name}*! Sou a *Dra. Sofia*, assistente virtual da RAIA para Consultórios e Clínicas Médicas. 🩺💉\n\n` +
-    `Acabei de receber o seu contato do nosso site! Estou pronta para demonstrar como faço triagem humanizada de pacientes, passo orientações de exames e organizo a agenda dos seus médicos no WhatsApp.\n\n` +
-    `👉 *Faça uma pergunta de teste como se fosse um paciente* (por exemplo: _"Vocês atendem Unimed?"_ ou _"Quais os horários disponíveis para dermatologista?"_)?`,
+    `👋 Olá, *${name}*! Sou a *Sofia*, assistente de atendimento e recepção da clínica (equipe da Dra. Raphaela). 🩺✨\n\n` +
+    `Recebi o seu contato no site da RAIA e estou pronta para demonstrar como acolho pacientes no WhatsApp, passo informações sobre horários, especialidades, convênios cadastrados e organizo solicitações de agendamento para a equipe de recepção.\n\n` +
+    `👉 *Faça uma pergunta de teste como se fosse um paciente* (por exemplo: _"Vocês atendem Unimed?"_ ou _"Quais os horários disponíveis para dermatologia?"_)?`,
 
   RESTAURANT: (name) =>
-    `🍕 Fala *${name}*, tudo bem? Aqui é o *ChefBot* da RAIA para Restaurantes, Hamburguerias e Delivery! 🍔🛵\n\n` +
-    `Comigo no seu WhatsApp, seus clientes visualizam o cardápio interativo, montam pedidos completos com adicionais, calculam taxa de entrega e pagam no Pix sem você pagar 30% de comissão para aplicativos de entrega!\n\n` +
-    `👉 *Experimente pedir nosso cardápio* (escreva: _"Quero ver o cardápio"_ ou _"Qual o valor da pizza de calabresa?"_)!`,
+    `🍕 Olá, *${name}*! Aqui é o *ChefBot*, assistente da RAIA para Restaurantes, Hamburguerias e Delivery! 🍔🛵\n\n` +
+    `Recebi seu pedido de demonstração! Comigo no WhatsApp, seus clientes consultam o cardápio, tiram dúvidas de itens e adicionais, informam o endereço e organizam o pedido de forma clara para sua cozinha produzir.\n\n` +
+    `👉 *Experimente consultar nosso cardápio de teste* (escreva: _"Quero ver o cardápio"_ ou _"Qual o valor da pizza de calabresa?"_)!`,
 
   LEGAL: (name) =>
-    `⚖️ Olá, *${name}*. Sou o *Dr. Lex*, assistente da RAIA especializado em Escritórios de Advocacia.\n\n` +
-    `Fui programado para recepcionar seus novos clientes 24h, realizar a triagem e qualificação preliminar dos casos e agendar a consulta direto com o advogado titular.\n\n` +
-    `👉 *Envie uma dúvida jurídica inicial como teste* (por exemplo: _"Gostaria de tirar uma dúvida sobre rescisão trabalhista"_)?`,
+    `⚖️ Olá, *${name}*. Sou o *Lex*, assistente de atendimento da RAIA para Escritórios de Advocacia.\n\n` +
+    `Fui programado para recepcionar interessados no WhatsApp, coletar as informações iniciais do caso de forma organizada e direcionar o agendamento direto com o advogado responsável pelo assunto.\n\n` +
+    `👉 *Envie uma dúvida inicial de teste* (por exemplo: _"Gostaria de agendar uma consulta sobre rescisão contratual"_)?`,
 
   REAL_ESTATE: (name) =>
     `🏡 Olá, *${name}*! Aqui é o *Lucas Imóveis*, assistente de IA da RAIA para Imobiliárias e Corretores! 🔑\n\n` +
-    `Eu respondo seus leads em 2 segundos, envio fotos e vídeos de imóveis de acordo com o perfil e já agendo a visita presencial com o corretor responsável!\n\n` +
+    `Eu atendo interessados com agilidade, coleto o perfil desejado (bairros, faixa de preço, quartos) e organizo as solicitações de visita para os corretores responsáveis darem continuidade.\n\n` +
     `👉 *Faça uma busca de teste* (por exemplo: _"Procuro apartamento de 2 quartos para alugar até R$ 3.500"_)?`,
 
   MECHANIC: (name) =>
     `🚗 Olá, *${name}*! Aqui é o *AutoCheck*, assistente da RAIA para Oficinas Mecânicas e Auto Centers! 🔧\n\n` +
-    `Eu aviso seus clientes automaticamente no momento exato em que o carro fica pronto, envio orçamentos de peças para aprovação no WhatsApp e lembro das revisões periódicas.\n\n` +
-    `👉 *Faça uma pergunta de teste* (por exemplo: _"Meu carro já terminou a revisão?"_)!`,
+    `Eu tiro dúvidas sobre serviços, coleto dados básicos do veículo para agilizar orçamentos e facilito as solicitações de agendamento de revisão para sua equipe.\n\n` +
+    `👉 *Faça uma pergunta de teste* (por exemplo: _"Quais serviços de revisão vocês realizam?"_)!`,
 
   FITNESS: (name) =>
-    `💪 E aí, *${name}*! Aqui é o *Coach Fit*, assistente de IA da RAIA para Academias, Studios e Treinadores! 🏋️\n\n` +
-    `Eu agendo aulas experimentais gratuitas, envio links de pagamento da mensalidade e resgato alunos ausentes há mais de 15 dias para você não perder faturamento.\n\n` +
-    `👉 *Faça uma simulação* (por exemplo: _"Tem vaga para aula experimental amanhã cedo?"_)!`,
+    `💪 Olá, *${name}*! Aqui é o *Coach Fit*, assistente de atendimento da RAIA para Academias e Studios! 🏋️\n\n` +
+    `Eu apresento as modalidades, planos disponíveis, horários de funcionamento e coleto solicitações para aulas experimentais para a recepção confirmar.\n\n` +
+    `👉 *Faça uma simulação de teste* (por exemplo: _"Quais os horários de Pilates e como agendar aula experimental?"_)!`,
 
   FINANCE: (name) =>
-    `💰 Olá, *${name}*! Sou o *Jarvis*, assistente de Gestão Financeira da RAIA para Autônomos e Pequenas Empresas! 📊\n\n` +
-    `Comigo você só manda um áudio rápido no trânsito ou foto da comanda e eu registro receitas e despesas no seu fluxo de caixa na hora, sem você precisar abrir planilhas.\n\n` +
-    `👉 *Envie um gasto de teste* (por exemplo: _"Almoço 35 no débito"_ ou _"Entrou 500 do cliente no Pix"_)!`,
+    `📊 Olá, *${name}*! Sou o *Jarvis*, assistente de Organização Financeira da RAIA para Autônomos e MEI! 💼\n\n` +
+    `Comigo você pode registrar suas entradas e despesas diárias de forma simples por texto ou áudio no WhatsApp para manter seu fluxo de caixa anotado.\n\n` +
+    `👉 *Envie um registro de teste* (por exemplo: _"Almoço 35 no débito"_ ou _"Recebido 500 do cliente no Pix"_)!`,
 
   RENTAL_MACHINES: (name) =>
-    `🏗️ Fala, *${name}*! Aqui é o *Marcão*, especialista em Locação de Máquinas e Equipamentos da RAIA!\n\n` +
-    `Eu atendo construtoras e mestres de obras 24h, consulto estoque de betoneiras e marteletes, calculo diárias e passo o frete na hora.\n\n` +
-    `👉 *Faça um orçamento de teste* (por exemplo: _"Tem betoneira 400L para locar por 15 dias?"_)!`,
+    `🏗️ Olá, *${name}*! Aqui é o *Marcão*, assistente da RAIA para Locação de Máquinas e Equipamentos de Construção!\n\n` +
+    `Eu tiro dúvidas sobre os equipamentos disponíveis para locação (betoneiras, marteletes, andaimes), coleto período de uso e endereço da obra para sua equipe orçar o frete.\n\n` +
+    `👉 *Faça uma consulta de teste* (por exemplo: _"Vocês têm betoneira 400L disponível para locar por 15 dias?"_)!`,
 
   CAR_DEALERSHIP: (name) =>
     `🏎️ Olá, *${name}*! Aqui é o *Rodrigo*, assistente da RAIA para Lojas de Veículos e Concessionárias! 🚗\n\n` +
-    `Eu atendo compradores no WhatsApp, envio ficha técnica de veículos do estoque, simulo parcelas de financiamento bancário e agendo test-drive.\n\n` +
-    `👉 *Simule um interesse em carro* (por exemplo: _"Vi o anúncio do Compass, aceita meu carro na troca?"_)!`,
+    `Eu recebo os interessados no WhatsApp, apresento opções do estoque conforme a faixa de valor e organizo as solicitações de test-drive e propostas para a equipe de vendas.\n\n` +
+    `👉 *Faça uma consulta de teste* (por exemplo: _"Estou procurando um SUV seminovo até R$ 120 mil"_)!`,
 };
 
 app.post('/api/test-agent', async (req, res) => {

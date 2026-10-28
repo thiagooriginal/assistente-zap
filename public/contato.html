@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contato e Suporte • RAIA Assistentes de IA</title>
+  <meta name="description" content="Entre em contato com a equipe da RAIA para tirar dúvidas, solicitar uma demonstração personalizada ou suporte técnico.">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: { raia: { black: '#07080c', bgDark: '#0a0d14', neon: '#00F59B' } }
+        }
+      }
+    }
+  </script>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    body { background-color: #040711; color: #ffffff; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .glass-nav { background: rgba(4, 7, 17, 0.9); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+    .glass-card { background: rgba(12, 18, 32, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; }
+  </style>
+</head>
+<body class="min-h-screen bg-[#040711] text-white selection:bg-[#00F59B] selection:text-black">
+
+  <!-- Header -->
+  <header class="fixed top-0 left-0 right-0 z-50 glass-nav">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <img src="/raia-logo.png" alt="RAIA" class="w-10 h-10 object-contain">
+        <div>
+          <span class="text-xl font-black text-white">RAIA</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#00F59B]/10 text-[#00F59B] font-bold uppercase ml-1">Contato</span>
+        </div>
+      </a>
+
+      <nav class="hidden md:flex items-center gap-7 text-xs font-bold text-zinc-300">
+        <a href="/" class="hover:text-white transition">Início</a>
+        <a href="/solucoes" class="hover:text-white transition">Soluções</a>
+        <a href="/como-funciona" class="hover:text-white transition">Como Funciona</a>
+        <a href="/planos" class="hover:text-white transition">Planos</a>
+        <a href="/contato" class="text-[#00F59B]">Contato</a>
+      </nav>
+
+      <div class="flex items-center gap-2.5">
+        <a href="/admin" class="px-3 py-1.5 rounded-full text-xs font-bold text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800">
+          Área do Gestor
+        </a>
+        <a href="https://wa.me/5511951364159" target="_blank" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs">
+          WhatsApp
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="pt-36 pb-24 max-w-4xl mx-auto px-4 sm:px-6 space-y-12">
+    <div class="text-center space-y-4 max-w-2xl mx-auto">
+      <span class="text-xs font-black uppercase tracking-widest text-[#00F59B]">Canais Oficiais</span>
+      <h1 class="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
+        Fale com a equipe da RAIA.
+      </h1>
+      <p class="text-sm text-zinc-400 leading-relaxed">
+        Estamos prontos para orientar sobre a melhor configuração para o seu segmento e esclarecer qualquer dúvida técnica ou comercial.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <!-- Card WhatsApp -->
+      <div class="glass-card p-8 space-y-5 border-emerald-500/30">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+          <i data-lucide="message-circle" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h2 class="text-lg font-bold text-white">Atendimento via WhatsApp</h2>
+          <p class="text-xs text-zinc-400 mt-1">Canal mais ágil para dúvidas comerciais e suporte técnico.</p>
+        </div>
+        <div class="space-y-1 text-xs text-zinc-300 font-mono">
+          <p class="font-bold text-white text-sm">+55 (11) 95136-4159</p>
+          <p class="text-zinc-500 font-sans">Segunda a Sexta, das 9h às 18h (Horário de Brasília)</p>
+        </div>
+        <a href="https://wa.me/5511951364159?text=Ol%C3%A1%2C+gostaria+de+falar+com+a+equipe+da+RAIA!" target="_blank" class="inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs shadow hover:scale-[1.02] transition">
+          <span>Abrir conversa no WhatsApp</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </a>
+      </div>
+
+      <!-- Card Institucional -->
+      <div class="glass-card p-8 space-y-5">
+        <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center">
+          <i data-lucide="building-2" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h2 class="text-lg font-bold text-white">Informações Institucionais</h2>
+          <p class="text-xs text-zinc-400 mt-1">Dados operacionais e localização da empresa.</p>
+        </div>
+        <div class="space-y-2 text-xs text-zinc-300">
+          <p><b>Operação:</b> RAIA RH — Soluções de Inteligência Artificial</p>
+          <p><b>Localização:</b> São Paulo, SP — Brasil</p>
+          <p><b>Disponibilidade dos Assistentes:</b> 24 horas por dia, 7 dias por semana na nuvem</p>
+          <p><b>Suporte Humano:</b> Dias úteis, em horário comercial</p>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="py-10 border-t border-zinc-800 bg-[#040711] text-xs text-zinc-500">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <img src="/raia-logo.png" alt="RAIA" class="w-6 h-6 object-contain">
+        <span class="font-bold text-zinc-400">RAIA • Assistentes de IA para WhatsApp</span>
+      </div>
+      <div class="flex items-center gap-4 text-zinc-400">
+        <a href="/" class="hover:text-white">Início</a>
+        <a href="/solucoes" class="hover:text-white">Soluções</a>
+        <a href="/como-funciona" class="hover:text-white">Como Funciona</a>
+        <a href="/planos" class="hover:text-white">Planos</a>
+        <a href="/termos" class="hover:text-white">Termos</a>
+        <a href="/privacidade" class="hover:text-white">Privacidade</a>
+      </div>
+      <p>© 2026 RAIA. Operado por RAIA RH.</p>
+    </div>
+  </footer>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => lucide.createIcons());
+  </script>
+</body>
+</html>

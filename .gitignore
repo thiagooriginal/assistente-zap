@@ -7,3 +7,5 @@ google_token.json
 qrcode.png
 *.log
 cloudflared.exe
+scratch/
+
