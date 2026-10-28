@@ -106,16 +106,28 @@
   </header>
 
   <!-- ============================================================ -->
-  <!-- HERO SECTION                                                 -->
+  <!-- HERO SECTION WITH AUTHENTIC NICHE ENVIRONMENT BACKGROUND     -->
   <!-- ============================================================ -->
-  <section class="relative pt-10 pb-16 px-4 sm:px-6 lg:px-8 border-b border-stone-200 overflow-hidden">
-    <div class="absolute inset-0 bg-gradient-to-b from-[#FFFDF9] via-[#FAF7F0] to-[#F5F2EA] pointer-events-none"></div>
+  <section class="relative pt-12 pb-20 px-4 sm:px-6 lg:px-8 border-b border-stone-200 overflow-hidden">
+
+    <!-- Real Niche Environment Ambient Background -->
+    <div class="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+      <img 
+        src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80" 
+        alt="🍔 Restaurante & Cozinha Artesanal" 
+        class="w-full h-full object-cover object-center filter brightness-[0.98] scale-[1.01]"
+      >
+      <!-- Gradient overlay: Left readable solid cream base, right translucent to reveal real niche environment -->
+      <div class="absolute inset-0 bg-gradient-to-r from-[#FAF9F6] via-[#FAF9F6]/92 to-[#FAF9F6]/30 hidden lg:block"></div>
+      <div class="absolute inset-0 bg-gradient-to-b from-[#FAF9F6] via-[#FAF9F6]/85 to-[#FAF9F6]/40 lg:hidden"></div>
+      <div class="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-[#FAF9F6] via-[#FAF9F6]/70 to-transparent"></div>
+    </div>
 
     <div class="relative z-10 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
       
-      <!-- Left Column -->
+      <!-- Left Column: Copywriting & Value Proposition -->
       <div class="lg:col-span-7 space-y-6 text-left">
-        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-stone-100 border border-stone-300 text-slate-800 text-xs font-extrabold tracking-wide">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/95 backdrop-blur-md border border-stone-300 text-slate-800 text-xs font-extrabold tracking-wide shadow-sm">
           <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
           <span>Especialmente Criado para Hamburguerias, Pizzarias & Restaurantes</span>
         </div>
@@ -124,7 +136,7 @@
           Seu delivery atendendo no WhatsApp e imprimindo pedidos sem você perder vendas no horário de pico.
         </h1>
 
-        <p class="text-base text-slate-600 leading-relaxed max-w-2xl font-normal">
+        <p class="text-base text-slate-700 leading-relaxed max-w-2xl font-normal bg-white/70 backdrop-blur-sm p-4 rounded-2xl border border-stone-200/60 shadow-xs">
           No sábado à noite, quando o WhatsApp não para, o ChefBot envia o cardápio com fotos em 3 segundos, calcula taxa de entrega pelo endereço, anota adicionais e manda o pedido formatado para a cozinha. No painel, você acompanha o faturamento do dia, custos de embalagens e repasse dos motoboys.
         </p>
 
@@ -135,43 +147,45 @@
             <span>Testar ChefBot no Meu WhatsApp Grátis</span>
           </button>
           
-          <a href="#dashboard" class="px-5 py-4 rounded-2xl bg-white hover:bg-stone-50 text-slate-800 font-extrabold text-xs border border-stone-300 transition flex items-center gap-2 card-shadow-soft">
+          <a href="#dashboard" class="px-5 py-4 rounded-2xl bg-white/95 hover:bg-white text-slate-800 font-extrabold text-xs border border-stone-300 transition flex items-center gap-2 card-shadow-soft">
             <i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-600"></i>
             <span>Ver Dashboard Financeiro & Equipe</span>
           </a>
         </div>
 
-        <!-- Metrics bar -->
+        <!-- Metric highlights -->
         <div class="pt-6 grid grid-cols-3 gap-4 border-t border-stone-200/80">
           <div class="space-y-0.5">
             <span class="text-2xl font-black text-emerald-700 font-mono">24h / 7d</span>
-            <p class="text-xs text-slate-500 font-medium">WhatsApp sem clientes no vácuo</p>
+            <p class="text-xs text-slate-600 font-medium">WhatsApp sem clientes no vácuo</p>
           </div>
           <div class="space-y-0.5">
-            <span class="text-2xl font-black text-amber-600 font-mono">98%</span>
-            <p class="text-xs text-slate-500 font-medium">Confirmação prévia amigável</p>
+            <span class="text-2xl font-black text-amber-600 font-mono">99%</span>
+            <p class="text-xs text-slate-600 font-medium">Pontualidade & comparecimento</p>
           </div>
           <div class="space-y-0.5">
             <span class="text-2xl font-black text-slate-900 font-mono">100%</span>
-            <p class="text-xs text-slate-500 font-medium">Caixa e comissões calculadas</p>
+            <p class="text-xs text-slate-600 font-medium">Custos & comissões apurados</p>
           </div>
         </div>
+
       </div>
 
-      <!-- Right Column: Visual Collage -->
+      <!-- Right Column: Visual Collage with Real Niche Atmosphere -->
       <div class="lg:col-span-5 relative">
-        <div class="relative rounded-3xl overflow-hidden card-shadow-elevated bg-white border border-stone-200 p-3 space-y-3">
+        <div class="relative rounded-3xl overflow-hidden card-shadow-elevated bg-white/95 backdrop-blur-md border border-stone-200 p-3 space-y-3">
           
+          <!-- Top: Real Niche Environment -->
           <div class="relative h-56 rounded-2xl overflow-hidden">
             <img 
-              src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1200&q=80" 
-              alt="Ambiente profissional do segmento Delivery & Restaurantes" 
+              src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80" 
+              alt="🍔 Restaurante & Cozinha Artesanal" 
               class="w-full h-full object-cover"
             >
-            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
             
             <div class="absolute top-3 left-3 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-slate-900 text-[10px] font-extrabold flex items-center gap-1.5 shadow">
-              <span>🍔 Delivery & Cozinha Ágil</span>
+              <span>🍔 Restaurante & Cozinha Artesanal</span>
             </div>
 
             <div class="absolute bottom-3 left-3 right-3 text-white">
@@ -180,12 +194,15 @@
             </div>
           </div>
 
+          <!-- Bottom: Human Specialist in Action + Active WhatsApp badge -->
           <div class="relative h-44 rounded-2xl overflow-hidden">
             <img 
-              src="https://images.unsplash.com/photo-1577219491135-ce391730fb2c?auto=format&fit=crop&w=800&q=80" 
+              src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=800&q=80" 
               alt="Atendimento profissional e humanizado" 
               class="w-full h-full object-cover object-top"
             >
+            
+            <!-- Floating badge -->
             <div class="absolute bottom-3 left-3 right-3 p-2.5 rounded-xl bg-white/95 backdrop-blur-md border border-stone-200 flex items-center justify-between text-xs shadow-md">
               <div class="flex items-center gap-2">
                 <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -228,21 +245,21 @@
 
           <div class="space-y-2">
             <span class="text-[10px] font-black uppercase text-rose-600 tracking-wider">Desafio #1</span>
-            <h3 class="text-base font-bold text-slate-900 leading-snug">
+            <h3 class="text-lg font-black text-slate-900 leading-snug">
               Clientes esperando 15 minutos no WhatsApp para receber o cardápio.
             </h3>
-            <p class="text-xs text-slate-600 leading-relaxed">
+            <p class="text-xs text-slate-500 leading-relaxed font-normal">
               Com a fome apertando, se o cliente não for atendido na hora, ele abre o app concorrente e fecha com outra pizzaria.
             </p>
           </div>
 
-          <div class="pt-4 border-t border-stone-100 space-y-1 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
-            <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1">
-              <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
-              <span>Com o(a) ChefBot</span>
+          <div class="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 space-y-1.5">
+            <span class="text-[10px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1">
+              <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+              Como a RAIA Resolve
             </span>
-            <p class="text-xs text-slate-700 leading-relaxed font-medium">
-              O ChefBot envia o cardápio completo com fotos, combos e opções de borda recheada no primeiro segundo.
+            <p class="text-xs font-bold text-emerald-950 leading-relaxed">
+              O ChefBot envia o cardápio completo com fotos, combos e opções de adicionais no primeiro segundo.
             </p>
           </div>
         </div>
@@ -254,21 +271,21 @@
 
           <div class="space-y-2">
             <span class="text-[10px] font-black uppercase text-rose-600 tracking-wider">Desafio #2</span>
-            <h3 class="text-base font-bold text-slate-900 leading-snug">
+            <h3 class="text-lg font-black text-slate-900 leading-snug">
               Erros de pedidos anotados às pressas em papel no balcão.
             </h3>
-            <p class="text-xs text-slate-600 leading-relaxed">
+            <p class="text-xs text-slate-500 leading-relaxed font-normal">
               Esquecer refrigerante, trocar o ponto da carne ou errar o endereço do cliente gera reclamação, atraso e prejuízo com reenvio.
             </p>
           </div>
 
-          <div class="pt-4 border-t border-stone-100 space-y-1 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
-            <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1">
-              <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
-              <span>Com o(a) ChefBot</span>
+          <div class="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 space-y-1.5">
+            <span class="text-[10px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1">
+              <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+              Como a RAIA Resolve
             </span>
-            <p class="text-xs text-slate-700 leading-relaxed font-medium">
-              O robô confirma item por item com adicionais, endereço completo e forma de pagamento antes de passar para a cozinha.
+            <p class="text-xs font-bold text-emerald-950 leading-relaxed">
+              Pedido 100% estruturado: itens, ponto da carne, taxa de entrega por CEP e forma de pagamento validados.
             </p>
           </div>
         </div>
@@ -280,20 +297,20 @@
 
           <div class="space-y-2">
             <span class="text-[10px] font-black uppercase text-rose-600 tracking-wider">Desafio #3</span>
-            <h3 class="text-base font-bold text-slate-900 leading-snug">
-              Altas comissões de aplicativos de entrega comendo seu lucro.
+            <h3 class="text-lg font-black text-slate-900 leading-snug">
+              Comissões abusivas de 27% dos grandes apps de delivery comendo sua margem.
             </h3>
-            <p class="text-xs text-slate-600 leading-relaxed">
+            <p class="text-xs text-slate-500 leading-relaxed font-normal">
               Pagar até 27% por pedido para marketplaces deixa a operação no limite. O cliente fiel precisa comprar direto no seu WhatsApp.
             </p>
           </div>
 
-          <div class="pt-4 border-t border-stone-100 space-y-1 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
-            <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1">
-              <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
-              <span>Com o(a) ChefBot</span>
+          <div class="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 space-y-1.5">
+            <span class="text-[10px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1">
+              <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i>
+              Como a RAIA Resolve
             </span>
-            <p class="text-xs text-slate-700 leading-relaxed font-medium">
+            <p class="text-xs font-bold text-emerald-950 leading-relaxed">
               Canal próprio direto no WhatsApp com custo fixo a partir de R$ 39/mês. Lucro 100% no seu caixa.
             </p>
           </div>
@@ -305,340 +322,309 @@
   <!-- ============================================================ -->
   <!-- SECTION: DASHBOARD FINANCEIRO & GESTÃO DE EQUIPE             -->
   <!-- ============================================================ -->
-  <section id="dashboard" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-stone-200">
-    <div class="space-y-8">
+  <section id="dashboard" class="py-16 px-4 sm:px-6 lg:px-8 border-y border-stone-200 bg-stone-100/50">
+    <div class="max-w-7xl mx-auto space-y-10">
       
       <!-- Section Header -->
-      <div class="text-center max-w-3xl mx-auto space-y-3">
-        <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-black uppercase tracking-wider">
-          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-emerald-600"></i>
-          <span>Gestão Financeira & Múltiplos Profissionais</span>
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <span class="px-3.5 py-1 rounded-full bg-stone-200 text-slate-800 text-xs font-extrabold uppercase tracking-wide">
+            Controle Operacional & Lucro Real
+          </span>
+          <h2 class="text-2xl sm:text-3xl font-black text-slate-900 mt-2">
+            O Painel da RAIA mostra seu negócio com clareza cristalina.
+          </h2>
+          <p class="text-sm text-slate-600 mt-1 max-w-xl">
+            Muito mais que um assistente no WhatsApp: um painel de gestão financeira completo com entradas, custos e repasses da equipe.
+          </p>
         </div>
-        <h2 class="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
-          O Painel de Controle que coloca os números do seu negócio em ordem.
-        </h2>
-        <p class="text-sm text-slate-600 leading-relaxed">
-          Inspirado nas melhores ferramentas de gestão visual do mundo. Acompanhe entradas, custos de materiais e o repasse transparente da sua equipe.
-        </p>
+        
+        <div class="flex items-center gap-2">
+          <span class="px-3 py-1.5 rounded-xl bg-white border border-stone-300 text-slate-700 text-xs font-bold flex items-center gap-2 shadow-xs">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Dados em Tempo Real</span>
+          </span>
+        </div>
       </div>
 
-      <!-- Main Dashboard Card -->
-      <div class="bg-white rounded-3xl border border-stone-200 card-shadow-elevated p-6 sm:p-8 space-y-8 overflow-hidden relative">
+      <!-- DASHBOARD SHELL CONTAINER -->
+      <div class="rounded-3xl bg-white border border-stone-200 card-shadow-elevated p-6 sm:p-8 space-y-8">
         
-        <!-- Top Bar -->
-        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-stone-200 pb-5">
-          <div class="flex items-center gap-3">
-            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-700 flex items-center justify-center text-white font-black text-lg shadow-md">
-              CH
+        <!-- Top Bar of the Dashboard Component -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-stone-100 gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="text-lg font-black text-slate-900">Hamburgueria & Pizzaria Forneria • Gestão de Comandas</span>
+              <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase">Ao Vivo</span>
             </div>
-            <div>
-              <div class="flex items-center gap-2">
-                <h3 class="text-lg font-black text-slate-900">Hamburgueria & Delivery Gourmet • Caixa & Expedição</h3>
-                <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold flex items-center gap-1">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-                  Caixa Aberto
-                </span>
-              </div>
-              <p class="text-xs text-slate-500 font-medium">Movimentação de Hoje • 4 Motoboys em Rota</p>
-            </div>
+            <p class="text-xs text-slate-500 font-medium">Movimentação de Hoje • Salão & Delivery</p>
           </div>
 
           <div class="flex items-center gap-2">
             <span class="text-xs font-bold text-slate-500">Período:</span>
-            <div class="flex items-center p-1 bg-stone-100 rounded-xl text-xs font-bold">
-              <button class="px-3 py-1 rounded-lg bg-white shadow-sm text-slate-900">Hoje</button>
-              <button class="px-3 py-1 text-slate-500 hover:text-slate-900">Semana</button>
-              <button class="px-3 py-1 text-slate-500 hover:text-slate-900">Mês</button>
+            <div class="px-3 py-1.5 rounded-xl bg-stone-100 border border-stone-200 text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+              <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-600"></i>
+              <span>Hoje (Tempo Real)</span>
             </div>
           </div>
         </div>
 
-        <!-- 4 Metric Cards -->
+        <!-- 4 Key Financial Metrics (SEDAP + CIRCLE SOFT INSPIRATION) -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           
-            <div class="p-5 rounded-2xl bg-stone-50 border border-stone-200 space-y-2">
+            <div class="p-5 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-2 hover:border-slate-300 transition">
               <div class="flex items-center justify-between">
-                <span class="text-[11px] font-black text-slate-700 bg-white border border-stone-200 px-2 py-0.5 rounded-full shadow-sm">
-                  ▲ +28% sábado
-                </span>
-                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
+                <span class="text-xs font-bold text-slate-500">Faturamento de Pedidos (Entradas)</span>
+                <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">▲ +32% sábado à noite</span>
               </div>
-              <div class="space-y-0.5">
-                <span class="text-xs font-bold text-slate-600">Faturamento de Delivery (Entradas)</span>
-                <div class="text-2xl font-black text-slate-900 font-mono">R$ 4.890,00</div>
-                <p class="text-[11px] text-slate-500">62 pedidos entregues hoje</p>
+              <div class="text-2xl font-black text-slate-900 font-mono tracking-tight">
+                R$ 4.820,00
               </div>
+              <p class="text-[11px] text-slate-400 font-medium">
+                68 pedidos despachados hoje
+              </p>
             </div>
           
-            <div class="p-5 rounded-2xl bg-stone-50 border border-stone-200 space-y-2">
+            <div class="p-5 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-2 hover:border-slate-300 transition">
               <div class="flex items-center justify-between">
-                <span class="text-[11px] font-black text-slate-700 bg-white border border-stone-200 px-2 py-0.5 rounded-full shadow-sm">
-                  Insumos Cozinha
-                </span>
-                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
+                <span class="text-xs font-bold text-slate-500">Custos de Insumos & Embalagens</span>
+                <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-rose-100 text-rose-800">Custos Operacionais</span>
               </div>
-              <div class="space-y-0.5">
-                <span class="text-xs font-bold text-slate-600">Custos de Insumos & Embalagens</span>
-                <div class="text-2xl font-black text-slate-900 font-mono">R$ 1.580,00</div>
-                <p class="text-[11px] text-slate-500">Carnes nobres, queijos, embalagens térmicas</p>
+              <div class="text-2xl font-black text-slate-900 font-mono tracking-tight">
+                R$ 1.580,00
               </div>
+              <p class="text-[11px] text-slate-400 font-medium">
+                Carnes, queijos, caixas térmicas
+              </p>
             </div>
           
-            <div class="p-5 rounded-2xl bg-stone-50 border border-stone-200 space-y-2">
+            <div class="p-5 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-2 hover:border-slate-300 transition">
               <div class="flex items-center justify-between">
-                <span class="text-[11px] font-black text-slate-700 bg-white border border-stone-200 px-2 py-0.5 rounded-full shadow-sm">
-                  4 Entregadores
-                </span>
-                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
+                <span class="text-xs font-bold text-slate-500">Repasse da Equipe de Entrega</span>
+                <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800">4 Entregadores</span>
               </div>
-              <div class="space-y-0.5">
-                <span class="text-xs font-bold text-slate-600">Repasse de Motoboys / Diárias</span>
-                <div class="text-2xl font-black text-slate-900 font-mono">R$ 680,00</div>
-                <p class="text-[11px] text-slate-500">Calculado por taxa de entrega</p>
+              <div class="text-2xl font-black text-slate-900 font-mono tracking-tight">
+                R$ 740,00
               </div>
+              <p class="text-[11px] text-slate-400 font-medium">
+                Diárias e taxas dos 4 motoboys
+              </p>
             </div>
           
-            <div class="p-5 rounded-2xl bg-stone-50 border border-stone-200 space-y-2">
+            <div class="p-5 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-2 hover:border-slate-300 transition">
               <div class="flex items-center justify-between">
-                <span class="text-[11px] font-black text-slate-700 bg-white border border-stone-200 px-2 py-0.5 rounded-full shadow-sm">
-                  Margem: 53.8%
-                </span>
-                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
+                <span class="text-xs font-bold text-slate-500">Lucro Líquido da Cozinha (Sobra)</span>
+                <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-slate-200 text-slate-800">Margem: 51.8%</span>
               </div>
-              <div class="space-y-0.5">
-                <span class="text-xs font-bold text-slate-600">Lucro Líquido do Restaurante</span>
-                <div class="text-2xl font-black text-slate-900 font-mono">R$ 2.630,00</div>
-                <p class="text-[11px] text-slate-500">Margem líquida de 53.8% hoje</p>
+              <div class="text-2xl font-black text-slate-900 font-mono tracking-tight">
+                R$ 2.500,00
               </div>
+              <p class="text-[11px] text-slate-400 font-medium">
+                Margem líquida de 51.8% no dia
+              </p>
             </div>
           
         </div>
 
-        <!-- Charts Middle Section -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <!-- Middle Section: Visual Charts (Wave Trend + Donut Category) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          <!-- Left: Wave SVG Chart -->
-          <div class="lg:col-span-7 p-6 rounded-2xl bg-stone-50/80 border border-stone-200 space-y-4 flex flex-col justify-between">
+          <!-- Left: Wave Curve Chart (Weekly Revenue Flow) -->
+          <div class="lg:col-span-7 p-6 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-4">
             <div class="flex items-center justify-between">
               <div>
-                <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-                  <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
-                  <span>Fluxo de Caixa: Entradas vs Custos</span>
-                </h4>
-                <p class="text-[11px] text-slate-500">Crescimento contínuo de receita e controle de gastos</p>
+                <h4 class="text-sm font-black text-slate-900">Evolução de Entradas da Semana</h4>
+                <p class="text-xs text-slate-500">Comparativo diário de faturamento e agendamentos</p>
               </div>
-              <div class="flex items-center gap-3 text-xs font-bold">
-                <span class="flex items-center gap-1.5 text-emerald-600">
-                  <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
-                  <span>Entradas</span>
-                </span>
-                <span class="flex items-center gap-1.5 text-rose-500">
-                  <span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
-                  <span>Custos</span>
-                </span>
-              </div>
+              <span class="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                ▲ +22.4% vs semana anterior
+              </span>
             </div>
 
-            <div class="relative h-44 w-full flex items-end">
-              <svg class="w-full h-full overflow-visible" viewBox="0 0 500 150" preserveAspectRatio="none">
-                <line x1="0" y1="30" x2="500" y2="30" stroke="#E2E8F0" stroke-dasharray="3,3" />
-                <line x1="0" y1="75" x2="500" y2="75" stroke="#E2E8F0" stroke-dasharray="3,3" />
-                <line x1="0" y1="120" x2="500" y2="120" stroke="#E2E8F0" stroke-dasharray="3,3" />
-                
-                <path d="M0,130 C80,120 120,70 180,60 C240,50 300,90 360,40 C420,20 460,30 500,10 L500,150 L0,150 Z" fill="rgba(5, 150, 105, 0.12)" />
-                <path d="M0,130 C80,120 120,70 180,60 C240,50 300,90 360,40 C420,20 460,30 500,10" fill="none" stroke="#059669" stroke-width="3" stroke-linecap="round" />
-                <path d="M0,140 C80,135 120,120 180,115 C240,110 300,125 360,105 C420,95 460,110 500,90" fill="none" stroke="#E11D48" stroke-width="2.5" stroke-dasharray="4,2" />
-                <circle cx="360" cy="40" r="5" fill="#059669" stroke="#FFFFFF" stroke-width="2" />
-                <circle cx="500" cy="10" r="5" fill="#059669" stroke="#FFFFFF" stroke-width="2" />
+            <!-- Stylized SVG Wave Chart -->
+            <div class="relative h-44 w-full flex items-end pt-4">
+              <svg class="w-full h-full overflow-visible" viewBox="0 0 500 120" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="nicheWaveGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#10B981" stop-opacity="0.35"/>
+                    <stop offset="100%" stop-color="#10B981" stop-opacity="0.0"/>
+                  </linearGradient>
+                </defs>
+                <path d="M 0,90 Q 70,110 120,60 T 250,50 T 370,25 T 500,10 L 500,120 L 0,120 Z" fill="url(#nicheWaveGrad)" />
+                <path d="M 0,90 Q 70,110 120,60 T 250,50 T 370,25 T 500,10" fill="none" stroke="#059669" stroke-width="3" stroke-linecap="round" />
+                <circle cx="120" cy="60" r="4" fill="#059669" />
+                <circle cx="250" cy="50" r="4" fill="#059669" />
+                <circle cx="370" cy="25" r="4" fill="#059669" />
+                <circle cx="500" cy="10" r="5" fill="#059669" stroke="#ffffff" stroke-width="2" />
               </svg>
             </div>
 
-            <div class="flex items-center justify-between text-[10px] text-slate-400 font-bold border-t border-stone-200 pt-2">
-              <span>Segunda</span>
-              <span>Terça</span>
-              <span>Quarta</span>
-              <span>Quinta</span>
-              <span>Sexta</span>
-              <span class="text-emerald-700 font-extrabold">Fim de Semana (Pico)</span>
+            <!-- Days of Week labels -->
+            <div class="flex justify-between text-[11px] font-bold text-slate-400 pt-1 border-t border-stone-200/60">
+              <span>Seg</span>
+              <span>Ter</span>
+              <span>Qua</span>
+              <span>Qui</span>
+              <span>Sex</span>
+              <span class="text-emerald-700 font-black">Sáb (Hoje)</span>
+              <span>Dom</span>
             </div>
           </div>
 
-          <!-- Right: Donut Services Breakdown -->
-          <div class="lg:col-span-5 p-6 rounded-2xl bg-stone-50/80 border border-stone-200 space-y-4">
-            <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
-              <i data-lucide="pie-chart" class="w-4 h-4 text-emerald-600"></i>
-              <span>Pratos Mais Pedidos da Noite</span>
-            </h4>
-
-            <div class="space-y-3 pt-1 text-xs">
-              
-                <div class="space-y-1">
-                  <div class="flex items-center justify-between font-bold text-slate-800">
-                    <span class="flex items-center gap-2">
-                      <span class="w-3 h-3 rounded-full bg-orange-500 inline-block"></span>
-                      <span>Burgers Artesanais & Combos</span>
-                    </span>
-                    <span class="font-mono text-slate-900">48% • R$ 2.347</span>
-                  </div>
-                  <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
-                    <div class="h-full bg-orange-500 rounded-full" style="width: 48%"></div>
-                  </div>
-                </div>
-              
-                <div class="space-y-1">
-                  <div class="flex items-center justify-between font-bold text-slate-800">
-                    <span class="flex items-center gap-2">
-                      <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
-                      <span>Pizzas Especiais & Bordas Recheadas</span>
-                    </span>
-                    <span class="font-mono text-slate-900">30% • R$ 1.467</span>
-                  </div>
-                  <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
-                    <div class="h-full bg-red-500 rounded-full" style="width: 30%"></div>
-                  </div>
-                </div>
-              
-                <div class="space-y-1">
-                  <div class="flex items-center justify-between font-bold text-slate-800">
-                    <span class="flex items-center gap-2">
-                      <span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
-                      <span>Porções & Batatas Rústicas</span>
-                    </span>
-                    <span class="font-mono text-slate-900">12% • R$ 586</span>
-                  </div>
-                  <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
-                    <div class="h-full bg-amber-500 rounded-full" style="width: 12%"></div>
-                  </div>
-                </div>
-              
-                <div class="space-y-1">
-                  <div class="flex items-center justify-between font-bold text-slate-800">
-                    <span class="flex items-center gap-2">
-                      <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
-                      <span>Bebidas & Sobremesas</span>
-                    </span>
-                    <span class="font-mono text-slate-900">10% • R$ 490</span>
-                  </div>
-                  <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
-                    <div class="h-full bg-emerald-500 rounded-full" style="width: 10%"></div>
-                  </div>
-                </div>
-              
+          <!-- Right: Donut Category Distribution -->
+          <div class="lg:col-span-5 p-6 rounded-2xl bg-stone-50 border border-stone-200/80 space-y-4">
+            <div>
+              <h4 class="text-sm font-black text-slate-900">Itens Mais Vendidos Hoje</h4>
+              <p class="text-xs text-slate-500">Distribuição percentual do faturamento de hoje</p>
             </div>
 
-            <div class="p-3 rounded-xl bg-white border border-stone-200 flex items-center justify-between text-xs">
-              <div class="flex items-center gap-2">
-                <i data-lucide="check-check" class="w-4 h-4 text-emerald-600"></i>
-                <span class="font-bold text-slate-800">Taxa de Confirmação no WhatsApp</span>
-              </div>
-              <span class="font-black text-emerald-700 font-mono text-sm">98%</span>
+            <div class="space-y-3 pt-2">
+              
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-slate-700">Burgers Artesanais & Combos</span>
+                    <span class="font-mono font-black text-slate-900">R$ 2.313 (48%)</span>
+                  </div>
+                  <div class="w-full h-2 rounded-full bg-stone-200 overflow-hidden">
+                    <div class="h-full rounded-full bg-orange-500" style="width: 48%"></div>
+                  </div>
+                </div>
+              
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-slate-700">Pizzas Especiais & Bordas Recheadas</span>
+                    <span class="font-mono font-black text-slate-900">R$ 1.542 (32%)</span>
+                  </div>
+                  <div class="w-full h-2 rounded-full bg-stone-200 overflow-hidden">
+                    <div class="h-full rounded-full bg-red-500" style="width: 32%"></div>
+                  </div>
+                </div>
+              
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-slate-700">Porções, Fritas & Petiscos</span>
+                    <span class="font-mono font-black text-slate-900">R$ 578 (12%)</span>
+                  </div>
+                  <div class="w-full h-2 rounded-full bg-stone-200 overflow-hidden">
+                    <div class="h-full rounded-full bg-amber-500" style="width: 12%"></div>
+                  </div>
+                </div>
+              
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between text-xs">
+                    <span class="font-bold text-slate-700">Bebidas & Sobremesas Artesanais</span>
+                    <span class="font-mono font-black text-slate-900">R$ 385 (8%)</span>
+                  </div>
+                  <div class="w-full h-2 rounded-full bg-stone-200 overflow-hidden">
+                    <div class="h-full rounded-full bg-yellow-500" style="width: 8%"></div>
+                  </div>
+                </div>
+              
             </div>
           </div>
 
         </div>
 
-        <!-- Team Management Table (Circle Soft Style) -->
-        <div class="space-y-4 pt-4 border-t border-stone-200">
-          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+        <!-- Bottom Section: Multi-Professional Team Management Table -->
+        <div class="space-y-4 pt-2">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h4 class="text-sm font-black text-slate-900 flex items-center gap-2">
-                <i data-lucide="users" class="w-4 h-4 text-emerald-600"></i>
-                <span>Equipe de Entregas & Repasse de Diárias dos Motoboys</span>
-              </h4>
-              <p class="text-xs text-slate-500">Controle de corridas realizadas e pagamento de taxas por motoboy</p>
+              <h4 class="text-base font-black text-slate-900">Equipe de Cozinha & Motoboys de Hoje</h4>
+              <p class="text-xs text-slate-500">Controle de diárias, entregas realizadas e repasse por corrida</p>
             </div>
-            <span class="text-xs text-emerald-700 font-extrabold bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl">
-              Cálculo 100% Automático
+            <span class="text-xs font-extrabold text-slate-700 bg-stone-100 px-3 py-1.5 rounded-xl border border-stone-200">
+              4 profissionais operando
             </span>
           </div>
 
+          <!-- Table Container -->
           <div class="overflow-x-auto rounded-2xl border border-stone-200">
-            <table class="w-full text-left text-xs bg-white">
-              <thead class="bg-stone-100/80 text-slate-600 border-b border-stone-200 text-[11px] font-bold">
-                <tr>
-                  <th class="py-3 px-4">Profissional / Responsável</th>
-                  <th class="py-3 px-4">Especialidade / Função</th>
-                  <th class="py-3 px-4 text-center">Volume Hoje</th>
-                  <th class="py-3 px-4">Faturamento Bruto</th>
-                  <th class="py-3 px-4">Comissão / Repasse</th>
-                  <th class="py-3 px-4 text-emerald-700">Retenção da Empresa</th>
-                  <th class="py-3 px-4 text-right">Status</th>
+            <table class="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr class="bg-stone-100/80 border-b border-stone-200 text-[11px] font-black text-slate-600 uppercase tracking-wider">
+                  <th class="p-3.5">Profissional / Responsável</th>
+                  <th class="p-3.5">Especialidade</th>
+                  <th class="p-3.5">Volume de Hoje</th>
+                  <th class="p-3.5">Faturamento Bruto</th>
+                  <th class="p-3.5">Repasse / Comissão</th>
+                  <th class="p-3.5">Retido pela Empresa</th>
+                  <th class="p-3.5 text-center">Status</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-stone-100 font-medium">
+              <tbody class="divide-y divide-stone-200 bg-white">
                 
-                  <tr class="hover:bg-stone-50 transition">
-                    <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2.5">
-                      <div class="w-8 h-8 rounded-full bg-stone-100 text-slate-800 font-black flex items-center justify-center text-xs border border-stone-200">
-                        LU
+                  <tr class="hover:bg-stone-50/70 transition">
+                    <td class="p-3.5 font-black text-slate-900 flex items-center gap-2.5">
+                      <div class="w-7 h-7 rounded-full bg-stone-200 text-slate-700 flex items-center justify-center font-bold text-[10px]">
+                        LM
                       </div>
-                      <span>Lucas Santana</span>
+                      <span>Lucas Motoboy (Zona Sul)</span>
                     </td>
-                    <td class="py-3.5 px-4 text-slate-600">Motoboy Zona Sul & Centro</td>
-                    <td class="py-3.5 px-4 text-center font-mono font-bold">18 entregas</td>
-                    <td class="py-3.5 px-4 font-mono font-bold text-slate-900">R$ 1.440,00</td>
-                    <td class="py-3.5 px-4 font-mono text-amber-700 font-bold">R$ 198,00 (Taxas)</td>
-                    <td class="py-3.5 px-4 font-mono text-emerald-700 font-bold">R$ 1.242,00</td>
-                    <td class="py-3.5 px-4 text-right">
-                      <span class="px-2.5 py-1 rounded-full bg-stone-100 text-slate-800 text-[10px] font-extrabold border border-stone-200">
+                    <td class="p-3.5 text-slate-600 font-medium">Entregador Titular</td>
+                    <td class="p-3.5 font-bold text-slate-800">22 entregas</td>
+                    <td class="p-3.5 font-mono font-black text-slate-900">R$ 242,00</td>
+                    <td class="p-3.5 font-mono font-bold text-amber-700 bg-amber-50/50 px-2 rounded">R$ 242,00 (100% taxa)</td>
+                    <td class="p-3.5 font-mono font-bold text-emerald-700">R$ 0,00 (frete)</td>
+                    <td class="p-3.5 text-center">
+                      <span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
                         Em Rota
                       </span>
                     </td>
                   </tr>
                 
-                  <tr class="hover:bg-stone-50 transition">
-                    <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2.5">
-                      <div class="w-8 h-8 rounded-full bg-stone-100 text-slate-800 font-black flex items-center justify-center text-xs border border-stone-200">
-                        DI
+                  <tr class="hover:bg-stone-50/70 transition">
+                    <td class="p-3.5 font-black text-slate-900 flex items-center gap-2.5">
+                      <div class="w-7 h-7 rounded-full bg-stone-200 text-slate-700 flex items-center justify-center font-bold text-[10px]">
+                        RM
                       </div>
-                      <span>Diego Ferreira</span>
+                      <span>Rodrigo Motoboy (Centro)</span>
                     </td>
-                    <td class="py-3.5 px-4 text-slate-600">Motoboy Zona Leste</td>
-                    <td class="py-3.5 px-4 text-center font-mono font-bold">16 entregas</td>
-                    <td class="py-3.5 px-4 font-mono font-bold text-slate-900">R$ 1.280,00</td>
-                    <td class="py-3.5 px-4 font-mono text-amber-700 font-bold">R$ 176,00 (Taxas)</td>
-                    <td class="py-3.5 px-4 font-mono text-emerald-700 font-bold">R$ 1.104,00</td>
-                    <td class="py-3.5 px-4 text-right">
-                      <span class="px-2.5 py-1 rounded-full bg-stone-100 text-slate-800 text-[10px] font-extrabold border border-stone-200">
+                    <td class="p-3.5 text-slate-600 font-medium">Entregador Titular</td>
+                    <td class="p-3.5 font-bold text-slate-800">19 entregas</td>
+                    <td class="p-3.5 font-mono font-black text-slate-900">R$ 209,00</td>
+                    <td class="p-3.5 font-mono font-bold text-amber-700 bg-amber-50/50 px-2 rounded">R$ 209,00 (100% taxa)</td>
+                    <td class="p-3.5 font-mono font-bold text-emerald-700">R$ 0,00 (frete)</td>
+                    <td class="p-3.5 text-center">
+                      <span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800">
                         Em Rota
                       </span>
                     </td>
                   </tr>
                 
-                  <tr class="hover:bg-stone-50 transition">
-                    <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2.5">
-                      <div class="w-8 h-8 rounded-full bg-stone-100 text-slate-800 font-black flex items-center justify-center text-xs border border-stone-200">
-                        RE
+                  <tr class="hover:bg-stone-50/70 transition">
+                    <td class="p-3.5 font-black text-slate-900 flex items-center gap-2.5">
+                      <div class="w-7 h-7 rounded-full bg-stone-200 text-slate-700 flex items-center justify-center font-bold text-[10px]">
+                        MM
                       </div>
-                      <span>Renan Oliveira</span>
+                      <span>Matheus Motoboy (Zona Leste)</span>
                     </td>
-                    <td class="py-3.5 px-4 text-slate-600">Motoboy Bairros Nobres</td>
-                    <td class="py-3.5 px-4 text-center font-mono font-bold">15 entregas</td>
-                    <td class="py-3.5 px-4 font-mono font-bold text-slate-900">R$ 1.210,00</td>
-                    <td class="py-3.5 px-4 font-mono text-amber-700 font-bold">R$ 165,00 (Taxas)</td>
-                    <td class="py-3.5 px-4 font-mono text-emerald-700 font-bold">R$ 1.045,00</td>
-                    <td class="py-3.5 px-4 text-right">
-                      <span class="px-2.5 py-1 rounded-full bg-stone-100 text-slate-800 text-[10px] font-extrabold border border-stone-200">
-                        Aguardando
+                    <td class="p-3.5 text-slate-600 font-medium">Entregador Apoio</td>
+                    <td class="p-3.5 font-bold text-slate-800">15 entregas</td>
+                    <td class="p-3.5 font-mono font-black text-slate-900">R$ 165,00</td>
+                    <td class="p-3.5 font-mono font-bold text-amber-700 bg-amber-50/50 px-2 rounded">R$ 165,00 (100% taxa)</td>
+                    <td class="p-3.5 font-mono font-bold text-emerald-700">R$ 0,00 (frete)</td>
+                    <td class="p-3.5 text-center">
+                      <span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800">
+                        No Pátio
                       </span>
                     </td>
                   </tr>
                 
-                  <tr class="hover:bg-stone-50 transition">
-                    <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2.5">
-                      <div class="w-8 h-8 rounded-full bg-stone-100 text-slate-800 font-black flex items-center justify-center text-xs border border-stone-200">
+                  <tr class="hover:bg-stone-50/70 transition">
+                    <td class="p-3.5 font-black text-slate-900 flex items-center gap-2.5">
+                      <div class="w-7 h-7 rounded-full bg-stone-200 text-slate-700 flex items-center justify-center font-bold text-[10px]">
                         CA
                       </div>
-                      <span>Caio Medeiros</span>
+                      <span>Chef Anderson</span>
                     </td>
-                    <td class="py-3.5 px-4 text-slate-600">Motoboy Apoio Rápido</td>
-                    <td class="py-3.5 px-4 text-center font-mono font-bold">13 entregas</td>
-                    <td class="py-3.5 px-4 font-mono font-bold text-slate-900">R$ 960,00</td>
-                    <td class="py-3.5 px-4 font-mono text-amber-700 font-bold">R$ 141,00 (Taxas)</td>
-                    <td class="py-3.5 px-4 font-mono text-emerald-700 font-bold">R$ 819,00</td>
-                    <td class="py-3.5 px-4 text-right">
-                      <span class="px-2.5 py-1 rounded-full bg-stone-100 text-slate-800 text-[10px] font-extrabold border border-stone-200">
-                        Concluído
+                    <td class="p-3.5 text-slate-600 font-medium">Chapeiro & Cozinha</td>
+                    <td class="p-3.5 font-bold text-slate-800">68 pedidos feitos</td>
+                    <td class="p-3.5 font-mono font-black text-slate-900">R$ 4.820,00</td>
+                    <td class="p-3.5 font-mono font-bold text-amber-700 bg-amber-50/50 px-2 rounded">Diária R$ 160,00</td>
+                    <td class="p-3.5 font-mono font-bold text-emerald-700">R$ 4.660,00</td>
+                    <td class="p-3.5 text-center">
+                      <span class="inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-sky-100 text-sky-800">
+                        Na Chapa
                       </span>
                     </td>
                   </tr>
@@ -648,20 +634,22 @@
           </div>
         </div>
 
-        <!-- Banner Lançamento de Gastos / Entradas no WhatsApp -->
-        <div class="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-stone-50 border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <!-- Voice & Photo Expense Logging Callout -->
+        <div class="p-4 sm:p-5 rounded-2xl bg-emerald-50 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+            <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-sm">
               <i data-lucide="mic" class="w-5 h-5"></i>
             </div>
             <div>
-              <h5 class="text-xs font-black text-slate-900">Como você lança um custo ou entrada no seu negócio?</h5>
-              <p class="text-[11px] text-slate-600">Basta mandar um áudio ou texto para seu robô no WhatsApp: <i>"ChefBot, paguei R$ 120 de insumos"</i> e o caixa atualiza na hora!</p>
+              <h5 class="text-xs font-black text-emerald-950">Lançamento de Custos por Áudio no WhatsApp</h5>
+              <p class="text-[11px] text-emerald-800">
+                Gastou insumos ou combustível? Mande um áudio: <i>"ContaZap, gastei R$ 75 de descartáveis"</i>. O painel atualiza na hora.
+              </p>
             </div>
           </div>
-          <button onclick="openTestModal()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-sm shrink-0 cursor-pointer">
-            Testar Agora
-          </button>
+          <span class="text-[11px] font-black text-emerald-700 bg-white px-3 py-1.5 rounded-xl border border-emerald-300 shrink-0">
+            ✓ Já incluso no plano
+          </span>
         </div>
 
       </div>
@@ -670,86 +658,140 @@
   </section>
 
   <!-- ============================================================ -->
-  <!-- SECTION: EXEMPLO REAL DE DIÁLOGO NO WHATSAPP                 -->
+  <!-- SECTION: DEMONSTRAÇÃO PRÁTICA NO WHATSAPP                    -->
   <!-- ============================================================ -->
-  <section id="conversa" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-stone-200">
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+  <section id="conversa" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
       
-      <div class="lg:col-span-6 space-y-5 text-left">
+      <!-- Left: Context & Explanation -->
+      <div class="lg:col-span-6 space-y-6 text-left">
         <span class="px-3.5 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-extrabold uppercase">
-          Exemplo Real de Atendimento
+          Atendimento Natural & Humanizado
         </span>
-        <h2 class="text-2xl sm:text-3xl font-black text-slate-900 leading-snug">
-          Comunicação ágil, humanizada e orientada ao fechamento.
+        
+        <h2 class="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 leading-tight">
+          Como seu cliente é atendido na prática?
         </h2>
+
         <p class="text-sm text-slate-600 leading-relaxed font-normal">
-          O(A) ChefBot não fala como um robô genérico. Ele(a) utiliza o vocabulário, as regras e a postura corretas para o seu setor, tirando dúvidas com clareza e acolhendo seu cliente.
+          Nada de menus engessados com <i>"Digite 1 para isso, Digite 2 para aquilo"</i>. O(A) <b>ChefBot</b> conversa como uma pessoa real da sua equipe: tira dúvidas, informa valores, checa horários e anota os dados com educação e precisão.
         </p>
 
-        <div class="space-y-3 pt-2 text-xs text-slate-700">
-          <div class="flex items-start gap-2.5">
-            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
-            <span><b>Respostas Precisas:</b> Regras comerciais, tabela de preços e horários sem erros.</span>
+        <div class="space-y-3">
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</div>
+            <div>
+              <h4 class="text-xs font-black text-slate-900">Resposta Imediata (3 segundos)</h4>
+              <p class="text-xs text-slate-500">Seu cliente nunca mais fica horas no vácuo esperando uma resposta.</p>
+            </div>
           </div>
-          <div class="flex items-start gap-2.5">
-            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
-            <span><b>Qualificação do Pedido / Caso:</b> Coleta os dados necessários para o atendimento da equipe.</span>
+
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</div>
+            <div>
+              <h4 class="text-xs font-black text-slate-900">Transbordo Humano Inteligente</h4>
+              <p class="text-xs text-slate-500">Se o cliente pedir para falar com uma pessoa, o assistente encaminha a conversa na hora para você.</p>
+            </div>
           </div>
-          <div class="flex items-start gap-2.5">
-            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
-            <span><b>Você assume quando quiser:</b> Basta digitar no WhatsApp da sua empresa e o robô dá passagem.</span>
+
+          <div class="flex items-start gap-3">
+            <div class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">✓</div>
+            <div>
+              <h4 class="text-xs font-black text-slate-900">Lembretes para Evitar Faltas</h4>
+              <p class="text-xs text-slate-500">Confirmação automática de agendamentos para manter seu negócio com comparecimento máximo.</p>
+            </div>
           </div>
         </div>
 
-        <div class="pt-3">
-          <button onclick="openTestModal()" class="px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 active:scale-95 transition flex items-center gap-2 cursor-pointer">
-            <i data-lucide="message-square" class="w-4 h-4 text-white"></i>
-            <span>Testar essa conversa no meu WhatsApp agora</span>
+        <div class="pt-2">
+          <button onclick="openTestModal()" class="px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md shadow-emerald-600/20 active:scale-95 transition flex items-center gap-2 cursor-pointer">
+            <i data-lucide="message-circle" class="w-4 h-4 text-white"></i>
+            <span>Testar Essa Conversa no Meu Celular</span>
           </button>
         </div>
+
       </div>
 
-      <!-- Right Column: Interactive Phone Simulation -->
-      <div class="lg:col-span-6">
-        <div class="p-6 rounded-3xl bg-white border border-stone-300 card-shadow-elevated space-y-4 relative">
+      <!-- Right: WhatsApp Phone Simulation -->
+      <div class="lg:col-span-6 flex justify-center">
+        <div class="w-full max-w-sm rounded-[2.5rem] bg-slate-900 p-3 shadow-2xl border-4 border-slate-800">
           
-          <div class="flex items-center justify-between border-b border-stone-200 pb-3">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-stone-100 border border-stone-300 flex items-center justify-center text-slate-800 text-sm font-bold">
-                CH
+          <!-- Screen Container -->
+          <div class="rounded-[2rem] bg-[#EFEAE2] overflow-hidden flex flex-col h-[520px]">
+            
+            <!-- WhatsApp Header -->
+            <div class="bg-[#075E54] text-white px-4 py-3 flex items-center justify-between shadow">
+              <div class="flex items-center gap-2.5">
+                <div class="relative w-8 h-8 rounded-full overflow-hidden bg-white/20 border border-white/30">
+                  <img src="/raia-emblem-small.png" alt="Avatar" class="w-full h-full object-contain p-0.5">
+                </div>
+                <div>
+                  <h4 class="text-xs font-black leading-tight">ChefBot</h4>
+                  <p class="text-[10px] text-emerald-200">online agora</p>
+                </div>
               </div>
-              <div>
-                <h4 class="text-xs font-black text-slate-900">ChefBot • Delivery & Restaurantes</h4>
-                <p class="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                  WhatsApp Oficial
-                </p>
+              <div class="flex items-center gap-3 text-white/80">
+                <i data-lucide="video" class="w-4 h-4"></i>
+                <i data-lucide="phone" class="w-4 h-4"></i>
               </div>
             </div>
-            <span class="text-[10px] text-slate-400 font-mono">Simulação Interativa</span>
-          </div>
 
-          <div class="space-y-3 text-xs">
-            <div class="max-w-[85%] ml-auto p-3.5 rounded-2xl rounded-tr-none bg-slate-900 text-white shadow-sm">
-              <p>Boa noite! Quero pedir 2 Smash Burgers com bacon e batata rústica. Entrega no centro?</p>
-              <span class="text-[9px] text-slate-400 block text-right mt-1 font-mono">14:10</span>
+            <!-- Chat Messages Body -->
+            <div class="flex-1 p-3.5 space-y-3 overflow-y-auto text-xs">
+              
+              <!-- Client Message 1 -->
+              <div class="flex justify-end">
+                <div class="bg-[#E7FFDB] text-slate-900 p-3 rounded-2xl rounded-tr-xs max-w-[85%] shadow-xs space-y-1">
+                  <p>Boa noite! Quero pedir 2 burgers especiais com batata e saber o tempo de entrega para o Centro.</p>
+                  <span class="block text-[9px] text-slate-400 text-right">14:22</span>
+                </div>
+              </div>
+
+              <!-- Agent Message 1 -->
+              <div class="flex justify-start">
+                <div class="bg-white text-slate-900 p-3 rounded-2xl rounded-tl-xs max-w-[85%] shadow-xs space-y-1">
+                  <p>Boa noite! Seja bem-vindo à nossa Hamburgueria Artesanal! 🍔🔥 Nosso tempo médio de entrega para o Centro hoje está em apenas 35 a 45 minutos.</p>
+                  <span class="block text-[9px] text-slate-400 text-right">14:22</span>
+                </div>
+              </div>
+
+              <!-- Agent Message 2 -->
+              <div class="flex justify-start">
+                <div class="bg-white text-slate-900 p-3 rounded-2xl rounded-tl-xs max-w-[85%] shadow-xs space-y-1">
+                  <p>Nosso combo mais pedido é o Smash Bacon Duplo que já acompanha fritas crocantes e maionese da casa por R$ 38,90 cada. Gostaria de adicionar refrigerante ou bebida?</p>
+                  <span class="block text-[9px] text-slate-400 text-right">14:22</span>
+                </div>
+              </div>
+
+              <!-- Client Message 2 -->
+              <div class="flex justify-end">
+                <div class="bg-[#E7FFDB] text-slate-900 p-3 rounded-2xl rounded-tr-xs max-w-[85%] shadow-xs space-y-1">
+                  <p>Quero sim, manda 1 Coca Zero e 1 Guaraná!</p>
+                  <span class="block text-[9px] text-slate-400 text-right">14:23</span>
+                </div>
+              </div>
+
+              <!-- Agent Message 3 -->
+              <div class="flex justify-start">
+                <div class="bg-white text-slate-900 p-3 rounded-2xl rounded-tl-xs max-w-[85%] shadow-xs space-y-1">
+                  <p>Maravilha! Total do seu pedido com os 2 combos + 2 bebidas + taxa de entrega: R$ 94,00. Pode me passar seu endereço completo e a forma de pagamento (Pix ou Cartão)?</p>
+                  <span class="block text-[9px] text-slate-400 text-right">14:23</span>
+                </div>
+              </div>
+
             </div>
 
-            <div class="max-w-[88%] mr-auto p-3.5 rounded-2xl rounded-tl-none bg-stone-100 text-slate-800 space-y-1.5 border border-stone-200 shadow-sm">
-              <p class="text-[11px] leading-relaxed">Boa noite! Que delícia, saiu na hora certa! 🍔🔥 Nosso Smash Duplo com Bacon Especial é o mais pedido da noite.</p>
-              <p class="text-[11px] text-emerald-800 font-bold">Entregamos no Centro sim! Me envia sua rua e número para eu calcular a taxa certinha?</p>
-              <span class="text-[9px] text-slate-400 block text-right mt-1 font-mono">14:10</span>
+            <!-- WhatsApp Input Footer -->
+            <div class="bg-[#F0F2F5] px-3 py-2 flex items-center gap-2 border-t border-stone-200">
+              <i data-lucide="smile" class="w-5 h-5 text-slate-500"></i>
+              <div class="flex-1 bg-white rounded-full px-3 py-1.5 text-[11px] text-slate-400 border border-stone-200">
+                Mensagem
+              </div>
+              <div class="w-8 h-8 rounded-full bg-[#00A884] text-white flex items-center justify-center">
+                <i data-lucide="mic" class="w-4 h-4"></i>
+              </div>
             </div>
 
-            <div class="max-w-[85%] ml-auto p-3.5 rounded-2xl rounded-tr-none bg-slate-900 text-white shadow-sm">
-              <p>Rua das Flores, 142. Vou querer refrigerante lata também.</p>
-              <span class="text-[9px] text-slate-400 block text-right mt-1 font-mono">14:11</span>
-            </div>
-
-            <div class="max-w-[88%] mr-auto p-3.5 rounded-2xl rounded-tl-none bg-stone-100 text-slate-800 border border-stone-200 shadow-sm">
-              <p class="text-[11px] leading-relaxed">Show! Taxa para a Rua das Flores fica R$ 6,00. Total do pedido com os 2 Burgers + Batata + Refri: R$ 68,00. Pode ser no Pix ou Cartão na entrega?</p>
-              <span class="text-[9px] text-slate-400 block text-right mt-1 font-mono">14:11</span>
-            </div>
           </div>
 
         </div>
@@ -761,12 +803,12 @@
   <!-- ============================================================ -->
   <!-- SECTION: PREÇO & OFERTA TRANSPARENTE (A partir de R$ 39)    -->
   <!-- ============================================================ -->
-  <section id="precos" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-stone-200">
-    <div class="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-white via-emerald-50/40 to-stone-50 border border-emerald-300 card-shadow-elevated text-center space-y-6">
+  <section id="precos" class="py-16 px-4 sm:px-6 lg:px-8 bg-stone-100/60 border-t border-stone-200 text-center">
+    <div class="max-w-3xl mx-auto space-y-6">
       
-      <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black uppercase">
-        Sem pegadinhas • Sem surpresas
-      </div>
+      <span class="px-3.5 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-black uppercase">
+        Sem Fidelidade • Cancele Quando Quiser
+      </span>
 
       <h2 class="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
         Planos a partir de <span class="text-emerald-600">R$ 39,00</span> por mês.
@@ -811,6 +853,42 @@
   </section>
 
   <!-- ============================================================ -->
+  <!-- FINAL CTA SECTION WITH AMBIENT NICHE WATERMARK              -->
+  <!-- ============================================================ -->
+  <section class="py-20 px-4 sm:px-6 lg:px-8 bg-slate-900 text-white relative overflow-hidden text-center">
+    <!-- Ambient Niche Photo Watermark in Footer CTA -->
+    <div class="absolute inset-0 z-0 opacity-15 pointer-events-none">
+      <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1920&q=80" alt="" class="w-full h-full object-cover filter blur-[2px]">
+    </div>
+    <div class="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/90 to-slate-900/80 z-0"></div>
+
+    <div class="relative z-10 max-w-4xl mx-auto space-y-6">
+      <span class="px-3.5 py-1 rounded-full bg-white/10 text-emerald-400 text-xs font-black uppercase tracking-wider border border-white/10">
+        Comece em Menos de 5 Minutos
+      </span>
+
+      <h2 class="text-3xl sm:text-5xl font-black tracking-tight leading-tight">
+        Seu WhatsApp atendendo agora mesmo com o(a) ChefBot.
+      </h2>
+
+      <p class="text-sm sm:text-base text-slate-300 max-w-xl mx-auto leading-relaxed">
+        Não perca mais clientes por demora de atendimento. Conecte seu WhatsApp e tenha controle total do seu negócio a partir de R$ 39/mês.
+      </p>
+
+      <div class="pt-4 flex flex-wrap items-center justify-center gap-4">
+        <button onclick="openTestModal()" class="px-8 py-4 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-xl shadow-emerald-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer">
+          <i data-lucide="play" class="w-4 h-4 fill-slate-950"></i>
+          <span>Receber Demonstração no WhatsApp</span>
+        </button>
+
+        <a href="/" class="px-6 py-4 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs border border-white/20 transition">
+          Ver Outras Soluções da RAIA
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
   <!-- MODAL: TESTAR NO WHATSAPP (Preservado e Funcional)           -->
   <!-- ============================================================ -->
   <div id="testModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
@@ -846,22 +924,27 @@
             type="tel" 
             id="leadPhoneInput" 
             required
-            placeholder="Ex: 11999998888"
+            placeholder="Ex: (11) 98765-4321"
             class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 border border-stone-300 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 transition"
           >
         </div>
 
-        <div id="modalAlertBox" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold"></div>
+        <div id="modalAlertBox" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-bold"></div>
 
-        <button type="submit" id="btnSubmitTest" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition flex items-center justify-center gap-2 shadow cursor-pointer">
+        <button 
+          type="submit" 
+          id="btnSubmitTest"
+          class="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-lg shadow-emerald-600/30 active:scale-95 transition flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <i data-lucide="send" class="w-4 h-4"></i>
           <span id="btnSubmitTestText">Receber Mensagem no WhatsApp Agora</span>
-          <i data-lucide="send" class="w-4 h-4 text-white"></i>
         </button>
-
-        <p class="text-[10px] text-slate-400 text-center">
-          🔒 Teste gratuito e sem compromisso.
-        </p>
       </form>
+
+      <div class="pt-2 text-center text-[10px] text-slate-400 flex items-center justify-center gap-1.5">
+        <i data-lucide="lock" class="w-3 h-3 text-emerald-600"></i>
+        <span>Seus dados estão protegidos. Não enviamos spam.</span>
+      </div>
 
     </div>
   </div>
@@ -869,33 +952,38 @@
   <!-- ============================================================ -->
   <!-- FOOTER                                                       -->
   <!-- ============================================================ -->
-  <footer class="border-t border-stone-200 bg-white pt-12 pb-8">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-      <div class="flex items-center gap-3">
-        <img src="/raia-emblem-small.png" alt="RAIA" class="w-7 h-7 object-contain">
-        <span class="text-slate-900 font-bold">RAIA • ChefBot para Delivery & Restaurantes</span>
+  <footer class="py-10 px-4 sm:px-6 lg:px-8 border-t border-stone-200 bg-white text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <img src="/raia-emblem-small.png" alt="RAIA" class="w-6 h-6 object-contain">
+        <span class="font-extrabold text-slate-900">RAIA</span>
+        <span class="text-stone-300">|</span>
+        <span>Assistentes de Inteligência Artificial para WhatsApp</span>
       </div>
-      <div class="flex items-center gap-4">
-        <a href="/solucoes" class="hover:text-slate-900 transition">Outras Soluções</a>
-        <a href="/termos" class="hover:text-slate-900 transition">Termos</a>
+      <div class="flex items-center gap-6">
+        <a href="/termos" class="hover:text-slate-900 transition">Termos de Uso</a>
         <a href="/privacidade" class="hover:text-slate-900 transition">Privacidade</a>
         <a href="/contato" class="hover:text-slate-900 transition">Contato</a>
       </div>
     </div>
   </footer>
 
-  <!-- ============================================================ -->
-  <!-- JAVASCRIPT: MODAL HANDLERS                                   -->
-  <!-- ============================================================ -->
+  <!-- Lucide & Scripts -->
   <script>
     function openTestModal() {
       const modal = document.getElementById('testModal');
-      if (modal) modal.classList.remove('hidden');
+      if (modal) {
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      }
     }
 
     function closeTestModal() {
       const modal = document.getElementById('testModal');
-      if (modal) modal.classList.add('hidden');
+      if (modal) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
     }
 
     async function handleTestSubmit(e) {
