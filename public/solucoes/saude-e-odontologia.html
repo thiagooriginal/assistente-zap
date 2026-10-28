@@ -1,474 +1,949 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="scroll-smooth dark">
+<html lang="pt-BR" class="scroll-smooth">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sofia • Assistente para Clínicas Médicas, Odontologia & Consultórios | RAIA</title>
-  <meta name="description" content="A Sofia é uma assistente de atendimento e recepção configurada para acolher pacientes, informar convênios aceitos, horários de atendimento e organizar pedidos de agendamento.">
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>Sofia • Assistente de Atendimento & Gestão para Clínicas e Consultórios | RAIA</title>
+  <meta name="description" content="Sua clínica atendendo no WhatsApp 24h, confirmando pacientes e organizando faturamento, custos de materiais e repasses médicos. Conheça a Sofia.">
+  <link rel="icon" type="image/png" href="/raia-emblem-small.png">
+
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
   <script>
     tailwind.config = {
-      darkMode: 'class',
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
           colors: {
-            raia: { black: '#07080c', bgDark: '#0a0d14', neon: '#00F59B' }
+            niche: {
+              primary: '#0284C7',
+              primaryLight: '#E0F2FE',
+              accent: '#059669',
+              slate: '#0F172A',
+            }
           }
         }
       }
     }
   </script>
-  
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest"></script>
 
   <style>
-    body { background-color: #040711; color: #ffffff; font-family: 'Plus Jakarta Sans', sans-serif; }
-    .glass-nav { background: rgba(4, 7, 17, 0.9); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
-    .glass-card { background: rgba(12, 18, 32, 0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 24px; }
+    body {
+      background-color: #FAF9F6;
+      color: #0F172A;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      overflow-x: hidden;
+    }
+    .card-shadow-soft {
+      box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.06), 0 4px 10px -2px rgba(15, 23, 42, 0.03);
+    }
+    .card-shadow-elevated {
+      box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.10), 0 8px 16px -4px rgba(15, 23, 42, 0.05);
+    }
   </style>
 </head>
-<body class="min-h-screen bg-[#040711] text-white selection:bg-[#00F59B] selection:text-black">
+<body class="min-h-screen bg-[#FAF9F6] text-slate-900 antialiased selection:bg-slate-900 selection:text-white">
 
-  <!-- Header -->
-  <header class="fixed top-0 left-0 right-0 z-50 glass-nav">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
-      <a href="/" class="flex items-center gap-3">
-        <img src="/raia-logo.png" alt="RAIA" class="w-10 h-10 object-contain">
-        <div>
-          <span class="text-xl font-black text-white">RAIA</span>
-          <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#00F59B]/10 text-[#00F59B] font-bold uppercase ml-1">Assistentes</span>
+  <!-- ============================================================ -->
+  <!-- TOP NAVIGATION BAR                                           -->
+  <!-- ============================================================ -->
+  <header class="sticky top-0 z-40 w-full backdrop-blur-xl bg-white/90 border-b border-stone-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+      
+      <!-- Logo RAIA -->
+      <a href="/" class="flex items-center gap-3 group shrink-0">
+        <div class="relative w-10 h-10 flex items-center justify-center rounded-xl bg-stone-100 border border-stone-300 p-1 group-hover:border-slate-800 transition">
+          <img src="/raia-emblem-small.png" alt="RAIA" class="w-full h-full object-contain">
+        </div>
+        <div class="flex flex-col">
+          <div class="flex items-center gap-2">
+            <span class="text-xl font-black tracking-tight text-slate-900 group-hover:text-emerald-700 transition">RAIA</span>
+            <span class="px-2 py-0.5 rounded-full bg-stone-100 text-slate-800 text-[9px] font-extrabold uppercase tracking-wider">Saúde & Odontologia</span>
+          </div>
+          <span class="text-[10px] text-slate-500 font-medium">Sofia • Assistente Inteligente</span>
         </div>
       </a>
 
-      <nav class="hidden md:flex items-center gap-7 text-xs font-bold text-zinc-300">
-        <a href="/" class="hover:text-white transition">Início</a>
-        <a href="/solucoes" class="text-[#00F59B] transition">Catálogo</a>
-        <a href="/como-funciona" class="hover:text-white transition">Como Funciona</a>
-        <a href="/planos" class="hover:text-white transition">Planos</a>
-        <a href="/contato" class="hover:text-white transition">Contato</a>
+      <!-- Desktop Nav -->
+      <nav class="hidden md:flex items-center gap-2 text-xs font-bold text-slate-600">
+        <a href="/solucoes" class="px-3 py-1.5 rounded-xl hover:text-slate-900 hover:bg-stone-100 transition flex items-center gap-1.5">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5 text-slate-400"></i>
+          <span>Catálogo</span>
+        </a>
+        <a href="#problemas" class="px-3 py-1.5 rounded-xl hover:text-slate-900 hover:bg-stone-100 transition">
+          Problemas & Soluções
+        </a>
+        <a href="#dashboard" class="px-3 py-1.5 rounded-xl bg-stone-100 text-slate-900 border border-stone-300 transition flex items-center gap-1.5 font-extrabold">
+          <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span>Dashboard & Equipe</span>
+        </a>
+        <a href="#conversa" class="px-3 py-1.5 rounded-xl hover:text-slate-900 hover:bg-stone-100 transition">
+          Exemplo WhatsApp
+        </a>
+        <a href="#precos" class="px-3 py-1.5 rounded-xl hover:text-slate-900 hover:bg-stone-100 transition">
+          Planos
+        </a>
       </nav>
 
-      <div class="flex items-center gap-2.5">
-        <a href="/admin" class="px-3 py-1.5 rounded-full text-xs font-bold text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-800">
-          Área do Gestor
-        </a>
-        <button onclick="openTestModal()" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs shadow">
-          Testar no WhatsApp
+      <!-- Right CTAs -->
+      <div class="flex items-center gap-3 shrink-0">
+        <button onclick="openTestModal()" class="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 active:scale-95 transition flex items-center gap-2 cursor-pointer">
+          <i data-lucide="message-circle" class="w-4 h-4 text-white"></i>
+          <span>Testar no WhatsApp</span>
         </button>
       </div>
+
     </div>
   </header>
 
-  <main class="pt-32 pb-24 max-w-5xl mx-auto px-4 sm:px-6 space-y-16">
-    
-    <!-- Breadcrumb -->
-    <div class="flex items-center gap-2 text-xs text-zinc-400">
-      <a href="/" class="hover:text-white">Início</a>
-      <span>/</span>
-      <a href="/solucoes" class="hover:text-white">Soluções</a>
-      <span>/</span>
-      <span class="text-cyan-400 font-bold">Clínicas Médicas, Odontologia & Consultórios</span>
-    </div>
+  <!-- ============================================================ -->
+  <!-- HERO SECTION                                                 -->
+  <!-- ============================================================ -->
+  <section class="relative pt-10 pb-16 px-4 sm:px-6 lg:px-8 border-b border-stone-200 overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-b from-[#FFFDF9] via-[#FAF7F0] to-[#F5F2EA] pointer-events-none"></div>
 
-    <!-- A & B & C: Hero do Segmento -->
-    <div class="space-y-6">
-      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-bold">
-        <span>🩺 Clínicas Médicas, Odontologia & Consultórios • Assistente Sofia</span>
+    <div class="relative z-10 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+      
+      <!-- Left Column -->
+      <div class="lg:col-span-7 space-y-6 text-left">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-stone-100 border border-stone-300 text-slate-800 text-xs font-extrabold tracking-wide">
+          <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+          <span>Especialmente Criado para Clínicas Médicas, Odontológicas & Consultórios</span>
+        </div>
+
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.15]">
+          Sua clínica acolhendo no WhatsApp e organizando o caixa enquanto você atende seus pacientes.
+        </h1>
+
+        <p class="text-base text-slate-600 leading-relaxed max-w-2xl font-normal">
+          Enquanto você está no consultório ou em atendimento clínico, a Sofia tira dúvidas de especialidades e convênios, recolhe solicitações de agendamento e envia lembretes para evitar faltas. No painel, você acompanha consultas do dia, custos de insumos e repasses de especialistas.
+        </p>
+
+        <!-- CTAs -->
+        <div class="flex flex-wrap items-center gap-3.5 pt-2">
+          <button onclick="openTestModal()" class="px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-600/25 active:scale-95 transition flex items-center gap-2.5 cursor-pointer">
+            <i data-lucide="play" class="w-4 h-4 fill-white"></i>
+            <span>Testar Sofia no Meu WhatsApp Grátis</span>
+          </button>
+          
+          <a href="#dashboard" class="px-5 py-4 rounded-2xl bg-white hover:bg-stone-50 text-slate-800 font-extrabold text-xs border border-stone-300 transition flex items-center gap-2 card-shadow-soft">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-600"></i>
+            <span>Ver Dashboard Financeiro & Equipe</span>
+          </a>
+        </div>
+
+        <!-- Metrics bar -->
+        <div class="pt-6 grid grid-cols-3 gap-4 border-t border-stone-200/80">
+          <div class="space-y-0.5">
+            <span class="text-2xl font-black text-emerald-700 font-mono">24h / 7d</span>
+            <p class="text-xs text-slate-500 font-medium">WhatsApp sem clientes no vácuo</p>
+          </div>
+          <div class="space-y-0.5">
+            <span class="text-2xl font-black text-amber-600 font-mono">94%</span>
+            <p class="text-xs text-slate-500 font-medium">Confirmação prévia amigável</p>
+          </div>
+          <div class="space-y-0.5">
+            <span class="text-2xl font-black text-slate-900 font-mono">100%</span>
+            <p class="text-xs text-slate-500 font-medium">Caixa e comissões calculadas</p>
+          </div>
+        </div>
       </div>
 
-      <h1 class="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
-        Atendimento humanizado e acolhedor para a recepção da sua clínica no WhatsApp.
-      </h1>
+      <!-- Right Column: Visual Collage -->
+      <div class="lg:col-span-5 relative">
+        <div class="relative rounded-3xl overflow-hidden card-shadow-elevated bg-white border border-stone-200 p-3 space-y-3">
+          
+          <div class="relative h-56 rounded-2xl overflow-hidden">
+            <img 
+              src="https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=1200&q=80" 
+              alt="Ambiente profissional do segmento Saúde & Odontologia" 
+              class="w-full h-full object-cover"
+            >
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
+            
+            <div class="absolute top-3 left-3 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-slate-900 text-[10px] font-extrabold flex items-center gap-1.5 shadow">
+              <span>🩺 Consultório Humanizado</span>
+            </div>
 
-      <p class="text-base sm:text-lg text-zinc-300 max-w-3xl leading-relaxed">
-        A Sofia é uma assistente de atendimento e recepção configurada para acolher pacientes, informar convênios aceitos, horários de atendimento e organizar pedidos de agendamento.
+            <div class="absolute bottom-3 left-3 right-3 text-white">
+              <span class="text-[9px] uppercase font-black text-amber-300 tracking-wider">Gestão Especializada</span>
+              <h3 class="text-base font-black leading-tight">Clínica Dra. Raphaela • Recepção Ágil</h3>
+            </div>
+          </div>
+
+          <div class="relative h-44 rounded-2xl overflow-hidden">
+            <img 
+              src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=800&q=80" 
+              alt="Atendimento profissional e humanizado" 
+              class="w-full h-full object-cover object-top"
+            >
+            <div class="absolute bottom-3 left-3 right-3 p-2.5 rounded-xl bg-white/95 backdrop-blur-md border border-stone-200 flex items-center justify-between text-xs shadow-md">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="font-extrabold text-slate-800 text-[11px]">Sofia atendendo no WhatsApp...</span>
+              </div>
+              <span class="font-bold text-emerald-700 text-[11px] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                A partir de R$ 39/mês
+              </span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION: PROBLEMAS COMUNS VS SOLUÇÕES DA RAIA                -->
+  <!-- ============================================================ -->
+  <section id="problemas" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+    <div class="text-center max-w-2xl mx-auto space-y-3 mb-12">
+      <span class="px-3.5 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-800 text-xs font-extrabold uppercase">
+        Rotina Real do Seu Segmento
+      </span>
+      <h2 class="text-2xl sm:text-3xl font-black text-slate-900">
+        Você se identifica com algum desses 3 desafios diários?
+      </h2>
+      <p class="text-sm text-slate-600">
+        Gerenciar um negócio exige foco na qualidade do serviço. Veja como a RAIA resolve os maiores gargalos do seu dia a dia:
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      
+        <div class="p-7 rounded-3xl bg-white border border-stone-200 card-shadow-soft space-y-5 hover:-translate-y-1 transition duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center text-slate-800 text-xl font-bold">
+            <i data-lucide="stethoscope" class="w-6 h-6 text-slate-700"></i>
+          </div>
+
+          <div class="space-y-2">
+            <span class="text-[10px] font-black uppercase text-rose-600 tracking-wider">Desafio #1</span>
+            <h3 class="text-base font-bold text-slate-900 leading-snug">
+              Telefone tocando sem parar e recepcionista dividida com o balcão.
+            </h3>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Pacientes querendo saber se atende convênio, valor de consulta particular ou endereço, enquanto a fila presencial na recepção só cresce.
+            </p>
+          </div>
+
+          <div class="pt-4 border-t border-stone-100 space-y-1 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
+            <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Com o(a) Sofia</span>
+            </span>
+            <p class="text-xs text-slate-700 leading-relaxed font-medium">
+              A Sofia acolhe o paciente no primeiro segundo com educação, informa especialidades, convênios aceitos e orientações preparatórias.
+            </p>
+          </div>
+        </div>
+      
+        <div class="p-7 rounded-3xl bg-white border border-stone-200 card-shadow-soft space-y-5 hover:-translate-y-1 transition duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center text-slate-800 text-xl font-bold">
+            <i data-lucide="calendar-x" class="w-6 h-6 text-slate-700"></i>
+          </div>
+
+          <div class="space-y-2">
+            <span class="text-[10px] font-black uppercase text-rose-600 tracking-wider">Desafio #2</span>
+            <h3 class="text-base font-bold text-slate-900 leading-snug">
+              Pacientes que marcam e faltam de última hora, deixando a sala ociosa.
+            </h3>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              O médico ou dentista fica parado 40 minutos esperando, sem faturar, enquanto outros pacientes aguardam na lista de espera.
+            </p>
+          </div>
+
+          <div class="pt-4 border-t border-stone-100 space-y-1 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
+            <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Com o(a) Sofia</span>
+            </span>
+            <p class="text-xs text-slate-700 leading-relaxed font-medium">
+              Lembretes automáticos e amigáveis no WhatsApp na véspera e na manhã da consulta. Se precisar remarcar, a Sofia avisa a recepção.
+            </p>
+          </div>
+        </div>
+      
+        <div class="p-7 rounded-3xl bg-white border border-stone-200 card-shadow-soft space-y-5 hover:-translate-y-1 transition duration-300">
+          <div class="w-12 h-12 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center text-slate-800 text-xl font-bold">
+            <i data-lucide="wallet" class="w-6 h-6 text-slate-700"></i>
+          </div>
+
+          <div class="space-y-2">
+            <span class="text-[10px] font-black uppercase text-rose-600 tracking-wider">Desafio #3</span>
+            <h3 class="text-base font-bold text-slate-900 leading-snug">
+              Controle confuso de repasses para especialistas parceiros e convênios.
+            </h3>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Planilhas dispersas para calcular porcentagens de dermatologistas, ortodontistas e terapeutas, além de conciliação de glosas.
+            </p>
+          </div>
+
+          <div class="pt-4 border-t border-stone-100 space-y-1 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
+            <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1">
+              <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+              <span>Com o(a) Sofia</span>
+            </span>
+            <p class="text-xs text-slate-700 leading-relaxed font-medium">
+              Dashboard clínico transparente. Acompanhe entradas particulares e convênios, custos de materiais cirúrgicos e repasses por profissional.
+            </p>
+          </div>
+        </div>
+      
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION: DASHBOARD FINANCEIRO & GESTÃO DE EQUIPE             -->
+  <!-- ============================================================ -->
+  <section id="dashboard" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-stone-200">
+    <div class="space-y-8">
+      
+      <!-- Section Header -->
+      <div class="text-center max-w-3xl mx-auto space-y-3">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-black uppercase tracking-wider">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span>Gestão Financeira & Múltiplos Profissionais</span>
+        </div>
+        <h2 class="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
+          O Painel de Controle que coloca os números do seu negócio em ordem.
+        </h2>
+        <p class="text-sm text-slate-600 leading-relaxed">
+          Inspirado nas melhores ferramentas de gestão visual do mundo. Acompanhe entradas, custos de materiais e o repasse transparente da sua equipe.
+        </p>
+      </div>
+
+      <!-- Main Dashboard Card -->
+      <div class="bg-white rounded-3xl border border-stone-200 card-shadow-elevated p-6 sm:p-8 space-y-8 overflow-hidden relative">
+        
+        <!-- Top Bar -->
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-stone-200 pb-5">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-slate-900 to-slate-700 flex items-center justify-center text-white font-black text-lg shadow-md">
+              SO
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-lg font-black text-slate-900">Clínica Médica & Odontológica Raphaela • Gestão</h3>
+                <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                  Caixa Aberto
+                </span>
+              </div>
+              <p class="text-xs text-slate-500 font-medium">Movimentação de Hoje • 4 Especialistas em Atendimento</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-slate-500">Período:</span>
+            <div class="flex items-center p-1 bg-stone-100 rounded-xl text-xs font-bold">
+              <button class="px-3 py-1 rounded-lg bg-white shadow-sm text-slate-900">Hoje</button>
+              <button class="px-3 py-1 text-slate-500 hover:text-slate-900">Semana</button>
+              <button class="px-3 py-1 text-slate-500 hover:text-slate-900">Mês</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 Metric Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+            <div class="p-5 rounded-2xl bg-stone-50 border border-stone-200 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-black text-slate-700 bg-white border border-stone-200 px-2 py-0.5 rounded-full shadow-sm">
+                  ▲ +20% vs ontem
+                </span>
+                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
+              </div>
+              <div class="space-y-0.5">
+                <span class="text-xs font-bold text-slate-600">Faturamento de Consultas (Entradas)</span>
+                <div class="text-2xl font-black text-slate-900 font-mono">R$ 5.400,00</div>
+                <p class="text-[11px] text-slate-500">14 consultas e procedimentos hoje</p>
+              </div>
+            </div>
+          
+            <div class="p-5 rounded-2xl bg-stone-50 border border-stone-200 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-black text-slate-700 bg-white border border-stone-200 px-2 py-0.5 rounded-full shadow-sm">
+                  Insumos Clínicos
+                </span>
+                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
+              </div>
+              <div class="space-y-0.5">
+                <span class="text-xs font-bold text-slate-600">Custos de Materiais & Insumos</span>
+                <div class="text-2xl font-black text-slate-900 font-mono">R$ 1.250,00</div>
+                <p class="text-[11px] text-slate-500">Anestésicos, descartáveis, esterilização</p>
+              </div>
+            </div>
+          
+            <div class="p-5 rounded-2xl bg-stone-50 border border-stone-200 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-black text-slate-700 bg-white border border-stone-200 px-2 py-0.5 rounded-full shadow-sm">
+                  4 Especialistas
+                </span>
+                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
+              </div>
+              <div class="space-y-0.5">
+                <span class="text-xs font-bold text-slate-600">Repasse dos Especialistas</span>
+                <div class="text-2xl font-black text-slate-900 font-mono">R$ 2.450,00</div>
+                <p class="text-[11px] text-slate-500">Calculado automaticamente por médico</p>
+              </div>
+            </div>
+          
+            <div class="p-5 rounded-2xl bg-stone-50 border border-stone-200 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-black text-slate-700 bg-white border border-stone-200 px-2 py-0.5 rounded-full shadow-sm">
+                  Margem: 31.5%
+                </span>
+                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-600"></i>
+              </div>
+              <div class="space-y-0.5">
+                <span class="text-xs font-bold text-slate-600">Lucro Líquido da Clínica (Sobra)</span>
+                <div class="text-2xl font-black text-slate-900 font-mono">R$ 1.700,00</div>
+                <p class="text-[11px] text-slate-500">Margem líquida de 31.5% no dia</p>
+              </div>
+            </div>
+          
+        </div>
+
+        <!-- Charts Middle Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+          
+          <!-- Left: Wave SVG Chart -->
+          <div class="lg:col-span-7 p-6 rounded-2xl bg-stone-50/80 border border-stone-200 space-y-4 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <div>
+                <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
+                  <span>Fluxo de Caixa: Entradas vs Custos</span>
+                </h4>
+                <p class="text-[11px] text-slate-500">Crescimento contínuo de receita e controle de gastos</p>
+              </div>
+              <div class="flex items-center gap-3 text-xs font-bold">
+                <span class="flex items-center gap-1.5 text-emerald-600">
+                  <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+                  <span>Entradas</span>
+                </span>
+                <span class="flex items-center gap-1.5 text-rose-500">
+                  <span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+                  <span>Custos</span>
+                </span>
+              </div>
+            </div>
+
+            <div class="relative h-44 w-full flex items-end">
+              <svg class="w-full h-full overflow-visible" viewBox="0 0 500 150" preserveAspectRatio="none">
+                <line x1="0" y1="30" x2="500" y2="30" stroke="#E2E8F0" stroke-dasharray="3,3" />
+                <line x1="0" y1="75" x2="500" y2="75" stroke="#E2E8F0" stroke-dasharray="3,3" />
+                <line x1="0" y1="120" x2="500" y2="120" stroke="#E2E8F0" stroke-dasharray="3,3" />
+                
+                <path d="M0,130 C80,120 120,70 180,60 C240,50 300,90 360,40 C420,20 460,30 500,10 L500,150 L0,150 Z" fill="rgba(5, 150, 105, 0.12)" />
+                <path d="M0,130 C80,120 120,70 180,60 C240,50 300,90 360,40 C420,20 460,30 500,10" fill="none" stroke="#059669" stroke-width="3" stroke-linecap="round" />
+                <path d="M0,140 C80,135 120,120 180,115 C240,110 300,125 360,105 C420,95 460,110 500,90" fill="none" stroke="#E11D48" stroke-width="2.5" stroke-dasharray="4,2" />
+                <circle cx="360" cy="40" r="5" fill="#059669" stroke="#FFFFFF" stroke-width="2" />
+                <circle cx="500" cy="10" r="5" fill="#059669" stroke="#FFFFFF" stroke-width="2" />
+              </svg>
+            </div>
+
+            <div class="flex items-center justify-between text-[10px] text-slate-400 font-bold border-t border-stone-200 pt-2">
+              <span>Segunda</span>
+              <span>Terça</span>
+              <span>Quarta</span>
+              <span>Quinta</span>
+              <span>Sexta</span>
+              <span class="text-emerald-700 font-extrabold">Fim de Semana (Pico)</span>
+            </div>
+          </div>
+
+          <!-- Right: Donut Services Breakdown -->
+          <div class="lg:col-span-5 p-6 rounded-2xl bg-stone-50/80 border border-stone-200 space-y-4">
+            <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+              <i data-lucide="pie-chart" class="w-4 h-4 text-emerald-600"></i>
+              <span>Procedimentos Mais Realizados Hoje</span>
+            </h4>
+
+            <div class="space-y-3 pt-1 text-xs">
+              
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between font-bold text-slate-800">
+                    <span class="flex items-center gap-2">
+                      <span class="w-3 h-3 rounded-full bg-sky-500 inline-block"></span>
+                      <span>Procedimentos Estéticos & Dermatologia</span>
+                    </span>
+                    <span class="font-mono text-slate-900">40% • R$ 2.160</span>
+                  </div>
+                  <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-sky-500 rounded-full" style="width: 40%"></div>
+                  </div>
+                </div>
+              
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between font-bold text-slate-800">
+                    <span class="flex items-center gap-2">
+                      <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+                      <span>Consultas Clínicas Especializadas</span>
+                    </span>
+                    <span class="font-mono text-slate-900">32% • R$ 1.728</span>
+                  </div>
+                  <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-emerald-500 rounded-full" style="width: 32%"></div>
+                  </div>
+                </div>
+              
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between font-bold text-slate-800">
+                    <span class="flex items-center gap-2">
+                      <span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
+                      <span>Ortodontia, Implantes & Próteses</span>
+                    </span>
+                    <span class="font-mono text-slate-900">18% • R$ 972</span>
+                  </div>
+                  <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-amber-500 rounded-full" style="width: 18%"></div>
+                  </div>
+                </div>
+              
+                <div class="space-y-1">
+                  <div class="flex items-center justify-between font-bold text-slate-800">
+                    <span class="flex items-center gap-2">
+                      <span class="w-3 h-3 rounded-full bg-purple-500 inline-block"></span>
+                      <span>Exames Preventivos & Check-up</span>
+                    </span>
+                    <span class="font-mono text-slate-900">10% • R$ 540</span>
+                  </div>
+                  <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+                    <div class="h-full bg-purple-500 rounded-full" style="width: 10%"></div>
+                  </div>
+                </div>
+              
+            </div>
+
+            <div class="p-3 rounded-xl bg-white border border-stone-200 flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2">
+                <i data-lucide="check-check" class="w-4 h-4 text-emerald-600"></i>
+                <span class="font-bold text-slate-800">Taxa de Confirmação no WhatsApp</span>
+              </div>
+              <span class="font-black text-emerald-700 font-mono text-sm">94%</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Team Management Table (Circle Soft Style) -->
+        <div class="space-y-4 pt-4 border-t border-stone-200">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div>
+              <h4 class="text-sm font-black text-slate-900 flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4 text-emerald-600"></i>
+                <span>Corpo Clínico & Repasse de Especialistas de Hoje</span>
+              </h4>
+              <p class="text-xs text-slate-500">Cálculo de repasse transparente por procedimento e especialidade</p>
+            </div>
+            <span class="text-xs text-emerald-700 font-extrabold bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl">
+              Cálculo 100% Automático
+            </span>
+          </div>
+
+          <div class="overflow-x-auto rounded-2xl border border-stone-200">
+            <table class="w-full text-left text-xs bg-white">
+              <thead class="bg-stone-100/80 text-slate-600 border-b border-stone-200 text-[11px] font-bold">
+                <tr>
+                  <th class="py-3 px-4">Profissional / Responsável</th>
+                  <th class="py-3 px-4">Especialidade / Função</th>
+                  <th class="py-3 px-4 text-center">Volume Hoje</th>
+                  <th class="py-3 px-4">Faturamento Bruto</th>
+                  <th class="py-3 px-4">Comissão / Repasse</th>
+                  <th class="py-3 px-4 text-emerald-700">Retenção da Empresa</th>
+                  <th class="py-3 px-4 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-stone-100 font-medium">
+                
+                  <tr class="hover:bg-stone-50 transition">
+                    <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2.5">
+                      <div class="w-8 h-8 rounded-full bg-stone-100 text-slate-800 font-black flex items-center justify-center text-xs border border-stone-200">
+                        DR
+                      </div>
+                      <span>Dra. Raphaela Santos</span>
+                    </td>
+                    <td class="py-3.5 px-4 text-slate-600">Clínica Geral & Dermatologia</td>
+                    <td class="py-3.5 px-4 text-center font-mono font-bold">5 pacientes</td>
+                    <td class="py-3.5 px-4 font-mono font-bold text-slate-900">R$ 2.200,00</td>
+                    <td class="py-3.5 px-4 font-mono text-amber-700 font-bold">R$ 1.100,00 (50%)</td>
+                    <td class="py-3.5 px-4 font-mono text-emerald-700 font-bold">R$ 1.100,00</td>
+                    <td class="py-3.5 px-4 text-right">
+                      <span class="px-2.5 py-1 rounded-full bg-stone-100 text-slate-800 text-[10px] font-extrabold border border-stone-200">
+                        Consultório Lotado
+                      </span>
+                    </td>
+                  </tr>
+                
+                  <tr class="hover:bg-stone-50 transition">
+                    <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2.5">
+                      <div class="w-8 h-8 rounded-full bg-stone-100 text-slate-800 font-black flex items-center justify-center text-xs border border-stone-200">
+                        DR
+                      </div>
+                      <span>Dr. Eduardo Lima</span>
+                    </td>
+                    <td class="py-3.5 px-4 text-slate-600">Ortodontia & Implantes</td>
+                    <td class="py-3.5 px-4 text-center font-mono font-bold">4 pacientes</td>
+                    <td class="py-3.5 px-4 font-mono font-bold text-slate-900">R$ 1.650,00</td>
+                    <td class="py-3.5 px-4 font-mono text-amber-700 font-bold">R$ 825,00 (50%)</td>
+                    <td class="py-3.5 px-4 font-mono text-emerald-700 font-bold">R$ 825,00</td>
+                    <td class="py-3.5 px-4 text-right">
+                      <span class="px-2.5 py-1 rounded-full bg-stone-100 text-slate-800 text-[10px] font-extrabold border border-stone-200">
+                        Em Procedimento
+                      </span>
+                    </td>
+                  </tr>
+                
+                  <tr class="hover:bg-stone-50 transition">
+                    <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2.5">
+                      <div class="w-8 h-8 rounded-full bg-stone-100 text-slate-800 font-black flex items-center justify-center text-xs border border-stone-200">
+                        DR
+                      </div>
+                      <span>Dra. Beatriz Costa</span>
+                    </td>
+                    <td class="py-3.5 px-4 text-slate-600">Pediatria & Prevenção</td>
+                    <td class="py-3.5 px-4 text-center font-mono font-bold">3 pacientes</td>
+                    <td class="py-3.5 px-4 font-mono font-bold text-slate-900">R$ 950,00</td>
+                    <td class="py-3.5 px-4 font-mono text-amber-700 font-bold">R$ 380,00 (40%)</td>
+                    <td class="py-3.5 px-4 font-mono text-emerald-700 font-bold">R$ 570,00</td>
+                    <td class="py-3.5 px-4 text-right">
+                      <span class="px-2.5 py-1 rounded-full bg-stone-100 text-slate-800 text-[10px] font-extrabold border border-stone-200">
+                        Concluído
+                      </span>
+                    </td>
+                  </tr>
+                
+                  <tr class="hover:bg-stone-50 transition">
+                    <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2.5">
+                      <div class="w-8 h-8 rounded-full bg-stone-100 text-slate-800 font-black flex items-center justify-center text-xs border border-stone-200">
+                        DR
+                      </div>
+                      <span>Dra. Larissa Ramos</span>
+                    </td>
+                    <td class="py-3.5 px-4 text-slate-600">Fisioterapia & Reabilitação</td>
+                    <td class="py-3.5 px-4 text-center font-mono font-bold">2 pacientes</td>
+                    <td class="py-3.5 px-4 font-mono font-bold text-slate-900">R$ 600,00</td>
+                    <td class="py-3.5 px-4 font-mono text-amber-700 font-bold">R$ 240,00 (40%)</td>
+                    <td class="py-3.5 px-4 font-mono text-emerald-700 font-bold">R$ 360,00</td>
+                    <td class="py-3.5 px-4 text-right">
+                      <span class="px-2.5 py-1 rounded-full bg-stone-100 text-slate-800 text-[10px] font-extrabold border border-stone-200">
+                        Concluído
+                      </span>
+                    </td>
+                  </tr>
+                
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Banner Lançamento de Gastos / Entradas no WhatsApp -->
+        <div class="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-stone-50 border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <i data-lucide="mic" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h5 class="text-xs font-black text-slate-900">Como você lança um custo ou entrada no seu negócio?</h5>
+              <p class="text-[11px] text-slate-600">Basta mandar um áudio ou texto para seu robô no WhatsApp: <i>"Sofia, paguei R$ 120 de insumos"</i> e o caixa atualiza na hora!</p>
+            </div>
+          </div>
+          <button onclick="openTestModal()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-sm shrink-0 cursor-pointer">
+            Testar Agora
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION: EXEMPLO REAL DE DIÁLOGO NO WHATSAPP                 -->
+  <!-- ============================================================ -->
+  <section id="conversa" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-stone-200">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+      
+      <div class="lg:col-span-6 space-y-5 text-left">
+        <span class="px-3.5 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-extrabold uppercase">
+          Exemplo Real de Atendimento
+        </span>
+        <h2 class="text-2xl sm:text-3xl font-black text-slate-900 leading-snug">
+          Comunicação ágil, humanizada e orientada ao fechamento.
+        </h2>
+        <p class="text-sm text-slate-600 leading-relaxed font-normal">
+          O(A) Sofia não fala como um robô genérico. Ele(a) utiliza o vocabulário, as regras e a postura corretas para o seu setor, tirando dúvidas com clareza e acolhendo seu cliente.
+        </p>
+
+        <div class="space-y-3 pt-2 text-xs text-slate-700">
+          <div class="flex items-start gap-2.5">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+            <span><b>Respostas Precisas:</b> Regras comerciais, tabela de preços e horários sem erros.</span>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+            <span><b>Qualificação do Pedido / Caso:</b> Coleta os dados necessários para o atendimento da equipe.</span>
+          </div>
+          <div class="flex items-start gap-2.5">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+            <span><b>Você assume quando quiser:</b> Basta digitar no WhatsApp da sua empresa e o robô dá passagem.</span>
+          </div>
+        </div>
+
+        <div class="pt-3">
+          <button onclick="openTestModal()" class="px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 active:scale-95 transition flex items-center gap-2 cursor-pointer">
+            <i data-lucide="message-square" class="w-4 h-4 text-white"></i>
+            <span>Testar essa conversa no meu WhatsApp agora</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Right Column: Interactive Phone Simulation -->
+      <div class="lg:col-span-6">
+        <div class="p-6 rounded-3xl bg-white border border-stone-300 card-shadow-elevated space-y-4 relative">
+          
+          <div class="flex items-center justify-between border-b border-stone-200 pb-3">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-stone-100 border border-stone-300 flex items-center justify-center text-slate-800 text-sm font-bold">
+                SO
+              </div>
+              <div>
+                <h4 class="text-xs font-black text-slate-900">Sofia • Saúde & Odontologia</h4>
+                <p class="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  WhatsApp Oficial
+                </p>
+              </div>
+            </div>
+            <span class="text-[10px] text-slate-400 font-mono">Simulação Interativa</span>
+          </div>
+
+          <div class="space-y-3 text-xs">
+            <div class="max-w-[85%] ml-auto p-3.5 rounded-2xl rounded-tr-none bg-slate-900 text-white shadow-sm">
+              <p>Boa tarde! A Dra. Raphaela atende convênio Bradesco para consulta dermatológica?</p>
+              <span class="text-[9px] text-slate-400 block text-right mt-1 font-mono">14:10</span>
+            </div>
+
+            <div class="max-w-[88%] mr-auto p-3.5 rounded-2xl rounded-tl-none bg-stone-100 text-slate-800 space-y-1.5 border border-stone-200 shadow-sm">
+              <p class="text-[11px] leading-relaxed">Olá! Seja muito bem-vindo(a) à nossa clínica. 🩺✨ Sim, a equipe da Dra. Raphaela atende Bradesco Saúde para consultas e avaliações dermatológicas!</p>
+              <p class="text-[11px] text-emerald-800 font-bold">Temos opções de agendamento para esta quinta às 15h30 ou na sexta às 10h. Qual período fica melhor para você?</p>
+              <span class="text-[9px] text-slate-400 block text-right mt-1 font-mono">14:10</span>
+            </div>
+
+            <div class="max-w-[85%] ml-auto p-3.5 rounded-2xl rounded-tr-none bg-slate-900 text-white shadow-sm">
+              <p>Quinta às 15h30 fica excelente! Meu nome é Márcia.</p>
+              <span class="text-[9px] text-slate-400 block text-right mt-1 font-mono">14:11</span>
+            </div>
+
+            <div class="max-w-[88%] mr-auto p-3.5 rounded-2xl rounded-tl-none bg-stone-100 text-slate-800 border border-stone-200 shadow-sm">
+              <p class="text-[11px] leading-relaxed">Excelente, Márcia! Já anotei sua solicitação para quinta-feira às 15h30. Nossa recepção vai confirmar seu horário e te enviar as orientações prévias pelo WhatsApp. Até breve!</p>
+              <span class="text-[9px] text-slate-400 block text-right mt-1 font-mono">14:11</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION: PREÇO & OFERTA TRANSPARENTE (A partir de R$ 39)    -->
+  <!-- ============================================================ -->
+  <section id="precos" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-stone-200">
+    <div class="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-white via-emerald-50/40 to-stone-50 border border-emerald-300 card-shadow-elevated text-center space-y-6">
+      
+      <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black uppercase">
+        Sem pegadinhas • Sem surpresas
+      </div>
+
+      <h2 class="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+        Planos a partir de <span class="text-emerald-600">R$ 39,00</span> por mês.
+      </h2>
+      
+      <p class="text-sm text-slate-600 max-w-xl mx-auto leading-relaxed">
+        Investimento acessível que se paga já nos primeiros atendimentos. Sem taxa de adesão, sem contratos que te prendem e com 7 dias de garantia incondicional.
       </p>
 
-      <div class="flex flex-col sm:flex-row gap-3 pt-2">
-        <button onclick="openTestModal()" class="px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs flex items-center justify-center gap-2 shadow-lg hover:scale-105 transition">
-          <i data-lucide="send" class="w-4 h-4"></i>
-          <span>Fazer teste gratuito deste assistente</span>
+      <!-- Checklist -->
+      <div class="max-w-md mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-left pt-2">
+        <div class="flex items-center gap-2 text-slate-800 font-bold">
+          <i data-lucide="check" class="w-4 h-4 text-emerald-600"></i>
+          <span>Sofia 24h no seu WhatsApp</span>
+        </div>
+        <div class="flex items-center gap-2 text-slate-800 font-bold">
+          <i data-lucide="check" class="w-4 h-4 text-emerald-600"></i>
+          <span>Dashboard & Controle Financeiro</span>
+        </div>
+        <div class="flex items-center gap-2 text-slate-800 font-bold">
+          <i data-lucide="check" class="w-4 h-4 text-emerald-600"></i>
+          <span>Gestão de múltiplos profissionais</span>
+        </div>
+        <div class="flex items-center gap-2 text-slate-800 font-bold">
+          <i data-lucide="check" class="w-4 h-4 text-emerald-600"></i>
+          <span>7 dias de garantia incondicional</span>
+        </div>
+      </div>
+
+      <!-- Action -->
+      <div class="pt-4 flex flex-wrap items-center justify-center gap-3">
+        <button onclick="openTestModal()" class="px-8 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-600/30 active:scale-95 transition flex items-center gap-2 cursor-pointer">
+          <i data-lucide="play" class="w-4 h-4 fill-white"></i>
+          <span>Começar Teste com 7 Dias de Garantia</span>
         </button>
-        <a href="https://wa.me/5511951364159?text=Ol%C3%A1%2C+gostaria+de+saber+mais+sobre+a+solu%C3%A7%C3%A3o+de+IA+para+Cl%C3%ADnicas%20M%C3%A9dicas%2C%20Odontologia%20%26%20Consult%C3%B3rios" target="_blank" class="px-6 py-3.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 border border-zinc-700 transition">
-          <i data-lucide="message-circle" class="w-4 h-4 text-emerald-400"></i>
-          <span>Falar com especialista comercial</span>
+        <a href="/planos" class="px-6 py-4 rounded-2xl bg-white hover:bg-stone-50 text-slate-800 font-bold text-xs border border-stone-300 transition">
+          Ver Tabela Completa de Planos
         </a>
       </div>
-    </div>
 
-    <!-- D: Situações Comuns da Rotina -->
-    <div class="glass-card p-6 sm:p-8 space-y-4">
-      <div class="flex items-center gap-2">
-        <i data-lucide="alert-circle" class="w-5 h-5 text-amber-400"></i>
-        <h2 class="text-lg font-bold text-white">Desafios frequentes na rotina deste segmento</h2>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- MODAL: TESTAR NO WHATSAPP (Preservado e Funcional)           -->
+  <!-- ============================================================ -->
+  <div id="testModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white border border-emerald-300 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl relative">
+      
+      <button onclick="closeTestModal()" class="absolute top-4 right-4 p-1 rounded-xl text-slate-400 hover:text-slate-900 hover:bg-stone-100 transition cursor-pointer">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="space-y-1">
+        <span class="text-[10px] font-black uppercase tracking-wider text-emerald-700">Demonstração Gratuita no seu Telefone</span>
+        <h3 class="text-xl font-black text-slate-900">Testar Sofia no seu WhatsApp</h3>
+        <p class="text-xs text-slate-600">
+          Informe seu nome e WhatsApp. O(A) Sofia vai te mandar uma mensagem de teste agora!
+        </p>
       </div>
-      <ul class="space-y-2.5 text-xs sm:text-sm">
-        
-    <li class="flex items-start gap-2.5">
-      <span class="text-cyan-400 font-bold mt-0.5">•</span>
-      <span class="text-zinc-300">Pacientes perguntando se a clínica atende determinado plano de saúde.</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <span class="text-cyan-400 font-bold mt-0.5">•</span>
-      <span class="text-zinc-300">Secretária sobrecarregada ao telefone enquanto mensagens no WhatsApp acumulam.</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <span class="text-cyan-400 font-bold mt-0.5">•</span>
-      <span class="text-zinc-300">Dúvidas sobre endereço, horários de funcionamento e especialidades médicas.</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <span class="text-cyan-400 font-bold mt-0.5">•</span>
-      <span class="text-zinc-300">Pacientes buscando agendar consulta fora do horário comercial da clínica.</span>
-    </li>
-  
-      </ul>
-    </div>
 
-    <!-- E: Funcionalidades Disponíveis -->
-    <div class="glass-card p-6 sm:p-8 space-y-4 border-cyan-500/20">
-      <div class="flex items-center gap-2">
-        <i data-lucide="zap" class="w-5 h-5 text-[#00F59B]"></i>
-        <h2 class="text-lg font-bold text-white">O que o assistente Sofia faz na prática</h2>
-      </div>
-      <ul class="space-y-3 text-xs sm:text-sm">
-        
-    <li class="flex items-start gap-2.5">
-      <i data-lucide="check" class="w-4 h-4 text-cyan-400 shrink-0 mt-0.5"></i>
-      <span class="text-zinc-200">Informações cadastrais sobre especialidades e médicos da clínica (equipe médica coordenada pela Dra. Raphaela).</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <i data-lucide="check" class="w-4 h-4 text-cyan-400 shrink-0 mt-0.5"></i>
-      <span class="text-zinc-200">Confirmação de convênios atendidos e modalidades particulares.</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <i data-lucide="check" class="w-4 h-4 text-cyan-400 shrink-0 mt-0.5"></i>
-      <span class="text-zinc-200">Coleta organizada de dados do paciente e preferência de data e turno.</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <i data-lucide="check" class="w-4 h-4 text-cyan-400 shrink-0 mt-0.5"></i>
-      <span class="text-zinc-200">Encaminhamento imediato para a secretária médica confirmar na agenda.</span>
-    </li>
-  
-    <li class="flex items-start gap-2.5">
-      <i data-lucide="check" class="w-4 h-4 text-cyan-400 shrink-0 mt-0.5"></i>
-      <span class="text-zinc-200">Orientações administrativas de preparo pré-consulta baseadas estritamente em conteúdo aprovado pela clínica.</span>
-    </li>
-  
-      </ul>
-    </div>
-
-    <!-- F: Conversa Ilustrativa -->
-    <div class="space-y-4">
-      <div class="flex items-center justify-between">
+      <form onsubmit="handleTestSubmit(event)" class="space-y-3.5 text-left">
         <div>
-          <h2 class="text-lg font-bold text-white">Exemplo ilustrativo de atendimento</h2>
-          <p class="text-xs text-zinc-400">Simulação de como o diálogo acontece de forma limpa no WhatsApp</p>
+          <label class="block text-[11px] font-bold text-slate-700 mb-1">Seu Nome Completo</label>
+          <input 
+            type="text" 
+            id="leadNameInput" 
+            required
+            placeholder="Ex: Seu Nome ou Empresa"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 border border-stone-300 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 transition"
+          >
         </div>
-        <span class="text-[10px] px-2.5 py-1 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-400">Exemplo Ilustrativo</span>
-      </div>
 
-      <div class="p-6 rounded-3xl bg-[#090C15] border border-zinc-800 space-y-3 max-w-xl mx-auto shadow-2xl">
-        <div class="flex items-center justify-between border-b border-zinc-800 pb-2 text-[11px] text-zinc-400">
-          <span class="font-bold flex items-center gap-1.5 text-cyan-300">
-            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-            Sofia
-          </span>
-          <span class="text-[10px] text-zinc-500">WhatsApp Oficial</span>
-        </div>
-        <div class="space-y-2.5">
-          
-      <div class="bg-cyan-950/70 border border-cyan-700/40 text-cyan-100 rounded-tr-none ml-auto text-right p-3 rounded-2xl max-w-[85%] text-xs leading-relaxed shadow">
-        Boa tarde! Vocês atendem convênio SulAmérica para consulta dermatológica? Como funciona o agendamento?
-      </div>
-    
-      <div class="bg-zinc-800 text-zinc-100 rounded-tl-none p-3 rounded-2xl max-w-[85%] text-xs leading-relaxed shadow">
-        Olá! Sim, na clínica da Dra. Raphaela atendemos o convênio SulAmérica para Dermatologia e outras especialidades. Os atendimentos acontecem de segunda a sexta, das 8h às 18h. Você prefere atendimento no período da manhã ou da tarde?
-      </div>
-    
-      <div class="bg-cyan-950/70 border border-cyan-700/40 text-cyan-100 rounded-tr-none ml-auto text-right p-3 rounded-2xl max-w-[85%] text-xs leading-relaxed shadow">
-        Prefiro na parte da tarde, se possível na próxima terça-feira.
-      </div>
-    
-      <div class="bg-zinc-800 text-zinc-100 rounded-tl-none p-3 rounded-2xl max-w-[85%] text-xs leading-relaxed shadow">
-        Anotado! Temos disponibilidade na terça-feira às 15h30. Por favor, me confirme seu nome completo e número da carteirinha do convênio para que nossa secretária finalize o agendamento no sistema.
-      </div>
-    
-        </div>
-      </div>
-    </div>
-
-    <!-- G & H: Fluxo Operacional & O que fornecer -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="glass-card p-6 sm:p-7 space-y-3">
-        <div class="flex items-center gap-2">
-          <i data-lucide="layers" class="w-5 h-5 text-cyan-400"></i>
-          <h3 class="text-base font-bold text-white">Fluxo Operacional</h3>
-        </div>
-        <p class="text-xs text-zinc-300 leading-relaxed">
-          O paciente envia mensagem no WhatsApp da clínica. A Sofia recepciona, tira dúvidas sobre convênios e especialidades e recolhe os dados preliminares. A secretária recebe os dados estruturados e valida a consulta no prontuário/sistema da clínica.
-        </p>
-      </div>
-
-      <div class="glass-card p-6 sm:p-7 space-y-3">
-        <div class="flex items-center gap-2">
-          <i data-lucide="file-text" class="w-5 h-5 text-violet-400"></i>
-          <h3 class="text-base font-bold text-white">O que você precisa fornecer</h3>
-        </div>
-        <ul class="space-y-2 text-xs">
-          
-    <li class="flex items-center gap-2">
-      <i data-lucide="check-circle-2" class="w-4 h-4 text-cyan-400"></i>
-      <span class="text-zinc-300">Relação de especialidades e médicos atuantes.</span>
-    </li>
-  
-    <li class="flex items-center gap-2">
-      <i data-lucide="check-circle-2" class="w-4 h-4 text-cyan-400"></i>
-      <span class="text-zinc-300">Lista oficial de planos de saúde e convênios aceitos.</span>
-    </li>
-  
-    <li class="flex items-center gap-2">
-      <i data-lucide="check-circle-2" class="w-4 h-4 text-cyan-400"></i>
-      <span class="text-zinc-300">Horários de atendimento por especialidade.</span>
-    </li>
-  
-    <li class="flex items-center gap-2">
-      <i data-lucide="check-circle-2" class="w-4 h-4 text-cyan-400"></i>
-      <span class="text-zinc-300">Orientações aprovadas pela clínica para exames e consultas.</span>
-    </li>
-  
-        </ul>
-      </div>
-    </div>
-
-    <!-- I & J: Integrações & Limites de Atuação -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div class="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-2.5 text-xs text-zinc-300">
-        <div class="flex items-center gap-2 text-white font-bold text-sm">
-          <i data-lucide="link-2" class="w-4 h-4 text-emerald-400"></i>
-          <span>Integrações e Dependências</span>
-        </div>
-        <p class="leading-relaxed text-zinc-400">
-          Conexão via WhatsApp seguro. A Sofia atua como secretária virtual de atendimento e não realiza conexão autônoma com prontuários eletrônicos sem homologação prévia.
-        </p>
-      </div>
-
-      <div class="p-6 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-2.5 text-xs text-zinc-300">
-        <div class="flex items-center gap-2 text-white font-bold text-sm">
-          <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400"></i>
-          <span>Limites e Encaminhamento Humano</span>
-        </div>
-        <p class="leading-relaxed text-zinc-400">
-          A Sofia NÃO é médica e NÃO realiza diagnósticos, triagem clínica autônoma, prescrições de remédios ou interpretação de exames. Casos de urgência são prontamente orientados a procurar um pronto-socorro.
-        </p>
-      </div>
-    </div>
-
-    <!-- K: Oferta Comercial Aplicável -->
-    <div class="p-8 rounded-3xl bg-gradient-to-b from-[#11141f] to-[#090C15] border-2 border-[#00F59B]/40 space-y-4">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-4">
         <div>
-          <span class="text-[10px] font-bold text-[#00F59B] uppercase tracking-wider">Oferta Comercial</span>
-          <h3 class="text-xl font-black text-white">Assistente para Clínicas Médicas, Odontologia & Consultórios</h3>
+          <label class="block text-[11px] font-bold text-slate-700 mb-1">Seu Número de WhatsApp (com DDD)</label>
+          <input 
+            type="tel" 
+            id="leadPhoneInput" 
+            required
+            placeholder="Ex: 11999998888"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 border border-stone-300 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 transition"
+          >
         </div>
-        <div class="sm:text-right">
-          <span class="text-xs text-zinc-400">Mensalidade</span>
-          <p class="text-2xl font-black text-white">R$ 97<span class="text-xs text-zinc-400">/mês</span></p>
-        </div>
-      </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-zinc-300">
-        <div class="flex items-center gap-2">
-          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-          <span>1 número de WhatsApp com atendimento contínuo</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-          <span>Regras personalizadas do seu negócio</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-          <span>Intervenção humana livre no celular a qualquer momento</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-          <span>Sem contrato de fidelidade (cancele quando quiser)</span>
-        </div>
-      </div>
-    </div>
+        <div id="modalAlertBox" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold"></div>
 
-    <!-- L: Perguntas Frequentes do Segmento -->
-    <div class="space-y-4">
-      <h2 class="text-xl font-bold text-white">Dúvidas frequentes sobre esta solução</h2>
-      <div class="space-y-3">
-        
-    <details class="p-4 rounded-2xl bg-[#11141f] border border-zinc-800 group">
-      <summary class="font-bold text-white cursor-pointer list-none flex items-center justify-between text-xs sm:text-sm">
-        <span>A assistente passa orientações médicas?</span>
-        <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition"></i>
-      </summary>
-      <p class="pt-3 text-zinc-300 text-xs leading-relaxed">
-        Não. A Sofia atua estritamente no suporte administrativo da recepção (horários, especialidades, convênios e localização). Dúvidas médicas são direcionadas aos profissionais da clínica.
-      </p>
-    </details>
-  
-    <details class="p-4 rounded-2xl bg-[#11141f] border border-zinc-800 group">
-      <summary class="font-bold text-white cursor-pointer list-none flex items-center justify-between text-xs sm:text-sm">
-        <span>Como a equipe médica da Dra. Raphaela acompanha as conversas?</span>
-        <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition"></i>
-      </summary>
-      <p class="pt-3 text-zinc-300 text-xs leading-relaxed">
-        A equipe de recepção visualiza todas as conversas em tempo real no WhatsApp da clínica e no Painel do Gestor, podendo assumir qualquer atendimento a qualquer instante.
-      </p>
-    </details>
-  
-    <details class="p-4 rounded-2xl bg-[#11141f] border border-zinc-800 group">
-      <summary class="font-bold text-white cursor-pointer list-none flex items-center justify-between text-xs sm:text-sm">
-        <span>É possível cadastrar múltiplos médicos?</span>
-        <i data-lucide="chevron-down" class="w-4 h-4 text-zinc-400 group-open:rotate-180 transition"></i>
-      </summary>
-      <p class="pt-3 text-zinc-300 text-xs leading-relaxed">
-        Sim. As informações de dias e especialidades de cada médico da clínica são configuradas nas diretrizes da assistente.
-      </p>
-    </details>
-  
-      </div>
-    </div>
-
-    <!-- M: CTA Final -->
-    <div class="p-8 rounded-3xl bg-[#090C15] border border-zinc-800 text-center space-y-4">
-      <h3 class="text-xl sm:text-2xl font-black text-white">
-        Pronto para experimentar o assistente Sofia no seu negócio?
-      </h3>
-      <p class="text-xs sm:text-sm text-zinc-400 max-w-xl mx-auto">
-        Envie uma mensagem de demonstração para o seu celular ou converse diretamente com nossa equipe técnica.
-      </p>
-      <div class="flex flex-col sm:flex-row justify-center gap-3 pt-2">
-        <button onclick="openTestModal()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs shadow hover:scale-105 transition">
-          Testar no meu WhatsApp
+        <button type="submit" id="btnSubmitTest" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition flex items-center justify-center gap-2 shadow cursor-pointer">
+          <span id="btnSubmitTestText">Receber Mensagem no WhatsApp Agora</span>
+          <i data-lucide="send" class="w-4 h-4 text-white"></i>
         </button>
-        <a href="/solucoes" class="px-6 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold text-xs transition">
-          Ver outras soluções
-        </a>
-      </div>
-    </div>
 
-  </main>
-
-  <!-- Modal de Teste -->
-  <div id="testAgentModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-4">
-    <div class="bg-[#0B0F19] border border-zinc-800 rounded-3xl w-full max-w-md p-6 shadow-2xl relative space-y-4">
-      <button onclick="closeTestModal()" class="absolute top-4 right-4 text-zinc-400 hover:text-white p-1 rounded-lg bg-zinc-800/80">✕</button>
-
-      <div class="flex items-center gap-3">
-        <div class="w-12 h-12 rounded-2xl bg-zinc-800 flex items-center justify-center text-2xl">🩺</div>
-        <div>
-          <span class="text-[10px] font-bold text-[#00F59B] uppercase tracking-wider">Demonstração no seu celular</span>
-          <h3 class="text-base font-black text-white">Sofia • Clínicas Médicas, Odontologia & Consultórios</h3>
-        </div>
-      </div>
-
-      <p class="text-xs text-zinc-300 leading-relaxed">
-        Você receberá uma mensagem deste assistente simulando o atendimento para testar a experiência real no seu WhatsApp.
-      </p>
-
-      <form onsubmit="submitTest(event)" class="space-y-3.5 pt-1">
-        <div>
-          <label class="block text-[11px] font-bold text-zinc-400 mb-1">Seu Primeiro Nome</label>
-          <input type="text" id="leadName" required placeholder="Ex: Thiago" class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs focus:border-[#00F59B] focus:outline-none">
-        </div>
-
-        <div>
-          <label class="block text-[11px] font-bold text-zinc-400 mb-1">Seu WhatsApp (com DDD)</label>
-          <input type="tel" id="leadPhone" required placeholder="(11) 99999-8888" class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-white text-xs focus:border-[#00F59B] focus:outline-none font-mono">
-        </div>
-
-        <div id="modalErrorMsg" class="hidden text-rose-400 text-xs p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20"></div>
-
-        <button type="submit" id="btnSubmitTest" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 text-black font-black text-xs shadow-lg hover:opacity-95 transition flex items-center justify-center gap-2">
-          <span id="btnSubmitTestText">Receber Mensagem de Teste</span>
-          <i data-lucide="send" class="w-3.5 h-3.5"></i>
-        </button>
+        <p class="text-[10px] text-slate-400 text-center">
+          🔒 Teste gratuito e sem compromisso.
+        </p>
       </form>
+
     </div>
   </div>
 
-  <!-- Footer -->
-  <footer class="py-10 border-t border-zinc-800 bg-[#040711] text-xs text-zinc-500">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-      <div class="flex items-center gap-2">
-        <img src="/raia-logo.png" alt="RAIA" class="w-6 h-6 object-contain">
-        <span class="font-bold text-zinc-400">RAIA • Assistentes de IA para WhatsApp</span>
+  <!-- ============================================================ -->
+  <!-- FOOTER                                                       -->
+  <!-- ============================================================ -->
+  <footer class="border-t border-stone-200 bg-white pt-12 pb-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
+      <div class="flex items-center gap-3">
+        <img src="/raia-emblem-small.png" alt="RAIA" class="w-7 h-7 object-contain">
+        <span class="text-slate-900 font-bold">RAIA • Sofia para Saúde & Odontologia</span>
       </div>
-      <div class="flex items-center gap-4 text-zinc-400">
-        <a href="/" class="hover:text-white">Início</a>
-        <a href="/solucoes" class="hover:text-white">Soluções</a>
-        <a href="/como-funciona" class="hover:text-white">Como Funciona</a>
-        <a href="/planos" class="hover:text-white">Planos</a>
-        <a href="/contato" class="hover:text-white">Contato</a>
-        <a href="/termos" class="hover:text-white">Termos</a>
-        <a href="/privacidade" class="hover:text-white">Privacidade</a>
+      <div class="flex items-center gap-4">
+        <a href="/solucoes" class="hover:text-slate-900 transition">Outras Soluções</a>
+        <a href="/termos" class="hover:text-slate-900 transition">Termos</a>
+        <a href="/privacidade" class="hover:text-slate-900 transition">Privacidade</a>
+        <a href="/contato" class="hover:text-slate-900 transition">Contato</a>
       </div>
-      <p>© 2026 RAIA. Operado por RAIA RH.</p>
     </div>
   </footer>
 
+  <!-- ============================================================ -->
+  <!-- JAVASCRIPT: MODAL HANDLERS                                   -->
+  <!-- ============================================================ -->
   <script>
     function openTestModal() {
-      document.getElementById('modalErrorMsg').classList.add('hidden');
-      document.getElementById('testAgentModal').classList.remove('hidden');
-      lucide.createIcons();
+      const modal = document.getElementById('testModal');
+      if (modal) modal.classList.remove('hidden');
     }
 
     function closeTestModal() {
-      document.getElementById('testAgentModal').classList.add('hidden');
+      const modal = document.getElementById('testModal');
+      if (modal) modal.classList.add('hidden');
     }
 
-    async function submitTest(e) {
+    async function handleTestSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('btnSubmitTest');
       const btnTxt = document.getElementById('btnSubmitTestText');
-      const errEl = document.getElementById('modalErrorMsg');
-      const name = document.getElementById('leadName').value.trim();
-      const phone = document.getElementById('leadPhone').value.trim();
+      const alertBox = document.getElementById('modalAlertBox');
+      const name = document.getElementById('leadNameInput')?.value?.trim();
+      const phone = document.getElementById('leadPhoneInput')?.value?.trim();
+      const nicheSlug = 'saude-e-odontologia';
 
-      errEl.classList.add('hidden');
+      if (!name || !phone) {
+        alertBox.innerText = 'Preencha seu nome e número de WhatsApp.';
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
       btn.disabled = true;
-      btnTxt.innerText = 'Enviando...';
+      btnTxt.innerText = 'Enviando mensagem do assistente...';
+      alertBox.classList.add('hidden');
 
       try {
-        const res = await fetch('/api/test-agent', {
+        const res = await fetch('/api/leads/request-test', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, phone, agentKey: 'CLINIC', agentName: 'Sofia' })
+          body: JSON.stringify({ name, phone, nicheSlug })
         });
-        const data = await res.json();
-        if (data.success) {
-          alert('Mensagem enviada com sucesso para o WhatsApp ' + (data.phone || phone) + '! Confira seu celular.');
+        const json = await res.json();
+        if (json.success) {
+          alert('Pronto, ' + name + '! Enviamos uma mensagem de demonstração para o seu WhatsApp no número ' + phone + '. Abra seu aplicativo agora!');
           closeTestModal();
         } else {
-          errEl.innerText = data.error || 'Erro ao enviar.';
-          errEl.classList.remove('hidden');
+          alertBox.innerText = json.error || 'Não foi possível disparar o teste no momento.';
+          alertBox.classList.remove('hidden');
         }
       } catch (err) {
-        errEl.innerText = 'Erro de conexão com o servidor.';
-        errEl.classList.remove('hidden');
+        alertBox.innerText = 'Erro ao conectar ao servidor: ' + err.message;
+        alertBox.classList.remove('hidden');
       } finally {
         btn.disabled = false;
-        btnTxt.innerText = 'Receber Mensagem de Teste';
+        btnTxt.innerText = 'Receber Mensagem no WhatsApp Agora';
       }
     }
 
-    window.addEventListener('DOMContentLoaded', () => lucide.createIcons());
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+    });
   </script>
+
 </body>
 </html>
