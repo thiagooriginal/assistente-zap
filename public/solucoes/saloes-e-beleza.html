@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="scroll-smooth dark">
+<html lang="pt-BR" class="scroll-smooth">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <title>Jéssica • Assistente de IA para Salões de Beleza & Estética | RAIA</title>
-  <meta name="description" content="Seu salão atendendo no WhatsApp, confirmando clientes e organizando o caixa enquanto você cuida do cabelo. Conheça a Jéssica e o Dashboard Financeiro da RAIA.">
+  <title>Jéssica • Assistente de IA & Gestão Financeira para Salões | RAIA</title>
+  <meta name="description" content="Seu salão atendendo no WhatsApp 24h, confirmando clientes e organizando faturamento, custos e comissões da sua equipe. Conheça a Jéssica e o Dashboard do Salão.">
   <link rel="icon" type="image/png" href="/raia-emblem-small.png">
 
   <!-- Tailwind CSS CDN -->
@@ -18,21 +18,26 @@
 
   <script>
     tailwind.config = {
-      darkMode: 'class',
       theme: {
         extend: {
           fontFamily: {
             sans: ['"Plus Jakarta Sans"', 'sans-serif'],
           },
           colors: {
-            brand: {
-              dark: '#080918',
-              surface: '#0F1126',
-              card: '#141632',
-              emerald: '#00F59B',
-              cyan: '#06B6D4',
-              pink: '#EC4899',
-              gold: '#F59E0B',
+            salon: {
+              bg: '#FAF9F6',
+              surface: '#FFFFFF',
+              card: '#FFFFFF',
+              border: '#EAE8E4',
+              emerald: '#059669',
+              emeraldLight: '#ECFDF5',
+              greenZap: '#00D775',
+              gold: '#D97706',
+              goldLight: '#FEF3C7',
+              rose: '#E11D48',
+              roseLight: '#FFE4E6',
+              slate: '#0F172A',
+              muted: '#64748B',
             }
           }
         }
@@ -42,68 +47,70 @@
 
   <style>
     body {
-      background-color: #070814;
-      color: #E2E8F0;
+      background-color: #FAF9F6;
+      color: #0F172A;
       font-family: 'Plus Jakarta Sans', sans-serif;
       overflow-x: hidden;
     }
-    .salon-hero-bg {
-      background: linear-gradient(180deg, rgba(7, 8, 20, 0.82) 0%, rgba(7, 8, 20, 0.94) 75%, #070814 100%), 
-                  url('https://images.unsplash.com/photo-1560066984-138dadb4c035?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+    .hero-warm-gradient {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.94) 0%, rgba(254, 243, 199, 0.70) 50%, rgba(236, 253, 245, 0.85) 100%);
     }
-    .salon-banner-pattern {
-      background-image: radial-gradient(rgba(236, 72, 153, 0.15) 1px, transparent 1px);
-      background-size: 24px 24px;
+    .card-shadow-soft {
+      box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.06), 0 4px 10px -2px rgba(15, 23, 42, 0.03);
+    }
+    .card-shadow-elevated {
+      box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.10), 0 8px 16px -4px rgba(15, 23, 42, 0.05);
     }
   </style>
 </head>
-<body class="min-h-screen bg-[#070814] text-slate-100 antialiased selection:bg-pink-500 selection:text-white">
+<body class="min-h-screen bg-[#FAF9F6] text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
 
   <!-- ============================================================ -->
-  <!-- TOP NAVIGATION BAR                                           -->
+  <!-- TOP NAVIGATION BAR (Clean Warm Luxury Style)                 -->
   <!-- ============================================================ -->
-  <header class="sticky top-0 z-40 w-full backdrop-blur-xl bg-[#070814]/85 border-b border-[#1F234D]">
+  <header class="sticky top-0 z-40 w-full backdrop-blur-xl bg-white/90 border-b border-stone-200">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
       
-      <!-- Brand Logo Emblem -->
+      <!-- Logo RAIA -->
       <a href="/" class="flex items-center gap-3 group shrink-0">
-        <div class="relative w-10 h-10 flex items-center justify-center rounded-xl bg-pink-500/10 border border-pink-500/30 group-hover:border-pink-400 transition p-1">
-          <img src="/raia-emblem-small.png" alt="RAIA" class="w-full h-full object-contain filter drop-shadow-[0_0_10px_rgba(236,72,153,0.5)]">
+        <div class="relative w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-50 border border-emerald-200 p-1 group-hover:border-emerald-500 transition">
+          <img src="/raia-emblem-small.png" alt="RAIA" class="w-full h-full object-contain">
         </div>
         <div class="flex flex-col">
           <div class="flex items-center gap-2">
-            <span class="text-xl font-black tracking-tight text-white group-hover:text-pink-400 transition">RAIA</span>
-            <span class="px-2 py-0.5 rounded-full bg-pink-500/15 border border-pink-500/30 text-[9px] font-extrabold uppercase tracking-widest text-pink-300">Salões & Estética</span>
+            <span class="text-xl font-black tracking-tight text-slate-900 group-hover:text-emerald-700 transition">RAIA</span>
+            <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-extrabold uppercase tracking-wider">Salões & Beleza</span>
           </div>
-          <span class="text-[10px] text-zinc-400 -mt-0.5 font-medium">Jéssica • Assistente Inteligente</span>
+          <span class="text-[10px] text-slate-500 font-medium">Jéssica • Assistente Inteligente</span>
         </div>
       </a>
 
       <!-- Desktop Nav -->
-      <nav class="hidden md:flex items-center gap-1.5 text-xs font-bold text-zinc-300">
-        <a href="/solucoes" class="px-3 py-1.5 rounded-xl hover:text-white hover:bg-white/5 transition flex items-center gap-1.5">
-          <i data-lucide="arrow-left" class="w-3.5 h-3.5 text-zinc-400"></i>
-          <span>Todos os Segmentos</span>
+      <nav class="hidden md:flex items-center gap-2 text-xs font-bold text-slate-600">
+        <a href="/solucoes" class="px-3 py-1.5 rounded-xl hover:text-slate-900 hover:bg-stone-100 transition flex items-center gap-1.5">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5 text-slate-400"></i>
+          <span>Catálogo</span>
         </a>
-        <a href="#problemas" class="px-3 py-1.5 rounded-xl hover:text-white hover:bg-white/5 transition">
+        <a href="#problemas" class="px-3 py-1.5 rounded-xl hover:text-slate-900 hover:bg-stone-100 transition">
           Problemas & Soluções
         </a>
-        <a href="#dashboard" class="px-3 py-1.5 rounded-xl hover:text-white hover:bg-white/5 transition text-cyan-300">
-          Controle Financeiro
+        <a href="#dashboard" class="px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 transition flex items-center gap-1.5">
+          <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span>Dashboard & Equipe</span>
         </a>
-        <a href="#conversa" class="px-3 py-1.5 rounded-xl hover:text-white hover:bg-white/5 transition">
-          Exemplo no WhatsApp
+        <a href="#conversa" class="px-3 py-1.5 rounded-xl hover:text-slate-900 hover:bg-stone-100 transition">
+          Exemplo WhatsApp
         </a>
-        <a href="#precos" class="px-3 py-1.5 rounded-xl hover:text-white hover:bg-white/5 transition">
+        <a href="#precos" class="px-3 py-1.5 rounded-xl hover:text-slate-900 hover:bg-stone-100 transition">
           Planos
         </a>
       </nav>
 
       <!-- Right CTAs -->
       <div class="flex items-center gap-3 shrink-0">
-        <button onclick="openTestModal()" class="px-4 py-2.5 rounded-xl text-xs font-extrabold bg-gradient-to-r from-pink-500 via-rose-500 to-[#00F59B] text-black hover:opacity-90 shadow-lg shadow-pink-500/25 active:scale-95 transition flex items-center gap-2 cursor-pointer">
-          <i data-lucide="message-circle" class="w-4 h-4 text-black"></i>
-          <span>Testar Jéssica no WhatsApp</span>
+        <button onclick="openTestModal()" class="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 active:scale-95 transition flex items-center gap-2 cursor-pointer">
+          <i data-lucide="message-circle" class="w-4 h-4 text-white"></i>
+          <span>Testar no WhatsApp</span>
         </button>
       </div>
 
@@ -111,100 +118,105 @@
   </header>
 
   <!-- ============================================================ -->
-  <!-- HERO SECTION (Luxury Salon Atmosphere & Hairdresser Tools)   -->
+  <!-- HERO SECTION (Warm, Luminous & Harmonious Luxury Salon)      -->
   <!-- ============================================================ -->
-  <section class="salon-hero-bg relative pt-12 pb-20 px-4 sm:px-6 lg:px-8 border-b border-[#1F234D]">
-    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+  <section class="relative pt-10 pb-16 px-4 sm:px-6 lg:px-8 border-b border-stone-200 overflow-hidden">
+    
+    <!-- Background Decor (Warm Light with Organic Plant Shadows) -->
+    <div class="absolute inset-0 bg-gradient-to-b from-[#FFFDF9] via-[#FAF7F0] to-[#F5F2EA] pointer-events-none"></div>
+    <div class="absolute -top-32 -right-32 w-96 h-96 bg-emerald-100/60 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute top-1/2 -left-32 w-96 h-96 bg-amber-100/70 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="relative z-10 max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
       
-      <!-- Left Column: Copy & Value Proposition -->
-      <div class="lg:col-span-7 space-y-6">
+      <!-- Left Column: Copywriting & Value Proposition -->
+      <div class="lg:col-span-7 space-y-6 text-left">
         
-        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-pink-500/20 border border-pink-400/40 text-pink-300 text-xs font-extrabold tracking-wide backdrop-blur-md">
-          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-pink-400"></i>
-          <span>Especialmente Criado para Salões, Esmalterias & Barbearias</span>
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-100/80 border border-emerald-300 text-emerald-800 text-xs font-extrabold tracking-wide">
+          <span class="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+          <span>Especialmente Criado para Salões de Beleza, Esmalterias & Barbearias</span>
         </div>
 
-        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight">
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.15]">
           Seu salão atendendo no WhatsApp e organizando o caixa enquanto você cuida do cabelo.
         </h1>
 
-        <p class="text-sm sm:text-base text-zinc-200 leading-relaxed max-w-2xl">
-          Enquanto suas mãos estão ocupadas lavando, escovando ou aplicando mechas, a <b>Jéssica</b> atende suas clientes no WhatsApp em segundos, tira dúvidas de procedimentos, recolhe preferências de horários e envia lembretes. E no painel da RAIA, você acompanha seu faturamento diário e comissões dos profissionais em tempo real.
+        <p class="text-base text-slate-600 leading-relaxed max-w-2xl font-normal">
+          Enquanto suas mãos estão ocupadas no lavatório, fazendo mechas ou finalizando uma escova, a <b>Jéssica</b> atende suas clientes no WhatsApp em segundos, tira dúvidas de procedimentos, recolhe preferências de horários e envia lembretes. E no painel da RAIA, você acompanha <b>entradas, custos do salão e comissões da equipe</b> em tempo real.
         </p>
 
         <!-- CTAs -->
-        <div class="flex flex-wrap items-center gap-4 pt-2">
-          <button onclick="openTestModal()" class="px-6 py-4 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-[#00F59B] text-black font-black text-xs hover:opacity-95 shadow-xl shadow-pink-500/30 active:scale-95 transition flex items-center gap-2.5 cursor-pointer">
-            <i data-lucide="play" class="w-4 h-4 fill-black"></i>
-            <span>Fazer um Teste Grátis no Meu WhatsApp</span>
+        <div class="flex flex-wrap items-center gap-3.5 pt-2">
+          <button onclick="openTestModal()" class="px-6 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-600/25 active:scale-95 transition flex items-center gap-2.5 cursor-pointer">
+            <i data-lucide="play" class="w-4 h-4 fill-white"></i>
+            <span>Testar a Jéssica no Meu WhatsApp Grátis</span>
           </button>
           
-          <a href="#dashboard" class="px-5 py-4 rounded-2xl bg-[#141632]/90 hover:bg-white/10 text-white font-bold text-xs border border-zinc-700 transition flex items-center gap-2">
-            <i data-lucide="bar-chart-3" class="w-4 h-4 text-cyan-400"></i>
-            <span>Ver Dashboard Financeiro</span>
+          <a href="#dashboard" class="px-5 py-4 rounded-2xl bg-white hover:bg-stone-50 text-slate-800 font-extrabold text-xs border border-stone-300 transition flex items-center gap-2 card-shadow-soft">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-emerald-600"></i>
+            <span>Ver Dashboard Financeiro & Equipe</span>
           </a>
         </div>
 
-        <!-- Highlights Badges -->
-        <div class="pt-4 grid grid-cols-3 gap-3 border-t border-white/10 text-xs">
-          <div>
-            <span class="text-lg font-black text-pink-400 font-mono">24h / 7d</span>
-            <p class="text-[11px] text-zinc-400 mt-0.5">Atendimento sem pausa</p>
+        <!-- Metric highlights -->
+        <div class="pt-6 grid grid-cols-3 gap-4 border-t border-stone-200/80">
+          <div class="space-y-0.5">
+            <span class="text-2xl font-black text-emerald-700 font-mono">24h / 7d</span>
+            <p class="text-xs text-slate-500 font-medium">WhatsApp sem clientes no vácuo</p>
           </div>
-          <div>
-            <span class="text-lg font-black text-[#00F59B] font-mono">-60%</span>
-            <p class="text-[11px] text-zinc-400 mt-0.5">Menos faltas com lembretes</p>
+          <div class="space-y-0.5">
+            <span class="text-2xl font-black text-amber-600 font-mono">95%</span>
+            <p class="text-xs text-slate-500 font-medium">Comparecimento com lembretes</p>
           </div>
-          <div>
-            <span class="text-lg font-black text-cyan-400 font-mono">100%</span>
-            <p class="text-[11px] text-zinc-400 mt-0.5">Caixa & Comissões na mão</p>
+          <div class="space-y-0.5">
+            <span class="text-2xl font-black text-slate-900 font-mono">100%</span>
+            <p class="text-xs text-slate-500 font-medium">Caixa e comissões calculadas</p>
           </div>
         </div>
 
       </div>
 
-      <!-- Right Column: Visual Card with Scissors, Brush & Salon Tools -->
+      <!-- Right Column: Visual Collage with Stylist & Modern Salon Decor -->
       <div class="lg:col-span-5 relative">
-        <div class="relative rounded-3xl overflow-hidden border-2 border-pink-500/40 shadow-2xl group bg-[#0F1126]">
+        <div class="relative rounded-3xl overflow-hidden card-shadow-elevated bg-white border border-stone-200 p-3 space-y-3">
           
-          <!-- Image with Salon Tools (Scissors & Hairbrush in foreground) -->
-          <div class="relative h-80 w-full overflow-hidden">
+          <!-- Top: Modern Salon Interior Image (User Reference 1) -->
+          <div class="relative h-56 rounded-2xl overflow-hidden">
             <img 
-              src="https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80" 
-              alt="Escova de cabelo e tesoura de cabeleireiro profissional em primeiro plano" 
-              class="w-full h-full object-cover group-hover:scale-105 transition duration-700"
+              src="/salon-interior-decor.jpg" 
+              alt="Ambiente moderno de salão de beleza com jardim vertical e iluminação acolhedora" 
+              class="w-full h-full object-cover"
             >
-            <div class="absolute inset-0 bg-gradient-to-t from-[#0F1126] via-transparent to-black/30"></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent"></div>
             
-            <div class="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-black/70 backdrop-blur-md border border-white/20 text-white text-[11px] font-extrabold flex items-center gap-1.5">
-              <span>✂️</span>
-              <span>Rotina Real do Salão</span>
+            <div class="absolute top-3 left-3 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-slate-900 text-[10px] font-extrabold flex items-center gap-1.5 shadow">
+              <span>🌿</span>
+              <span>Ambiente Aconchegante & Sofisticado</span>
             </div>
 
-            <div class="absolute bottom-4 left-4 right-4">
-              <span class="text-[10px] uppercase font-black text-pink-400 tracking-wider">Atendimento + Gestão de Caixa</span>
-              <h3 class="text-xl font-black text-white">Jéssica • A aliada do seu salão</h3>
+            <div class="absolute bottom-3 left-3 right-3 text-white">
+              <span class="text-[9px] uppercase font-black text-amber-300 tracking-wider">Gestão do Salão</span>
+              <h3 class="text-base font-black leading-tight">Studio Bella • Mais tempo para atender bem</h3>
             </div>
           </div>
 
-          <!-- Card Content Body -->
-          <div class="p-5 space-y-3 bg-[#0F1126]">
-            <div class="flex items-center justify-between text-xs border-b border-zinc-800 pb-2">
-              <span class="text-zinc-400">Agendamentos & Dúvidas</span>
-              <span class="text-[#00F59B] font-bold flex items-center gap-1">
-                <span class="w-2 h-2 rounded-full bg-[#00F59B] animate-pulse"></span>
-                WhatsApp Automático
+          <!-- Bottom: Stylist smiling with client (User Reference 2) + Floating pill -->
+          <div class="relative h-44 rounded-2xl overflow-hidden">
+            <img 
+              src="/salon-stylist-happy.png" 
+              alt="Cabeleireira profissional sorrindo atendendo cliente com babyliss" 
+              class="w-full h-full object-cover object-top"
+            >
+            
+            <!-- Floating badge -->
+            <div class="absolute bottom-3 left-3 right-3 p-2.5 rounded-xl bg-white/95 backdrop-blur-md border border-stone-200 flex items-center justify-between text-xs shadow-md">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="font-extrabold text-slate-800 text-[11px]">Jéssica atendendo no WhatsApp...</span>
+              </div>
+              <span class="font-bold text-emerald-700 text-[11px] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                14 agendamentos hoje
               </span>
-            </div>
-
-            <div class="flex items-center justify-between text-xs border-b border-zinc-800 pb-2">
-              <span class="text-zinc-400">Controle de Faturamento</span>
-              <span class="text-cyan-400 font-bold">Dashboard em Tempo Real</span>
-            </div>
-
-            <div class="flex items-center justify-between text-xs">
-              <span class="text-zinc-400">Investimento Mensal</span>
-              <span class="text-white font-mono font-black text-sm text-[#00F59B]">Apenas R$ 97 / mês</span>
             </div>
           </div>
 
@@ -215,91 +227,100 @@
   </section>
 
   <!-- ============================================================ -->
-  <!-- SECTION: PROBLEMAS COMUNS VS SOLUÇÕES DA RAIA                -->
+  <!-- SECTION: OS 3 PROBLEMAS REAIS DO SALÃO VS SOLUÇÃO RAIA       -->
   <!-- ============================================================ -->
   <section id="problemas" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
     <div class="text-center max-w-2xl mx-auto space-y-3 mb-12">
-      <span class="px-3.5 py-1 rounded-full bg-pink-500/10 border border-pink-500/30 text-pink-300 text-xs font-extrabold uppercase">
-        Problemas da Rotina de Salão
+      <span class="px-3.5 py-1 rounded-full bg-amber-100 border border-amber-300 text-amber-800 text-xs font-extrabold uppercase">
+        Rotina Real de Quem Empreende na Beleza
       </span>
-      <h2 class="text-2xl sm:text-3xl font-black text-white">
+      <h2 class="text-2xl sm:text-3xl font-black text-slate-900">
         Você se identifica com algum desses 3 desafios diários?
       </h2>
-      <p class="text-xs sm:text-sm text-zinc-400">
-        Ter salão de beleza exige técnica, cuidado e atenção plena à cliente. Veja como a RAIA resolve as dores que tiram o sono de quem empreende na beleza:
+      <p class="text-sm text-slate-600">
+        Atender com carinho exige concentração total. Veja como a RAIA resolve os gargalos que drenam o tempo e a paz da cabeleireira:
       </p>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       
       <!-- Card 1: Mãos Ocupadas -->
-      <div class="p-6 rounded-3xl bg-[#0F1126] border border-[#1F234D] hover:border-pink-500/50 transition space-y-4 relative group">
-        <div class="w-12 h-12 rounded-2xl bg-pink-500/15 border border-pink-400/30 flex items-center justify-center text-pink-400 text-xl font-bold">
+      <div class="p-7 rounded-3xl bg-white border border-stone-200 card-shadow-soft space-y-5 hover:-translate-y-1 transition duration-300">
+        <div class="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 text-xl font-bold">
           ✂️
         </div>
 
         <div class="space-y-2">
-          <span class="text-[10px] font-black uppercase text-rose-400 tracking-wider">O Problema Real</span>
-          <h3 class="text-base font-bold text-white leading-snug">
-            Mãos ocupadas no lavatório ou escova e mensagens acumulando no WhatsApp.
+          <span class="text-[10px] font-black uppercase text-rose-600 tracking-wider">Desafio #1</span>
+          <h3 class="text-base font-bold text-slate-900 leading-snug">
+            Mãos ocupadas na química ou escova e mensagens acumulando no WhatsApp.
           </h3>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Se uma cliente nova chamar para saber o valor da mecha e você demorar 2 horas para responder, ela já procurou outro salão no Instagram ou no Google.
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Se uma cliente nova pergunta o preço das mechas e você demora 2 horas para responder, ela já procurou e marcou no salão vizinho.
           </p>
         </div>
 
-        <div class="pt-3 border-t border-zinc-800/80 space-y-1">
-          <span class="text-[10px] font-black uppercase text-[#00F59B] tracking-wider">A Solução com a Jéssica</span>
-          <p class="text-xs text-zinc-300 leading-relaxed">
-            A Jéssica acolhe a cliente no primeiro segundo, passa valores cadastrados com simpatia e anota a preferência de horário para a recepção.
+        <div class="pt-4 border-t border-stone-100 space-y-1 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
+          <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1">
+            <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Com a Jéssica</span>
+          </span>
+          <p class="text-xs text-slate-700 leading-relaxed font-medium">
+            Responde em segundos com carinho, envia a tabela de valores e recolhe a preferência de dia e horário da cliente.
           </p>
         </div>
       </div>
 
       <!-- Card 2: Cadeira Vazia -->
-      <div class="p-6 rounded-3xl bg-[#0F1126] border border-[#1F234D] hover:border-[#00F59B]/50 transition space-y-4 relative group">
-        <div class="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-[#00F59B] text-xl font-bold">
+      <div class="p-7 rounded-3xl bg-white border border-stone-200 card-shadow-soft space-y-5 hover:-translate-y-1 transition duration-300">
+        <div class="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 text-xl font-bold">
           📅
         </div>
 
         <div class="space-y-2">
-          <span class="text-[10px] font-black uppercase text-rose-400 tracking-wider">O Problema Real</span>
-          <h3 class="text-base font-bold text-white leading-snug">
-            Cliente que marca no sábado à tarde, não aparece e deixa a cadeira vazia.
+          <span class="text-[10px] font-black uppercase text-amber-600 tracking-wider">Desafio #2</span>
+          <h3 class="text-base font-bold text-slate-900 leading-snug">
+            Cliente que marca no sábado, não aparece e deixa a cadeira vazia.
           </h3>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            O profissional fica parado 3 horas sem faturar, o produto foi separado e aquele horário poderia ter sido preenchido por outra cliente fiel.
+          <p class="text-xs text-slate-600 leading-relaxed">
+            O profissional fica parado 3 horas sem faturar, o produto foi separado e aquele horário nobre poderia ter sido de outra cliente.
           </p>
         </div>
 
-        <div class="pt-3 border-t border-zinc-800/80 space-y-1">
-          <span class="text-[10px] font-black uppercase text-[#00F59B] tracking-wider">A Solução com a Jéssica</span>
-          <p class="text-xs text-zinc-300 leading-relaxed">
-            Disparo de lembrete amigável na véspera. Se a cliente precisar reagendar, ela avisa na hora e o salão tem tempo de encaixar outra pessoa.
+        <div class="pt-4 border-t border-stone-100 space-y-1 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
+          <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1">
+            <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Com a Jéssica</span>
+          </span>
+          <p class="text-xs text-slate-700 leading-relaxed font-medium">
+            Lembretes automáticos no WhatsApp na véspera. Se a cliente precisar reagendar, ela avisa a tempo de encaixar outra pessoa.
           </p>
         </div>
       </div>
 
       <!-- Card 3: Caixa & Comissões -->
-      <div class="p-6 rounded-3xl bg-[#0F1126] border border-[#1F234D] hover:border-cyan-500/50 transition space-y-4 relative group">
-        <div class="w-12 h-12 rounded-2xl bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-400 text-xl font-bold">
+      <div class="p-7 rounded-3xl bg-white border border-stone-200 card-shadow-soft space-y-5 hover:-translate-y-1 transition duration-300">
+        <div class="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 text-xl font-bold">
           💰
         </div>
 
         <div class="space-y-2">
-          <span class="text-[10px] font-black uppercase text-rose-400 tracking-wider">O Problema Real</span>
-          <h3 class="text-base font-bold text-white leading-snug">
-            Caderninho de anotações e confusão para saber quanto faturou e quanto pagar de comissão.
+          <span class="text-[10px] font-black uppercase text-emerald-700 tracking-wider">Desafio #3</span>
+          <h3 class="text-base font-bold text-slate-900 leading-snug">
+            Caderninho confuso para saber custos, faturamento e pagar comissões.
           </h3>
-          <p class="text-xs text-zinc-400 leading-relaxed">
-            Comandas em papel que somem, notas de despesas de produtos misturadas com o caixa pessoal e desentendimento com parceiros sobre porcentagens.
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Comandas de papel que se perdem, notas de produtos misturadas com o caixa pessoal e desentendimento com profissionais parceiros.
           </p>
         </div>
 
-        <div class="pt-3 border-t border-zinc-800/80 space-y-1">
-          <span class="text-[10px] font-black uppercase text-cyan-400 tracking-wider">A Solução com o Painel RAIA</span>
-          <p class="text-xs text-zinc-300 leading-relaxed">
-            Dashboard visual completo. Registre entradas e saídas por áudio no WhatsApp ou no painel e veja gráficos claros de faturamento e comissões.
+        <div class="pt-4 border-t border-stone-100 space-y-1 bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100">
+          <span class="text-[10px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1">
+            <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+            <span>Com o Painel RAIA</span>
+          </span>
+          <p class="text-xs text-slate-700 leading-relaxed font-medium">
+            Dashboard visual completo. Faturamento por profissional, controle de custos e cálculo de comissões sem dor de cabeça.
           </p>
         </div>
       </div>
@@ -308,224 +329,493 @@
   </section>
 
   <!-- ============================================================ -->
-  <!-- SECTION: DASHBOARD FINANCEIRO & NÚMEROS DO SALÃO (Destaque)  -->
+  <!-- SECTION: DASHBOARD FINANCEIRO & GESTÃO DE EQUIPE (DESTAQUE)  -->
   <!-- ============================================================ -->
-  <section id="dashboard" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-[#1F234D]">
-    <div class="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-[#10132E] via-[#0E1026] to-[#121535] border border-cyan-500/40 shadow-2xl space-y-8">
+  <section id="dashboard" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-stone-200">
+    <div class="space-y-8">
       
-      <!-- Header do Bloco Financeiro -->
-      <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
-        <div>
-          <span class="px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-xs font-black uppercase">
-            Não é só agendamento • É Gestão Financeira Completa
-          </span>
-          <h2 class="text-2xl sm:text-3xl font-black text-white mt-2">
-            O Painel de Controle que mostra os números reais do seu salão.
-          </h2>
-          <p class="text-xs sm:text-sm text-zinc-300 max-w-2xl mt-1">
-            Esqueça planilhas confusas. Acompanhe entradas, comissões dos profissionais e lucratividade líquida pelo seu computador ou celular.
-          </p>
+      <!-- Section Title & Subtitle -->
+      <div class="text-center max-w-3xl mx-auto space-y-3">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-black uppercase tracking-wider">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-emerald-600"></i>
+          <span>Gestão Financeira & Múltiplos Profissionais</span>
         </div>
-
-        <div class="flex items-center gap-2">
-          <span class="px-3 py-1 rounded-xl bg-emerald-500/20 text-[#00F59B] text-xs font-bold border border-emerald-500/30 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-[#00F59B] animate-pulse"></span>
-            <span>Caixa do Dia Aberto</span>
-          </span>
-        </div>
-      </div>
-
-      <!-- Mockup Realista de Dashboard do Salão (Tailwind Bento) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        <!-- Metric 1: Faturamento do Dia -->
-        <div class="p-5 rounded-2xl bg-[#141632] border border-[#232759] space-y-2">
-          <div class="flex items-center justify-between text-xs text-zinc-400">
-            <span>Faturamento Hoje</span>
-            <i data-lucide="trending-up" class="w-4 h-4 text-[#00F59B]"></i>
-          </div>
-          <div class="text-2xl font-black text-white font-mono">R$ 2.450,00</div>
-          <p class="text-[11px] text-[#00F59B] flex items-center gap-1">
-            <span>▲ +18%</span>
-            <span class="text-zinc-500">em relação a ontem</span>
-          </p>
-        </div>
-
-        <!-- Metric 2: Atendimentos Realizados -->
-        <div class="p-5 rounded-2xl bg-[#141632] border border-[#232759] space-y-2">
-          <div class="flex items-center justify-between text-xs text-zinc-400">
-            <span>Atendimentos Concluídos</span>
-            <i data-lucide="scissors" class="w-4 h-4 text-pink-400"></i>
-          </div>
-          <div class="text-2xl font-black text-white font-mono">14 clientes</div>
-          <p class="text-[11px] text-zinc-400">3 agendamentos restantes hoje</p>
-        </div>
-
-        <!-- Metric 3: Repasse de Comissões -->
-        <div class="p-5 rounded-2xl bg-[#141632] border border-[#232759] space-y-2">
-          <div class="flex items-center justify-between text-xs text-zinc-400">
-            <span>Comissões a Pagar</span>
-            <i data-lucide="users" class="w-4 h-4 text-amber-400"></i>
-          </div>
-          <div class="text-2xl font-black text-amber-300 font-mono">R$ 980,00</div>
-          <p class="text-[11px] text-zinc-400">Calculado automaticamente</p>
-        </div>
-
-        <!-- Metric 4: Lucro Líquido do Salão -->
-        <div class="p-5 rounded-2xl bg-[#141632] border border-[#232759] space-y-2">
-          <div class="flex items-center justify-between text-xs text-zinc-400">
-            <span>Lucro Líquido do Salão</span>
-            <i data-lucide="wallet" class="w-4 h-4 text-cyan-400"></i>
-          </div>
-          <div class="text-2xl font-black text-[#00F59B] font-mono">R$ 1.470,00</div>
-          <p class="text-[11px] text-cyan-300 font-semibold">60% de margem no dia</p>
-        </div>
-
-      </div>
-
-      <!-- Tabela Ilustrativa de Serviços & Comissões do Dia -->
-      <div class="p-6 rounded-2xl bg-[#090A1A] border border-[#232759] space-y-4">
-        <div class="flex items-center justify-between">
-          <h4 class="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
-            <i data-lucide="clipboard-list" class="w-4 h-4 text-pink-400"></i>
-            <span>Detalhamento dos Procedimentos de Hoje</span>
-          </h4>
-          <span class="text-[10px] text-zinc-500 font-mono">Sincronizado via WhatsApp & Painel</span>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs">
-            <thead>
-              <tr class="text-zinc-500 border-b border-zinc-800 text-[11px]">
-                <th class="py-2.5 px-3">Cliente</th>
-                <th class="py-2.5 px-3">Procedimento</th>
-                <th class="py-2.5 px-3">Profissional</th>
-                <th class="py-2.5 px-3">Valor Total</th>
-                <th class="py-2.5 px-3">Comissão</th>
-                <th class="py-2.5 px-3">Status</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-zinc-800/60 font-medium">
-              <tr class="hover:bg-zinc-900/40 transition">
-                <td class="py-3 px-3 font-bold text-white">Carla Ribeiro</td>
-                <td class="py-3 px-3 text-pink-300">Mechas + Tratamento Kérastase</td>
-                <td class="py-3 px-3 text-zinc-300">Paulinha (Cabelo)</td>
-                <td class="py-3 px-3 font-mono font-bold text-white">R$ 580,00</td>
-                <td class="py-3 px-3 font-mono text-amber-300">R$ 232,00 (40%)</td>
-                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-[#00F59B] text-[10px] font-bold">Pago (Pix)</span></td>
-              </tr>
-              <tr class="hover:bg-zinc-900/40 transition">
-                <td class="py-3 px-3 font-bold text-white">Fernanda Lima</td>
-                <td class="py-3 px-3 text-pink-300">Manicure + Esmaltação em Gel</td>
-                <td class="py-3 px-3 text-zinc-300">Jéssica (Unhas)</td>
-                <td class="py-3 px-3 font-mono font-bold text-white">R$ 110,00</td>
-                <td class="py-3 px-3 font-mono text-amber-300">R$ 55,00 (50%)</td>
-                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-[#00F59B] text-[10px] font-bold">Pago (Cartão)</span></td>
-              </tr>
-              <tr class="hover:bg-zinc-900/40 transition">
-                <td class="py-3 px-3 font-bold text-white">Renata Soares</td>
-                <td class="py-3 px-3 text-pink-300">Corte Bordado + Escova Modelada</td>
-                <td class="py-3 px-3 text-zinc-300">Marcos (Cabelo)</td>
-                <td class="py-3 px-3 font-mono font-bold text-white">R$ 180,00</td>
-                <td class="py-3 px-3 font-mono text-amber-300">R$ 72,00 (40%)</td>
-                <td class="py-3 px-3"><span class="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-bold">Em Atendimento</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- SECTION: CONVERSA ILUSTRATIVA NO WHATSAPP                    -->
-  <!-- ============================================================ -->
-  <section id="conversa" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-[#1F234D]">
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-      
-      <div class="lg:col-span-6 space-y-4">
-        <span class="px-3.5 py-1 rounded-full bg-pink-500/10 border border-pink-500/30 text-pink-300 text-xs font-extrabold uppercase">
-          Exemplo Real de Diálogo
-        </span>
-        <h2 class="text-2xl sm:text-3xl font-black text-white">
-          Simpatia, educação e foco em fechar o horário.
+        <h2 class="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
+          O Painel de Controle que coloca os números do seu salão em ordem.
         </h2>
-        <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
-          A Jéssica não fala feito um robô mecânico. Ela usa o vocabulário carinhoso e profissional dos melhores salões de beleza, tira dúvidas com clareza e nunca deixa a cliente perdida.
+        <p class="text-sm text-slate-600 leading-relaxed">
+          Inspirado nas melhores ferramentas de gestão visual do mundo. Acompanhe entradas, custos de produtos e o repasse transparente de cada cabeleireira, manicure e depiladora.
+        </p>
+      </div>
+
+      <!-- MAIN APP DASHBOARD CARD (Style Sedap + Circle Soft) -->
+      <div class="bg-white rounded-3xl border border-stone-200 card-shadow-elevated p-6 sm:p-8 space-y-8 overflow-hidden relative">
+        
+        <!-- Dashboard Top Header Bar -->
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-stone-200 pb-5">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white font-black text-lg shadow-md">
+              SB
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="text-lg font-black text-slate-900">Studio Bella • Gestão & Caixa</h3>
+                <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
+                  Caixa Aberto
+                </span>
+              </div>
+              <p class="text-xs text-slate-500 font-medium">Movimentação de Hoje • 4 Profissionais Ativos</p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-slate-500">Período:</span>
+            <div class="flex items-center p-1 bg-stone-100 rounded-xl text-xs font-bold">
+              <button class="px-3 py-1 rounded-lg bg-white shadow-sm text-slate-900">Hoje</button>
+              <button class="px-3 py-1 text-slate-500 hover:text-slate-900">Semana</button>
+              <button class="px-3 py-1 text-slate-500 hover:text-slate-900">Mês</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4 Key Metric Cards (Sedap Style) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          <!-- Card 1: Faturamento (Entradas) -->
+          <div class="p-5 rounded-2xl bg-[#F0FDF4] border border-emerald-200 space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm">
+                <i data-lucide="trending-up" class="w-5 h-5"></i>
+              </div>
+              <span class="text-[11px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                ▲ +24% vs ontem
+              </span>
+            </div>
+            <div class="space-y-0.5">
+              <span class="text-xs font-bold text-emerald-800">Faturamento Bruto (Entradas)</span>
+              <div class="text-2xl font-black text-slate-900 font-mono">R$ 4.280,00</div>
+              <p class="text-[11px] text-slate-500">18 atendimentos realizados hoje</p>
+            </div>
+          </div>
+
+          <!-- Card 2: Custos & Despesas -->
+          <div class="p-5 rounded-2xl bg-[#FFF1F2] border border-rose-200 space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-sm">
+                <i data-lucide="receipt" class="w-5 h-5"></i>
+              </div>
+              <span class="text-[11px] font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full">
+                Produtos & Insumos
+              </span>
+            </div>
+            <div class="space-y-0.5">
+              <span class="text-xs font-bold text-rose-800">Custos & Despesas do Salão</span>
+              <div class="text-2xl font-black text-slate-900 font-mono">R$ 1.120,00</div>
+              <p class="text-[11px] text-slate-500">Tinturas, pó descolorante, descartáveis</p>
+            </div>
+          </div>
+
+          <!-- Card 3: Comissões dos Profissionais -->
+          <div class="p-5 rounded-2xl bg-[#FEF3C7] border border-amber-200 space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-sm">
+                <i data-lucide="users" class="w-5 h-5"></i>
+              </div>
+              <span class="text-[11px] font-black text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                4 Profissionais
+              </span>
+            </div>
+            <div class="space-y-0.5">
+              <span class="text-xs font-bold text-amber-900">Comissões a Repassar</span>
+              <div class="text-2xl font-black text-slate-900 font-mono">R$ 1.640,00</div>
+              <p class="text-[11px] text-slate-500">Calculado automaticamente por serviço</p>
+            </div>
+          </div>
+
+          <!-- Card 4: Lucro Líquido Real do Salão -->
+          <div class="p-5 rounded-2xl bg-[#F8FAFC] border border-slate-300 space-y-2">
+            <div class="flex items-center justify-between">
+              <div class="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-sm">
+                <i data-lucide="wallet" class="w-5 h-5"></i>
+              </div>
+              <span class="text-[11px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                Margem: 35.5%
+              </span>
+            </div>
+            <div class="space-y-0.5">
+              <span class="text-xs font-bold text-slate-700">Lucro Líquido do Salão (Sobra)</span>
+              <div class="text-2xl font-black text-emerald-600 font-mono">R$ 1.520,00</div>
+              <p class="text-[11px] text-slate-500">Livre de comissões e insumos hoje</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Middle Section: Visual Charts (Sedap Style Donut & Wave) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+          
+          <!-- Left: Wave Revenue vs Costs Chart (Simulated SVG) -->
+          <div class="lg:col-span-7 p-6 rounded-2xl bg-stone-50/80 border border-stone-200 space-y-4 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <div>
+                <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <i data-lucide="activity" class="w-4 h-4 text-emerald-600"></i>
+                  <span>Fluxo de Caixa: Entradas vs Custos</span>
+                </h4>
+                <p class="text-[11px] text-slate-500">Crescimento contínuo de receita e controle de gastos</p>
+              </div>
+              <div class="flex items-center gap-3 text-xs font-bold">
+                <span class="flex items-center gap-1.5 text-emerald-600">
+                  <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+                  <span>Entradas</span>
+                </span>
+                <span class="flex items-center gap-1.5 text-rose-500">
+                  <span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+                  <span>Custos</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- SVG Wave Graph -->
+            <div class="relative h-44 w-full flex items-end">
+              <svg class="w-full h-full overflow-visible" viewBox="0 0 500 150" preserveAspectRatio="none">
+                <!-- Grid Lines -->
+                <line x1="0" y1="30" x2="500" y2="30" stroke="#E2E8F0" stroke-dasharray="3,3" />
+                <line x1="0" y1="75" x2="500" y2="75" stroke="#E2E8F0" stroke-dasharray="3,3" />
+                <line x1="0" y1="120" x2="500" y2="120" stroke="#E2E8F0" stroke-dasharray="3,3" />
+                
+                <!-- Revenue Area & Line -->
+                <path d="M0,130 C80,120 120,70 180,60 C240,50 300,90 360,40 C420,20 460,30 500,10 L500,150 L0,150 Z" fill="rgba(5, 150, 105, 0.12)" />
+                <path d="M0,130 C80,120 120,70 180,60 C240,50 300,90 360,40 C420,20 460,30 500,10" fill="none" stroke="#059669" stroke-width="3" stroke-linecap="round" />
+
+                <!-- Costs Line -->
+                <path d="M0,140 C80,135 120,120 180,115 C240,110 300,125 360,105 C420,95 460,110 500,90" fill="none" stroke="#E11D48" stroke-width="2.5" stroke-dasharray="4,2" />
+
+                <!-- Highlight Points -->
+                <circle cx="360" cy="40" r="5" fill="#059669" stroke="#FFFFFF" stroke-width="2" />
+                <circle cx="500" cy="10" r="5" fill="#059669" stroke="#FFFFFF" stroke-width="2" />
+              </svg>
+            </div>
+
+            <!-- X Axis Labels -->
+            <div class="flex items-center justify-between text-[10px] text-slate-400 font-bold border-t border-stone-200 pt-2">
+              <span>Segunda</span>
+              <span>Terça</span>
+              <span>Quarta</span>
+              <span>Quinta</span>
+              <span>Sexta</span>
+              <span class="text-emerald-700 font-extrabold">Sábado (Pico)</span>
+            </div>
+          </div>
+
+          <!-- Right: Circular Donut Breakdown (Sedap Style) -->
+          <div class="lg:col-span-5 p-6 rounded-2xl bg-stone-50/80 border border-stone-200 space-y-4">
+            <h4 class="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+              <i data-lucide="pie-chart" class="w-4 h-4 text-amber-600"></i>
+              <span>Serviços Mais Lucrativos do Dia</span>
+            </h4>
+
+            <div class="space-y-3 pt-1 text-xs">
+              
+              <!-- Service 1 -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between font-bold text-slate-800">
+                  <span class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span>
+                    <span>Mechas, Luzes & Coloração</span>
+                  </span>
+                  <span class="font-mono text-emerald-700">45% • R$ 1.920</span>
+                </div>
+                <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+                  <div class="h-full bg-emerald-500 rounded-full" style="width: 45%"></div>
+                </div>
+              </div>
+
+              <!-- Service 2 -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between font-bold text-slate-800">
+                  <span class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-teal-500 inline-block"></span>
+                    <span>Corte, Escova & Tratamento</span>
+                  </span>
+                  <span class="font-mono text-teal-700">28% • R$ 1.200</span>
+                </div>
+                <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+                  <div class="h-full bg-teal-500 rounded-full" style="width: 28%"></div>
+                </div>
+              </div>
+
+              <!-- Service 3 -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between font-bold text-slate-800">
+                  <span class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span>
+                    <span>Manicure & Esmaltação em Gel</span>
+                  </span>
+                  <span class="font-mono text-amber-700">17% • R$ 730</span>
+                </div>
+                <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+                  <div class="h-full bg-amber-500 rounded-full" style="width: 17%"></div>
+                </div>
+              </div>
+
+              <!-- Service 4 -->
+              <div class="space-y-1">
+                <div class="flex items-center justify-between font-bold text-slate-800">
+                  <span class="flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-rose-500 inline-block"></span>
+                    <span>Estética & Sobrancelhas</span>
+                  </span>
+                  <span class="font-mono text-rose-700">10% • R$ 430</span>
+                </div>
+                <div class="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+                  <div class="h-full bg-rose-500 rounded-full" style="width: 10%"></div>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Attendance Rate Badge -->
+            <div class="p-3 rounded-xl bg-white border border-stone-200 flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2">
+                <i data-lucide="check-check" class="w-4 h-4 text-emerald-600"></i>
+                <span class="font-bold text-slate-800">Taxa de Presença Confirmada</span>
+              </div>
+              <span class="font-black text-emerald-700 font-mono text-sm">95%</span>
+            </div>
+
+          </div>
+
+        </div>
+
+        <!-- Bottom Section: GESTÃO DE MÚLTIPLOS PROFISSIONAIS (Circle Soft Style) -->
+        <div class="space-y-4 pt-4 border-t border-stone-200">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div>
+              <h4 class="text-sm font-black text-slate-900 flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4 text-emerald-600"></i>
+                <span>Gestão da Equipe & Repasse de Comissões de Hoje</span>
+              </h4>
+              <p class="text-xs text-slate-500">Transparência total para cada cabeleireira, manicure e especialista</p>
+            </div>
+            <span class="text-xs text-emerald-700 font-extrabold bg-emerald-50 border border-emerald-200 px-3 py-1 rounded-xl">
+              Cálculo 100% Automático
+            </span>
+          </div>
+
+          <div class="overflow-x-auto rounded-2xl border border-stone-200">
+            <table class="w-full text-left text-xs bg-white">
+              <thead class="bg-stone-100/80 text-slate-600 border-b border-stone-200 text-[11px] font-bold">
+                <tr>
+                  <th class="py-3 px-4">Profissional</th>
+                  <th class="py-3 px-4">Especialidade</th>
+                  <th class="py-3 px-4 text-center">Atendimentos</th>
+                  <th class="py-3 px-4">Faturamento Bruto</th>
+                  <th class="py-3 px-4">Comissão a Pagar</th>
+                  <th class="py-3 px-4 text-emerald-700">Retenção Salão</th>
+                  <th class="py-3 px-4 text-right">Status da Cadeira</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-stone-100 font-medium">
+                
+                <!-- Profissional 1 -->
+                <tr class="hover:bg-stone-50 transition">
+                  <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-black flex items-center justify-center text-xs">
+                      PS
+                    </div>
+                    <span>Paulinha Santos</span>
+                  </td>
+                  <td class="py-3.5 px-4 text-slate-600">Hair Stylist / Mechas & Loiros</td>
+                  <td class="py-3.5 px-4 text-center font-mono font-bold">4 clientes</td>
+                  <td class="py-3.5 px-4 font-mono font-bold text-slate-900">R$ 2.100,00</td>
+                  <td class="py-3.5 px-4 font-mono text-amber-700 font-bold">R$ 1.050,00 (50%)</td>
+                  <td class="py-3.5 px-4 font-mono text-emerald-700 font-bold">R$ 1.050,00</td>
+                  <td class="py-3.5 px-4 text-right">
+                    <span class="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
+                      Cadeira Lotada
+                    </span>
+                  </td>
+                </tr>
+
+                <!-- Profissional 2 -->
+                <tr class="hover:bg-stone-50 transition">
+                  <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-full bg-teal-100 text-teal-800 font-black flex items-center justify-center text-xs">
+                      MV
+                    </div>
+                    <span>Marcos Vinícius</span>
+                  </td>
+                  <td class="py-3.5 px-4 text-slate-600">Cortes, Escova & Barba</td>
+                  <td class="py-3.5 px-4 text-center font-mono font-bold">6 clientes</td>
+                  <td class="py-3.5 px-4 font-mono font-bold text-slate-900">R$ 780,00</td>
+                  <td class="py-3.5 px-4 font-mono text-amber-700 font-bold">R$ 351,00 (45%)</td>
+                  <td class="py-3.5 px-4 font-mono text-emerald-700 font-bold">R$ 429,00</td>
+                  <td class="py-3.5 px-4 text-right">
+                    <span class="px-2.5 py-1 rounded-full bg-cyan-100 text-cyan-800 text-[10px] font-extrabold">
+                      Em Atendimento
+                    </span>
+                  </td>
+                </tr>
+
+                <!-- Profissional 3 -->
+                <tr class="hover:bg-stone-50 transition">
+                  <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-full bg-amber-100 text-amber-800 font-black flex items-center justify-center text-xs">
+                      CD
+                    </div>
+                    <span>Camila Duarte</span>
+                  </td>
+                  <td class="py-3.5 px-4 text-slate-600">Nails Designer / Esmaltação em Gel</td>
+                  <td class="py-3.5 px-4 text-center font-mono font-bold">5 clientes</td>
+                  <td class="py-3.5 px-4 font-mono font-bold text-slate-900">R$ 850,00</td>
+                  <td class="py-3.5 px-4 font-mono text-amber-700 font-bold">R$ 425,00 (50%)</td>
+                  <td class="py-3.5 px-4 font-mono text-emerald-700 font-bold">R$ 425,00</td>
+                  <td class="py-3.5 px-4 text-right">
+                    <span class="px-2.5 py-1 rounded-full bg-stone-100 text-stone-700 text-[10px] font-extrabold">
+                      Concluído
+                    </span>
+                  </td>
+                </tr>
+
+                <!-- Profissional 4 -->
+                <tr class="hover:bg-stone-50 transition">
+                  <td class="py-3.5 px-4 font-bold text-slate-900 flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-full bg-rose-100 text-rose-800 font-black flex items-center justify-center text-xs">
+                      JR
+                    </div>
+                    <span>Juliana Rocha</span>
+                  </td>
+                  <td class="py-3.5 px-4 text-slate-600">Design de Sobrancelhas & Estética</td>
+                  <td class="py-3.5 px-4 text-center font-mono font-bold">3 clientes</td>
+                  <td class="py-3.5 px-4 font-mono font-bold text-slate-900">R$ 550,00</td>
+                  <td class="py-3.5 px-4 font-mono text-amber-700 font-bold">R$ 220,00 (40%)</td>
+                  <td class="py-3.5 px-4 font-mono text-emerald-700 font-bold">R$ 330,00</td>
+                  <td class="py-3.5 px-4 text-right">
+                    <span class="px-2.5 py-1 rounded-full bg-stone-100 text-stone-700 text-[10px] font-extrabold">
+                      Concluído
+                    </span>
+                  </td>
+                </tr>
+
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Banner Lançamento de Gastos / Entradas no WhatsApp -->
+        <div class="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 via-teal-50 to-stone-50 border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <i data-lucide="mic" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h5 class="text-xs font-black text-slate-900">Como você lança um custo no salão?</h5>
+              <p class="text-[11px] text-slate-600">Basta mandar um áudio ou texto para seu robô no WhatsApp: <i>"Jéssica, gastei R$ 85 em toalhas descartáveis"</i> e o caixa atualiza na hora!</p>
+            </div>
+          </div>
+          <button onclick="openTestModal()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-sm shrink-0 cursor-pointer">
+            Testar Agora
+          </button>
+        </div>
+
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SECTION: EXEMPLO REAL DE DIÁLOGO NO WHATSAPP                 -->
+  <!-- ============================================================ -->
+  <section id="conversa" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-stone-200">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+      
+      <div class="lg:col-span-6 space-y-5 text-left">
+        <span class="px-3.5 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-extrabold uppercase">
+          Exemplo Real de Conversa
+        </span>
+        <h2 class="text-2xl sm:text-3xl font-black text-slate-900 leading-snug">
+          Simpatia, educação e foco em garantir o horário da cliente.
+        </h2>
+        <p class="text-sm text-slate-600 leading-relaxed font-normal">
+          A Jéssica fala com a linguagem carinhosa e acolhedora dos melhores salões de beleza. Ela não deixa a cliente esperando, informa os valores corretos e anota tudo para a sua recepção.
         </p>
 
-        <div class="space-y-3 pt-2 text-xs">
+        <div class="space-y-3 pt-2 text-xs text-slate-700">
           <div class="flex items-start gap-2.5">
-            <i data-lucide="check-circle" class="w-4 h-4 text-[#00F59B] shrink-0 mt-0.5"></i>
-            <span><b>Tabela de Preços Cadastrada:</b> Valores corretos sem você precisar parar o atendimento para checar.</span>
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+            <span><b>Tabela de Preços Oficial:</b> Informa valores exatos dos procedimentos sem confusão.</span>
           </div>
           <div class="flex items-start gap-2.5">
-            <i data-lucide="check-circle" class="w-4 h-4 text-[#00F59B] shrink-0 mt-0.5"></i>
-            <span><b>Coleta de Preferências:</b> Dia da semana, período (manhã/tarde) e profissional de preferência da cliente.</span>
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+            <span><b>Preferência de Profissional:</b> Direciona para a Paulinha, o Marcos ou a Camila conforme a cliente pedir.</span>
           </div>
           <div class="flex items-start gap-2.5">
-            <i data-lucide="check-circle" class="w-4 h-4 text-[#00F59B] shrink-0 mt-0.5"></i>
-            <span><b>Você assume a qualquer momento:</b> Basta digitar no WhatsApp do salão e o robô dá passagem para a sua equipe humana.</span>
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5"></i>
+            <span><b>Você assume quando quiser:</b> Basta enviar uma mensagem pelo WhatsApp e o robô dá passagem instantânea.</span>
           </div>
         </div>
 
-        <div class="pt-4">
-          <button onclick="openTestModal()" class="px-5 py-3 rounded-xl bg-gradient-to-r from-pink-500 to-[#00F59B] text-black font-extrabold text-xs hover:opacity-90 transition flex items-center gap-2 cursor-pointer shadow">
-            <i data-lucide="message-square" class="w-4 h-4 text-black"></i>
-            <span>Testar essa conversa no meu WhatsApp agora</span>
+        <div class="pt-3">
+          <button onclick="openTestModal()" class="px-6 py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md shadow-emerald-600/20 active:scale-95 transition flex items-center gap-2 cursor-pointer">
+            <i data-lucide="message-square" class="w-4 h-4 text-white"></i>
+            <span>Testar essa conversa no meu telefone agora</span>
           </button>
         </div>
       </div>
 
-      <!-- Right Chat Box Simulator -->
+      <!-- Right Column: Interactive Phone Simulation -->
       <div class="lg:col-span-6">
-        <div class="p-6 rounded-3xl bg-[#0F1126] border border-pink-500/30 space-y-4 shadow-2xl relative">
+        <div class="p-6 rounded-3xl bg-white border border-stone-300 card-shadow-elevated space-y-4 relative">
           
-          <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div class="flex items-center justify-between border-b border-stone-200 pb-3">
             <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-pink-500/20 border border-pink-400/40 flex items-center justify-center text-pink-300 text-lg">
+              <div class="w-10 h-10 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-800 text-lg">
                 💇‍♀️
               </div>
               <div>
-                <h4 class="text-xs font-black text-white">Jéssica • Studio de Beleza</h4>
-                <p class="text-[10px] text-[#00F59B]">WhatsApp Comercial</p>
+                <h4 class="text-xs font-black text-slate-900">Jéssica • Studio Bella</h4>
+                <p class="text-[10px] text-emerald-700 font-bold flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  WhatsApp Oficial
+                </p>
               </div>
             </div>
-            <span class="text-[10px] text-zinc-500 font-mono">Exemplo Ilustrativo</span>
+            <span class="text-[10px] text-slate-400 font-mono">Simulação Interativa</span>
           </div>
 
           <div class="space-y-3 text-xs">
             <!-- Client Balloon -->
-            <div class="max-w-[85%] ml-auto p-3.5 rounded-2xl rounded-tr-none bg-cyan-950/70 border border-cyan-800/60 text-white">
+            <div class="max-w-[85%] ml-auto p-3.5 rounded-2xl rounded-tr-none bg-emerald-700 text-white shadow-sm">
               <p>Olá! Quanto tá a escova com hidratação? Vocês atendem sábado de manhã?</p>
-              <span class="text-[9px] text-cyan-300/60 block text-right mt-1 font-mono">10:14</span>
+              <span class="text-[9px] text-emerald-200 block text-right mt-1 font-mono">10:14</span>
             </div>
 
             <!-- Jessica Balloon -->
-            <div class="max-w-[88%] mr-auto p-3.5 rounded-2xl rounded-tl-none bg-[#141632] border border-zinc-800 text-zinc-200 space-y-1.5">
+            <div class="max-w-[88%] mr-auto p-3.5 rounded-2xl rounded-tl-none bg-stone-100 text-slate-800 space-y-1.5 border border-stone-200 shadow-sm">
               <p>Oi, flor! Que alegria ter você por aqui. ✨</p>
-              <p class="text-[11px] text-zinc-300 leading-relaxed">
+              <p class="text-[11px] text-slate-700 leading-relaxed">
                 Nossa <b>Escova Modelada + Hidratação Nutritiva</b> fica a partir de <b>R$ 120</b> (depende do comprimento dos fios).
               </p>
-              <p class="text-[11px] text-pink-300 font-bold">
+              <p class="text-[11px] text-emerald-800 font-bold">
                 Para sábado de manhã, temos opções às 09h30 ou às 11h! Qual horário você prefere garantir?
               </p>
-              <span class="text-[9px] text-zinc-500 block text-right mt-1 font-mono">10:14</span>
+              <span class="text-[9px] text-slate-400 block text-right mt-1 font-mono">10:14</span>
             </div>
 
             <!-- Client Balloon -->
-            <div class="max-w-[85%] ml-auto p-3.5 rounded-2xl rounded-tr-none bg-cyan-950/70 border border-cyan-800/60 text-white">
+            <div class="max-w-[85%] ml-auto p-3.5 rounded-2xl rounded-tr-none bg-emerald-700 text-white shadow-sm">
               <p>Pode ser às 09h30! Meu nome é Patrícia.</p>
-              <span class="text-[9px] text-cyan-300/60 block text-right mt-1 font-mono">10:15</span>
+              <span class="text-[9px] text-emerald-200 block text-right mt-1 font-mono">10:15</span>
             </div>
 
             <!-- Jessica Balloon -->
-            <div class="max-w-[88%] mr-auto p-3.5 rounded-2xl rounded-tl-none bg-[#141632] border border-zinc-800 text-zinc-200">
+            <div class="max-w-[88%] mr-auto p-3.5 rounded-2xl rounded-tl-none bg-stone-100 text-slate-800 border border-stone-200 shadow-sm">
               <p class="text-[11px] leading-relaxed">
                 Perfeito, Patrícia! Já pré-agendei seu horário para este sábado às <b>09h30</b>. Nossa recepção vai confirmar seu encaixe e na sexta-feira te mandamos um lembrete com todo carinho. Te esperamos! 💖
               </p>
-              <span class="text-[9px] text-zinc-500 block text-right mt-1 font-mono">10:15</span>
+              <span class="text-[9px] text-slate-400 block text-right mt-1 font-mono">10:15</span>
             </div>
           </div>
 
@@ -536,103 +826,50 @@
   </section>
 
   <!-- ============================================================ -->
-  <!-- SECTION: O QUE VOCÊ PRECISA FORNECER PARA COMEÇAR            -->
+  <!-- SECTION: PREÇO & OFERTA TRANSPARENTE                         -->
   <!-- ============================================================ -->
-  <section class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-[#1F234D]">
-    <div class="text-center max-w-2xl mx-auto space-y-3 mb-12">
-      <span class="px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-extrabold uppercase">
-        Configuração em Poucas Horas
-      </span>
-      <h2 class="text-2xl sm:text-3xl font-black text-white">
-        O que precisamos para colocar a Jéssica no ar no seu salão?
-      </h2>
-      <p class="text-xs sm:text-sm text-zinc-400">
-        Você não precisa entender de programação. Nós cuidamos de tudo, você só nos envia:
-      </p>
-    </div>
-
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+  <section id="precos" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-stone-200">
+    <div class="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-white via-emerald-50/40 to-amber-50/40 border border-emerald-300 card-shadow-elevated text-center space-y-6">
       
-      <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-2.5">
-        <div class="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-sm font-bold">1</div>
-        <h4 class="text-xs font-bold text-white">Tabela de Serviços</h4>
-        <p class="text-[11px] text-zinc-400 leading-relaxed">
-          Lista dos procedimentos realizados (corte, escova, mechas, manicure, sobrancelhas) e valores médios.
-        </p>
+      <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black uppercase">
+        Sem pegadinhas • Sem surpresas
       </div>
 
-      <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-2.5">
-        <div class="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-sm font-bold">2</div>
-        <h4 class="text-xs font-bold text-white">Horários de Funcionamento</h4>
-        <p class="text-[11px] text-zinc-400 leading-relaxed">
-          Dias da semana que o salão abre, horários de início/fechamento e política para agendamentos de sábado.
-        </p>
-      </div>
-
-      <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-2.5">
-        <div class="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-sm font-bold">3</div>
-        <h4 class="text-xs font-bold text-white">Profissionais & Equipe</h4>
-        <p class="text-[11px] text-zinc-400 leading-relaxed">
-          Nomes dos cabeleireiros, manicures e especialistas para a Jéssica direcionar as preferências das clientes.
-        </p>
-      </div>
-
-      <div class="p-5 rounded-3xl bg-[#0F1126] border border-[#1F234D] space-y-2.5">
-        <div class="w-8 h-8 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-sm font-bold">4</div>
-        <h4 class="text-xs font-bold text-white">Chave Pix ou Pagamentos</h4>
-        <p class="text-[11px] text-zinc-400 leading-relaxed">
-          Se desejar receber sinal de reserva ou pagamentos antecipados pelo WhatsApp para garantir a vaga.
-        </p>
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ============================================================ -->
-  <!-- SECTION: OFERTA COMERCIAL (Transparente R$ 97/mês)           -->
-  <!-- ============================================================ -->
-  <section id="precos" class="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-[#1F234D]">
-    <div class="p-8 sm:p-12 rounded-3xl bg-gradient-to-br from-[#12142E] via-[#0E1026] to-[#1a1435] border-2 border-pink-500/40 text-center space-y-6 shadow-2xl relative overflow-hidden">
-      
-      <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-pink-500/20 border border-pink-500/30 text-pink-300 text-xs font-extrabold uppercase">
-        Investimento Simples e Acessível
-      </div>
-
-      <h2 class="text-3xl sm:text-4xl font-black text-white tracking-tight">
-        Apenas <span class="text-[#00F59B]">R$ 97</span> por mês.
+      <h2 class="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">
+        Apenas <span class="text-emerald-600">R$ 97</span> por mês.
       </h2>
       
-      <p class="text-xs sm:text-sm text-zinc-300 max-w-xl mx-auto leading-relaxed">
+      <p class="text-sm text-slate-600 max-w-xl mx-auto leading-relaxed">
         Com uma única escova ou manicure a mais que você fecha por mês pelo WhatsApp, a ferramenta já se paga com sobra. Sem taxa de adesão e sem fidelidade.
       </p>
 
       <!-- Checklist -->
-      <div class="max-w-md mx-auto grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs text-left pt-2">
-        <div class="flex items-center gap-2 text-zinc-200">
-          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
+      <div class="max-w-md mx-auto grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-left pt-2">
+        <div class="flex items-center gap-2 text-slate-800 font-bold">
+          <i data-lucide="check" class="w-4 h-4 text-emerald-600"></i>
           <span>Jéssica 24h no seu WhatsApp</span>
         </div>
-        <div class="flex items-center gap-2 text-zinc-200">
-          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-          <span>Dashboard Financeiro do Salão</span>
+        <div class="flex items-center gap-2 text-slate-800 font-bold">
+          <i data-lucide="check" class="w-4 h-4 text-emerald-600"></i>
+          <span>Dashboard & Caixa do Salão</span>
         </div>
-        <div class="flex items-center gap-2 text-zinc-200">
-          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
-          <span>Lembretes automáticos anti-falta</span>
+        <div class="flex items-center gap-2 text-slate-800 font-bold">
+          <i data-lucide="check" class="w-4 h-4 text-emerald-600"></i>
+          <span>Gestão de múltiplos profissionais</span>
         </div>
-        <div class="flex items-center gap-2 text-zinc-200">
-          <i data-lucide="check" class="w-4 h-4 text-[#00F59B]"></i>
+        <div class="flex items-center gap-2 text-slate-800 font-bold">
+          <i data-lucide="check" class="w-4 h-4 text-emerald-600"></i>
           <span>7 dias de garantia incondicional</span>
         </div>
       </div>
 
       <!-- Action -->
       <div class="pt-4 flex flex-wrap items-center justify-center gap-3">
-        <button onclick="openTestModal()" class="px-8 py-4 rounded-2xl bg-gradient-to-r from-pink-500 via-rose-500 to-[#00F59B] text-black font-black text-xs hover:opacity-95 shadow-xl shadow-pink-500/30 active:scale-95 transition flex items-center gap-2 cursor-pointer">
-          <i data-lucide="play" class="w-4 h-4 fill-black"></i>
-          <span>Testar Grátis Agora no WhatsApp</span>
+        <button onclick="openTestModal()" class="px-8 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-600/30 active:scale-95 transition flex items-center gap-2 cursor-pointer">
+          <i data-lucide="play" class="w-4 h-4 fill-white"></i>
+          <span>Começar Teste com 7 Dias de Garantia</span>
         </button>
-        <a href="/contato" class="px-6 py-4 rounded-2xl bg-[#141632] hover:bg-white/10 text-white font-bold text-xs border border-zinc-700 transition">
+        <a href="/contato" class="px-6 py-4 rounded-2xl bg-white hover:bg-stone-50 text-slate-800 font-bold text-xs border border-stone-300 transition">
           Falar com um Consultor da RAIA
         </a>
       </div>
@@ -643,52 +880,52 @@
   <!-- ============================================================ -->
   <!-- MODAL: TESTAR NO WHATSAPP (Preservado e Funcional)           -->
   <!-- ============================================================ -->
-  <div id="testModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-    <div class="w-full max-w-md bg-[#0F1126] border border-pink-500/40 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl relative">
+  <div id="testModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="w-full max-w-md bg-white border border-emerald-300 rounded-3xl p-6 sm:p-8 space-y-5 shadow-2xl relative">
       
-      <button onclick="closeTestModal()" class="absolute top-4 right-4 p-1 rounded-xl text-zinc-400 hover:text-white hover:bg-white/10 transition cursor-pointer">
+      <button onclick="closeTestModal()" class="absolute top-4 right-4 p-1 rounded-xl text-slate-400 hover:text-slate-900 hover:bg-stone-100 transition cursor-pointer">
         <i data-lucide="x" class="w-5 h-5"></i>
       </button>
 
       <div class="space-y-1">
-        <span class="text-[10px] font-black uppercase tracking-wider text-pink-400">Demonstração Interativa para Salões</span>
-        <h3 class="text-xl font-black text-white">Testar a Jéssica no seu WhatsApp</h3>
-        <p class="text-xs text-zinc-400">
-          Coloque seu nome e WhatsApp. A Jéssica vai te mandar uma mensagem agora simulando um atendimento de salão!
+        <span class="text-[10px] font-black uppercase tracking-wider text-emerald-700">Demonstração Gratuita no seu Telefone</span>
+        <h3 class="text-xl font-black text-slate-900">Testar a Jéssica no seu WhatsApp</h3>
+        <p class="text-xs text-slate-600">
+          Informe seu nome e WhatsApp. A Jéssica vai te mandar uma mensagem agora simulando um atendimento de salão!
         </p>
       </div>
 
       <form onsubmit="handleTestSubmit(event)" class="space-y-3.5 text-left">
         <div>
-          <label class="block text-[11px] font-bold text-zinc-400 mb-1">Seu Nome Completo</label>
+          <label class="block text-[11px] font-bold text-slate-700 mb-1">Seu Nome Completo</label>
           <input 
             type="text" 
             id="leadNameInput" 
             required
             placeholder="Ex: Amanda Silva (Studio Bela)"
-            class="w-full px-3.5 py-2.5 rounded-xl bg-[#141632] border border-[#232759] text-white text-xs focus:outline-none focus:border-pink-400 transition"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 border border-stone-300 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 transition"
           >
         </div>
 
         <div>
-          <label class="block text-[11px] font-bold text-zinc-400 mb-1">Seu Número de WhatsApp (com DDD)</label>
+          <label class="block text-[11px] font-bold text-slate-700 mb-1">Seu Número de WhatsApp (com DDD)</label>
           <input 
             type="tel" 
             id="leadPhoneInput" 
             required
             placeholder="Ex: 11999998888"
-            class="w-full px-3.5 py-2.5 rounded-xl bg-[#141632] border border-[#232759] text-white text-xs focus:outline-none focus:border-pink-400 transition"
+            class="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 border border-stone-300 text-slate-900 text-xs focus:outline-none focus:border-emerald-500 transition"
           >
         </div>
 
-        <div id="modalAlertBox" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs"></div>
+        <div id="modalAlertBox" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold"></div>
 
-        <button type="submit" id="btnSubmitTest" class="w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-[#00F59B] text-black font-black text-xs hover:opacity-90 transition flex items-center justify-center gap-2 shadow cursor-pointer">
+        <button type="submit" id="btnSubmitTest" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition flex items-center justify-center gap-2 shadow cursor-pointer">
           <span id="btnSubmitTestText">Receber Mensagem da Jéssica Agora</span>
-          <i data-lucide="send" class="w-4 h-4 text-black"></i>
+          <i data-lucide="send" class="w-4 h-4 text-white"></i>
         </button>
 
-        <p class="text-[10px] text-zinc-500 text-center">
+        <p class="text-[10px] text-slate-400 text-center">
           🔒 Teste gratuito e sem compromisso.
         </p>
       </form>
@@ -699,17 +936,17 @@
   <!-- ============================================================ -->
   <!-- FOOTER                                                       -->
   <!-- ============================================================ -->
-  <footer class="border-t border-[#1F234D] bg-[#070814] pt-12 pb-8">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-500 gap-4">
+  <footer class="border-t border-stone-200 bg-white pt-12 pb-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
       <div class="flex items-center gap-3">
         <img src="/raia-emblem-small.png" alt="RAIA" class="w-7 h-7 object-contain">
-        <span class="text-white font-bold">RAIA • Jéssica para Salões</span>
+        <span class="text-slate-900 font-bold">RAIA • Jéssica para Salões & Estética</span>
       </div>
       <div class="flex items-center gap-4">
-        <a href="/solucoes" class="hover:text-white transition">Outras Soluções</a>
-        <a href="/termos" class="hover:text-white transition">Termos</a>
-        <a href="/privacidade" class="hover:text-white transition">Privacidade</a>
-        <a href="/contato" class="hover:text-white transition">Contato</a>
+        <a href="/solucoes" class="hover:text-slate-900 transition">Outras Soluções</a>
+        <a href="/termos" class="hover:text-slate-900 transition">Termos</a>
+        <a href="/privacidade" class="hover:text-slate-900 transition">Privacidade</a>
+        <a href="/contato" class="hover:text-slate-900 transition">Contato</a>
       </div>
     </div>
   </footer>
