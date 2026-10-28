@@ -447,12 +447,12 @@ const AGENT_MESSAGES = {
     `👉 *Envie uma dúvida inicial de teste* (por exemplo: _"Gostaria de agendar uma consulta sobre rescisão contratual"_)?`,
 
   REAL_ESTATE: (name) =>
-    `🏡 Olá, *${name}*! Aqui é o *Lucas Imóveis*, assistente de IA da RAIA para Imobiliárias e Corretores! 🔑\n\n` +
+    `🏡 Olá, *${name}*! Aqui é o *ImobBot*, assistente de IA da RAIA para Imobiliárias e Corretores! 🔑\n\n` +
     `Eu atendo interessados com agilidade, coleto o perfil desejado (bairros, faixa de preço, quartos) e organizo as solicitações de visita para os corretores responsáveis darem continuidade.\n\n` +
     `👉 *Faça uma busca de teste* (por exemplo: _"Procuro apartamento de 2 quartos para alugar até R$ 3.500"_)?`,
 
   MECHANIC: (name) =>
-    `🚗 Olá, *${name}*! Aqui é o *AutoCheck*, assistente da RAIA para Oficinas Mecânicas e Auto Centers! 🔧\n\n` +
+    `🚗 Olá, *${name}*! Aqui é o *MecânicoBot*, assistente da RAIA para Oficinas Mecânicas e Auto Centers! 🔧\n\n` +
     `Eu tiro dúvidas sobre serviços, coleto dados básicos do veículo para agilizar orçamentos e facilito as solicitações de agendamento de revisão para sua equipe.\n\n` +
     `👉 *Faça uma pergunta de teste* (por exemplo: _"Quais serviços de revisão vocês realizam?"_)!`,
 
@@ -462,24 +462,47 @@ const AGENT_MESSAGES = {
     `👉 *Faça uma simulação de teste* (por exemplo: _"Quais os horários de Pilates e como agendar aula experimental?"_)!`,
 
   FINANCE: (name) =>
-    `📊 Olá, *${name}*! Sou o *Jarvis*, assistente de Organização Financeira da RAIA para Autônomos e MEI! 💼\n\n` +
+    `📊 Olá, *${name}*! Sou o *ContaZap*, assistente de Organização Financeira da RAIA para Autônomos e MEI! 💼\n\n` +
     `Comigo você pode registrar suas entradas e despesas diárias de forma simples por texto ou áudio no WhatsApp para manter seu fluxo de caixa anotado.\n\n` +
     `👉 *Envie um registro de teste* (por exemplo: _"Almoço 35 no débito"_ ou _"Recebido 500 do cliente no Pix"_)!`,
 
   RENTAL_MACHINES: (name) =>
-    `🏗️ Olá, *${name}*! Aqui é o *Marcão*, assistente da RAIA para Locação de Máquinas e Equipamentos de Construção!\n\n` +
+    `🏗️ Olá, *${name}*! Aqui é o *AlugaObra*, assistente da RAIA para Locação de Máquinas e Equipamentos de Construção!\n\n` +
     `Eu tiro dúvidas sobre os equipamentos disponíveis para locação (betoneiras, marteletes, andaimes), coleto período de uso e endereço da obra para sua equipe orçar o frete.\n\n` +
     `👉 *Faça uma consulta de teste* (por exemplo: _"Vocês têm betoneira 400L disponível para locar por 15 dias?"_)!`,
 
   CAR_DEALERSHIP: (name) =>
-    `🏎️ Olá, *${name}*! Aqui é o *Rodrigo*, assistente da RAIA para Lojas de Veículos e Concessionárias! 🚗\n\n` +
+    `🏎️ Olá, *${name}*! Aqui é o *AutoZap*, assistente da RAIA para Lojas de Veículos e Concessionárias! 🚗\n\n` +
     `Eu recebo os interessados no WhatsApp, apresento opções do estoque conforme a faixa de valor e organizo as solicitações de test-drive e propostas para a equipe de vendas.\n\n` +
     `👉 *Faça uma consulta de teste* (por exemplo: _"Estou procurando um SUV seminovo até R$ 120 mil"_)!`,
 };
 
-app.post('/api/test-agent', async (req, res) => {
+const NICHE_SLUG_MAP = {
+  'saloes-e-beleza': { key: 'SALON', name: 'Jéssica (Salões & Beleza)' },
+  'saude-e-odontologia': { key: 'CLINIC', name: 'Sofia (Saúde & Odontologia)' },
+  'delivery-e-restaurantes': { key: 'RESTAURANT', name: 'ChefBot (Delivery & Restaurantes)' },
+  'advocacia': { key: 'LEGAL', name: 'Lex (Advocacia & Jurídico)' },
+  'imobiliarias-e-corretores': { key: 'REAL_ESTATE', name: 'ImobBot (Imobiliárias & Corretores)' },
+  'oficinas-e-auto-centers': { key: 'MECHANIC', name: 'MecânicoBot (Oficinas & Auto Centers)' },
+  'academias-e-pilates': { key: 'FITNESS', name: 'Coach Fit (Academias & Pilates)' },
+  'financeiro-e-mei': { key: 'FINANCE', name: 'ContaZap (Financeiro & MEI)' },
+  'construcao-e-locacao': { key: 'RENTAL_MACHINES', name: 'AlugaObra (Construção & Locação)' },
+  'veiculos-e-seminovos': { key: 'CAR_DEALERSHIP', name: 'AutoZap (Veículos & Seminovos)' },
+};
+
+async function handleLeadTestRequest(req, res) {
   try {
-    const { name, phone, agentKey, agentName } = req.body || {};
+    const { name, phone, nicheSlug } = req.body || {};
+    let agentKey = req.body.agentKey;
+    let agentName = req.body.agentName;
+
+    if (nicheSlug && (!agentKey || !agentName)) {
+      const mapped = NICHE_SLUG_MAP[nicheSlug];
+      if (mapped) {
+        agentKey = mapped.key;
+        agentName = mapped.name;
+      }
+    }
 
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, error: 'Por favor, informe o seu nome.' });
@@ -541,14 +564,17 @@ app.post('/api/test-agent', async (req, res) => {
         success: true,
         sent: false,
         fallbackUrl: directUrl,
-        message: `Contato registrado com sucesso! O bot está conectando. Você também pode abrir diretamente.`
+        message: `Contato registrado com sucesso! O assistente está conectando. Você também pode abrir diretamente.`
       });
     }
   } catch (err) {
-    console.error('Erro em /api/test-agent:', err);
+    console.error('Erro em /api/test-agent / leads/request-test:', err);
     return res.status(500).json({ success: false, error: 'Erro interno ao processar envio: ' + err.message });
   }
-});
+}
+
+app.post('/api/test-agent', handleLeadTestRequest);
+app.post('/api/leads/request-test', handleLeadTestRequest);
 
 // ==========================================
 // 1-CLICK PASSWORDLESS MAGIC LINK ENDPOINT

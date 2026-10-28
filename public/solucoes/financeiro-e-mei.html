@@ -1013,16 +1013,30 @@ Saldo líquido atualizado do dia: + R$ 2.250,00.</p>
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, phone, nicheSlug })
         });
-        const json = await res.json();
+        
+        let json;
+        try {
+          json = await res.json();
+        } catch (jsonErr) {
+          throw new Error('Serviço temporariamente indisponível. Tente novamente em instantes.');
+        }
+
         if (json.success) {
-          alert('Pronto, ' + name + '! Enviamos uma mensagem de demonstração para o seu WhatsApp no número ' + phone + '. Abra seu aplicativo agora!');
+          if (json.sent) {
+            alert('Pronto, ' + name + '! Enviamos uma mensagem de demonstração para o seu WhatsApp no número ' + phone + '. Abra seu aplicativo agora!');
+          } else if (json.fallbackUrl) {
+            alert('Pronto, ' + name + '! Para iniciar sua demonstração imediata, vamos abrir seu WhatsApp agora!');
+            window.open(json.fallbackUrl, '_blank');
+          } else {
+            alert('Pronto, ' + name + '! Recebemos sua solicitação. O assistente entrará em contato em breve no seu WhatsApp!');
+          }
           closeTestModal();
         } else {
           alertBox.innerText = json.error || 'Não foi possível disparar o teste no momento.';
           alertBox.classList.remove('hidden');
         }
       } catch (err) {
-        alertBox.innerText = 'Erro ao conectar ao servidor: ' + err.message;
+        alertBox.innerText = err.message || 'Erro ao conectar ao servidor.';
         alertBox.classList.remove('hidden');
       } finally {
         btn.disabled = false;
