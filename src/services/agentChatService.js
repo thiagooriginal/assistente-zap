@@ -271,8 +271,21 @@ DIRETRIZES FUNDAMENTAIS DE COMUNICAÇÃO NO WHATSAPP:
 5. Se o usuário estiver testando a IA e fizer perguntas de procedimentos e valores, responda com valores aproximados realistas e conduza para o agendamento/venda.
 6. Nunca responda em formato JSON. Responda em texto puro pronto para ser enviado diretamente no WhatsApp.`;
 
-  const history = getRecentHistory(lead.phone, 8);
+  const rawHistory = getRecentHistory(lead.phone, 8);
   const contents = [];
+
+  // Filter out any accidentally truncated history items so they don't corrupt the prompt
+  const history = rawHistory.filter((h) => {
+    if (!h.content || !h.content.trim()) return false;
+    if (h.role === 'assistant') {
+      const trimmed = h.content.trim();
+      // If it ends abruptly without punctuation and is short, ignore
+      if (trimmed.length < 120 && !/[.!?✨😊🙏🤝✂️💖)]$/.test(trimmed)) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   // Build raw history
   for (const h of history) {
@@ -333,36 +346,48 @@ DIRETRIZES FUNDAMENTAIS DE COMUNICAÇÃO NO WHATSAPP:
     });
   }
 
-  // Priority order of Gemini models: fast and available first
+  // Priority order of Gemini models: fast, complete and available first
   const modelsToTry = [
-    'gemini-3.5-flash-lite',
-    'gemini-3.1-flash-lite',
-    'gemini-flash-lite-latest',
-    'gemini-3.5-flash',
-    'gemini-3-flash-preview',
-    'gemini-3.8-flash',
+    { name: 'gemini-3.1-flash-lite', thinkingBudget: 0 },
+    { name: 'gemini-3.5-flash-lite' },
+    { name: 'gemini-flash-lite-latest' },
+    { name: 'gemini-3.5-flash', thinkingBudget: 0 },
+    { name: 'gemini-3.8-flash' },
   ];
 
   let lastError = null;
-  for (const modelName of modelsToTry) {
+  for (const item of modelsToTry) {
     try {
+      const genConfig = {
+        temperature: 0.7,
+        maxOutputTokens: 2500,
+      };
+      if (item.thinkingBudget !== undefined) {
+        genConfig.thinkingConfig = { thinkingBudget: item.thinkingBudget };
+      }
+
       const model = client.getGenerativeModel({
-        model: modelName,
+        model: item.name,
         systemInstruction: systemInstruction,
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1500,
-        },
+        generationConfig: genConfig,
       });
 
       const result = await model.generateContent({ contents: normalizedContents });
+      const candidate = result.response.candidates?.[0];
       const responseText = result.response.text();
+
+      // Avoid incomplete fragments cut by token limit
+      if (candidate?.finishReason === 'MAX_TOKENS') {
+        console.warn(`[AgentChat] Modelo ${item.name} cortou por MAX_TOKENS. Tentando próximo modelo...`);
+        continue;
+      }
+
       if (responseText && responseText.trim()) {
         return responseText.trim();
       }
     } catch (err) {
       lastError = err;
-      console.warn(`[AgentChat] Falha com modelo ${modelName}: ${err.message}`);
+      console.warn(`[AgentChat] Falha com modelo ${item.name}: ${err.message}`);
     }
   }
 
