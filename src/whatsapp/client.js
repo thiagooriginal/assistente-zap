@@ -59,7 +59,15 @@ async function sendWhatsAppMessage(jid, text) {
   }
 
   try {
-    await currentSock.sendMessage(finalJid, { text });
+    const sent = await currentSock.sendMessage(finalJid, { text });
+    if (sent?.key?.id) {
+      try {
+        db.prepare('INSERT OR IGNORE INTO processed_messages (id, sender_jid) VALUES (?, ?)').run(
+          sent.key.id,
+          finalJid
+        );
+      } catch (e) {}
+    }
   } catch (err) {
     console.error(`Erro ao enviar mensagem para ${finalJid}:`, err.message);
   }
@@ -163,9 +171,13 @@ async function startWhatsAppBot() {
         senderClean = clean;
       }
 
-      // If message is fromMe: only process if it's a self-chat (talking to oneself)
+      // If message is fromMe: only process if it's a self-chat (talking to oneself) or authorized tester
       if (msg.key.fromMe) {
-        const isSelfChat = myCleanNumber && senderClean && senderClean === myCleanNumber;
+        const authList = config.authorizedPhone
+          ? config.authorizedPhone.split(',').map((s) => s.trim().replace(/\D/g, '')).filter(Boolean)
+          : [];
+        const isAuth = authList.includes(senderClean) || authList.some((p) => msg.key.remoteJid.includes(p));
+        const isSelfChat = (myCleanNumber && senderClean && senderClean === myCleanNumber) || isAuth;
         if (!isSelfChat) {
           // User is texting someone else, never interfere
           continue;
@@ -200,19 +212,17 @@ async function startWhatsAppBot() {
         lastKnownUserJid = `${senderClean}@s.whatsapp.net`;
       }
 
-      // 1. PRIORIDADE MÁXIMA: Verificar se é um Lead interagindo com um Agente RAIA (Lucas Imóveis, etc.)
-      if (senderClean) {
-        const lead = agentChatService.findActiveLead(senderClean);
-        if (lead) {
-          console.log(`[WhatsApp] 🤖 Lead ativo para Agente ${lead.agent_name || lead.agent_key} (${senderClean}). Processando resposta com agentChatService...`);
-          try {
-            const handled = await agentChatService.handleLeadMessage(sock, msg, senderClean);
-            if (handled) {
-              continue; // Sucesso: mensagem respondida como o Agente de IA!
-            }
-          } catch (agentErr) {
-            console.error('[WhatsApp] Erro no agentChatService:', agentErr.message);
+      // 1. PRIORIDADE MÁXIMA: Verificar se é um Lead interagindo com um Agente RAIA (Jéssica, Sofia, Lex, etc.)
+      const lead = agentChatService.findActiveLead(senderClean, msg.key?.remoteJid);
+      if (lead) {
+        console.log(`[WhatsApp] 🤖 Lead ativo para Agente ${lead.agent_name || lead.agent_key} (${senderClean || msg.key?.remoteJid}). Processando resposta com agentChatService...`);
+        try {
+          const handled = await agentChatService.handleLeadMessage(sock, msg, senderClean);
+          if (handled) {
+            continue; // Sucesso: mensagem respondida como o Agente de IA!
           }
+        } catch (agentErr) {
+          console.error('[WhatsApp] Erro no agentChatService:', agentErr.message);
         }
       }
 

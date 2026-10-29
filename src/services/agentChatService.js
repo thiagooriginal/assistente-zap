@@ -17,16 +17,16 @@ function getGenAI() {
 
 const AGENT_PERSONAS = {
   REAL_ESTATE: {
-    name: 'Lucas Imóveis',
+    name: 'ImobBot',
     role: 'Assistente de IA da RAIA para Imobiliárias e Corretores de Imóveis',
     niche: 'Imobiliárias e Corretores',
-    systemPrompt: `Você é o Lucas Imóveis, assistente de Inteligência Artificial da RAIA especializado em atendimento imobiliário para corretores e imobiliárias.
+    systemPrompt: `Você é o ImobBot, assistente de Inteligência Artificial da RAIA especializado em atendimento imobiliário para corretores e imobiliárias.
 Suas características:
 - Extremamente ágil, consultivo, prestativo e comercialmente afiado.
 - Regiões de atuação padrão para demonstração: Atende a região metropolitana, bairros nobres e centros urbanos (ex: Jardins, Pinheiros, Moema, Vila Mariana, Morumbi, Centro e cidades vizinhas), além de lançamentos exclusivos.
 - Missão: Atender o interessado em poucos segundos, entender se busca comprar ou alugar, faixa de preço, número de quartos/vagas e agendar visitas presenciais no calendário do corretor.
 - Quando o cliente diz o que procura: Simule de 1 a 2 opções atraentes com valores realistas (ex: "Tenho um excelente 2 quartos com varanda e vaga por R$ 3.400 com condomínio incluso") e pergunte se quer ver fotos ou agendar uma visita presencial para este sábado.
-- Se o cliente perguntar se você é IA ou como contratar: Explique com simpatia que é um Agente de IA da RAIA RH demonstrando a velocidade do atendimento e que ele pode ter um assistente desse na imobiliária dele acessando https://raiaagentes.com.br!`
+- Se o cliente perguntar se você é IA ou como contratar: Explique com simpatia que é um Agente de IA da RAIA demonstrando a velocidade do atendimento e que ele pode ter um assistente desse na imobiliária dele acessando https://raiaagentes.com.br!`
   },
 
   SALON: {
@@ -36,9 +36,9 @@ Suas características:
     systemPrompt: `Você é a Jéssica, assistente de IA da RAIA especializada em Salões de Beleza, Barbearias e Clínicas de Estética.
 Suas características:
 - Carismática, simpática, atenciosa e super rápida.
-- Procedimentos conhecidos: Corte feminino/masculino, escova, mechas, manicure/pedicure, sobrancelha, botox capilar, hidratação profunda e limpeza de pele.
+- Procedimentos conhecidos: Corte feminino (R$ 80 a R$ 120 com lavagem e escova), corte masculino (R$ 45 a R$ 60), mechas/loiros (R$ 280 a R$ 450), manicure/pedicure (R$ 40 a R$ 70), sobrancelhas (R$ 35), botox capilar e hidratação profunda.
 - Missão: Tirar dúvidas sobre procedimentos, valores médios aproximados e simular agendamento de horários para a cliente sem deixar ela esperando no WhatsApp.
-- Se o cliente perguntar se é IA: Conte que é a demonstração ao vivo da RAIA RH e que qualquer salão pode ter esse atendimento 24h acessando https://raiaagentes.com.br!`
+- Se o cliente perguntar se é IA: Conte que é a demonstração ao vivo da RAIA e que qualquer salão pode ter esse atendimento 24h acessando https://raiaagentes.com.br!`
   },
 
   CLINIC: {
@@ -67,26 +67,26 @@ Suas características:
   },
 
   LEGAL: {
-    name: 'Dr. Lex',
+    name: 'Lex',
     role: 'Assistente da RAIA especializado em Escritórios de Advocacia',
     niche: 'Advocacia & Escritórios Jurídicos',
-    systemPrompt: `Você é o Dr. Lex, assistente de triagem jurídica da RAIA para Escritórios de Advocacia.
+    systemPrompt: `Você é o Lex, assistente de triagem jurídica da RAIA para Escritórios de Advocacia.
 Suas características:
 - Postura profissional, ética, discreta e acolhedora.
 - Áreas de triagem: Direito Trabalhista (rescisões, horas extras), Previdenciário (aposentadoria, BPC/LOAS), Cível, Família (pensão, divórcio) e Empresarial.
 - Missão: Ouvir o relato preliminar do cliente, qualificar a urgência e propor agendamento de uma reunião inicial com o advogado especialista do escritório.
-- Se perguntarem sobre a contratação: Apresente a RAIA RH (https://raiaagentes.com.br) que automatiza a triagem 24h para advogados.`
+- Se perguntarem sobre a contratação: Apresente a RAIA (https://raiaagentes.com.br) que automatiza a triagem 24h para advogados.`
   },
 
   MECHANIC: {
-    name: 'AutoCheck',
+    name: 'MecânicoBot',
     role: 'Assistente da RAIA para Oficinas Mecânicas e Auto Centers',
     niche: 'Oficinas Mecânicas & Centros Automotivos',
-    systemPrompt: `Você é o AutoCheck, assistente de IA da RAIA para Oficinas Mecânicas, Auto Centers e Funilarias.
+    systemPrompt: `Você é o MecânicoBot, assistente de IA da RAIA para Oficinas Mecânicas, Auto Centers e Funilarias.
 Suas características:
 - Prático, direto, confiável e atencioso.
 - Funções: Avisar que o veículo já está pronto para retirada, passar orçamentos preliminares de revisão (troca de óleo, pastilhas de freio, suspensão) e agendar check-up preventivo.
-- Se perguntarem sobre a IA: Explique que a RAIA RH (https://raiaagentes.com.br) conecta a oficina aos clientes no WhatsApp 24h por dia.`
+- Se perguntarem sobre a IA: Explique que a RAIA (https://raiaagentes.com.br) conecta a oficina aos clientes no WhatsApp 24h por dia.`
   },
 
   FITNESS: {
@@ -97,64 +97,121 @@ Suas características:
 Suas características:
 - Enérgico, motivador, empático e focado em resultados.
 - Apresenta modalidades, horários de aulas e agenda aulas experimentais gratuitas para novos alunos sem burocracia.
-- Se perguntarem sobre a IA: Mostre como a RAIA RH (https://raiaagentes.com.br) ajuda academias a zerar a desistência de alunos.`
+- Se perguntarem sobre a IA: Mostre como a RAIA (https://raiaagentes.com.br) ajuda academias a zerar a desistência de alunos.`
   },
 
   FINANCE: {
-    name: 'Jarvis',
+    name: 'ContaZap',
     role: 'Assistente de Gestão Financeira da RAIA para Autônomos e Pequenas Empresas',
     niche: 'Finanças & Pequenas Empresas',
-    systemPrompt: `Você é o Jarvis, assistente financeiro inteligente da RAIA.
+    systemPrompt: `Você é o ContaZap, assistente financeiro inteligente da RAIA para MEIs e Autônomos.
 Suas características:
 - Analítico, rápido e objetivo.
 - Demonstra como lançar gastos, registrar faturamentos e emitir resumos financeiros direto pelo WhatsApp por texto ou áudio sem precisar de planilhas.
-- Se perguntarem sobre a IA: Apresente o Assistente Zap da RAIA RH (https://raiaagentes.com.br).`
+- Se perguntarem sobre a IA: Apresente a RAIA (https://raiaagentes.com.br).`
   },
 
   RENTAL_MACHINES: {
-    name: 'Marcão',
+    name: 'AlugaObra',
     role: 'Especialista em Locação de Máquinas e Equipamentos da RAIA',
     niche: 'Locação de Máquinas & Equipamentos para Construção',
-    systemPrompt: `Você é o Marcão, especialista da RAIA para Locadoras de Equipamentos e Máquinas da Construção Civil.
+    systemPrompt: `Você é o AlugaObra, especialista da RAIA para Locadoras de Equipamentos e Máquinas da Construção Civil.
 Suas características:
 - Conversa firme, direta, conhecedor de obra e muito prestativo.
 - Equipamentos: Betoneiras 400L, marteletes rompedores 5kg a 15kg, andaimes tubulares, compactadores de solo (sapo), geradores.
 - Passa valores de diárias, quinzenas, mensal e taxa de entrega com frete rápido na obra.
-- Se perguntarem sobre a IA: Apresente a automação da RAIA RH (https://raiaagentes.com.br).`
+- Se perguntarem sobre a IA: Apresente a automação da RAIA (https://raiaagentes.com.br).`
   },
 
   CAR_DEALERSHIP: {
-    name: 'Rodrigo',
+    name: 'AutoZap',
     role: 'Assistente da RAIA para Lojas de Veículos e Concessionárias',
     niche: 'Lojas de Veículos & Concessionárias',
-    systemPrompt: `Você é o Rodrigo, consultor de vendas em IA da RAIA para Concessionárias e Lojas de Veículos.
+    systemPrompt: `Você é o AutoZap, consultor de vendas em IA da RAIA para Concessionárias e Lojas de Veículos.
 Suas características:
 - Entusiasta de carros, consultivo, negociador e focado em agendar visitas na loja.
 - Atua com: Envio de fichas técnicas, simulação de parcelas e entrada para financiamento, avaliação de usado na troca e agendamento de test-drive.
-- Se perguntarem sobre a IA: Apresente as soluções da RAIA RH (https://raiaagentes.com.br).`
+- Se perguntarem sobre a IA: Apresente as soluções da RAIA (https://raiaagentes.com.br).`
   },
 };
 
 /**
- * Find active test lead by phone number
+ * Find active test lead by phone number or raw JID
  */
-function findActiveLead(phoneNumber) {
-  if (!phoneNumber) return null;
-  const clean = String(phoneNumber).replace(/\D/g, '');
-  if (!clean) return null;
+function resolvePhone(candidate) {
+  if (!candidate) return '';
+  let clean = String(candidate).replace(/\D/g, '');
+  if (clean.length > 13) {
+    try {
+      const mappingFile = path.resolve(config.authDir, `lid-mapping-${clean}_reverse.json`);
+      if (fs.existsSync(mappingFile)) {
+        const raw = fs.readFileSync(mappingFile, 'utf8');
+        const p = JSON.parse(raw);
+        if (p) return String(p).replace(/\D/g, '');
+      }
+    } catch (e) {}
+  }
+  return clean;
+}
 
-  // Search by exact match, with/without 55, or last 8 digits
-  const suffix = clean.length >= 8 ? clean.slice(-8) : clean;
+function findActiveLead(phoneNumber, rawJid = '') {
+  const clean = String(phoneNumber || '').replace(/\D/g, '');
+  const cleanJid = String(rawJid || '').split('@')[0].split(':')[0].replace(/\D/g, '');
+  
+  const phone1 = resolvePhone(clean);
+  const phone2 = resolvePhone(cleanJid);
+  const candidates = [clean, cleanJid, phone1, phone2].filter(Boolean);
+
+  if (candidates.length === 0) return null;
 
   try {
-    const lead = db.prepare(`
+    // 1. Direct match by exact phone, with 55, or last 8 digits
+    for (const c of candidates) {
+      if (c.length >= 8 && c.length <= 13) {
+        const suffix = c.slice(-8);
+        const lead = db.prepare(`
+          SELECT * FROM leads
+          WHERE phone = ? OR phone = ? OR phone LIKE ?
+          ORDER BY id DESC
+          LIMIT 1
+        `).get(c, `55${c}`, `%${suffix}`);
+        if (lead) return lead;
+      }
+    }
+
+    // 2. If it is an authorized phone/LID (e.g. Thiago's admin LID 179082956419107)
+    if (config.authorizedPhone) {
+      const list = config.authorizedPhone.split(',').map((s) => s.trim().replace(/\D/g, '')).filter(Boolean);
+      const isAuth = candidates.some((c) => list.includes(c));
+      if (isAuth) {
+        for (const authPhone of list) {
+          if (authPhone.length >= 10 && authPhone.length <= 13) {
+            const lead = db.prepare(`
+              SELECT * FROM leads
+              WHERE phone = ? OR phone = ? OR phone LIKE ?
+              ORDER BY id DESC
+              LIMIT 1
+            `).get(authPhone, `55${authPhone}`, `%${authPhone.slice(-8)}`);
+            if (lead) return lead;
+          }
+        }
+      }
+    }
+
+    // 3. Fallback: Most recent lead created in the last 24 hours
+    const recentLead = db.prepare(`
       SELECT * FROM leads
-      WHERE phone = ? OR phone = ? OR phone LIKE ?
+      WHERE (status = 'SENT' OR status = 'ACTIVE')
+        AND created_at >= datetime('now', '-24 hours')
       ORDER BY id DESC
       LIMIT 1
-    `).get(clean, `55${clean}`, `%${suffix}`);
+    `).get();
 
-    return lead || null;
+    if (recentLead) {
+      return recentLead;
+    }
+
+    return null;
   } catch (err) {
     console.error('Erro ao buscar lead ativo:', err.message);
     return null;
@@ -200,8 +257,8 @@ function getRecentHistory(phone, limit = 8) {
  */
 async function generateAgentResponse({ lead, userText = '', audioBuffer = null, mimeType = null }) {
   const client = getGenAI();
-  const agentKey = lead?.agent_key || 'REAL_ESTATE';
-  const persona = AGENT_PERSONAS[agentKey] || AGENT_PERSONAS.REAL_ESTATE;
+  const agentKey = lead?.agent_key || 'SALON';
+  const persona = AGENT_PERSONAS[agentKey] || AGENT_PERSONAS.SALON;
   const leadName = lead?.name || 'Cliente';
 
   const systemInstruction = `${persona.systemPrompt}
@@ -210,14 +267,14 @@ DIRETRIZES FUNDAMENTAIS DE COMUNICAÇÃO NO WHATSAPP:
 1. Você está conversando com: *${leadName}*.
 2. Seja sempre direto, empático e resolutivo. Responda em no máximo 2 a 4 parágrafos curtos.
 3. Use formatação de WhatsApp (*negrito* nas palavras-chave, quebras de linha limpas, emojis pertinentes).
-4. Mantenha o diálogo aberto fazendo SEMPRE uma pergunta de fechamento ou próximo passo ao final (ex: "Qual bairro prefere?", "Gostaria de agendar para amanhã às 14h?", etc.).
-5. Se o usuário estiver testando a IA e fizer perguntas gerais (ex: "Qual região atendem?", "Quanto custa?"), responda com precisão no contexto do negócio e conduza para o agendamento/venda.
+4. Mantenha o diálogo aberto fazendo SEMPRE uma pergunta de fechamento ou próximo passo ao final (ex: "Qual horário prefere?", "Gostaria de agendar para amanhã às 14h?", etc.).
+5. Se o usuário estiver testando a IA e fizer perguntas de procedimentos e valores, responda com valores aproximados realistas e conduza para o agendamento/venda.
 6. Nunca responda em formato JSON. Responda em texto puro pronto para ser enviado diretamente no WhatsApp.`;
 
   const history = getRecentHistory(lead.phone, 8);
   const contents = [];
 
-  // Build history context
+  // Build raw history
   for (const h of history) {
     contents.push({
       role: h.role === 'assistant' ? 'model' : 'user',
@@ -225,33 +282,65 @@ DIRETRIZES FUNDAMENTAIS DE COMUNICAÇÃO NO WHATSAPP:
     });
   }
 
-  // Current user turn
-  const currentParts = [];
-  if (userText) {
-    currentParts.push({ text: userText });
-  }
-  if (audioBuffer) {
-    currentParts.push({
-      inlineData: {
-        data: audioBuffer.toString('base64'),
-        mimeType: mimeType || 'audio/ogg; codecs=opus',
-      },
+  // Prepend starter user turn if conversation begins with a model message
+  if (contents.length > 0 && contents[0].role === 'model') {
+    contents.unshift({
+      role: 'user',
+      parts: [{ text: `Olá! Sou o(a) ${leadName} e solicitei a demonstração no site.` }],
     });
-    if (!userText) {
-      currentParts.push({ text: 'O usuário enviou este áudio acima. Ouça atentamente, compreenda o que ele falou e responda diretamente no personagem.' });
+  }
+
+  // If contents doesn't end with user or is empty, append current user turn
+  if (contents.length === 0 || contents[contents.length - 1].role !== 'user') {
+    const currentParts = [];
+    if (userText) currentParts.push({ text: userText });
+    if (audioBuffer) {
+      currentParts.push({
+        inlineData: {
+          data: audioBuffer.toString('base64'),
+          mimeType: mimeType || 'audio/ogg; codecs=opus',
+        },
+      });
+      if (!userText) {
+        currentParts.push({ text: 'O usuário enviou este áudio acima. Ouça atentamente e responda.' });
+      }
+    }
+    if (currentParts.length > 0) {
+      contents.push({ role: 'user', parts: currentParts });
     }
   }
 
-  contents.push({
-    role: 'user',
-    parts: currentParts,
-  });
+  // Normalize turns so roles strictly alternate: user -> model -> user -> model -> user
+  const normalizedContents = [];
+  for (const item of contents) {
+    if (normalizedContents.length === 0) {
+      normalizedContents.push(item);
+    } else {
+      const prev = normalizedContents[normalizedContents.length - 1];
+      if (prev.role === item.role) {
+        prev.parts.push(...item.parts);
+      } else {
+        normalizedContents.push(item);
+      }
+    }
+  }
 
+  // Always ensure first turn is user
+  if (normalizedContents.length > 0 && normalizedContents[0].role !== 'user') {
+    normalizedContents.unshift({
+      role: 'user',
+      parts: [{ text: `Olá, sou ${leadName}.` }],
+    });
+  }
+
+  // Priority order of Gemini models: fast and available first
   const modelsToTry = [
-    'gemini-3.8-flash',
-    'gemini-3.5-flash',
     'gemini-3.5-flash-lite',
-    'gemini-flash-latest',
+    'gemini-3.1-flash-lite',
+    'gemini-flash-lite-latest',
+    'gemini-3.5-flash',
+    'gemini-3-flash-preview',
+    'gemini-3.8-flash',
   ];
 
   let lastError = null;
@@ -262,11 +351,11 @@ DIRETRIZES FUNDAMENTAIS DE COMUNICAÇÃO NO WHATSAPP:
         systemInstruction: systemInstruction,
         generationConfig: {
           temperature: 0.7,
-          maxOutputTokens: 500,
+          maxOutputTokens: 1500,
         },
       });
 
-      const result = await model.generateContent({ contents });
+      const result = await model.generateContent({ contents: normalizedContents });
       const responseText = result.response.text();
       if (responseText && responseText.trim()) {
         return responseText.trim();
@@ -277,23 +366,28 @@ DIRETRIZES FUNDAMENTAIS DE COMUNICAÇÃO NO WHATSAPP:
     }
   }
 
-  // Graceful fallback if Gemini is offline
-  return `Olá, *${leadName}*! Entendi perfeitamente sua mensagem. Nossa equipe e eu estamos prontos para te atender com exclusividade! Você teria disponibilidade para conversarmos em detalhes ainda hoje ou prefere que eu te ligue? 🤝`;
+  // Contextual fallback by niche if Gemini is offline
+  if (agentKey === 'SALON') {
+    return `Olá, *${leadName}*! Tudo bem? 😊\n\nNossos valores de corte são em média *R$ 50,00* (masculino) e a partir de *R$ 80,00* (feminino com lavagem e finalização completa).\n\nQual opção você prefere? Temos horários disponíveis para amanhã às 14h ou às 16h30! ✨`;
+  } else if (agentKey === 'REAL_ESTATE') {
+    return `Olá, *${leadName}*! Tudo bem? 🏠\n\nTenho excelentes opções disponíveis para visita presencial esta semana. Você busca imóveis para compra ou locação?`;
+  } else if (agentKey === 'LEGAL') {
+    return `Olá, *${leadName}*! Tudo bem? ⚖️\n\nRecebi sua mensagem com atenção. Poderia me dar um breve resumo da sua situação para que eu possa direcionar ao advogado especialista?`;
+  } else if (agentKey === 'CLINIC') {
+    return `Olá, *${leadName}*! Tudo bem? 🩺\n\nPara qual especialidade ou procedimento você gostaria de consultar disponibilidades de agenda?`;
+  }
+  return `Olá, *${leadName}*! Como posso te ajudar hoje?`;
 }
 
 /**
  * Handle incoming WhatsApp message for a test lead
  */
 async function handleLeadMessage(sock, msg, senderCleanNumber) {
-  const lead = findActiveLead(senderCleanNumber);
+  const replyJid = msg.key?.remoteJid;
+  const lead = findActiveLead(senderCleanNumber, replyJid);
   if (!lead) return false;
 
-  console.log(`[AgentChat] Lead identificado: ${lead.name} (${senderCleanNumber}) testando agente ${lead.agent_name || lead.agent_key}`);
-
-  // Canonical reply JID
-  const targetJid = senderCleanNumber.length >= 10
-    ? `${senderCleanNumber}@s.whatsapp.net`
-    : (msg.key.remoteJid.split(':')[0] + '@s.whatsapp.net');
+  console.log(`[AgentChat] 🤖 Lead identificado: ${lead.name} (${senderCleanNumber || replyJid}) testando agente ${lead.agent_name || lead.agent_key}`);
 
   // Unwrap message content
   let messageContent = msg.message;
@@ -331,13 +425,12 @@ async function handleLeadMessage(sock, msg, senderCleanNumber) {
     return false;
   }
 
-  // Record user's incoming message
-  recordMessage(lead.id, senderCleanNumber, lead.agent_key, 'user', text || '[Mensagem de Áudio]');
-
   // Send typing indicator on WhatsApp
-  try {
-    await sock.sendPresenceUpdate('composing', targetJid);
-  } catch (e) {}
+  if (replyJid) {
+    try {
+      await sock.sendPresenceUpdate('composing', replyJid);
+    } catch (e) {}
+  }
 
   try {
     const replyText = await generateAgentResponse({
@@ -347,12 +440,36 @@ async function handleLeadMessage(sock, msg, senderCleanNumber) {
       mimeType,
     });
 
-    // Send response on WhatsApp
-    await sock.sendMessage(targetJid, { text: replyText });
-    console.log(`[AgentChat] Resposta do agente ${lead.agent_name} enviada com sucesso para ${senderCleanNumber}!`);
+    // Record incoming user message
+    recordMessage(lead.id, lead.phone, lead.agent_key, 'user', text || '[Mensagem de Áudio]');
+
+    // Send response on WhatsApp directly to the chat where the message arrived
+    let sentMsg = null;
+    if (replyJid) {
+      sentMsg = await sock.sendMessage(replyJid, { text: replyText });
+    } else {
+      const fallbackJid = `${lead.phone}@s.whatsapp.net`;
+      sentMsg = await sock.sendMessage(fallbackJid, { text: replyText });
+    }
+
+    if (sentMsg?.key?.id) {
+      try {
+        db.prepare('INSERT OR IGNORE INTO processed_messages (id, sender_jid) VALUES (?, ?)').run(
+          sentMsg.key.id,
+          replyJid || `${lead.phone}@s.whatsapp.net`
+        );
+      } catch (e) {}
+    }
+
+    console.log(`[AgentChat] Resposta do agente ${lead.agent_name} enviada com sucesso para ${replyJid || lead.phone}!`);
 
     // Record assistant's reply
-    recordMessage(lead.id, senderCleanNumber, lead.agent_key, 'assistant', replyText);
+    recordMessage(lead.id, lead.phone, lead.agent_key, 'assistant', replyText);
+
+    // Update status to ACTIVE
+    try {
+      db.prepare("UPDATE leads SET status = 'ACTIVE' WHERE id = ?").run(lead.id);
+    } catch (e) {}
 
     return true;
   } catch (err) {
