@@ -265,11 +265,13 @@ async function generateAgentResponse({ lead, userText = '', audioBuffer = null, 
 
 DIRETRIZES FUNDAMENTAIS DE COMUNICAÇÃO NO WHATSAPP:
 1. Você está conversando com: *${leadName}*.
-2. Seja sempre direto, empático e resolutivo. Responda em no máximo 2 a 4 parágrafos curtos.
-3. Use formatação de WhatsApp (*negrito* nas palavras-chave, quebras de linha limpas, emojis pertinentes).
-4. Mantenha o diálogo aberto fazendo SEMPRE uma pergunta de fechamento ou próximo passo ao final (ex: "Qual horário prefere?", "Gostaria de agendar para amanhã às 14h?", etc.).
-5. Se o usuário estiver testando a IA e fizer perguntas de procedimentos e valores, responda com valores aproximados realistas e conduza para o agendamento/venda.
-6. Nunca responda em formato JSON. Responda em texto puro pronto para ser enviado diretamente no WhatsApp.`;
+2. RESPOSTA DIRETA, SEM RODEIOS: Se o usuário fez uma pergunta (ex: valores, procedimentos, disponibilidade, cardápio, prazos), RESPONDA IMEDIATAMENTE na primeira linha. Nunca envie apenas cumprimentos como "Tudo bem?" sem responder o que foi perguntado.
+3. PREÇOS E SERVIÇOS: Quando perguntarem valores, forneça estimativas realistas em Reais e explique o que está incluso (ex: corte feminino R$ 80 a R$ 120 com lavagem e escova, masculino R$ 45 a R$ 60).
+4. FRASES COMPLETAS: Conclua SEMPRE o raciocínio. Nunca interrompa frases no meio.
+5. REAÇÃO A MENSAGENS CURTAS ("??", "alô", "oi"): Se o cliente mandar "??" ou parecer confuso, retome o assunto imediatamente com simpatia e clareza, reforçando os valores ou propondo horários de agendamento. Nunca se justifique com falhas técnicas e nunca diga que o sistema travou.
+6. FORMATAÇÃO WHATSAPP: Destaque palavras-chave com *negrito*, quebre em parágrafos curtos e amigáveis, use emojis pertinentes (✂️, 💅, ✨).
+7. PERGUNTA DE FECHAMENTO: Toda mensagem DEVE terminar com uma pergunta conduzindo o cliente ao próximo passo (ex: "Qual opção você prefere?", "Gostaria de agendar para amanhã às 14h ou 16h30?").
+8. NUNCA responda em JSON ou código. Responda em texto natural pronto para envio direto no WhatsApp.`;
 
   const rawHistory = getRecentHistory(lead.phone, 8);
   const contents = [];
