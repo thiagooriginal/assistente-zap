@@ -15,6 +15,45 @@ function getGenAI() {
   return genAI;
 }
 
+const NICHE_PHOTOS = {
+  REAL_ESTATE: [
+    {
+      url: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80',
+      caption: '🏢 *Sala Comercial no Tatuapé (45m²)*\nEspaço amplo, excelente luminosidade e recepção pronta. Aluguel: *R$ 1.850,00/mês*.'
+    },
+    {
+      url: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=800&q=80',
+      caption: '🏬 *Loja de Rua no Anália Franco (50m²)*\nVitrine ampla com altíssimo fluxo de pedestres. Pacote: *R$ 2.000,00/mês*.'
+    }
+  ],
+  SALON: [
+    {
+      url: 'https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=800&q=80',
+      caption: '✂️ *Corte Feminino em Camadas & Escova*\nModelagem moderna com acabamento leve e brilho intenso.'
+    },
+    {
+      url: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
+      caption: '💇‍♂️ *Corte Masculino Degradê / Fade*\nAlinhamento navalhado com finalização na tesoura.'
+    }
+  ],
+  RESTAURANT: [
+    {
+      url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80',
+      caption: '🍔 *Smash Burger Artesanal Especial*\nBlend 160g, cheddar duplo derretido, bacon crocante no pão brioche.'
+    },
+    {
+      url: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=800&q=80',
+      caption: '🍕 *Pizza Artesanal de Forno a Lenha*\nMassa de fermentação natural, queijo gratinado e molho de tomate fresco.'
+    }
+  ],
+  CAR_DEALERSHIP: [
+    {
+      url: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?auto=format&fit=crop&w=800&q=80',
+      caption: '🚗 *SUV Seminovo Impecável*\nRevisado com garantia de procedência, laudo cautelar 100% aprovado e baixa km.'
+    }
+  ]
+};
+
 const AGENT_PERSONAS = {
   REAL_ESTATE: {
     name: 'ImobBot',
@@ -26,6 +65,7 @@ Suas características:
 - Regiões de atuação padrão para demonstração: Atende a região metropolitana, bairros nobres e centros urbanos (ex: Jardins, Pinheiros, Moema, Vila Mariana, Morumbi, Centro e cidades vizinhas), além de lançamentos exclusivos.
 - Missão: Atender o interessado em poucos segundos, entender se busca comprar ou alugar, faixa de preço, número de quartos/vagas e agendar visitas presenciais no calendário do corretor.
 - Quando o cliente diz o que procura: Simule de 1 a 2 opções atraentes com valores realistas (ex: "Tenho um excelente 2 quartos com varanda e vaga por R$ 3.400 com condomínio incluso") e pergunte se quer ver fotos ou agendar uma visita presencial para este sábado.
+- ENVIO DE FOTOS: Quando o cliente pedir fotos ou confirmar que gostaria de vê-las (ex: "sim", "manda fotos", "quero ver", "pode mandar"), diga com entusiasmo que está enviando as fotos agora mesmo e OBRIGATORIAMENTE termine sua mensagem incluindo a tag especial [ENVIAR_FOTOS].
 - Se o cliente perguntar se você é IA ou como contratar: Explique com simpatia que é um Agente de IA da RAIA demonstrando a velocidade do atendimento e que ele pode ter um assistente desse na imobiliária dele acessando https://raiaagentes.com.br!`
   },
 
@@ -38,6 +78,7 @@ Suas características:
 - Carismática, simpática, atenciosa e super rápida.
 - Procedimentos conhecidos: Corte feminino (R$ 80 a R$ 120 com lavagem e escova), corte masculino (R$ 45 a R$ 60), mechas/loiros (R$ 280 a R$ 450), manicure/pedicure (R$ 40 a R$ 70), sobrancelhas (R$ 35), botox capilar e hidratação profunda.
 - Missão: Tirar dúvidas sobre procedimentos, valores médios aproximados e simular agendamento de horários para a cliente sem deixar ela esperando no WhatsApp.
+- ENVIO DE FOTOS: Se a cliente pedir fotos de cortes, modelos de cabelos ou trabalhos realizados (ex: "tem foto?", "manda fotos de corte"), diga com carinho que está enviando exemplos e inclua no final da mensagem a tag especial [ENVIAR_FOTOS].
 - Se o cliente perguntar se é IA: Conte que é a demonstração ao vivo da RAIA e que qualquer salão pode ter esse atendimento 24h acessando https://raiaagentes.com.br!`
   },
 
@@ -63,6 +104,7 @@ Suas características:
 - Descontraído, rápido, com linguagem apetitosa e vendedor.
 - Apresenta cardápio com opções de burgers artesanais (Smash Burger R$ 28, Duplo Cheddar Bacon R$ 36), pizzas (Calabresa especial R$ 52, Margherita R$ 56), porções de batata frita e bebidas.
 - Calcula taxa de entrega simulada e fecha o pedido no Pix ou Cartão.
+- ENVIO DE FOTOS: Se o cliente pedir para ver fotos dos lanches, pizzas ou pratos (ex: "tem foto?", "manda fotos do cardápio"), diga de forma animada que está enviando e inclua a tag especial [ENVIAR_FOTOS] no final da sua mensagem.
 - Se perguntarem sobre a IA: Explique que o ChefBot ajuda restaurantes a economizar até 30% de comissão de aplicativos atendendo clientes direto no WhatsApp!`
   },
 
@@ -131,6 +173,7 @@ Suas características:
 Suas características:
 - Entusiasta de carros, consultivo, negociador e focado em agendar visitas na loja.
 - Atua com: Envio de fichas técnicas, simulação de parcelas e entrada para financiamento, avaliação de usado na troca e agendamento de test-drive.
+- ENVIO DE FOTOS: Se o cliente pedir fotos do veículo ou do estoque (ex: "tem fotos?", "manda fotos do carro"), diga com entusiasmo que está enviando os detalhes e inclua a tag especial [ENVIAR_FOTOS] no final da sua mensagem.
 - Se perguntarem sobre a IA: Apresente as soluções da RAIA (https://raiaagentes.com.br).`
   },
 };
@@ -470,28 +513,62 @@ async function handleLeadMessage(sock, msg, senderCleanNumber) {
     // Record incoming user message
     recordMessage(lead.id, lead.phone, lead.agent_key, 'user', text || '[Mensagem de Áudio]');
 
-    // Send response on WhatsApp directly to the chat where the message arrived
-    let sentMsg = null;
-    if (replyJid) {
-      sentMsg = await sock.sendMessage(replyJid, { text: replyText });
+    // Check if response triggers photos dispatch
+    let cleanReplyText = replyText;
+    let shouldSendPhotos = false;
+
+    if (cleanReplyText.includes('[ENVIAR_FOTOS]')) {
+      shouldSendPhotos = true;
+      cleanReplyText = cleanReplyText.replace(/\[ENVIAR_FOTOS\]/gi, '').trim();
     } else {
-      const fallbackJid = `${lead.phone}@s.whatsapp.net`;
-      sentMsg = await sock.sendMessage(fallbackJid, { text: replyText });
+      const lowerUser = (text || '').toLowerCase();
+      const wantsPhotos = /(?:foto|fotos|imagem|imagens|ver\s+as\s+fotos|manda\s+foto|manda\s+as\s+fotos|quero\s+ver|pode\s+mandar)/i.test(lowerUser);
+      if (wantsPhotos && NICHE_PHOTOS[lead.agent_key]) {
+        shouldSendPhotos = true;
+      }
     }
+
+    const targetDestJid = replyJid || `${lead.phone}@s.whatsapp.net`;
+
+    // Send text response on WhatsApp directly to the chat where the message arrived
+    let sentMsg = await sock.sendMessage(targetDestJid, { text: cleanReplyText });
 
     if (sentMsg?.key?.id) {
       try {
         db.prepare('INSERT OR IGNORE INTO processed_messages (id, sender_jid) VALUES (?, ?)').run(
           sentMsg.key.id,
-          replyJid || `${lead.phone}@s.whatsapp.net`
+          targetDestJid
         );
       } catch (e) {}
     }
 
-    console.log(`[AgentChat] Resposta do agente ${lead.agent_name} enviada com sucesso para ${replyJid || lead.phone}!`);
+    // If photos are triggered for this niche, send photos with captions
+    if (shouldSendPhotos && NICHE_PHOTOS[lead.agent_key]) {
+      const photos = NICHE_PHOTOS[lead.agent_key];
+      for (const item of photos) {
+        try {
+          const sentImg = await sock.sendMessage(targetDestJid, {
+            image: { url: item.url },
+            caption: item.caption,
+          });
+          if (sentImg?.key?.id) {
+            try {
+              db.prepare('INSERT OR IGNORE INTO processed_messages (id, sender_jid) VALUES (?, ?)').run(
+                sentImg.key.id,
+                targetDestJid
+              );
+            } catch (e) {}
+          }
+        } catch (imgErr) {
+          console.warn(`[AgentChat] Erro ao enviar foto do nicho ${lead.agent_key}:`, imgErr.message);
+        }
+      }
+    }
+
+    console.log(`[AgentChat] Resposta do agente ${lead.agent_name} enviada com sucesso para ${targetDestJid}! (Fotos: ${shouldSendPhotos})`);
 
     // Record assistant's reply
-    recordMessage(lead.id, lead.phone, lead.agent_key, 'assistant', replyText);
+    recordMessage(lead.id, lead.phone, lead.agent_key, 'assistant', cleanReplyText);
 
     // Update status to ACTIVE
     try {
