@@ -20,6 +20,8 @@ const hotmartService = require('../services/hotmartService');
 const analyticsService = require('../services/analyticsService');
 const metaCapiService = require('../services/metaCapiService');
 const clientAuth = require('../services/clientAuthService');
+const directSales = require('../services/directSalesService');
+const { PLANS } = require('../services/planCatalog');
 const { adminLoginLimiter } = require('../middlewares/rateLimiter');
 
 // Initialize isolated demo account for Hotmart compliance
@@ -368,26 +370,46 @@ app.post('/api/asaas/create-link', requireAdmin, async (req, res) => {
 
 app.post('/api/webhooks/asaas', async (req, res) => {
   try {
+    // 1. Mandatory Asaas Webhook Authentication (Token Validation)
+    if (!asaasService.validateWebhookToken(req)) {
+      console.warn('[Asaas Webhook] 401 Unauthorized: token secreto ausente ou inválido.');
+      return res.status(401).json({ success: false, error: 'Unauthorized: token inválido.' });
+    }
+
     const eventData = req.body || {};
     const result = await asaasService.handleWebhookEvent(eventData);
 
-    // If payment confirmed and phone is available, notify via WhatsApp
+    // Idempotent duplicate event
+    if (result.duplicate) {
+      return res.json({ success: true, duplicate: true, eventId: result.eventId });
+    }
+
+    // 2. WhatsApp Notification on First Payment / Activation
     if (result.isPaid) {
       const payment = eventData.payment;
       try {
-        const row = db.prepare('SELECT customer_name, customer_phone, value FROM asaas_payments WHERE asaas_id = ?').get(payment.id);
+        const row = db.prepare('SELECT customer_name, customer_phone, value FROM asaas_payments WHERE asaas_id = ?').get(payment?.id);
         const phone = row?.customer_phone;
         const name = row?.customer_name || 'Cliente';
-        const val = Number(payment.value || row?.value || 0).toFixed(2).replace('.', ',');
+        const val = Number(payment?.value || row?.value || 0).toFixed(2).replace('.', ',');
 
         if (phone && whatsappClient.sendWhatsAppMessage) {
           const targetJid = `${String(phone).replace(/\D/g, '')}@s.whatsapp.net`;
-          const confirmationMsg =
-            `🎉 *PAGAMENTO CONFIRMADO!* 🚀\n\n` +
-            `Olá, *${name}*! Confirmamos o recebimento do seu pagamento de *R$ ${val}* via Asaas.\n\n` +
-            `Seu Agente de Inteligência Artificial da RAIA RH foi ativado com sucesso!\n\n` +
-            `Nossa equipe de suporte técnico e engenharia de IA entrará em contato em instantes para os ajustes finais do seu fluxo de atendimento.\n\n` +
-            `Dúvidas? Basta responder esta mensagem!`;
+          let confirmationMsg;
+          if (result.activationUrl) {
+            confirmationMsg =
+              `🎉 *PAGAMENTO CONFIRMADO!* 🚀\n\n` +
+              `Olá, *${name}*! Confirmamos o seu pagamento de *R$ ${val}* via Asaas.\n\n` +
+              `Sua Área de Membros está liberada! Ative seu acesso e crie sua senha pelo link exclusivo abaixo (válido por 48h):\n` +
+              `🔗 ${result.activationUrl}\n\n` +
+              `Nossa equipe de engenharia e suporte técnico da RAIA está à sua disposição!`;
+          } else {
+            confirmationMsg =
+              `🎉 *PAGAMENTO CONFIRMADO!* 🚀\n\n` +
+              `Olá, *${name}*! Confirmamos a renovação da sua assinatura de *R$ ${val}* via Asaas.\n\n` +
+              `Seu Agente de Inteligência Artificial da RAIA segue 100% ativo!\n\n` +
+              `Dúvidas? Basta responder esta mensagem!`;
+          }
 
           await whatsappClient.sendWhatsAppMessage(targetJid, confirmationMsg);
           console.log(`[Asaas Webhook] Notificação de pagamento enviada para WhatsApp ${phone}`);
@@ -397,10 +419,10 @@ app.post('/api/webhooks/asaas', async (req, res) => {
       }
     }
 
-    res.json({ success: true, received: true });
+    return res.json({ success: true, received: true, event: result.event });
   } catch (err) {
     console.error('Erro em /api/webhooks/asaas:', err);
-    res.status(500).json({ success: false, error: err.message });
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -491,6 +513,49 @@ app.get('/api/admin/analytics/affiliates', requireAdmin, (req, res) => {
   const days = parseInt(req.query.days, 10) || 30;
   const report = analyticsService.getAffiliateSalesOverview(days);
   return res.json(report);
+});
+
+// Memberships from Hotmart and direct RAIA contracts share the client login.
+// Every operation requires an authenticated admin. No public payment approval.
+app.get('/api/admin/memberships/plans', requireAdmin, (_req, res) =>
+  res.json({ success: true, plans: Object.values(PLANS) }));
+app.get('/admin/vendas-diretas', requireAdmin, (_req, res) =>
+  res.sendFile(path.resolve(__dirname, '../../views/admin-direct-sales.html')));
+app.get('/api/admin/direct-sales', requireAdmin, (_req, res) => {
+  try { return res.json({ success: true, contracts: directSales.listContracts() }); }
+  catch (err) { console.error(err); return res.status(500).json({ success: false, error: 'Erro interno.' }); }
+});
+app.post('/api/admin/direct-sales', requireAdmin, async (req, res) => {
+  try {
+    const contract = await directSales.createDirectContract(req.body || {}, req.user.id);
+    return res.status(201).json({ success: true, contract });
+  } catch (e) {
+    return res.status(e.status || 500).json({ success: false, error: e.status ? e.message : 'Erro interno.' });
+  }
+});
+app.post('/api/admin/direct-sales/:id/confirm', requireAdmin, (req, res) => {
+  try { return res.json({ success: true, ...directSales.confirmPayment({
+    contractId: req.params.id, paymentReference: req.body?.paymentReference,
+    paidUntil: req.body?.paidUntil, adminId: req.user.id,
+  }) }); }
+  catch (e) { return res.status(e.status || 500).json({ success: false, error: e.status ? e.message : 'Erro interno.' }); }
+});
+app.post('/api/admin/direct-sales/:id/renew', requireAdmin, (req, res) => {
+  try { return res.json({ success: true, contract: directSales.renewContract({
+    contractId: req.params.id, paymentReference: req.body?.paymentReference,
+    paidUntil: req.body?.paidUntil, adminId: req.user.id,
+  }) }); }
+  catch (e) { return res.status(e.status || 500).json({ success: false, error: e.status ? e.message : 'Erro interno.' }); }
+});
+app.post('/api/admin/direct-sales/:id/cancel', requireAdmin, async (req, res) => {
+  try {
+    const contract = await directSales.cancelContract({
+      contractId: req.params.id, adminId: req.user.id,
+    });
+    return res.json({ success: true, contract });
+  } catch (e) {
+    return res.status(e.status || 500).json({ success: false, error: e.status ? e.message : 'Erro interno.' });
+  }
 });
 
 app.get('/api/asaas/payments', requireAdmin, async (req, res) => {
@@ -924,7 +989,8 @@ app.get('/api/me', authMiddleware, (req, res) => {
 // ADMIN MANAGEMENT (ONLY ROLE = ADMIN)
 // ==========================================
 app.get('/api/admin/users', requireAdmin, (req, res) => {
-  const users = userService.getAllUsers();
+  const origin = req.query.origin ? String(req.query.origin).toUpperCase() : null;
+  const users = userService.getAllUsers({ origin });
   res.json({ success: true, count: users.length, data: users });
 });
 

@@ -61,6 +61,12 @@ function activateAccount(token, password) {
 
   const user = check.user;
 
+  if (['DIRECT', 'ASAAS'].includes(user.subscription_origin) &&
+      (user.subscription_status !== 'PENDING' || !user.paid_until ||
+       !Number.isFinite(Date.parse(user.paid_until)) || Date.parse(user.paid_until) <= Date.now())) {
+    return { valid: false, error: 'Pagamento não confirmado ou vigência encerrada.' };
+  }
+
   if (!password || password.length < 8) {
     return { valid: false, error: 'A senha deve conter no mínimo 8 caracteres.' };
   }
@@ -120,6 +126,21 @@ function login(email, password) {
 
   // Check subscription status
   const subStatus = user.subscription_status || 'ACTIVE';
+  if (['DIRECT', 'ASAAS'].includes(user.subscription_origin) &&
+    (!user.paid_until || !Number.isFinite(Date.parse(user.paid_until)) || Date.parse(user.paid_until) <= Date.now())) {
+    return { success: false, error: 'Assinatura sem pagamento válido ou período encerrado.', code: 'PAYMENT_REQUIRED' };
+  }
+
+  if (subStatus === 'OVERDUE') {
+    const paidUntilMs = user.paid_until ? Date.parse(user.paid_until) : 0;
+    if (!Number.isFinite(paidUntilMs) || paidUntilMs <= Date.now()) {
+      return {
+        success: false,
+        error: 'Sua assinatura está em atraso. Regularize seu pagamento para reativar o acesso.',
+        code: 'SUBSCRIPTION_OVERDUE',
+      };
+    }
+  }
 
   if (subStatus === 'REFUNDED' || subStatus === 'CHARGEBACK') {
     return {
@@ -278,6 +299,8 @@ function resetPassword(token, newPassword) {
         password_salt = ?,
         reset_token = NULL,
         reset_expires_at = NULL,
+        magic_token = NULL,
+        magic_token_expires_at = NULL,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(hash, salt, user.id);
@@ -348,7 +371,7 @@ function ensureSalonForUser(userId, userName = '') {
 function getSanitizedUser(userId) {
   const user = db.prepare(`
     SELECT id, email, name, phone_number, plan_tier, subscription_status,
-           paid_until, is_demo, created_at, last_login_at
+           paid_until, is_demo, created_at, last_login_at, subscription_origin, extra_professionals, hotmart_product_id
     FROM users
     WHERE id = ?
   `).get(userId);
@@ -364,6 +387,8 @@ function getSanitizedUser(userId) {
     phone: user.phone_number,
     planTier: user.plan_tier || 'JESSICA_START',
     plan_tier: user.plan_tier || 'JESSICA_START',
+    subscriptionOrigin: user.subscription_origin === 'LEGACY' && user.hotmart_product_id ? 'HOTMART' : (user.subscription_origin || 'LEGACY'),
+    extraProfessionals: user.extra_professionals || 0,
     subscriptionStatus: user.subscription_status || 'ACTIVE',
     subscription_status: user.subscription_status || 'ACTIVE',
     paidUntil: user.paid_until,

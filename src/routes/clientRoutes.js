@@ -4,6 +4,7 @@ const path = require('path');
 const db = require('../database/db');
 const clientAuth = require('../services/clientAuthService');
 const config = require('../config');
+const { getPlan } = require('../services/planCatalog');
 const whatsappClient = require('../whatsapp/client');
 const {
   clientLoginLimiter,
@@ -100,6 +101,12 @@ function clientAuthMiddleware(req, res, next) {
   // 2. Subscription status verification
   const subStatus = user.subscription_status || 'INACTIVE';
   const isDemo = Boolean(user.is_demo);
+  if (!isDemo && ['DIRECT', 'ASAAS'].includes(user.subscription_origin) &&
+      (!user.paid_until || !Number.isFinite(Date.parse(user.paid_until)) ||
+       Date.parse(user.paid_until) <= Date.now())) {
+    return res.status(403).json({ success: false, code: 'PAYMENT_REQUIRED',
+      error: 'Pagamento não confirmado ou período contratado encerrado.' });
+  }
 
   if (subStatus === 'REFUNDED' || subStatus === 'CHARGEBACK') {
     return res.status(403).json({
@@ -109,10 +116,32 @@ function clientAuthMiddleware(req, res, next) {
     });
   }
 
+  if (subStatus === 'OVERDUE') {
+    const paidUntilMs = user.paid_until ? Date.parse(user.paid_until) : 0;
+    if (!Number.isFinite(paidUntilMs) || paidUntilMs <= Date.now()) {
+      return res.status(403).json({
+        success: false,
+        error: 'Sua assinatura está em atraso. Regularize seu pagamento para reativar o acesso.',
+        code: 'SUBSCRIPTION_OVERDUE',
+      });
+    }
+  }
+
+  if (subStatus === 'CANCELED') {
+    const paidUntilMs = user.paid_until ? Date.parse(user.paid_until) : 0;
+    if (!Number.isFinite(paidUntilMs) || paidUntilMs <= Date.now()) {
+      return res.status(403).json({
+        success: false,
+        error: 'Sua assinatura foi cancelada e o período contratado encerrou.',
+        code: 'SUBSCRIPTION_CANCELED',
+      });
+    }
+  }
+
   if (subStatus === 'INACTIVE') {
     return res.status(403).json({
       success: false,
-      error: 'Assinatura inativa. Confirme o pagamento na Hotmart para liberar seu acesso.',
+      error: 'Assinatura inativa. Confirme o pagamento para liberar seu acesso.',
       code: 'SUBSCRIPTION_INACTIVE',
     });
   }
@@ -380,6 +409,14 @@ router.post('/staff', clientAuthMiddleware, (req, res) => {
   if (!name || !name.trim()) {
     return res.status(400).json({ success: false, error: 'Nome do profissional é obrigatório.' });
   }
+  const plan = getPlan(req.clientUser.plan_tier);
+  const available = (plan?.includedProfessionals || 1) + Math.max(0, Number(req.clientUser.extra_professionals) || 0);
+  const total = db.prepare('SELECT COUNT(*) AS n FROM client_staff WHERE user_id = ? AND active = 1')
+    .get(req.clientUser.id)?.n || 0;
+  if (!req.isDemo && total >= available) {
+    return res.status(403).json({ success: false,
+      error: 'Limite de profissionais atingido. Contrate mais um profissional para ampliar seu plano.' });
+  }
 
   const info = db.prepare(`
     INSERT INTO client_staff (user_id, name, specialty)
@@ -454,14 +491,14 @@ router.delete('/appointments/:id', clientAuthMiddleware, (req, res) => {
 // ==========================================
 
 router.get('/pro/dashboard', clientAuthMiddleware, (req, res) => {
-  const isPro = req.clientUser.plan_tier === 'JESSICA_PRO' || req.isDemo;
+  const canAccessDashboard = ['JESSICA_INTERMEDIATE', 'JESSICA_PRO'].includes(req.clientUser.plan_tier) || req.isDemo;
 
-  if (!isPro) {
+  if (!canAccessDashboard) {
     return res.status(403).json({
       success: false,
       upgradeRequired: true,
       currentPlan: req.clientUser.plan_tier,
-      message: 'O Dashboard Gerencial com números financeiros e desempenho da equipe é exclusivo do Plano Jéssica Pro.',
+      message: 'Dashboard Gerencial disponível nos planos Intermediário e Pró.',
       upgradeUrl: `${config.baseUrl}/planos`,
     });
   }

@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const config = require('../config');
 const db = require('../database/db');
 
@@ -295,58 +296,348 @@ async function getPayment(paymentId) {
 }
 
 /**
- * Process incoming Asaas Webhook event
+ * Create an Asaas Monthly Subscription
+ */
+async function createSubscription({
+  customerId,
+  billingType = 'BOLETO',
+  value,
+  nextDueDate,
+  cycle = 'MONTHLY',
+  description,
+  externalReference,
+}) {
+  if (!isConfigured()) throw new Error('Chave de API do Asaas não configurada.');
+
+  const payload = {
+    customer: customerId,
+    billingType: billingType || 'BOLETO',
+    value: Number(value),
+    nextDueDate: nextDueDate || formatDate(new Date(Date.now() + 24 * 3600 * 1000)),
+    cycle: cycle || 'MONTHLY',
+    description: (description || 'Assinatura Agente IA - RAIA').slice(0, 500),
+    externalReference: externalReference || `RAIA_SUB_${Date.now()}`,
+    updatePendingPayments: true,
+  };
+
+  const response = await asaasRequest('/subscriptions', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+  return response;
+}
+
+/**
+ * Get subscription details by ID
+ */
+async function getSubscription(subscriptionId) {
+  if (!isConfigured()) throw new Error('Chave de API do Asaas não configurada.');
+  return await asaasRequest(`/subscriptions/${subscriptionId}`);
+}
+
+/**
+ * List payments of a specific subscription
+ */
+async function listSubscriptionPayments(subscriptionId, { limit = 10 } = {}) {
+  if (!isConfigured()) throw new Error('Chave de API do Asaas não configurada.');
+  return await asaasRequest(`/subscriptions/${subscriptionId}/payments?limit=${limit}`);
+}
+
+/**
+ * Get Pix QR Code for a specific payment
+ */
+async function getPaymentPixQrCode(paymentId) {
+  if (!isConfigured()) throw new Error('Chave de API do Asaas não configurada.');
+  try {
+    return await asaasRequest(`/payments/${paymentId}/pixQrCode`);
+  } catch (err) {
+    console.warn(`[Asaas] Erro ao obter Pix QR Code para payment ${paymentId}:`, err.message);
+    return null;
+  }
+}
+
+/**
+ * Cancel an Asaas Subscription (sem fidelidade)
+ */
+async function cancelSubscription(subscriptionId) {
+  if (!isConfigured()) throw new Error('Chave de API do Asaas não configurada.');
+  return await asaasRequest(`/subscriptions/${subscriptionId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Validate incoming Asaas Webhook secret token
+ */
+function validateWebhookToken(req) {
+  const secret = (config.asaasWebhookSecret || '').trim();
+  if (!secret) return false;
+  const token = req.headers['asaas-access-token'] || req.headers['access_token'] || req.headers['authorization'];
+  if (!token) return false;
+  const cleanToken = String(token).replace(/^Bearer\s+/i, '').trim();
+  if (cleanToken.length !== secret.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(cleanToken), Buffer.from(secret));
+  } catch (e) {
+    return false;
+  }
+}
+
+/**
+ * Process incoming Asaas Webhook event with Idempotency & Membership Entitlements
  */
 async function handleWebhookEvent(eventData) {
   const event = eventData.event;
   const payment = eventData.payment;
+  const subscription = eventData.subscription;
 
-  console.log(`[Asaas Webhook] Evento recebido: ${event} para cobrança ID: ${payment?.id}`);
+  console.log(`[Asaas Webhook] Evento recebido: ${event} para cobrança ID: ${payment?.id || 'N/A'}, sub: ${payment?.subscription || subscription?.id || 'N/A'}`);
 
-  if (!payment || !payment.id) {
-    return { received: true, ignored: true };
+  const eventId = eventData.id || `${event}_${payment?.id || subscription?.id || 'unknown'}_${payment?.status || ''}`;
+
+  // 1. Idempotency Check
+  try {
+    const existingEvt = db.prepare('SELECT id FROM asaas_webhook_events WHERE event_id = ?').get(eventId);
+    if (existingEvt) {
+      console.log(`[Asaas Webhook] Evento ${eventId} duplicado. Retornando 200 OK sem reprocessar.`);
+      return { received: true, duplicate: true, eventId };
+    }
+    db.prepare(`
+      INSERT INTO asaas_webhook_events (event_id, event_type, payment_id, subscription_id, customer_id, payload)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      eventId,
+      event,
+      payment?.id || null,
+      payment?.subscription || subscription?.id || null,
+      payment?.customer || eventData.customer || null,
+      JSON.stringify(eventData)
+    );
+  } catch (evtErr) {
+    if (evtErr.message && evtErr.message.includes('UNIQUE')) {
+      console.log(`[Asaas Webhook] Evento ${eventId} já registrado em concorrência.`);
+      return { received: true, duplicate: true, eventId };
+    }
+    console.warn('[Asaas Webhook] Erro ao registrar idempotência:', evtErr.message);
   }
 
-  // Update local DB
+  // 2. Update asaas_payments table
   const isPaid = event === 'PAYMENT_RECEIVED' || event === 'PAYMENT_CONFIRMED';
   const paidAt = isPaid ? new Date().toISOString() : null;
 
-  try {
-    const existing = db.prepare('SELECT id, customer_phone, customer_name FROM asaas_payments WHERE asaas_id = ?').get(payment.id);
-    if (existing) {
-      db.prepare(`
-        UPDATE asaas_payments
-        SET status = ?, net_value = ?, paid_at = COALESCE(?, paid_at)
-        WHERE asaas_id = ?
-      `).run(payment.status || event, payment.netValue || payment.value, paidAt, payment.id);
-    } else {
-      db.prepare(`
-        INSERT INTO asaas_payments (
-          asaas_id, customer_id, value, net_value, billing_type, status,
-          description, invoice_url, paid_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        payment.id,
-        payment.customer,
-        payment.value,
-        payment.netValue || payment.value,
-        payment.billingType,
-        payment.status || event,
-        payment.description || null,
-        payment.invoiceUrl || null,
-        paidAt
-      );
+  if (payment && payment.id) {
+    try {
+      const existing = db.prepare('SELECT id, customer_phone, customer_name FROM asaas_payments WHERE asaas_id = ?').get(payment.id);
+      if (existing) {
+        db.prepare(`
+          UPDATE asaas_payments
+          SET status = ?, net_value = ?, paid_at = COALESCE(?, paid_at),
+              subscription_id = COALESCE(?, subscription_id)
+          WHERE asaas_id = ?
+        `).run(payment.status || event || 'UNKNOWN', payment.netValue || payment.value || 0, paidAt, payment.subscription || null, payment.id);
+      } else {
+        db.prepare(`
+          INSERT INTO asaas_payments (
+            asaas_id, customer_id, subscription_id, value, net_value, billing_type, status,
+            description, invoice_url, paid_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          payment.id,
+          payment.customer || null,
+          payment.subscription || null,
+          payment.value || 0,
+          payment.netValue || payment.value || 0,
+          payment.billingType || null,
+          payment.status || event || null,
+          payment.description || null,
+          payment.invoiceUrl || null,
+          paidAt
+        );
+      }
+    } catch (dbErr) {
+      console.error('[Asaas Webhook] Erro ao atualizar asaas_payments:', dbErr.message);
     }
-  } catch (dbErr) {
-    console.error('[Asaas Webhook] Erro ao atualizar DB:', dbErr.message);
+  }
+
+  // 3. Find User in SQLite
+  let user = null;
+  const subId = payment?.subscription || subscription?.id;
+  if (subId) {
+    user = db.prepare('SELECT * FROM users WHERE asaas_subscription_id = ?').get(subId);
+  }
+  if (!user && payment?.id) {
+    user = db.prepare('SELECT * FROM users WHERE asaas_payment_id = ?').get(payment.id);
+  }
+  if (!user && payment?.customer) {
+    user = db.prepare('SELECT * FROM users WHERE asaas_customer_id = ?').get(payment.customer);
+  }
+  if (!user && subId) {
+    const contract = db.prepare('SELECT user_id FROM direct_sales_contracts WHERE asaas_subscription_id = ?').get(subId);
+    if (contract) {
+      user = db.prepare('SELECT * FROM users WHERE id = ?').get(contract.user_id);
+    }
+  }
+
+  // Check Hotmart isolation: Do NOT let Asaas events alter Hotmart customers
+  if (user && user.subscription_origin === 'HOTMART') {
+    console.warn(`[Asaas Webhook] Usuário ID ${user.id} é originário da Hotmart. Ignorando alteração de plano via Asaas.`);
+    return { received: true, ignored: true, reason: 'HOTMART_ISOLATION' };
+  }
+
+  let activationUrl = null;
+
+  // 4. Handle State Transitions
+  if (user) {
+    if (isPaid) {
+      // Calculate paidUntil (30 days from due date or today)
+      let paidUntilDate;
+      if (payment?.dueDate) {
+        const d = new Date(payment.dueDate);
+        if (!Number.isNaN(d.getTime())) {
+          d.setDate(d.getDate() + 30);
+          if (d.getTime() < Date.now()) {
+            d.setTime(Date.now() + 30 * 86400000);
+          }
+          paidUntilDate = d.toISOString();
+        }
+      }
+      if (!paidUntilDate) {
+        paidUntilDate = new Date(Date.now() + 30 * 86400000).toISOString();
+      }
+
+      if (!user.password_hash) {
+        // Needs initial activation
+        let actToken = user.activation_token;
+        let actExp = user.activation_expires_at;
+        if (!actToken || !actExp || new Date(actExp) <= new Date()) {
+          actToken = crypto.randomBytes(32).toString('hex');
+          actExp = new Date(Date.now() + 48 * 3600000).toISOString();
+        }
+        db.prepare(`
+          UPDATE users
+          SET subscription_status = 'PENDING',
+              paid_until = ?,
+              activation_token = ?,
+              activation_expires_at = ?,
+              subscription_origin = 'ASAAS',
+              asaas_payment_id = COALESCE(?, asaas_payment_id),
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(paidUntilDate, actToken, actExp, payment?.id || null, user.id);
+
+        const baseUrl = String(config.baseUrl || '').replace(/\/+$/, '');
+        activationUrl = `${baseUrl}/cliente/ativar?token=${encodeURIComponent(actToken)}`;
+      } else {
+        // Already activated account (recurring renewal or reactivated)
+        db.prepare(`
+          UPDATE users
+          SET subscription_status = 'ACTIVE',
+              paid_until = ?,
+              subscription_origin = 'ASAAS',
+              asaas_payment_id = COALESCE(?, asaas_payment_id),
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(paidUntilDate, payment?.id || null, user.id);
+      }
+
+      // Update contract
+      db.prepare(`
+        UPDATE direct_sales_contracts
+        SET payment_status = 'PAID',
+            asaas_payment_id = COALESCE(?, asaas_payment_id),
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+      `).run(payment?.id || null, user.id);
+
+      const contract = db.prepare('SELECT id FROM direct_sales_contracts WHERE user_id = ?').get(user.id);
+      if (contract) {
+        try {
+          db.prepare(`
+            INSERT OR REPLACE INTO direct_sales_payments (contract_id, reference, paid_until, confirmed_by)
+            VALUES (?, ?, ?, 0)
+          `).run(contract.id, payment?.id || `PAY_${Date.now()}`, paidUntilDate);
+
+          db.prepare(`
+            INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
+            VALUES (?, 0, 'PAYMENT_CONFIRMED_ASAAS', ?)
+          `).run(contract.id, `Pagamento Asaas confirmado: R$ ${payment?.value || 0}`);
+        } catch (e) {
+          console.warn('[Asaas Webhook] Erro ao gravar evento direto:', e.message);
+        }
+      }
+    } else if (event === 'PAYMENT_OVERDUE') {
+      db.prepare(`
+        UPDATE users SET subscription_status = 'OVERDUE', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+      `).run(user.id);
+      db.prepare(`
+        UPDATE direct_sales_contracts SET payment_status = 'OVERDUE', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?
+      `).run(user.id);
+
+      const contract = db.prepare('SELECT id FROM direct_sales_contracts WHERE user_id = ?').get(user.id);
+      if (contract) {
+        db.prepare(`
+          INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
+          VALUES (?, 0, 'PAYMENT_OVERDUE_ASAAS', ?)
+        `).run(contract.id, `Cobrança ID ${payment?.id} em atraso.`);
+      }
+    } else if (event === 'PAYMENT_REFUNDED' || event === 'PAYMENT_CHARGEBACK') {
+      db.prepare(`
+        UPDATE users
+        SET subscription_status = 'REFUNDED',
+            magic_token = NULL,
+            magic_token_expires_at = NULL,
+            reset_token = NULL,
+            reset_expires_at = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(user.id);
+      db.prepare(`
+        UPDATE direct_sales_contracts SET payment_status = 'REFUNDED', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?
+      `).run(user.id);
+
+      const contract = db.prepare('SELECT id FROM direct_sales_contracts WHERE user_id = ?').get(user.id);
+      if (contract) {
+        db.prepare(`
+          INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
+          VALUES (?, 0, 'PAYMENT_REFUNDED_ASAAS', ?)
+        `).run(contract.id, `Estorno / chargeback recebido no Asaas.`);
+      }
+    } else if (event === 'PAYMENT_RESTORED') {
+      db.prepare(`
+        UPDATE users SET subscription_status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+      `).run(user.id);
+      db.prepare(`
+        UPDATE direct_sales_contracts SET payment_status = 'PAID', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?
+      `).run(user.id);
+    } else if (event === 'SUBSCRIPTION_DELETED' || event === 'SUBSCRIPTION_INACTIVATED') {
+      // Cancellation without penalty (sem fidelidade) -> keeps access until paid_until expires
+      db.prepare(`
+        UPDATE users SET subscription_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP WHERE id = ?
+      `).run(user.id);
+      db.prepare(`
+        UPDATE direct_sales_contracts SET payment_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?
+      `).run(user.id);
+
+      const contract = db.prepare('SELECT id FROM direct_sales_contracts WHERE user_id = ?').get(user.id);
+      if (contract) {
+        db.prepare(`
+          INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
+          VALUES (?, 0, 'SUBSCRIPTION_CANCELED_ASAAS', ?)
+        `).run(contract.id, 'Assinatura cancelada no Asaas. Acesso mantido até o término do período pago.');
+      }
+    }
   }
 
   return {
     received: true,
     event,
-    paymentId: payment.id,
-    status: payment.status,
+    paymentId: payment?.id,
+    subscriptionId: subId,
+    status: payment?.status,
     isPaid,
+    activationUrl,
+    userId: user?.id,
   };
 }
 
@@ -376,6 +667,12 @@ module.exports = {
   createPixCharge,
   createPaymentLink,
   getPayment,
+  createSubscription,
+  getSubscription,
+  listSubscriptionPayments,
+  getPaymentPixQrCode,
+  cancelSubscription,
+  validateWebhookToken,
   listPayments,
   listCustomers,
   handleWebhookEvent,

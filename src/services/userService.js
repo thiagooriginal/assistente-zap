@@ -183,14 +183,32 @@ function isUserActive(user) {
 /**
  * Get all users for admin dashboard
  */
-function getAllUsers() {
-  return db.prepare(`
-    SELECT id, phone_number, name, role, plan, trial_ends_at, created_at,
+/**
+ * Get all users with full membership details & origin filter (HOTMART / ASAAS)
+ */
+function getAllUsers(filter = {}) {
+  const origin = filter && typeof filter === 'object' ? filter.origin : (typeof filter === 'string' ? filter : null);
+  let query = `
+    SELECT id, phone_number, name, email, role, plan, plan_tier, subscription_status,
+           subscription_origin, paid_until, asaas_customer_id, asaas_subscription_id,
+           hotmart_subscriber_code, hotmart_product_id, is_demo, trial_ends_at, created_at,
            (SELECT COUNT(*) FROM expenses WHERE expenses.user_id = users.id) as total_expenses,
            (SELECT COUNT(*) FROM scheduled_payments WHERE scheduled_payments.user_id = users.id) as total_bills
     FROM users
-    ORDER BY id ASC
-  `).all();
+  `;
+  if (origin === 'HOTMART') {
+    query += ` WHERE subscription_origin = 'HOTMART' OR (subscription_origin = 'LEGACY' AND hotmart_product_id IS NOT NULL) OR hotmart_subscriber_code IS NOT NULL`;
+  } else if (origin === 'ASAAS') {
+    query += ` WHERE subscription_origin IN ('ASAAS', 'DIRECT') OR asaas_customer_id IS NOT NULL`;
+  }
+  query += ` ORDER BY id DESC`;
+
+  const rows = db.prepare(query).all();
+  return rows.map(u => ({
+    ...u,
+    phone: formatPhone(u.phone_number),
+    subscriptionOrigin: (u.subscription_origin === 'LEGACY' && u.hotmart_product_id) || u.hotmart_subscriber_code ? 'HOTMART' : (u.subscription_origin || 'ASAAS'),
+  }));
 }
 
 /**

@@ -707,6 +707,128 @@
 
       </div>
 
+      <!-- CARD C: CRIAR ASSINATURA ASAAS PARA ÁREA DE MEMBROS -->
+      <div class="p-6 rounded-3xl bg-[#11131a] border border-cyan-500/30 space-y-4 shadow-xl">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-2xl bg-gradient-to-tr from-cyan-500 to-[#00F59B] flex items-center justify-center text-black shadow-md">
+              <i data-lucide="user-plus" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="text-base font-extrabold text-white">Nova Assinatura Asaas (Área de Membros)</h3>
+              <p class="text-xs text-zinc-400">Cadastre o salão e gere a assinatura recorrente oficial no Asaas (sem fidelidade)</p>
+            </div>
+          </div>
+          <span class="text-[10px] font-bold text-cyan-300 bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-500/30">Oficial Asaas v3</span>
+        </div>
+
+        <form id="asaasSubForm" onsubmit="handleCreateAsaasSubscription(event)" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Nome do Salão / Responsável</label>
+              <input type="text" id="asSubName" required placeholder="Ex: Studio Bella Donna" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-cyan-400">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">E-mail do Cliente</label>
+              <input type="email" id="asSubEmail" required placeholder="cliente@exemplo.com" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-cyan-400">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">WhatsApp com DDD</label>
+              <input type="tel" id="asSubPhone" required placeholder="11999998888" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-cyan-400">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">CPF ou CNPJ (Opcional)</label>
+              <input type="text" id="asSubCpf" placeholder="000.000.000-00" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-cyan-400">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Plano da Jéssica</label>
+              <select id="asSubPlan" onchange="updateAsaasSubPricePreview()" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-cyan-400">
+                <option value="JESSICA_START" selected>Entrada (Jéssica Start)</option>
+                <option value="JESSICA_INTERMEDIATE">Intermediário (Dashboard)</option>
+                <option value="JESSICA_PRO">Pró (Campanhas + 2 Profissionais)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Condição Comercial</label>
+              <select id="asSubPromo" onchange="updateAsaasSubPricePreview()" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-cyan-400">
+                <option value="FAIR_2026" selected>Oferta de Feira (R$ 0 taxa implantação)</option>
+                <option value="STANDARD">Padrão Fora da Feira (+ R$ 350 implantação)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Profissionais Extras (+ R$ 19,90/mês)</label>
+              <input type="number" id="asSubExtra" min="0" max="20" value="0" onchange="updateAsaasSubPricePreview()" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-cyan-400">
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Forma de Cobrança no Asaas</label>
+              <select id="asSubMethod" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-cyan-400">
+                <option value="BOLETO" selected>Boleto Bancário com Pix QR Code Automático</option>
+                <option value="PIX">Pix Recorrente Direto</option>
+                <option value="CARD_RECURRING">Cartão de Crédito</option>
+                <option value="UNDEFINED">Aberto (Cliente escolhe na fatura)</option>
+              </select>
+            </div>
+            <div class="flex items-center">
+              <div id="asSubPricePreview" class="p-3 rounded-xl bg-zinc-900/90 border border-zinc-700 text-xs text-zinc-300 w-full">
+                Carregando valores...
+              </div>
+            </div>
+          </div>
+
+          <button type="submit" id="btnCreateAsaasSub" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 via-teal-400 to-[#00F59B] text-black font-black text-xs hover:opacity-95 transition flex items-center justify-center gap-2 shadow-lg shadow-cyan-500/20 cursor-pointer">
+            <i data-lucide="check-circle" class="w-4 h-4"></i>
+            <span id="btnCreateAsaasSubText">Gerar Assinatura Mensal no Asaas</span>
+          </button>
+        </form>
+
+        <!-- Resultado da Criação da Assinatura Asaas -->
+        <div id="asaasSubResultBox" class="hidden p-5 rounded-2xl bg-zinc-900 border border-cyan-500/40 space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-800 pb-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+              <span class="text-xs font-black text-cyan-300 uppercase tracking-wider">Assinatura Asaas Criada com Sucesso!</span>
+            </div>
+            <span id="asResStatus" class="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">⏳ Aguardando Pagamento</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div class="p-3 bg-black/60 rounded-xl border border-zinc-800">
+              <p class="text-[10px] text-zinc-400 uppercase font-black">ID da Assinatura Asaas</p>
+              <p id="asResSubId" class="font-mono text-cyan-300 font-bold mt-0.5 select-all">-</p>
+            </div>
+            <div class="p-3 bg-black/60 rounded-xl border border-zinc-800">
+              <p class="text-[10px] text-zinc-400 uppercase font-black">Mensalidade Contratada</p>
+              <p id="asResMonthly" class="font-bold text-[#00F59B] mt-0.5">R$ 0,00</p>
+            </div>
+          </div>
+
+          <div id="asResInvoiceContainer" class="space-y-2">
+            <label class="block text-xs font-bold text-white">Link da Fatura do Cliente (Pix, Cartão e Boleto):</label>
+            <div class="flex gap-2">
+              <input type="text" id="asResInvoiceUrl" readonly class="flex-1 px-3 py-2 bg-black border border-zinc-700 rounded-xl text-cyan-300 font-mono text-xs select-all">
+              <button type="button" onclick="copyAsaasInvoiceUrl()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs rounded-xl transition cursor-pointer">Copiar Fatura</button>
+            </div>
+          </div>
+
+          <div id="asResPixContainer" class="hidden p-4 rounded-xl bg-black/80 border border-[#00F59B]/30 space-y-3 text-center">
+            <p class="text-xs font-black text-[#00F59B]">Pix Copia e Cola para Ativação Imediata:</p>
+            <div id="asResQrWrapper" class="p-2 bg-white rounded-lg inline-block shadow">
+              <img id="asResPixQrImg" src="" alt="QR Code Pix" class="w-36 h-36 mx-auto">
+            </div>
+            <div class="flex gap-2">
+              <input type="text" id="asResPixPayload" readonly class="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-zinc-300 font-mono text-xs select-all">
+              <button type="button" onclick="copyAsaasPixPayload()" class="px-4 py-2 bg-[#00F59B] text-black font-extrabold text-xs rounded-xl hover:opacity-90 transition cursor-pointer">Copiar Pix</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- TABELA 1: COBRANÇAS & HISTÓRICO DE PAGAMENTOS ASAAS -->
       <div class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
         <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
@@ -799,7 +921,14 @@
         </div>
 
         <div class="pt-4 border-t border-zinc-800">
-          <h4 class="text-xs font-black uppercase tracking-wider text-zinc-400 mb-3">Clientes Cadastrados na Plataforma</h4>
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h4 class="text-xs font-black uppercase tracking-wider text-zinc-400">Clientes Cadastrados na Plataforma</h4>
+            <div class="flex items-center gap-1.5 bg-zinc-900 p-1 rounded-xl border border-zinc-800 text-[11px] font-bold">
+              <button type="button" onclick="filterAdminUsersByOrigin('ALL')" id="filterOriginAll" class="px-2.5 py-1 rounded-lg bg-zinc-800 text-white cursor-pointer">Todos</button>
+              <button type="button" onclick="filterAdminUsersByOrigin('HOTMART')" id="filterOriginHotmart" class="px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white cursor-pointer">🔥 Hotmart</button>
+              <button type="button" onclick="filterAdminUsersByOrigin('ASAAS')" id="filterOriginAsaas" class="px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white cursor-pointer">💳 Asaas</button>
+            </div>
+          </div>
           <div id="secUsersList" class="space-y-2 max-h-96 overflow-y-auto pr-1">
             <p class="text-xs text-zinc-500 py-4 text-center">Carregando lista de clientes...</p>
           </div>
@@ -1540,6 +1669,7 @@
 
       if (tab === 'asaas') {
         loadAsaasDashboard();
+        updateAsaasSubPricePreview();
       } else if (tab === 'analyzer') {
         loadBusinessAnalyses();
       }
@@ -1890,30 +2020,187 @@
       loadAsaasDashboard();
     }
 
+    let currentAdminUserOriginFilter = 'ALL';
+    function filterAdminUsersByOrigin(origin) {
+      currentAdminUserOriginFilter = origin;
+      ['filterOriginAll', 'filterOriginHotmart', 'filterOriginAsaas'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.className = 'px-2.5 py-1 rounded-lg text-zinc-400 hover:text-white cursor-pointer';
+      });
+      const activeBtn = document.getElementById(origin === 'HOTMART' ? 'filterOriginHotmart' : (origin === 'ASAAS' ? 'filterOriginAsaas' : 'filterOriginAll'));
+      if (activeBtn) activeBtn.className = 'px-2.5 py-1 rounded-lg bg-zinc-800 text-white cursor-pointer';
+      loadAdminUsers();
+    }
+
     async function loadAdminUsers() {
       try {
-        const res = await authFetch('/api/admin/users');
+        const url = currentAdminUserOriginFilter && currentAdminUserOriginFilter !== 'ALL'
+          ? `/api/admin/users?origin=${currentAdminUserOriginFilter}`
+          : '/api/admin/users';
+        const res = await authFetch(url);
         const json = await res.json();
         if (!json.success) return;
         const container = document.getElementById('secUsersList');
         if (!container) return;
 
         if (!json.data || json.data.length === 0) {
-          container.innerHTML = '<p class="text-xs text-zinc-500 py-3 text-center">Nenhum cliente cadastrado ainda.</p>';
+          container.innerHTML = '<p class="text-xs text-zinc-500 py-4 text-center">Nenhum cliente cadastrado nesta categoria.</p>';
           return;
         }
 
-        container.innerHTML = json.data.map(u => `
-          <div class="p-3 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-between text-xs">
-            <div>
-              <p class="font-bold text-white">${u.name || 'Sem nome'} <span class="text-zinc-500 font-normal">(${u.phone})</span></p>
-              <p class="text-[10px] text-zinc-400">Plano: <b>${u.plan}</b> • Role: ${u.role}</p>
+        container.innerHTML = json.data.map(u => {
+          const isHotmart = u.subscriptionOrigin === 'HOTMART';
+          const originBadge = isHotmart
+            ? '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-amber-500/20 text-amber-400 border border-amber-500/30">🔥 HOTMART</span>'
+            : '<span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">💳 ASAAS</span>';
+
+          const tierMap = {
+            JESSICA_PRO: 'JÉSSICA PRÓ',
+            JESSICA_INTERMEDIATE: 'JÉSSICA INTERMEDIÁRIO',
+            JESSICA_START: 'JÉSSICA ENTRADA'
+          };
+          const tierName = tierMap[u.plan_tier] || u.plan || 'JÉSSICA';
+
+          let statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-400">INACTIVE</span>';
+          if (u.subscription_status === 'ACTIVE') {
+            statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#00F59B]/20 text-[#00F59B] border border-[#00F59B]/40">✓ ATIVO</span>';
+          } else if (u.subscription_status === 'PENDING') {
+            statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40">⏳ PENDENTE</span>';
+          } else if (u.subscription_status === 'OVERDUE') {
+            statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/40">⚠️ EM ATRASO</span>';
+          } else if (u.subscription_status === 'CANCELED') {
+            statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-400">CANCELADO</span>';
+          }
+
+          const paidUntilText = u.paid_until ? `Vigência: ${new Date(u.paid_until).toLocaleDateString('pt-BR')}` : '';
+
+          return `
+            <div class="p-3 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-between text-xs flex-wrap gap-2">
+              <div class="space-y-0.5">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <p class="font-bold text-white">${u.name || 'Sem nome'}</p>
+                  ${originBadge}
+                  ${statusBadge}
+                </div>
+                <p class="text-[11px] text-zinc-400">
+                  ${u.email ? `<span class="text-zinc-300">${u.email}</span> • ` : ''}
+                  ${u.phone} • Plano: <b class="text-white">${tierName}</b>
+                  ${paidUntilText ? ` • <span class="text-zinc-400">${paidUntilText}</span>` : ''}
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] text-zinc-500 font-mono">${u.asaas_subscription_id || u.hotmart_subscriber_code || ''}</span>
+              </div>
             </div>
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${u.plan === 'PRO' ? 'bg-[#00F59B] text-black' : 'bg-zinc-800 text-zinc-300'}">${u.plan}</span>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       } catch (e) {
         console.error('Error loadAdminUsers:', e);
+      }
+    }
+
+    // ASAAS SUBSCRIPTIONS LOGIC
+    function updateAsaasSubPricePreview() {
+      const plan = document.getElementById('asSubPlan')?.value || 'JESSICA_START';
+      const promo = document.getElementById('asSubPromo')?.value || 'FAIR_2026';
+      const extra = parseInt(document.getElementById('asSubExtra')?.value, 10) || 0;
+
+      const basePrices = {
+        JESSICA_START: { FAIR_2026: 59, STANDARD: 89 },
+        JESSICA_INTERMEDIATE: { FAIR_2026: 79, STANDARD: 109 },
+        JESSICA_PRO: { FAIR_2026: 99, STANDARD: 139 }
+      };
+
+      const monthly = (basePrices[plan]?.[promo] || 59) + (extra * 19.90);
+      const setup = promo === 'STANDARD' ? 350 : 0;
+      const el = document.getElementById('asSubPricePreview');
+      if (el) {
+        el.innerHTML = `Mensalidade: <b class="text-[#00F59B]">R$ ${monthly.toFixed(2).replace('.', ',')}</b> | Implantação: <b>R$ ${setup.toFixed(2).replace('.', ',')}</b> <span class="text-cyan-400 text-[10px] block mt-0.5">✓ Sem fidelidade</span>`;
+      }
+    }
+
+    async function handleCreateAsaasSubscription(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnCreateAsaasSub');
+      const btnText = document.getElementById('btnCreateAsaasSubText');
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.innerText = 'Comunicando com Asaas...';
+
+      const payload = {
+        name: document.getElementById('asSubName')?.value?.trim(),
+        email: document.getElementById('asSubEmail')?.value?.trim(),
+        phone: document.getElementById('asSubPhone')?.value?.trim(),
+        cpfCnpj: document.getElementById('asSubCpf')?.value?.trim(),
+        planTier: document.getElementById('asSubPlan')?.value,
+        promotion: document.getElementById('asSubPromo')?.value,
+        paymentMethod: document.getElementById('asSubMethod')?.value,
+        extraProfessionals: parseInt(document.getElementById('asSubExtra')?.value, 10) || 0,
+      };
+
+      try {
+        const res = await authFetch('/api/admin/direct-sales', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) {
+          alert('Erro ao criar assinatura Asaas: ' + (json.error || 'Verifique os dados informados.'));
+          return;
+        }
+
+        const contract = json.contract;
+        document.getElementById('asResSubId').innerText = contract.asaasSubscriptionId || `#${contract.id}`;
+        document.getElementById('asResMonthly').innerText = 'R$ ' + ((contract.monthlyCents || 0) / 100).toFixed(2).replace('.', ',');
+        
+        if (contract.invoiceUrl) {
+          document.getElementById('asResInvoiceUrl').value = contract.invoiceUrl;
+          document.getElementById('asResInvoiceContainer').classList.remove('hidden');
+        } else {
+          document.getElementById('asResInvoiceContainer').classList.add('hidden');
+        }
+
+        if (contract.pixQrCode && contract.pixQrCode.payload) {
+          document.getElementById('asResPixPayload').value = contract.pixQrCode.payload;
+          if (contract.pixQrCode.encodedImage) {
+            document.getElementById('asResPixQrImg').src = 'data:image/png;base64,' + contract.pixQrCode.encodedImage;
+            document.getElementById('asResQrWrapper').classList.remove('hidden');
+          } else {
+            document.getElementById('asResQrWrapper').classList.add('hidden');
+          }
+          document.getElementById('asResPixContainer').classList.remove('hidden');
+        } else {
+          document.getElementById('asResPixContainer').classList.add('hidden');
+        }
+
+        document.getElementById('asaasSubResultBox').classList.remove('hidden');
+        document.getElementById('asaasSubResultBox').scrollIntoView({ behavior: 'smooth' });
+        loadAdminUsers();
+        loadAsaasPaymentsList();
+      } catch (err) {
+        alert('Erro ao processar assinatura Asaas: ' + err.message);
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.innerText = 'Gerar Assinatura Mensal no Asaas';
+      }
+    }
+
+    function copyAsaasInvoiceUrl() {
+      const el = document.getElementById('asResInvoiceUrl');
+      if (el) {
+        el.select();
+        navigator.clipboard.writeText(el.value);
+        alert('Link da fatura Asaas copiado com sucesso!');
+      }
+    }
+
+    function copyAsaasPixPayload() {
+      const el = document.getElementById('asResPixPayload');
+      if (el) {
+        el.select();
+        navigator.clipboard.writeText(el.value);
+        alert('Código Pix Copia-e-Cola copiado com sucesso!');
       }
     }
 

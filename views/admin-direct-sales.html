@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAIA | Vendas Diretas</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{font:15px system-ui,Arial,sans-serif;background:#080e18;color:#f1f5f9;margin:0;padding:24px}
+main{max-width:1020px;margin:auto}h1{font-size:30px;margin:0 0 8px}h2{font-size:19px;margin:0 0 20px}
+small,p{color:#a7b0c1}section{background:#121a29;border:1px solid #2a3548;border-radius:18px;padding:24px;margin-top:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px}.field{display:flex;flex-direction:column;gap:6px}
+label{font-size:13px;color:#cbd5e1}input,select{width:100%;background:#070d17;border:1px solid #344357;border-radius:9px;color:white;padding:12px;font-size:14px}
+button{background:#39e5cb;border:0;border-radius:10px;padding:12px 18px;color:#001a1b;font-weight:bold;cursor:pointer}button:disabled{opacity:.6;cursor:wait}
+.secondary{background:#2d3950;color:white}.muted{color:#a7b0c1;font-size:13px}.msg{min-height:28px;padding:10px 0}
+.good{color:#66f3bc}.bad{color:#ff9292}table{width:100%;border-collapse:collapse;font-size:13px}td,th{text-align:left;padding:12px 8px;border-bottom:1px solid #28374a}
+nav a{color:#60e5ff}.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.pill{display:inline-block;background:#263552;padding:6px 10px;border-radius:99px}code{white-space:normal;word-break:break-all}
+</style>
+</head>
+<body><main>
+<nav><a href="/admin">Voltar ao painel RAIA</a></nav>
+<h1>Vendas diretas da RAIA</h1>
+<p>Clientes da feira, WhatsApp e vendas diretas usam a mesma área de membros dos clientes da Hotmart.</p>
+<section><h2>1. Criar contrato sem liberar acesso</h2>
+<form id="createForm">
+<div class="grid">
+<div class="field"><label>Nome do responsável</label><input name="name" required minlength="2" maxlength="150"></div>
+<div class="field"><label>E-mail do cliente</label><input name="email" type="email" required></div>
+<div class="field"><label>WhatsApp com DDD</label><input name="phone" required placeholder="11999998888"></div>
+<div class="field"><label>Plano</label><select name="planTier" id="planTier"><option value="JESSICA_START">Entrada</option><option value="JESSICA_INTERMEDIATE">Intermediário</option><option value="JESSICA_PRO">Pró</option></select></div>
+<div class="field"><label>Preço</label><select name="promotion" id="promotion"><option value="FAIR_2026">Oferta da feira</option><option value="STANDARD">Valor normal</option></select></div>
+<div class="field"><label>Forma de Cobrança (Asaas)</label><select name="paymentMethod"><option value="BOLETO" selected>Boleto com Pix Automático</option><option value="PIX">Pix Recorrente Direto</option><option value="CARD_RECURRING">Cartão de Crédito Recorrente</option></select></div>
+<div class="field"><label>Profissionais extras</label><input name="extraProfessionals" id="extraProfessionals" type="number" min="0" max="20" value="0" required></div>
+</div>
+<p id="pricePreview" class="pill">Carregando valores...</p>
+<p class="muted">O cadastro não cobra nem ativa automaticamente. A confirmação de pagamento é uma ação administrativa separada.</p>
+<button>Cadastrar contrato pendente</button><div class="msg" id="createMsg" role="status"></div>
+</form></section>
+<section><h2>2. Confirmar pagamento já recebido</h2>
+<form id="confirmForm"><div class="grid">
+<div class="field"><label>ID do contrato</label><input name="id" type="number" min="1" required></div>
+<div class="field"><label>Identificador único comprovado do pagamento</label><input name="paymentReference" minlength="6" required placeholder="PIX-2026-123456"></div>
+<div class="field"><label>Vigência até (data)</label><input name="date" type="date" required></div>
+</div><p class="muted">Confira primeiro o recebimento no banco ou no provedor. O sistema NÃO consulta Pix, boleto ou cartão nesta etapa.</p>
+<button>Confirmar pagamento e gerar ativação</button><div class="msg" id="confirmMsg" role="status"></div>
+<div id="activation" hidden><p>Compartilhe somente pelo canal verificado do cliente:</p><code id="activationLink"></code> <button id="copyLink" type="button" class="secondary">Copiar link</button></div>
+</form></section>
+<section><h2>3. Renovações e cancelamentos sem fidelidade</h2>
+<form id="manageForm"><div class="grid"><div class="field"><label>Contrato</label><input name="id" min="1" type="number" required></div>
+<div class="field"><label>Ação</label><select name="action" id="manageAction"><option value="renew">Confirmar renovação</option><option value="cancel">Cancelar sem fidelidade</option></select></div>
+<div class="field"><label>Referência do pagamento (renovação)</label><input name="paymentReference"></div>
+<div class="field"><label>Nova vigência (renovação)</label><input name="date" type="date"></div>
+</div><p class="muted">No cancelamento, o cliente mantém o acesso somente até o fim do período já pago.</p>
+<button>Executar operação</button><div class="msg" id="manageMsg" role="status"></div></form></section>
+<section><div class="row" style="justify-content:space-between"><h2>Contratos cadastrados</h2><button class="secondary" id="reload" type="button">Atualizar</button></div>
+<div style="overflow-x:auto"><table><thead><tr><th>ID</th><th>Cliente</th><th>Plano</th><th>Mensalidade</th><th>Pagamento</th><th>Acesso</th><th>Vigência</th></tr></thead><tbody id="contracts"></tbody></table></div>
+</section></main><script>
+'use strict';
+let plans = {};
+const $ = id => document.getElementById(id);
+const brl = cents => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(cents/100);
+function status(id,message,ok){$(id).textContent=message;$(id).className='msg '+(ok?'good':'bad');}
+async function api(path,options={}){const r=await fetch(path,{credentials:'same-origin',headers:{'Content-Type':'application/json'},...options});let data={};try{data=await r.json();}catch{}if(!r.ok)throw Error(data.error||('Erro HTTP '+r.status));return data;}
+function payload(form){return Object.fromEntries(new FormData(form));}
+function updatePrice(){const p=plans[$('planTier').value];if(!p)return;
+const promotion=$('promotion').value,extra=Number($('extraProfessionals').value||0);
+const monthly=(promotion==='FAIR_2026'?p.fairMonthlyCents:p.standardMonthlyCents)+extra*1990;
+const setup=promotion==='FAIR_2026'?0:p.standardSetupCents;
+$('pricePreview').textContent='Mensalidade: '+brl(monthly)+' | Implementação: '+brl(setup)+' | Sem fidelidade';}
+function until(date){if(!/^\d{4}-\d{2}-\d{2}$/.test(date||''))throw Error('Informe a data de vigência.');return date+'T23:59:59-03:00';}
+async function reload(){try{const data=await api('/api/admin/direct-sales');const t=$('contracts');t.replaceChildren();for(const c of data.contracts){const tr=document.createElement('tr');for(const value of [c.id,c.name,c.planTier,brl(c.monthlyCents),c.paymentStatus,c.subscriptionStatus,c.paidUntil||'—']){const td=document.createElement('td');td.textContent=String(value);tr.appendChild(td);}t.appendChild(tr);}}catch(e){status('createMsg',e.message,false);}}
+$('createForm').addEventListener('submit',async(e)=>{e.preventDefault();const b=e.submitter;b.disabled=true;try{const p=payload(e.target);p.extraProfessionals=Number(p.extraProfessionals);const r=await api('/api/admin/direct-sales',{method:'POST',body:JSON.stringify(p)});let msg='Contrato #'+r.contract.id+' registrado no Asaas. Aguardando pagamento.';if(r.contract.invoiceUrl)msg+=' Fatura gerada: '+r.contract.invoiceUrl;status('createMsg',msg,true);e.target.reset();updatePrice();reload();}catch(err){status('createMsg',err.message,false);}finally{b.disabled=false;}});
+$('confirmForm').addEventListener('submit',async(e)=>{e.preventDefault();const b=e.submitter;b.disabled=true;try{const p=payload(e.target);const r=await api('/api/admin/direct-sales/'+Number(p.id)+'/confirm',{method:'POST',body:JSON.stringify({paymentReference:p.paymentReference,paidUntil:until(p.date)})});$('activationLink').textContent=r.activationUrl;$('activation').hidden=false;status('confirmMsg','Pagamento registrado. Entregue o link ao cliente verificado.',true);reload();}catch(err){$('activation').hidden=true;status('confirmMsg',err.message,false);}finally{b.disabled=false;}});
+$('copyLink').addEventListener('click',async()=>{await navigator.clipboard.writeText($('activationLink').textContent);});
+$('manageForm').addEventListener('submit',async(e)=>{e.preventDefault();const b=e.submitter;b.disabled=true;try{const p=payload(e.target),action=p.action;const body=action==='renew'?{paymentReference:p.paymentReference,paidUntil:until(p.date)}:{};await api('/api/admin/direct-sales/'+Number(p.id)+'/'+action,{method:'POST',body:JSON.stringify(body)});status('manageMsg','Operação registrada com sucesso.',true);reload();}catch(err){status('manageMsg',err.message,false);}finally{b.disabled=false;}});
+$('reload').addEventListener('click',reload);
+for(const id of ['planTier','promotion','extraProfessionals'])$(id).addEventListener('change',updatePrice);
+(async()=>{try{const r=await api('/api/admin/memberships/plans');for(const p of r.plans)plans[p.id]=p;updatePrice();await reload();}catch(e){status('createMsg','Acesso negado ou sessão expirada: '+e.message,false);}})();
+</script></body></html>

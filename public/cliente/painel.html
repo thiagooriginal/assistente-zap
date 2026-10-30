@@ -468,15 +468,15 @@
             <i data-lucide="crown" class="w-8 h-8"></i>
           </div>
           <div>
-            <span class="text-xs px-3 py-1 rounded-full font-bold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40">RECURSO EXCLUSIVO DO PLANO PRO</span>
+            <span class="text-xs px-3 py-1 rounded-full font-bold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40">RECURSO DOS PLANOS INTERMEDIÁRIO E PRÓ</span>
             <h2 class="text-2xl font-black text-white mt-3">Dashboard Gerencial & Financeiro</h2>
             <p class="text-sm text-slate-300 mt-2 max-w-md mx-auto">
               Tenha controle total do faturamento do seu salão, comissões por profissional, ticket médio e lucratividade em tempo real.
             </p>
           </div>
           <div class="pt-2">
-            <a href="https://pay.hotmart.com/YOUR_PRO_OFFER" target="_blank" class="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#F59E0B] to-amber-500 text-[#07080c] font-extrabold text-sm shadow-lg shadow-[#F59E0B]/30 hover:brightness-110 transition-all">
-              <span>Fazer Upgrade para Jéssica Pro (R$ 89/mês)</span>
+            <a href="/planos" target="_blank" class="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#F59E0B] to-amber-500 text-[#07080c] font-extrabold text-sm shadow-lg shadow-[#F59E0B]/30 hover:brightness-110 transition-all">
+              <span>Conhecer os planos Intermediário e Pró</span>
               <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
             </a>
           </div>
@@ -538,7 +538,7 @@
             </p>
           </div>
           <div class="pt-2">
-            <a href="https://pay.hotmart.com/YOUR_PRO_OFFER" target="_blank" class="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#F59E0B] to-amber-500 text-[#07080c] font-extrabold text-sm shadow-lg shadow-[#F59E0B]/30 hover:brightness-110 transition-all">
+            <a href="/planos" target="_blank" class="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#F59E0B] to-amber-500 text-[#07080c] font-extrabold text-sm shadow-lg shadow-[#F59E0B]/30 hover:brightness-110 transition-all">
               <span>Desbloquear Campanhas com o Plano Pro</span>
               <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
             </a>
@@ -697,7 +697,8 @@
       document.getElementById('footerUserEmail').innerText = p.email || '';
 
       const isPro = p.planTier === 'JESSICA_PRO';
-      const badgeText = isPro ? 'JÉSSICA PRO 🌟' : 'JÉSSICA START ✂️';
+      const isIntermediate = p.planTier === 'JESSICA_INTERMEDIATE';
+      const badgeText = isPro ? 'JÉSSICA PRÓ 🌟' : (isIntermediate ? 'JÉSSICA INTERMEDIÁRIO 📊' : 'JÉSSICA ENTRADA ✂️');
       const badgeClass = isPro
         ? 'text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40'
         : 'text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-[#00F59B]/20 text-[#00F59B] border border-[#00F59B]/40';
@@ -705,7 +706,7 @@
       document.getElementById('planBadgeText').innerHTML = `<span>${badgeText}</span>`;
       document.getElementById('headerPlanBadge').innerText = badgeText;
       document.getElementById('headerPlanBadge').className = badgeClass;
-      document.getElementById('mobilePlanBadge').innerText = isPro ? 'PRO 🌟' : 'START ✂️';
+      document.getElementById('mobilePlanBadge').innerText = isPro ? 'PRÓ 🌟' : (isIntermediate ? 'INTERMEDIÁRIO 📊' : 'ENTRADA ✂️');
 
       // Demo Account notice
       if (p.isDemo) {

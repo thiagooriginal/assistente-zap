@@ -317,6 +317,46 @@ db.exec(`
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
   CREATE INDEX IF NOT EXISTS idx_affiliate_sales_code ON affiliate_sales(affiliate_code);
+
+  CREATE TABLE IF NOT EXISTS direct_sales_contracts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES users(id),
+    plan_tier TEXT NOT NULL CHECK(plan_tier IN ('JESSICA_START','JESSICA_INTERMEDIATE','JESSICA_PRO')),
+    promotion TEXT NOT NULL CHECK(promotion IN ('FAIR_2026','STANDARD')),
+    monthly_cents INTEGER NOT NULL CHECK(monthly_cents > 0),
+    setup_cents INTEGER NOT NULL CHECK(setup_cents >= 0),
+    extra_professionals INTEGER NOT NULL DEFAULT 0,
+    payment_method TEXT NOT NULL CHECK(payment_method IN ('PIX','BOLETO','CARD_RECURRING')),
+    payment_status TEXT NOT NULL DEFAULT 'AWAITING_PAYMENT',
+    created_by INTEGER NOT NULL,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS direct_sales_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    contract_id INTEGER NOT NULL REFERENCES direct_sales_contracts(id),
+    reference TEXT NOT NULL UNIQUE,
+    paid_until TEXT NOT NULL,
+    confirmed_by INTEGER NOT NULL,
+    confirmed_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE TABLE IF NOT EXISTS direct_sales_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    contract_id INTEGER NOT NULL REFERENCES direct_sales_contracts(id),
+    admin_id INTEGER NOT NULL, event_type TEXT NOT NULL, notes TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS asaas_webhook_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT UNIQUE,
+    event_type TEXT NOT NULL,
+    payment_id TEXT,
+    subscription_id TEXT,
+    customer_id TEXT,
+    payload TEXT,
+    processed_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_asaas_events_event_id ON asaas_webhook_events(event_id);
 `);
 
 // 2. Run migrations for existing databases
@@ -352,6 +392,22 @@ ensureColumnExists('users', 'is_demo', 'INTEGER DEFAULT 0');
 ensureColumnExists('users', 'last_login_at', 'TEXT');
 ensureColumnExists('users', 'hotmart_last_event_at', 'INTEGER DEFAULT 0');
 ensureColumnExists('users', 'needs_reconciliation', 'INTEGER DEFAULT 0');
+ensureColumnExists('users', 'subscription_origin', "TEXT DEFAULT 'LEGACY'");
+ensureColumnExists('users', 'extra_professionals', 'INTEGER DEFAULT 0');
+ensureColumnExists('users', 'asaas_customer_id', 'TEXT');
+ensureColumnExists('users', 'asaas_subscription_id', 'TEXT');
+ensureColumnExists('users', 'asaas_payment_id', 'TEXT');
+ensureColumnExists('users', 'asaas_last_event_at', 'INTEGER DEFAULT 0');
+
+ensureColumnExists('direct_sales_contracts', 'asaas_customer_id', 'TEXT');
+ensureColumnExists('direct_sales_contracts', 'asaas_subscription_id', 'TEXT');
+ensureColumnExists('direct_sales_contracts', 'asaas_payment_id', 'TEXT');
+ensureColumnExists('direct_sales_contracts', 'asaas_invoice_url', 'TEXT');
+ensureColumnExists('direct_sales_contracts', 'pix_payload', 'TEXT');
+
+ensureColumnExists('asaas_payments', 'subscription_id', 'TEXT');
+ensureColumnExists('asaas_payments', 'user_id', 'INTEGER');
+ensureColumnExists('asaas_payments', 'event_type', 'TEXT');
 ensureColumnExists('hotmart_webhook_events', 'creation_date', 'INTEGER');
 
 ensureColumnExists('expenses', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
@@ -365,6 +421,8 @@ try {
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
     CREATE INDEX IF NOT EXISTS idx_users_activation ON users(activation_token);
     CREATE INDEX IF NOT EXISTS idx_users_reset ON users(reset_token);
+    CREATE INDEX IF NOT EXISTS idx_users_asaas_sub ON users(asaas_subscription_id);
+    CREATE INDEX IF NOT EXISTS idx_users_asaas_cust ON users(asaas_customer_id);
     CREATE INDEX IF NOT EXISTS idx_expenses_user ON expenses(user_id);
     CREATE INDEX IF NOT EXISTS idx_incomes_user ON incomes(user_id);
     CREATE INDEX IF NOT EXISTS idx_payments_user ON scheduled_payments(user_id);
