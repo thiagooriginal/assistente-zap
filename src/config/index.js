@@ -23,6 +23,23 @@ const config = {
   asaasApiKey: (process.env.ASAAS_API_KEY || '').trim(),
   asaasApiUrl: process.env.ASAAS_API_URL || 'https://api.asaas.com/v3',
   asaasWebhookSecret: (process.env.ASAAS_WEBHOOK_SECRET || '').trim(),
+
+  // Hotmart Integration
+  hotmartWebhookSecret: (process.env.HOTMART_WEBHOOK_SECRET || process.env.HOTMART_HOTTOK || '').trim(),
+  hotmartProductId: (process.env.HOTMART_PRODUCT_ID || '8840376').trim(),
+  hotmartPlanStartId: (process.env.HOTMART_PLAN_START_ID || '').trim(),
+  hotmartPlanProId: (process.env.HOTMART_PLAN_PRO_ID || '').trim(),
+
+  // Isolated Demo Account for Hotmart Compliance
+  demoAccountEmail: (process.env.DEMO_ACCOUNT_EMAIL || 'homologacao.hotmart@raiaagentes.com.br').trim().toLowerCase(),
+  demoAccountPassword: (process.env.DEMO_ACCOUNT_PASSWORD || '').trim(),
+
+  // Marketing & Analytics
+  ga4MeasurementId: (process.env.GA4_MEASUREMENT_ID || '').trim(),
+  gtmContainerId: (process.env.GTM_CONTAINER_ID || '').trim(),
+  metaPixelId: (process.env.META_PIXEL_ID || '').trim(),
+  metaCapiToken: (process.env.META_CAPI_TOKEN || '').trim(),
+  metaCapiTestCode: (process.env.META_CAPI_TEST_CODE || '').trim(),
 };
 
 module.exports = config;

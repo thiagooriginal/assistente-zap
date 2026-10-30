@@ -222,6 +222,10 @@
         <i data-lucide="brain-circuit" class="w-4 h-4 text-cyan-400"></i>
         <span>🧠 Análise de Oferta & IA</span>
       </button>
+      <button onclick="switchAdminTab('marketing')" id="tabBtnMarketing" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
+        <i data-lucide="line-chart" class="w-4 h-4 text-emerald-400"></i>
+        <span>📊 Marketing & Analytics</span>
+      </button>
     </div>
 
     <!-- ============================================================ -->
@@ -1036,6 +1040,249 @@
       </div>
     </div>
 
+  
+    <!-- ============================================================ -->
+    <!-- SECTION 7: MARKETING & ANALYTICS                             -->
+    <!-- ============================================================ -->
+    <div id="sectionMarketing" class="hidden space-y-6">
+      
+      <!-- Top Banner / Intelligence Header -->
+      <div class="p-6 rounded-3xl bg-gradient-to-r from-emerald-950/80 via-teal-950/60 to-zinc-900 border border-emerald-500/40 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-wider border border-emerald-500/30">
+              Auditoria de Tráfego & Vendas
+            </span>
+            <span class="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 text-[10px] font-bold border border-cyan-500/20">
+              LGPD em Conformidade
+            </span>
+          </div>
+          <h2 class="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+            <span>Marketing & Inteligência Comercial</span>
+            <i data-lucide="bar-chart-2" class="w-6 h-6 text-emerald-400"></i>
+          </h2>
+          <p class="text-xs text-zinc-400 max-w-2xl leading-relaxed">
+            Painel auditado com métricas oficiais: funil do site, origem de campanhas UTM, webhooks de compras Hotmart e rastreamento oficial de afiliados.
+          </p>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+          <select id="marketingPeriodSelect" onchange="loadMarketingAnalytics(this.value)" class="px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-xs font-bold text-white outline-none focus:border-emerald-400">
+            <option value="7">Últimos 7 dias</option>
+            <option value="30" selected>Últimos 30 dias</option>
+            <option value="90">Últimos 90 dias</option>
+          </select>
+
+          <button onclick="loadMarketingAnalytics()" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs flex items-center gap-1.5 transition shadow cursor-pointer">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>Atualizar</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- FUNNEL CARDS (KPIs) -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <!-- 1. Visitantes -->
+        <div class="p-4 rounded-2xl bg-[#11131a] border border-zinc-800 space-y-1">
+          <div class="flex items-center justify-between text-zinc-400">
+            <span class="text-[11px] font-bold">1. Visitantes</span>
+            <i data-lucide="users" class="w-4 h-4 text-cyan-400"></i>
+          </div>
+          <p id="mktKpiVisitors" class="text-2xl font-black text-white">0</p>
+          <p class="text-[10px] text-zinc-500">Acessos únicos</p>
+        </div>
+
+        <!-- 2. Cliques WhatsApp -->
+        <div class="p-4 rounded-2xl bg-[#11131a] border border-zinc-800 space-y-1">
+          <div class="flex items-center justify-between text-zinc-400">
+            <span class="text-[11px] font-bold">2. Clique Zap</span>
+            <i data-lucide="message-circle" class="w-4 h-4 text-[#00F59B]"></i>
+          </div>
+          <p id="mktKpiZapClicks" class="text-2xl font-black text-[#00F59B]">0</p>
+          <p id="mktRateZap" class="text-[10px] text-zinc-400">0% dos visitantes</p>
+        </div>
+
+        <!-- 3. Testes / Leads -->
+        <div class="p-4 rounded-2xl bg-[#11131a] border border-zinc-800 space-y-1">
+          <div class="flex items-center justify-between text-zinc-400">
+            <span class="text-[11px] font-bold">3. Demos</span>
+            <i data-lucide="sparkles" class="w-4 h-4 text-amber-400"></i>
+          </div>
+          <p id="mktKpiDemos" class="text-2xl font-black text-amber-400">0</p>
+          <p id="mktRateDemos" class="text-[10px] text-zinc-400">0% dos visitantes</p>
+        </div>
+
+        <!-- 4. Início de Checkout -->
+        <div class="p-4 rounded-2xl bg-[#11131a] border border-zinc-800 space-y-1">
+          <div class="flex items-center justify-between text-zinc-400">
+            <span class="text-[11px] font-bold">4. Checkout</span>
+            <i data-lucide="shopping-cart" class="w-4 h-4 text-blue-400"></i>
+          </div>
+          <p id="mktKpiCheckouts" class="text-2xl font-black text-blue-400">0</p>
+          <p id="mktRateCheckouts" class="text-[10px] text-zinc-400">0% dos visitantes</p>
+        </div>
+
+        <!-- 5. Compras Aprovadas -->
+        <div class="p-4 rounded-2xl bg-[#11131a] border border-emerald-500/40 bg-emerald-950/10 space-y-1">
+          <div class="flex items-center justify-between text-zinc-400">
+            <span class="text-[11px] font-bold text-emerald-400">5. Vendas Hotmart</span>
+            <i data-lucide="badge-check" class="w-4 h-4 text-emerald-400"></i>
+          </div>
+          <p id="mktKpiApproved" class="text-2xl font-black text-emerald-400">0</p>
+          <p id="mktRateApproved" class="text-[10px] text-emerald-300">0% do checkout</p>
+        </div>
+
+        <!-- 6. Conversão Global -->
+        <div class="p-4 rounded-2xl bg-[#11131a] border border-zinc-800 space-y-1">
+          <div class="flex items-center justify-between text-zinc-400">
+            <span class="text-[11px] font-bold">Conversão Global</span>
+            <i data-lucide="trending-up" class="w-4 h-4 text-violet-400"></i>
+          </div>
+          <p id="mktKpiGlobalConv" class="text-2xl font-black text-violet-300">0.0%</p>
+          <p class="text-[10px] text-zinc-500">Visitantes → Vendas</p>
+        </div>
+      </div>
+
+      <!-- HOTMART SUBSCRIPTIONS BREAKDOWN -->
+      <div class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-3">
+          <div>
+            <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+              <i data-lucide="layers" class="w-4 h-4 text-cyan-400"></i>
+              <span>Status Oficial de Assinaturas (Hotmart Produto 8840376)</span>
+            </h3>
+            <p class="text-xs text-zinc-400">Isolamento rigoroso por status no banco de dados</p>
+          </div>
+          <span class="text-[11px] font-mono text-zinc-400">Webhooks v2 Ativos</span>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 pt-1">
+          <div class="p-3 bg-zinc-900/80 rounded-xl border border-zinc-800">
+            <p class="text-[10px] text-zinc-400 uppercase font-black">Total Clientes</p>
+            <p id="mktSubTotal" class="text-lg font-black text-white mt-0.5">0</p>
+          </div>
+          <div class="p-3 bg-emerald-950/30 rounded-xl border border-emerald-500/30">
+            <p class="text-[10px] text-emerald-400 uppercase font-black">Ativas (Com Acesso)</p>
+            <p id="mktSubActive" class="text-lg font-black text-emerald-300 mt-0.5">0</p>
+          </div>
+          <div class="p-3 bg-cyan-950/30 rounded-xl border border-cyan-500/30">
+            <p class="text-[10px] text-cyan-300 uppercase font-black">Jéssica Start (R$ 59)</p>
+            <p id="mktSubStart" class="text-lg font-black text-cyan-300 mt-0.5">0</p>
+          </div>
+          <div class="p-3 bg-violet-950/30 rounded-xl border border-violet-500/30">
+            <p class="text-[10px] text-violet-300 uppercase font-black">Jéssica Pro (R$ 89)</p>
+            <p id="mktSubPro" class="text-lg font-black text-violet-300 mt-0.5">0</p>
+          </div>
+          <div class="p-3 bg-amber-950/30 rounded-xl border border-amber-500/30">
+            <p class="text-[10px] text-amber-300 uppercase font-black">Pendentes / Atraso</p>
+            <p id="mktSubPending" class="text-lg font-black text-amber-300 mt-0.5">0</p>
+          </div>
+          <div class="p-3 bg-rose-950/30 rounded-xl border border-rose-500/30">
+            <p class="text-[10px] text-rose-300 uppercase font-black">Canceladas / Reembolso</p>
+            <p id="mktSubCanceled" class="text-lg font-black text-rose-300 mt-0.5">0</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- TRAFFIC SOURCES & UTM CAMPAIGNS -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Tabela Origem de Tráfego -->
+        <div class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div>
+              <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                <i data-lucide="compass" class="w-4 h-4 text-cyan-400"></i>
+                <span>Origem do Tráfego & Parâmetros UTM</span>
+              </h3>
+              <p class="text-xs text-zinc-400">Rastreamento de canais de aquisição e campanhas pagas</p>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="text-zinc-500 border-b border-zinc-800 text-[11px] uppercase font-black">
+                  <th class="py-2.5 px-3">Origem (Source)</th>
+                  <th class="py-2.5 px-3">Mídia (Medium)</th>
+                  <th class="py-2.5 px-3">Campanha</th>
+                  <th class="py-2.5 px-3 text-right">Visitas</th>
+                  <th class="py-2.5 px-3 text-right">Conversões</th>
+                </tr>
+              </thead>
+              <tbody id="mktTrafficTableBody" class="divide-y divide-zinc-800/60 font-mono text-[11px]">
+                <tr><td colspan="5" class="py-4 text-center text-zinc-500 font-sans">Nenhum tráfego registrado no período.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tabela Vendas por Afiliado (Dados Oficiais Hotmart) -->
+        <div class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div>
+              <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                <i data-lucide="award" class="w-4 h-4 text-amber-400"></i>
+                <span>Vendas por Afiliado (Hotmart)</span>
+              </h3>
+              <p class="text-xs text-zinc-400">Dados oficiais atribuídos via Webhook da Hotmart</p>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 font-bold">Oficial</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="text-zinc-500 border-b border-zinc-800 text-[11px] uppercase font-black">
+                  <th class="py-2.5 px-3">Código Afiliado</th>
+                  <th class="py-2.5 px-3">Nome</th>
+                  <th class="py-2.5 px-3 text-right">Vendas</th>
+                  <th class="py-2.5 px-3 text-right">Comissões</th>
+                  <th class="py-2.5 px-3 text-right">Última Venda</th>
+                </tr>
+              </thead>
+              <tbody id="mktAffiliatesTableBody" class="divide-y divide-zinc-800/60 font-mono text-[11px]">
+                <tr><td colspan="5" class="py-4 text-center text-zinc-500 font-sans">Nenhuma venda de afiliado identificada ainda.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- FEED DE EVENTOS RECENTES DE MARKETING -->
+      <div class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div>
+            <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+              <i data-lucide="activity" class="w-4 h-4 text-emerald-400"></i>
+              <span>Log em Tempo Real de Eventos de Marketing</span>
+            </h3>
+            <p class="text-xs text-zinc-400">Últimos eventos capturados (Webhooks, Pixels e Navegador)</p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="text-zinc-500 border-b border-zinc-800 text-[11px] uppercase font-black">
+                <th class="py-2.5 px-3">Evento</th>
+                <th class="py-2.5 px-3">Canal / Fonte</th>
+                <th class="py-2.5 px-3">Página / Rota</th>
+                <th class="py-2.5 px-3">UTM Source</th>
+                <th class="py-2.5 px-3">Campanha</th>
+                <th class="py-2.5 px-3 text-right">Data/Hora</th>
+              </tr>
+            </thead>
+            <tbody id="mktEventsTableBody" class="divide-y divide-zinc-800/60 font-mono text-[11px]">
+              <tr><td colspan="6" class="py-4 text-center text-zinc-500 font-sans">Carregando feed de eventos...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
   </div>
 
   <!-- Include Modals (Expense, Income, Bill, Appointment) -->
@@ -1272,6 +1519,7 @@
         finance: document.getElementById('sectionFinance'),
         system: document.getElementById('sectionSystem'),
         analyzer: document.getElementById('sectionAnalyzer'),
+        marketing: document.getElementById('sectionMarketing'),
       };
       const buttons = {
         studio: document.getElementById('tabBtnStudio'),
@@ -1280,6 +1528,7 @@
         finance: document.getElementById('tabBtnFinance'),
         system: document.getElementById('tabBtnSystem'),
         analyzer: document.getElementById('tabBtnAnalyzer'),
+        marketing: document.getElementById('tabBtnMarketing'),
       };
 
       Object.keys(sections).forEach(k => {
@@ -2321,7 +2570,123 @@
       }
     }
 
-</script>
+
+    // -------------------------------------------------------------
+    // MARKETING & ANALYTICS INTELLIGENCE
+    // -------------------------------------------------------------
+    async function loadMarketingAnalytics(days = null) {
+      if (!days) {
+        days = document.getElementById('marketingPeriodSelect')?.value || 30;
+      }
+      try {
+        const [overviewRes, affiliatesRes] = await Promise.all([
+          authFetch('/api/admin/analytics/overview?days=' + days),
+          authFetch('/api/admin/analytics/affiliates?days=' + days)
+        ]);
+
+        const overview = await overviewRes.json();
+        const affiliates = await affiliatesRes.json();
+
+        if (overview.success) {
+          const f = overview.funnel || {};
+          const visitors = f.visitors || 0;
+          const zapClicks = f.whatsappClicks || 0;
+          const demos = f.demoRequests || 0;
+          const checkouts = f.initiatedCheckouts || 0;
+          const approved = f.approvedPurchases || 0;
+
+          document.getElementById('mktKpiVisitors').innerText = visitors.toLocaleString('pt-BR');
+          document.getElementById('mktKpiZapClicks').innerText = zapClicks.toLocaleString('pt-BR');
+          document.getElementById('mktKpiDemos').innerText = demos.toLocaleString('pt-BR');
+          document.getElementById('mktKpiCheckouts').innerText = checkouts.toLocaleString('pt-BR');
+          document.getElementById('mktKpiApproved').innerText = approved.toLocaleString('pt-BR');
+
+          const zapRate = visitors > 0 ? ((zapClicks / visitors) * 100).toFixed(1) : '0.0';
+          const demoRate = visitors > 0 ? ((demos / visitors) * 100).toFixed(1) : '0.0';
+          const checkoutRate = visitors > 0 ? ((checkouts / visitors) * 100).toFixed(1) : '0.0';
+          const approvedRate = checkouts > 0 ? ((approved / checkouts) * 100).toFixed(1) : '0.0';
+          const globalConv = visitors > 0 ? ((approved / visitors) * 100).toFixed(2) : '0.00';
+
+          document.getElementById('mktRateZap').innerText = zapRate + '% dos visitantes';
+          document.getElementById('mktRateDemos').innerText = demoRate + '% dos visitantes';
+          document.getElementById('mktRateCheckouts').innerText = checkoutRate + '% dos visitantes';
+          document.getElementById('mktRateApproved').innerText = approvedRate + '% dos checkouts';
+          document.getElementById('mktKpiGlobalConv').innerText = globalConv + '%';
+
+          // Subscriptions
+          const subs = overview.subscriptions || {};
+          document.getElementById('mktSubTotal').innerText = subs.total || 0;
+          document.getElementById('mktSubActive').innerText = subs.activeCount || 0;
+          document.getElementById('mktSubStart').innerText = subs.startCount || 0;
+          document.getElementById('mktSubPro').innerText = subs.proCount || 0;
+          document.getElementById('mktSubPending').innerText = (subs.pendingCount || 0) + (subs.overdueCount || 0);
+          document.getElementById('mktSubCanceled').innerText = subs.canceledCount || 0;
+
+          // Traffic sources
+          const trafficBody = document.getElementById('mktTrafficTableBody');
+          const sources = overview.trafficSources || [];
+          if (sources.length === 0) {
+            trafficBody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-zinc-500 font-sans">Nenhum tráfego com parâmetros registrado ainda.</td></tr>';
+          } else {
+            trafficBody.innerHTML = sources.map(s => `
+              <tr class="hover:bg-zinc-800/40">
+                <td class="py-2.5 px-3 text-cyan-300 font-bold">${s.source || '(direto)'}</td>
+                <td class="py-2.5 px-3 text-zinc-400">${s.medium || '-'}</td>
+                <td class="py-2.5 px-3 text-zinc-300">${s.campaign || '-'}</td>
+                <td class="py-2.5 px-3 text-right text-white font-bold">${(s.visits || 0).toLocaleString('pt-BR')}</td>
+                <td class="py-2.5 px-3 text-right text-emerald-400 font-bold">${(s.conversions || 0).toLocaleString('pt-BR')}</td>
+              </tr>
+            `).join('');
+          }
+
+          // Recent events
+          const eventsBody = document.getElementById('mktEventsTableBody');
+          const events = overview.recentEvents || [];
+          if (events.length === 0) {
+            eventsBody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-zinc-500 font-sans">Nenhum evento registrado ainda.</td></tr>';
+          } else {
+            eventsBody.innerHTML = events.map(e => `
+              <tr class="hover:bg-zinc-800/40">
+                <td class="py-2 px-3 font-bold ${e.event_name === 'purchase_approved' ? 'text-emerald-400' : 'text-zinc-200'}">${e.event_name}</td>
+                <td class="py-2 px-3 text-zinc-400">${e.event_source}</td>
+                <td class="py-2 px-3 text-zinc-400 max-w-[150px] truncate">${e.page_path || '-'}</td>
+                <td class="py-2 px-3 text-cyan-300">${e.utm_source || '-'}</td>
+                <td class="py-2 px-3 text-zinc-400">${e.utm_campaign || '-'}</td>
+                <td class="py-2 px-3 text-right text-zinc-500 font-sans text-[10px]">${new Date(e.created_at).toLocaleString('pt-BR')}</td>
+              </tr>
+            `).join('');
+          }
+        }
+
+        // Affiliates
+        if (affiliates.success) {
+          const affBody = document.getElementById('mktAffiliatesTableBody');
+          const affList = affiliates.affiliates || [];
+          if (affList.length === 0) {
+            affBody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-zinc-500 font-sans">Nenhuma venda de afiliado identificada ainda.</td></tr>';
+          } else {
+            affBody.innerHTML = affList.map(a => {
+              const commissionFormatted = ((a.total_commission_cents || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: a.currency || 'BRL' });
+              return `
+                <tr class="hover:bg-zinc-800/40">
+                  <td class="py-2.5 px-3 text-amber-300 font-bold font-mono">${a.affiliate_code}</td>
+                  <td class="py-2.5 px-3 text-white font-sans font-bold">${a.affiliate_name || 'Afiliado Hotmart'}</td>
+                  <td class="py-2.5 px-3 text-right text-white font-bold">${a.total_sales || 0}</td>
+                  <td class="py-2.5 px-3 text-right text-emerald-400 font-bold">${commissionFormatted}</td>
+                  <td class="py-2.5 px-3 text-right text-zinc-500 font-sans text-[10px]">${a.last_sale_at ? new Date(a.last_sale_at).toLocaleDateString('pt-BR') : '-'}</td>
+                </tr>
+              `;
+            }).join('');
+          }
+        }
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Erro ao carregar dados de marketing:', err);
+      }
+    }
+
+  </script>
 
   <!-- Lead Conversation Modal -->
   <div id="leadChatModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">

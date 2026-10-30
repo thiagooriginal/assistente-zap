@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  raia-staging:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: raia_homologacao
+    restart: unless-stopped
+    ports:
+      - "3334:3333"
+    environment:
+      - NODE_ENV=production
+      - PORT=3333
+      - BASE_URL=https://staging.raiaagentes.com.br
+      - PAUSE_PERSONAL_ASSISTANT=true
+      - HOTMART_PRODUCT_ID=8840376
+      - HOTMART_WEBHOOK_SECRET=${HOTMART_WEBHOOK_SECRET:-}
+      - HOTMART_PLAN_START_ID=${HOTMART_PLAN_START_ID:-}
+      - HOTMART_PLAN_PRO_ID=${HOTMART_PLAN_PRO_ID:-}
+      - DEMO_ACCOUNT_EMAIL=homologacao.hotmart@raiaagentes.com.br
+      - DEMO_ACCOUNT_PASSWORD=${DEMO_ACCOUNT_PASSWORD:-}
+    volumes:
+      # Volumes isolados: Não tocam no banco de produção
+      - staging_sqlite_data:/app/data
+      - staging_baileys_auth:/app/auth_info_baileys
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3333/api/cliente/auth/login').then(() => process.exit(0)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  staging_sqlite_data:
+    name: raia_staging_sqlite_data
+  staging_baileys_auth:
+    name: raia_staging_baileys_auth

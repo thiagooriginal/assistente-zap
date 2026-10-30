@@ -14,12 +14,27 @@ const whatsappClient = require('../whatsapp/client');
 const asaasService = require('../services/asaasService');
 const agentChatService = require('../services/agentChatService');
 const businessAnalyzerService = require('../services/businessAnalyzerService');
+const clientRoutes = require('../routes/clientRoutes');
+const hotmartService = require('../services/hotmartService');
+const analyticsService = require('../services/analyticsService');
+const metaCapiService = require('../services/metaCapiService');
+const clientAuth = require('../services/clientAuthService');
+
+// Initialize isolated demo account for Hotmart compliance
+try {
+  clientAuth.ensureDemoAccount();
+} catch (demoErr) {
+  console.warn('[Demo Account] Erro ao verificar conta demo:', demoErr.message);
+}
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.resolve(__dirname, '../../public')));
+
+// Mount Client Portal APIs
+app.use('/api/cliente', clientRoutes);
 
 // Ensure official RAIA logo is available in public folder if present locally
 try {
@@ -65,8 +80,36 @@ app.get(['/privacidade', '/privacidade.html'], (req, res) => {
   res.sendFile(path.resolve(__dirname, '../../public/privacidade.html'));
 });
 
+// Client Portal Isolated SPA routes
+app.get(['/cliente/login', '/cliente/entrar'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../public/cliente/login.html'));
+});
+
+app.get(['/cliente/ativar', '/cliente/ativacao'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../public/cliente/ativar.html'));
+});
+
+app.get(['/cliente/recuperar-senha', '/cliente/esqueci-senha'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../public/cliente/recuperar-senha.html'));
+});
+
+app.get(['/cliente', '/cliente/painel', '/cliente/dashboard'], (req, res) => {
+  res.sendFile(path.resolve(__dirname, '../../public/cliente/painel.html'));
+});
+
 // Explicit SPA routes
 app.get(['/admin', '/admin.html', '/dashboard', '/painel'], (req, res) => {
+  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
+  const isTunnelOrExternal = host.includes('trycloudflare.com') || host.includes('loca.lt') || host.includes('ngrok') || (host && !host.includes('localhost') && !host.includes('127.0.0.1'));
+
+  if (isTunnelOrExternal) {
+    const cookieToken = getCookie(req, 'auth_token');
+    const existingAdmin = cookieToken ? db.prepare("SELECT * FROM users WHERE magic_token = ? AND role = 'ADMIN'").get(cookieToken) : null;
+    if (!existingAdmin) {
+      return res.redirect('/cliente/login');
+    }
+  }
+
   res.sendFile(path.resolve(__dirname, '../../public/admin.html'));
 });
 
@@ -331,6 +374,101 @@ app.post('/api/webhooks/asaas', async (req, res) => {
   }
 });
 
+// ==========================================
+// HOTMART WEBHOOK (PRODUCT 8840376 - JÉSSICA START & PRO)
+// ==========================================
+app.post('/api/webhooks/hotmart', async (req, res) => {
+  try {
+    const isValid = hotmartService.validateHotmartHeader(req);
+    if (!isValid) {
+      console.warn('[Hotmart Webhook] Requisição rejeitada: token de validação (X-HOTMART-HOTTOK) inválido ou ausente.');
+      return res.status(401).json({ success: false, error: 'Unauthorized: X-HOTMART-HOTTOK inválido ou ausente.' });
+    }
+
+    const payload = req.body || {};
+    const result = await hotmartService.processWebhook(payload, whatsappClient.sendWhatsAppMessage);
+
+    // If purchase was approved, dispatch Meta CAPI server-side event
+    if (result.action === 'USER_CREATED_PENDING' || result.action === 'USER_UPDATED') {
+      const buyer = payload.data?.buyer || {};
+      const purchase = payload.data?.purchase || {};
+      metaCapiService.sendMetaCapiEvent({
+        eventName: 'Purchase',
+        eventId: payload.id || `purchase_${purchase.transaction}`,
+        userData: {
+          email: buyer.email,
+          phone: buyer.checkout_phone || buyer.phone,
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        },
+        customData: {
+          currency: purchase.price?.currency_value || 'BRL',
+          value: purchase.price?.value || (result.planTier === 'JESSICA_PRO' ? 89.0 : 59.0),
+          contentName: result.planTier === 'JESSICA_PRO' ? 'Jéssica Pro' : 'Jéssica Start',
+        },
+      }).catch(() => {});
+    }
+
+    return res.json({ success: true, ...result });
+  } catch (err) {
+    console.error('Erro em /api/webhooks/hotmart:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// MARKETING & ANALYTICS INGESTION ENDPOINTS
+// ==========================================
+app.post('/api/analytics/event', (req, res) => {
+  try {
+    const {
+      eventName, visitorId, utmSource, utmMedium, utmCampaign,
+      utmContent, utmTerm, src, sck, pageUrl, referrer, metadata
+    } = req.body || {};
+
+    analyticsService.recordEvent({
+      eventName,
+      visitorId,
+      utmSource,
+      utmMedium,
+      utmCampaign,
+      utmContent,
+      utmTerm,
+      src,
+      sck,
+      pageUrl,
+      referrer,
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
+      metadata,
+    });
+
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Admin Analytics Overview & Funnel (Protected by authMiddleware)
+app.get('/api/admin/analytics/overview', authMiddleware, (req, res) => {
+  if (req.user?.role !== 'ADMIN' && req.user?.id !== 1) {
+    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
+  }
+  const days = parseInt(req.query.days, 10) || 30;
+  const overview = analyticsService.getMarketingOverview(days);
+  return res.json(overview);
+});
+
+// Admin Affiliate Sales Report (Protected by authMiddleware)
+app.get('/api/admin/analytics/affiliates', authMiddleware, (req, res) => {
+  if (req.user?.role !== 'ADMIN' && req.user?.id !== 1) {
+    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
+  }
+  const days = parseInt(req.query.days, 10) || 30;
+  const report = analyticsService.getAffiliateSalesOverview(days);
+  return res.json(report);
+});
+
 app.get('/api/asaas/payments', async (req, res) => {
   try {
     const localPayments = db.prepare('SELECT * FROM asaas_payments ORDER BY created_at DESC LIMIT 50').all();
@@ -551,6 +689,32 @@ async function handleLeadTestRequest(req, res) {
         console.warn('Erro ao registrar mensagem inicial no histórico do agente:', errRec.message);
       }
 
+      // Track lead in marketing analytics & Meta CAPI
+      try {
+        analyticsService.recordEvent({
+          eventName: 'demo_requested',
+          utmSource: req.body?.utmSource || 'site',
+          pageUrl: req.headers.referer || `${config.baseUrl}/solucoes/${nicheSlug}`,
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+          metadata: { niche: nicheSlug, agentKey, name: name.trim() },
+        });
+
+        metaCapiService.sendMetaCapiEvent({
+          eventName: 'Lead',
+          eventSourceUrl: req.headers.referer || config.baseUrl,
+          userData: {
+            phone: cleanPhone,
+            ip: req.ip,
+            userAgent: req.headers['user-agent'],
+          },
+          customData: {
+            contentName: agentName || agentKey,
+            status: 'DEMO_REQUESTED',
+          },
+        }).catch(() => {});
+      } catch (trackErr) {}
+
       return res.json({
         success: true,
         sent: true,
@@ -686,6 +850,19 @@ app.post('/api/auth/admin-login', (req, res) => {
 // DIRECT ADMIN SHORTCUT: /admin
 // ==========================================
 app.get('/admin', (req, res) => {
+  const host = (req.headers.host || '').toLowerCase();
+  const isTunnelOrExternal = host.includes('trycloudflare.com') || host.includes('loca.lt') || host.includes('ngrok');
+
+  // If accessed via public tunnel, strictly prevent automatic admin token elevation
+  if (isTunnelOrExternal) {
+    const cookieToken = getCookie(req, 'auth_token') || getCookie(req, 'client_auth_token');
+    const existingAdmin = cookieToken ? db.prepare("SELECT * FROM users WHERE magic_token = ? AND role = 'ADMIN'").get(cookieToken) : null;
+    if (!existingAdmin) {
+      console.warn(`[Segurança Homologação] Acesso a /admin bloqueado no túnel público (${host}). Redirecionando para login.`);
+      return res.redirect('/cliente/login');
+    }
+  }
+
   let admin = db.prepare("SELECT * FROM users WHERE role = 'ADMIN' ORDER BY id ASC LIMIT 1").get();
   if (!admin) {
     admin = userService.getUserById(1);

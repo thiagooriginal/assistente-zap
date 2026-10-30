@@ -204,9 +204,122 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_business_analyses_niche ON business_analyses(niche);
+
+  -- CLIENT PORTAL: Salon Establishment Configuration
+  CREATE TABLE IF NOT EXISTS client_salons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL UNIQUE,
+    salon_name TEXT NOT NULL DEFAULT 'Meu Salão',
+    phone TEXT,
+    address TEXT,
+    opening_hours TEXT,
+    agent_custom_instructions TEXT,
+    whatsapp_status TEXT DEFAULT 'DISCONNECTED',
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_client_salons_user ON client_salons(user_id);
+
+  -- CLIENT PORTAL: Salon Services Catalog & Prices
+  CREATE TABLE IF NOT EXISTS client_services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    price REAL NOT NULL,
+    duration_min INTEGER DEFAULT 45,
+    category TEXT DEFAULT 'Cabelo',
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_client_services_user ON client_services(user_id);
+
+  -- CLIENT PORTAL: Salon Staff / Team Members
+  CREATE TABLE IF NOT EXISTS client_staff (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    specialty TEXT,
+    active INTEGER DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_client_staff_user ON client_staff(user_id);
+
+  -- CLIENT PORTAL: Promotional Campaigns (Pro Plan)
+  CREATE TABLE IF NOT EXISTS client_campaigns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    target_audience TEXT DEFAULT 'TODOS',
+    status TEXT DEFAULT 'DRAFT',
+    consent_confirmed INTEGER DEFAULT 0,
+    opt_out_text TEXT DEFAULT 'Para não receber mais mensagens, responda SAIR.',
+    recipients_count INTEGER DEFAULT 0,
+    scheduled_at TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_client_campaigns_user ON client_campaigns(user_id);
+
+  -- HOTMART: Idempotent Webhook Events & Audit Log
+  CREATE TABLE IF NOT EXISTS hotmart_webhook_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id TEXT UNIQUE NOT NULL,
+    event_name TEXT NOT NULL,
+    transaction_code TEXT,
+    subscriber_code TEXT,
+    buyer_email TEXT,
+    buyer_phone TEXT,
+    product_id TEXT,
+    plan_id TEXT,
+    raw_payload TEXT,
+    status TEXT DEFAULT 'PROCESSED',
+    processed_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_hotmart_event_id ON hotmart_webhook_events(event_id);
+  CREATE INDEX IF NOT EXISTS idx_hotmart_transaction ON hotmart_webhook_events(transaction_code);
+  CREATE INDEX IF NOT EXISTS idx_hotmart_subscriber ON hotmart_webhook_events(subscriber_code);
+
+  -- MARKETING & ANALYTICS: Conversion Tracking & Traffic Source
+  CREATE TABLE IF NOT EXISTS marketing_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_name TEXT NOT NULL,
+    visitor_id TEXT,
+    utm_source TEXT,
+    utm_medium TEXT,
+    utm_campaign TEXT,
+    utm_content TEXT,
+    utm_term TEXT,
+    src TEXT,
+    sck TEXT,
+    page_url TEXT,
+    referrer TEXT,
+    ip_hash TEXT,
+    user_agent TEXT,
+    metadata TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_marketing_event_name ON marketing_events(event_name);
+  CREATE INDEX IF NOT EXISTS idx_marketing_created ON marketing_events(created_at);
+  CREATE INDEX IF NOT EXISTS idx_marketing_utm_source ON marketing_events(utm_source);
+
+  -- HOTMART: Official Affiliate Sales Records
+  CREATE TABLE IF NOT EXISTS affiliate_sales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    affiliate_code TEXT NOT NULL,
+    affiliate_name TEXT,
+    transaction_code TEXT,
+    product_id TEXT,
+    plan_id TEXT,
+    commission_amount REAL DEFAULT 0,
+    currency TEXT DEFAULT 'BRL',
+    buyer_email_masked TEXT,
+    sale_date TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_affiliate_sales_code ON affiliate_sales(affiliate_code);
 `);
 
-// 2. Run migrations for existing databases to add user_id column if missing
+// 2. Run migrations for existing databases
 function ensureColumnExists(tableName, columnName, columnDef) {
   try {
     const columns = db.prepare(`PRAGMA table_info(${tableName})`).all();
@@ -220,6 +333,27 @@ function ensureColumnExists(tableName, columnName, columnDef) {
   }
 }
 
+// User columns for Client Authentication & Hotmart Subscriptions
+ensureColumnExists('users', 'email', 'TEXT');
+ensureColumnExists('users', 'password_hash', 'TEXT');
+ensureColumnExists('users', 'password_salt', 'TEXT');
+ensureColumnExists('users', 'plan_tier', "TEXT DEFAULT 'JESSICA_START'");
+ensureColumnExists('users', 'subscription_status', "TEXT DEFAULT 'INACTIVE'");
+ensureColumnExists('users', 'paid_until', 'TEXT');
+ensureColumnExists('users', 'hotmart_subscriber_code', 'TEXT');
+ensureColumnExists('users', 'hotmart_transaction', 'TEXT');
+ensureColumnExists('users', 'hotmart_product_id', 'TEXT');
+ensureColumnExists('users', 'hotmart_plan_id', 'TEXT');
+ensureColumnExists('users', 'activation_token', 'TEXT');
+ensureColumnExists('users', 'activation_expires_at', 'TEXT');
+ensureColumnExists('users', 'reset_token', 'TEXT');
+ensureColumnExists('users', 'reset_expires_at', 'TEXT');
+ensureColumnExists('users', 'is_demo', 'INTEGER DEFAULT 0');
+ensureColumnExists('users', 'last_login_at', 'TEXT');
+ensureColumnExists('users', 'hotmart_last_event_at', 'INTEGER DEFAULT 0');
+ensureColumnExists('users', 'needs_reconciliation', 'INTEGER DEFAULT 0');
+ensureColumnExists('hotmart_webhook_events', 'creation_date', 'INTEGER');
+
 ensureColumnExists('expenses', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumnExists('incomes', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumnExists('scheduled_payments', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
@@ -228,6 +362,9 @@ ensureColumnExists('appointments', 'google_event_id', 'TEXT');
 
 try {
   db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+    CREATE INDEX IF NOT EXISTS idx_users_activation ON users(activation_token);
+    CREATE INDEX IF NOT EXISTS idx_users_reset ON users(reset_token);
     CREATE INDEX IF NOT EXISTS idx_expenses_user ON expenses(user_id);
     CREATE INDEX IF NOT EXISTS idx_incomes_user ON incomes(user_id);
     CREATE INDEX IF NOT EXISTS idx_payments_user ON scheduled_payments(user_id);

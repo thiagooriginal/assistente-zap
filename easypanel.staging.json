@@ -1,0 +1,51 @@
+{
+  "name": "raia-staging",
+  "type": "app",
+  "source": {
+    "type": "github",
+    "owner": "thiagooriginal",
+    "repo": "assistente-zap",
+    "ref": "staging",
+    "path": "/"
+  },
+  "build": {
+    "type": "dockerfile",
+    "file": "Dockerfile"
+  },
+  "env": [
+    { "key": "NODE_ENV", "value": "production" },
+    { "key": "PORT", "value": "3333" },
+    { "key": "BASE_URL", "value": "https://staging.raiaagentes.com.br" },
+    { "key": "PAUSE_PERSONAL_ASSISTANT", "value": "true" },
+    { "key": "HOTMART_PRODUCT_ID", "value": "8840376" },
+    { "key": "HOTMART_WEBHOOK_SECRET", "value": "" },
+    { "key": "HOTMART_PLAN_START_ID", "value": "" },
+    { "key": "HOTMART_PLAN_PRO_ID", "value": "" },
+    { "key": "DEMO_ACCOUNT_EMAIL", "value": "homologacao.hotmart@raiaagentes.com.br" },
+    { "key": "DEMO_ACCOUNT_PASSWORD", "value": "" }
+  ],
+  "mounts": [
+    {
+      "type": "volume",
+      "name": "raia_staging_data",
+      "mountPath": "/app/data"
+    },
+    {
+      "type": "volume",
+      "name": "raia_staging_baileys",
+      "mountPath": "/app/auth_info_baileys"
+    }
+  ],
+  "domains": [
+    {
+      "host": "staging.raiaagentes.com.br",
+      "https": true
+    }
+  ],
+  "resources": {
+    "memoryReservation": 256,
+    "memoryLimit": 1024,
+    "cpuReservation": 250,
+    "cpuLimit": 1000
+  }
+}

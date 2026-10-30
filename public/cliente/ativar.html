@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Ativação de Conta • RAIA AGENTES | Hotmart</title>
+  <link rel="icon" type="image/png" href="/raia-emblem-small.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            raia: {
+              black: '#07080c',
+              card: '#11131a',
+              cardHover: '#181b24',
+              border: 'rgba(255, 255, 255, 0.08)',
+              neon: '#00F59B',
+              lime: '#ccff00',
+              violet: '#8B5CF6',
+              gold: '#F59E0B',
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body class="bg-[#07080c] text-slate-100 min-h-screen flex items-center justify-center p-4 relative overflow-x-hidden selection:bg-[#00F59B]/20 selection:text-[#00F59B]">
+
+  <!-- Background decorative glows -->
+  <div class="fixed top-[-150px] left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-b from-[#00F59B]/15 via-[#8B5CF6]/10 to-transparent blur-[120px] pointer-events-none -z-10"></div>
+
+  <div class="w-full max-w-md">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <a href="/" class="inline-flex items-center gap-3 group mb-4">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#00F59B]/20 to-[#8B5CF6]/20 border border-white/10 flex items-center justify-center shadow-lg shadow-[#00F59B]/10">
+          <img src="/raia-emblem-small.png" alt="RAIA" class="w-7 h-7 object-contain">
+        </div>
+        <div class="text-left">
+          <div class="text-xl font-extrabold tracking-tight text-white flex items-center gap-1.5">
+            RAIA <span class="text-xs px-2 py-0.5 rounded-full bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30 font-semibold tracking-normal">HOTMART</span>
+          </div>
+          <div class="text-[11px] text-slate-400 font-medium tracking-wide">ATIVAÇÃO DE ASSINATURA</div>
+        </div>
+      </a>
+      <h1 class="text-2xl font-bold text-white tracking-tight" id="headerTitle">Ativar sua Conta</h1>
+      <p class="text-sm text-slate-400 mt-1.5" id="headerSubtitle">Crie sua senha de acesso para configurar o seu salão</p>
+    </div>
+
+    <!-- Activation Card -->
+    <div class="bg-[#11131a] border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl relative">
+      <div id="alertBox" class="hidden mb-5 p-3.5 rounded-xl text-sm border flex items-start gap-3"></div>
+
+      <!-- Loading State -->
+      <div id="loadingState" class="py-12 text-center text-slate-400 space-y-3">
+        <div class="w-8 h-8 mx-auto border-2 border-[#00F59B] border-t-transparent rounded-full animate-spin"></div>
+        <div class="text-sm font-medium">Validando seu token de ativação...</div>
+      </div>
+
+      <!-- Invalid Token State -->
+      <div id="invalidState" class="hidden py-6 text-center space-y-4">
+        <div class="w-14 h-14 mx-auto rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400">
+          <i data-lucide="alert-octagon" class="w-7 h-7"></i>
+        </div>
+        <div>
+          <h2 class="text-lg font-bold text-white">Link Expirado ou Inválido</h2>
+          <p class="text-xs text-slate-400 mt-1" id="invalidReason">
+            Não foi possível validar seu link de ativação.
+          </p>
+        </div>
+        <div class="pt-2">
+          <a href="/cliente/recuperar-senha" class="inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200 transition-colors">
+            <span>Solicitar redefinição por e-mail</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Activation Form -->
+      <form id="activateForm" class="hidden space-y-5">
+        <div class="p-3.5 rounded-xl bg-[#07080c] border border-white/5 space-y-1">
+          <div class="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Cliente Confirmado</div>
+          <div class="text-sm font-bold text-white flex items-center justify-between">
+            <span id="clientName">Carregando...</span>
+            <span id="planBadge" class="text-[10px] px-2 py-0.5 rounded-full font-bold">PLANO</span>
+          </div>
+          <div class="text-xs text-slate-400" id="clientEmail">email@exemplo.com</div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Crie sua Senha de Acesso</label>
+          <div class="relative">
+            <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input
+              type="password"
+              id="password"
+              required
+              minlength="8"
+              placeholder="Mínimo 8 caracteres"
+              class="w-full bg-[#07080c] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] focus:ring-1 focus:ring-[#00F59B] transition-all"
+            >
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Confirme sua Senha</label>
+          <div class="relative">
+            <i data-lucide="check" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input
+              type="password"
+              id="confirmPassword"
+              required
+              minlength="8"
+              placeholder="Digite a mesma senha novamente"
+              class="w-full bg-[#07080c] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] focus:ring-1 focus:ring-[#00F59B] transition-all"
+            >
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          id="submitBtn"
+          class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#00F59B] to-[#00D284] text-[#07080c] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all shadow-lg shadow-[#00F59B]/20 flex items-center justify-center gap-2"
+        >
+          <span>Ativar Conta & Acessar Painel</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+      </form>
+    </div>
+
+    <!-- Security & Footer -->
+    <div class="text-center mt-8 space-y-2">
+      <div class="inline-flex items-center gap-2 text-xs text-slate-500">
+        <i data-lucide="shield-check" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+        <span>Ativação Segura • Produto Oficial Hotmart 8840376</span>
+      </div>
+      <div>
+        <a href="/cliente/login" class="text-xs text-slate-400 hover:text-white transition-colors">Já tem senha? Fazer login</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+
+    const loadingState = document.getElementById('loadingState');
+    const invalidState = document.getElementById('invalidState');
+    const invalidReason = document.getElementById('invalidReason');
+    const activateForm = document.getElementById('activateForm');
+    const alertBox = document.getElementById('alertBox');
+    const clientName = document.getElementById('clientName');
+    const clientEmail = document.getElementById('clientEmail');
+    const planBadge = document.getElementById('planBadge');
+    const passwordInput = document.getElementById('password');
+    const confirmInput = document.getElementById('confirmPassword');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function showAlert(message, type = 'error') {
+      alertBox.className = type === 'error'
+        ? 'mb-5 p-3.5 rounded-xl text-sm border border-red-500/30 bg-red-500/10 text-red-300 flex items-start gap-3'
+        : 'mb-5 p-3.5 rounded-xl text-sm border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 flex items-start gap-3';
+      alertBox.innerHTML = `
+        <i data-lucide="${type === 'error' ? 'alert-triangle' : 'check-circle-2'}" class="w-5 h-5 flex-shrink-0 mt-0.5"></i>
+        <div>${message}</div>
+      `;
+      alertBox.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    async function checkToken() {
+      if (!token) {
+        loadingState.classList.add('hidden');
+        invalidReason.innerText = 'Token de ativação ausente na URL. Verifique o link recebido no seu WhatsApp ou e-mail.';
+        invalidState.classList.remove('hidden');
+        lucide.createIcons();
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/cliente/auth/validate-activation?token=${encodeURIComponent(token)}`);
+        const data = await res.json();
+
+        loadingState.classList.add('hidden');
+
+        if (!res.ok || !data.valid) {
+          invalidReason.innerText = data.error || 'Este link de ativação expirou ou não é mais válido.';
+          invalidState.classList.remove('hidden');
+          lucide.createIcons();
+          return;
+        }
+
+        // Show form with client details
+        clientName.innerText = data.user.name || 'Assinante RAIA';
+        clientEmail.innerText = data.user.email || 'E-mail cadastrado';
+        
+        const isPro = data.user.planTier === 'JESSICA_PRO';
+        planBadge.innerText = isPro ? 'JÉSSICA PRO 🌟' : 'JÉSSICA START ✂️';
+        planBadge.className = isPro
+          ? 'text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40'
+          : 'text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-[#00F59B]/20 text-[#00F59B] border border-[#00F59B]/40';
+
+        activateForm.classList.remove('hidden');
+        lucide.createIcons();
+      } catch (e) {
+        loadingState.classList.add('hidden');
+        invalidReason.innerText = 'Erro ao conectar ao servidor. Tente novamente mais tarde.';
+        invalidState.classList.remove('hidden');
+        lucide.createIcons();
+      }
+    }
+
+    checkToken();
+
+    activateForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alertBox.classList.add('hidden');
+
+      if (passwordInput.value.length < 8) {
+        showAlert('A senha deve conter pelo menos 8 caracteres.');
+        return;
+      }
+
+      if (passwordInput.value !== confirmInput.value) {
+        showAlert('As senhas digitadas não coincidem.');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="inline-block animate-spin mr-2">⟳</span> Ativando conta...';
+
+      try {
+        const res = await fetch('/api/cliente/auth/activate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            token,
+            password: passwordInput.value,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          showAlert(data.error || 'Erro ao ativar a conta. Tente novamente.');
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<span>Ativar Conta & Acessar Painel</span><i data-lucide="arrow-right" class="w-4 h-4"></i>';
+          lucide.createIcons();
+          return;
+        }
+
+        showAlert('Conta ativada com sucesso! Redirecionando para seu painel...', 'success');
+        setTimeout(() => {
+          window.location.href = '/cliente/painel';
+        }, 800);
+      } catch (err) {
+        showAlert('Erro de conexão ao ativar conta.');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Ativar Conta & Acessar Painel</span><i data-lucide="arrow-right" class="w-4 h-4"></i>';
+        lucide.createIcons();
+      }
+    });
+  </script>
+</body>
+</html>

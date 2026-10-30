@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Painel do Salão • RAIA AGENTES | Área do Cliente</title>
+  <link rel="icon" type="image/png" href="/raia-emblem-small.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            raia: {
+              black: '#07080c',
+              card: '#11131a',
+              cardHover: '#181b24',
+              border: 'rgba(255, 255, 255, 0.08)',
+              neon: '#00F59B',
+              lime: '#ccff00',
+              violet: '#8B5CF6',
+              gold: '#F59E0B',
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #07080c; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00F59B; }
+  </style>
+</head>
+<body class="bg-[#07080c] text-slate-100 min-h-screen flex flex-col md:flex-row antialiased font-sans selection:bg-[#00F59B]/20 selection:text-[#00F59B]">
+
+  <!-- Demo Notice Banner if Demo Account -->
+  <div id="demoNoticeBanner" class="hidden fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 text-white text-xs font-bold py-2 px-4 text-center shadow-lg flex items-center justify-center gap-2">
+    <i data-lucide="shield-alert" class="w-4 h-4"></i>
+    <span>CONTA DE HOMOLOGAÇÃO HOTMART: Ambiente Sandbox Isolado com dados ilustrativos. Disparos reais de WhatsApp desativados para segurança.</span>
+  </div>
+
+  <!-- Mobile Top Bar -->
+  <div class="md:hidden bg-[#11131a] border-b border-white/10 p-4 flex items-center justify-between sticky top-0 z-40">
+    <div class="flex items-center gap-2.5">
+      <img src="/raia-emblem-small.png" alt="RAIA" class="w-7 h-7 object-contain">
+      <span class="font-extrabold text-white text-sm">RAIA AGENTES</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="mobilePlanBadge" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30">START</span>
+      <button id="mobileMenuBtn" class="p-2 rounded-lg bg-white/5 text-slate-300 hover:text-white">
+        <i data-lucide="menu" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Sidebar Navigation -->
+  <aside id="sidebar" class="fixed md:sticky top-0 inset-y-0 left-0 z-50 w-72 bg-[#0c0e15] border-r border-white/10 flex flex-col justify-between transition-transform duration-300 -translate-x-full md:translate-x-0 h-screen">
+    <div class="p-5 overflow-y-auto">
+      <!-- Logo & Establishment -->
+      <div class="flex items-center gap-3 pb-6 border-b border-white/10">
+        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#00F59B]/20 to-[#8B5CF6]/20 border border-white/10 flex items-center justify-center shadow-md">
+          <img src="/raia-emblem-small.png" alt="RAIA" class="w-6 h-6 object-contain">
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase">Painel do Salão</div>
+          <div id="sidebarSalonName" class="text-sm font-bold text-white truncate">Carregando...</div>
+        </div>
+      </div>
+
+      <!-- Plan Status Card -->
+      <div class="my-4 p-3.5 rounded-xl bg-[#11131a] border border-white/5 flex items-center justify-between">
+        <div>
+          <div class="text-[10px] uppercase font-bold text-slate-400">Assinatura</div>
+          <div id="planBadgeText" class="text-xs font-extrabold text-white flex items-center gap-1.5 mt-0.5">
+            <span>JÉSSICA START</span>
+          </div>
+        </div>
+        <div id="planStatusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-emerald-400/20"></div>
+      </div>
+
+      <!-- Nav Items -->
+      <nav class="space-y-1.5 mt-4">
+        <button data-tab="overview" class="nav-btn active w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/20">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+          <span>Visão Geral & WhatsApp</span>
+        </button>
+
+        <button data-tab="salon" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+          <i data-lucide="store" class="w-4 h-4"></i>
+          <span>Meu Salão & Horários</span>
+        </button>
+
+        <button data-tab="services" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+          <i data-lucide="scissors" class="w-4 h-4"></i>
+          <span>Serviços & Preços</span>
+        </button>
+
+        <button data-tab="staff" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+          <i data-lucide="users" class="w-4 h-4"></i>
+          <span>Equipe & Profissionais</span>
+        </button>
+
+        <button data-tab="appointments" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+          <i data-lucide="calendar" class="w-4 h-4"></i>
+          <span>Agenda de Atendimentos</span>
+        </button>
+
+        <!-- Pro Features (Highlighted) -->
+        <div class="pt-3 pb-1">
+          <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3">Exclusivos Pro</div>
+        </div>
+
+        <button data-tab="dashboard-pro" class="nav-btn w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+          <div class="flex items-center gap-3">
+            <i data-lucide="bar-chart-3" class="w-4 h-4 text-[#F59E0B]"></i>
+            <span>Dashboard Gerencial</span>
+          </div>
+          <span class="pro-tag text-[9px] px-1.5 py-0.5 rounded font-extrabold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30">PRO</span>
+        </button>
+
+        <button data-tab="campaigns-pro" class="nav-btn w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+          <div class="flex items-center gap-3">
+            <i data-lucide="megaphone" class="w-4 h-4 text-[#F59E0B]"></i>
+            <span>Campanhas Promocionais</span>
+          </div>
+          <span class="pro-tag text-[9px] px-1.5 py-0.5 rounded font-extrabold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30">PRO</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- User Footer & Logout -->
+    <div class="p-4 border-t border-white/10 bg-[#07080c] flex items-center justify-between">
+      <div class="min-w-0">
+        <div id="footerUserName" class="text-xs font-bold text-white truncate">Carregando...</div>
+        <div id="footerUserEmail" class="text-[11px] text-slate-500 truncate">email@exemplo.com</div>
+      </div>
+      <button id="logoutBtn" title="Encerrar Sessão" class="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+        <i data-lucide="log-out" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+
+    <!-- Topbar Header -->
+    <header class="bg-[#11131a]/80 backdrop-blur-md border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+      <div>
+        <h1 id="pageTitle" class="text-lg font-bold text-white flex items-center gap-2">
+          <span>Visão Geral & Assistente Jéssica</span>
+        </h1>
+        <p id="pageSubtitle" class="text-xs text-slate-400">Status em tempo real da sua secretária de IA</p>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <a href="/" target="_blank" class="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg transition-colors">
+          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          <span>Ver Vitrine Oficial</span>
+        </a>
+        <div id="headerPlanBadge" class="text-xs px-3 py-1 rounded-full font-bold bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30">
+          PLANO START
+        </div>
+      </div>
+    </header>
+
+    <!-- Global Toast Container -->
+    <div id="toast" class="hidden fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl text-xs font-bold shadow-2xl flex items-center gap-3 border transition-all duration-300"></div>
+
+    <!-- Content Sections Container -->
+    <div class="p-6 md:p-8 space-y-8 flex-1">
+
+      <!-- ============================================== -->
+      <!-- TAB 1: VISÃO GERAL & WHATSAPP                   -->
+      <!-- ============================================== -->
+      <section id="tab-overview" class="tab-content space-y-6">
+        <!-- Status Hero -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <!-- Card 1: Assistente Jéssica -->
+          <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 relative overflow-hidden group">
+            <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-[#00F59B]/10 rounded-full blur-xl group-hover:scale-125 transition-transform"></div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Agente de IA</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ATIVA 24H
+              </span>
+            </div>
+            <div class="text-xl font-extrabold text-white">Jéssica • Salões</div>
+            <p class="text-xs text-slate-400 mt-1">Treinada para responder cortes, mechas, valores e agendamentos.</p>
+          </div>
+
+          <!-- Card 2: Conexão WhatsApp -->
+          <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 relative overflow-hidden group">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Canal WhatsApp</span>
+              <span id="waStatusBadge" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-500/10 text-red-400 border border-red-500/30">
+                DESCONECTADO
+              </span>
+            </div>
+            <div id="waStatusText" class="text-xl font-extrabold text-white">Aguardando Conexão</div>
+            <p class="text-xs text-slate-400 mt-1">Conecte o número do seu salão para a Jéssica atender suas clientes.</p>
+          </div>
+
+          <!-- Card 3: Serviços Cadastrados -->
+          <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 relative overflow-hidden group">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Catálogo Ativo</span>
+              <i data-lucide="check-check" class="w-4 h-4 text-[#00F59B]"></i>
+            </div>
+            <div id="servicesCountOverview" class="text-xl font-extrabold text-white">0 Serviços</div>
+            <p class="text-xs text-slate-400 mt-1">Preços e durações informados automaticamente pela IA.</p>
+          </div>
+        </div>
+
+        <!-- WhatsApp Connection Guidance Card -->
+        <div class="p-6 rounded-2xl bg-gradient-to-br from-[#11131a] to-[#0c0e15] border border-white/10 space-y-4">
+          <div class="flex items-start justify-between flex-wrap gap-4">
+            <div>
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="smartphone" class="w-5 h-5 text-[#00F59B]"></i>
+                <span>Conectar WhatsApp do Salão</span>
+              </h2>
+              <p class="text-xs text-slate-400 mt-1 max-w-xl">
+                O assistente utiliza conexão oficial via QR Code Multi-Device, permitindo que a Jéssica responda em tempo real sem interferir no uso normal do celular da sua equipe.
+              </p>
+            </div>
+            <button id="btnPairWhatsApp" class="px-4 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-[#00F59B]/20">
+              <i data-lucide="qr-code" class="w-4 h-4"></i>
+              <span>Gerar QR Code de Pareamento</span>
+            </button>
+          </div>
+
+          <!-- Pairing Modal Simulation -->
+          <div id="pairingBox" class="hidden p-5 rounded-xl bg-[#07080c] border border-white/10 space-y-3">
+            <div class="text-xs font-bold text-[#00F59B] flex items-center gap-2">
+              <i data-lucide="info" class="w-4 h-4"></i>
+              <span>Instruções para Conexão</span>
+            </div>
+            <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1.5">
+              <li>Abra o WhatsApp no celular do seu salão.</li>
+              <li>Acesse <strong>Aparelhos Conectados</strong> > <strong>Conectar um Aparelho</strong>.</li>
+              <li>Aponte a câmera para o QR Code abaixo:</li>
+            </ol>
+            <div class="p-4 bg-white rounded-xl inline-block mx-auto text-center shadow-lg">
+              <img id="qrCodeImg" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=RAIA_JESSICA_SALON_SETUP" alt="QR Code" class="w-44 h-44">
+              <div class="text-[10px] text-slate-800 font-bold mt-2">RAIA JÉSSICA • ESCANEIE NO WHATSAPP</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- TAB 2: MEU SALÃO & HORÁRIOS                    -->
+      <!-- ============================================== -->
+      <section id="tab-salon" class="tab-content hidden space-y-6">
+        <form id="salonForm" class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-6">
+          <div class="border-b border-white/5 pb-4">
+            <h2 class="text-base font-bold text-white">Dados do Estabelecimento</h2>
+            <p class="text-xs text-slate-400 mt-1">Essas informações serão utilizadas pela Jéssica para informar localização e contatos às clientes.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Nome do Salão / Barbearia</label>
+              <input type="text" id="salonName" required class="w-full bg-[#07080c] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Telefone Comercial / WhatsApp</label>
+              <input type="text" id="salonPhone" placeholder="(11) 99999-8888" class="w-full bg-[#07080c] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+            </div>
+
+            <div class="md:col-span-2">
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Endereço Completo</label>
+              <input type="text" id="salonAddress" placeholder="Rua das Flores, 123 - Bairro, Cidade - SP" class="w-full bg-[#07080c] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+            </div>
+
+            <div class="md:col-span-2">
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Instruções Especiais para a IA (Opcional)</label>
+              <textarea id="salonCustomInstructions" rows="3" placeholder="Ex: Sempre oferecer café na recepção; Não atendemos químicas sem teste de mecha prévio; Estacionamento conveniado ao lado." class="w-full bg-[#07080c] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]"></textarea>
+            </div>
+          </div>
+
+          <!-- Opening Hours Table -->
+          <div class="border-t border-white/5 pt-5 space-y-3">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Horários de Atendimento Semanal</h3>
+            <div id="hoursContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs"></div>
+          </div>
+
+          <div class="flex justify-end pt-4 border-t border-white/5">
+            <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2">
+              <i data-lucide="save" class="w-4 h-4"></i>
+              <span>Salvar Configurações</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- TAB 3: SERVIÇOS & PREÇOS                        -->
+      <!-- ============================================== -->
+      <section id="tab-services" class="tab-content hidden space-y-6">
+        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-5">
+          <div class="flex items-center justify-between flex-wrap gap-4 border-b border-white/5 pb-4">
+            <div>
+              <h2 class="text-base font-bold text-white">Tabela de Procedimentos & Preços</h2>
+              <p class="text-xs text-slate-400 mt-1">A Jéssica consultará essa lista sempre que uma cliente perguntar valores no WhatsApp.</p>
+            </div>
+            <button id="btnOpenNewService" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>Novo Serviço</span>
+            </button>
+          </div>
+
+          <!-- New Service Form (Modal / Collapse) -->
+          <form id="newServiceForm" class="hidden p-4 rounded-xl bg-[#07080c] border border-white/10 space-y-4">
+            <div class="text-xs font-bold text-[#00F59B]">Cadastrar Novo Serviço</div>
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+              <div class="sm:col-span-2">
+                <label class="block text-slate-400 mb-1">Nome do Procedimento</label>
+                <input type="text" id="svcName" required placeholder="Ex: Botox Capilar" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Valor (R$)</label>
+                <input type="number" step="0.01" id="svcPrice" required placeholder="Ex: 150.00" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Duração (Min)</label>
+                <input type="number" id="svcDuration" value="45" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
+              </div>
+            </div>
+            <div class="flex justify-end gap-2">
+              <button type="button" id="btnCancelService" class="px-3 py-1.5 rounded-lg bg-white/5 text-slate-300 text-xs">Cancelar</button>
+              <button type="submit" class="px-4 py-1.5 rounded-lg bg-[#00F59B] text-[#07080c] font-bold text-xs">Adicionar</button>
+            </div>
+          </form>
+
+          <!-- Services Table -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="border-b border-white/10 text-slate-400 uppercase text-[10px] tracking-wider">
+                  <th class="py-3 px-3">Serviço</th>
+                  <th class="py-3 px-3">Categoria</th>
+                  <th class="py-3 px-3">Duração</th>
+                  <th class="py-3 px-3">Valor</th>
+                  <th class="py-3 px-3 text-right">Ação</th>
+                </tr>
+              </thead>
+              <tbody id="servicesTableBody" class="divide-y divide-white/5 text-slate-300">
+                <tr><td colspan="5" class="py-6 text-center text-slate-500">Carregando serviços...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- TAB 4: EQUIPE & PROFISSIONAIS                   -->
+      <!-- ============================================== -->
+      <section id="tab-staff" class="tab-content hidden space-y-6">
+        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-5">
+          <div class="flex items-center justify-between flex-wrap gap-4 border-b border-white/5 pb-4">
+            <div>
+              <h2 class="text-base font-bold text-white">Equipe do Salão</h2>
+              <p class="text-xs text-slate-400 mt-1">A Jéssica pode direcionar clientes para profissionais específicos da sua equipe.</p>
+            </div>
+            <button id="btnOpenStaffForm" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5">
+              <i data-lucide="user-plus" class="w-4 h-4"></i>
+              <span>Adicionar Profissional</span>
+            </button>
+          </div>
+
+          <!-- New Staff Form -->
+          <form id="newStaffForm" class="hidden p-4 rounded-xl bg-[#07080c] border border-white/10 space-y-3">
+            <div class="text-xs font-bold text-[#00F59B]">Cadastrar Profissional</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div>
+                <label class="block text-slate-400 mb-1">Nome Completo</label>
+                <input type="text" id="staffName" required placeholder="Ex: Camila Santos" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Especialidade</label>
+                <input type="text" id="staffSpecialty" placeholder="Ex: Colorista / Mechas" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
+              </div>
+            </div>
+            <div class="flex justify-end gap-2">
+              <button type="button" id="btnCancelStaff" class="px-3 py-1.5 rounded-lg bg-white/5 text-slate-300 text-xs">Cancelar</button>
+              <button type="submit" class="px-4 py-1.5 rounded-lg bg-[#00F59B] text-[#07080c] font-bold text-xs">Salvar</button>
+            </div>
+          </form>
+
+          <div id="staffList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- TAB 5: AGENDA DE ATENDIMENTOS                   -->
+      <!-- ============================================== -->
+      <section id="tab-appointments" class="tab-content hidden space-y-6">
+        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-5">
+          <div class="flex items-center justify-between flex-wrap gap-4 border-b border-white/5 pb-4">
+            <div>
+              <h2 class="text-base font-bold text-white">Agenda de Atendimentos</h2>
+              <p class="text-xs text-slate-400 mt-1">Horários agendados pela Jéssica no WhatsApp ou adicionados manualmente.</p>
+            </div>
+            <button id="btnOpenNewAppt" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>Novo Agendamento Manual</span>
+            </button>
+          </div>
+
+          <!-- New Appointment Form -->
+          <form id="newApptForm" class="hidden p-4 rounded-xl bg-[#07080c] border border-white/10 space-y-3">
+            <div class="text-xs font-bold text-[#00F59B]">Marcar Atendimento Manual</div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div>
+                <label class="block text-slate-400 mb-1">Nome da Cliente</label>
+                <input type="text" id="apptClientName" required placeholder="Ex: Juliana Mendes" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
+              </div>
+              <div>
+                <label class="block text-slate-400 mb-1">Procedimento</label>
+                <input type="text" id="apptServiceName" placeholder="Ex: Corte e Escova" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
+              </div>
+              <div class="grid grid-cols-2 gap-2">
+                <div>
+                  <label class="block text-slate-400 mb-1">Data</label>
+                  <input type="date" id="apptDate" required class="w-full bg-[#11131a] border border-white/10 rounded-lg px-2 py-2 text-white">
+                </div>
+                <div>
+                  <label class="block text-slate-400 mb-1">Horário</label>
+                  <input type="time" id="apptTime" required class="w-full bg-[#11131a] border border-white/10 rounded-lg px-2 py-2 text-white">
+                </div>
+              </div>
+            </div>
+            <div class="flex justify-end gap-2">
+              <button type="button" id="btnCancelAppt" class="px-3 py-1.5 rounded-lg bg-white/5 text-slate-300 text-xs">Cancelar</button>
+              <button type="submit" class="px-4 py-1.5 rounded-lg bg-[#00F59B] text-[#07080c] font-bold text-xs">Agendar</button>
+            </div>
+          </form>
+
+          <div id="appointmentsList" class="space-y-3"></div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- TAB 6: DASHBOARD GERENCIAL (PRO EXCLUSIVO)     -->
+      <!-- ============================================== -->
+      <section id="tab-dashboard-pro" class="tab-content hidden space-y-6">
+        <!-- Upgrade Card for Start Plan -->
+        <div id="proUpgradeLockDashboard" class="hidden p-8 rounded-3xl bg-gradient-to-br from-[#11131a] via-[#1a1408] to-[#11131a] border border-[#F59E0B]/30 text-center space-y-4 max-w-2xl mx-auto shadow-2xl">
+          <div class="w-16 h-16 rounded-2xl bg-[#F59E0B]/10 border border-[#F59E0B]/30 flex items-center justify-center mx-auto text-[#F59E0B]">
+            <i data-lucide="crown" class="w-8 h-8"></i>
+          </div>
+          <div>
+            <span class="text-xs px-3 py-1 rounded-full font-bold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40">RECURSO EXCLUSIVO DO PLANO PRO</span>
+            <h2 class="text-2xl font-black text-white mt-3">Dashboard Gerencial & Financeiro</h2>
+            <p class="text-sm text-slate-300 mt-2 max-w-md mx-auto">
+              Tenha controle total do faturamento do seu salão, comissões por profissional, ticket médio e lucratividade em tempo real.
+            </p>
+          </div>
+          <div class="pt-2">
+            <a href="https://pay.hotmart.com/YOUR_PRO_OFFER" target="_blank" class="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#F59E0B] to-amber-500 text-[#07080c] font-extrabold text-sm shadow-lg shadow-[#F59E0B]/30 hover:brightness-110 transition-all">
+              <span>Fazer Upgrade para Jéssica Pro (R$ 89/mês)</span>
+              <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+            </a>
+          </div>
+        </div>
+
+        <!-- Real Pro Dashboard Metrics (Shown if Pro) -->
+        <div id="proDashboardContent" class="hidden space-y-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10">
+              <span class="text-xs font-semibold text-slate-400">Faturamento Mensal</span>
+              <div id="dashRevenue" class="text-2xl font-black text-[#00F59B] mt-1">R$ 0,00</div>
+              <div id="dashGrowth" class="text-[11px] text-emerald-400 font-semibold mt-1">+18.4% vs mês anterior</div>
+            </div>
+
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10">
+              <span class="text-xs font-semibold text-slate-400">Atendimentos Concluídos</span>
+              <div id="dashAppointments" class="text-2xl font-black text-white mt-1">0</div>
+              <div class="text-[11px] text-slate-400 mt-1">Média de 5 por dia</div>
+            </div>
+
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10">
+              <span class="text-xs font-semibold text-slate-400">Ticket Médio</span>
+              <div id="dashTicket" class="text-2xl font-black text-[#F59E0B] mt-1">R$ 0,00</div>
+              <div class="text-[11px] text-slate-400 mt-1">Por cliente atendido</div>
+            </div>
+
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10">
+              <span class="text-xs font-semibold text-slate-400">Taxa de Retenção</span>
+              <div id="dashRetention" class="text-2xl font-black text-[#8B5CF6] mt-1">0%</div>
+              <div class="text-[11px] text-slate-400 mt-1">Clientes recorrentes</div>
+            </div>
+          </div>
+
+          <!-- Staff Revenue Breakdown -->
+          <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-4">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="award" class="w-4 h-4 text-[#F59E0B]"></i>
+              <span>Faturamento por Profissional da Equipe</span>
+            </h3>
+            <div id="staffRevenueList" class="space-y-3"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- TAB 7: CAMPANHAS PROMOCIONAIS (PRO EXCLUSIVO)   -->
+      <!-- ============================================== -->
+      <section id="tab-campaigns-pro" class="tab-content hidden space-y-6">
+        <!-- Upgrade Lock for Start Plan -->
+        <div id="proUpgradeLockCampaigns" class="hidden p-8 rounded-3xl bg-gradient-to-br from-[#11131a] via-[#1a1408] to-[#11131a] border border-[#F59E0B]/30 text-center space-y-4 max-w-2xl mx-auto shadow-2xl">
+          <div class="w-16 h-16 rounded-2xl bg-[#F59E0B]/10 border border-[#F59E0B]/30 flex items-center justify-center mx-auto text-[#F59E0B]">
+            <i data-lucide="megaphone" class="w-8 h-8"></i>
+          </div>
+          <div>
+            <span class="text-xs px-3 py-1 rounded-full font-bold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40">RECURSO EXCLUSIVO DO PLANO PRO</span>
+            <h2 class="text-2xl font-black text-white mt-3">Campanhas Promocionais via WhatsApp</h2>
+            <p class="text-sm text-slate-300 mt-2 max-w-md mx-auto">
+              Dispare novidades, lembretes de retorno e promoções em massa para reaquecer clientes sumidas do seu salão de forma 100% consentida.
+            </p>
+          </div>
+          <div class="pt-2">
+            <a href="https://pay.hotmart.com/YOUR_PRO_OFFER" target="_blank" class="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#F59E0B] to-amber-500 text-[#07080c] font-extrabold text-sm shadow-lg shadow-[#F59E0B]/30 hover:brightness-110 transition-all">
+              <span>Desbloquear Campanhas com o Plano Pro</span>
+              <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+            </a>
+          </div>
+        </div>
+
+        <!-- Pro Campaigns Content -->
+        <div id="proCampaignsContent" class="hidden space-y-6">
+          <div class="flex items-center justify-between flex-wrap gap-4 p-6 rounded-2xl bg-[#11131a] border border-white/10">
+            <div>
+              <h2 class="text-base font-bold text-white">Disparador de Campanhas & Promoções</h2>
+              <p class="text-xs text-slate-400 mt-1">Envie comunicados para reativar clientes antigas com total conformidade LGPD.</p>
+            </div>
+            <button id="btnOpenCampaignModal" class="px-4 py-2 rounded-xl bg-[#F59E0B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>Criar Nova Campanha</span>
+            </button>
+          </div>
+
+          <!-- Create Campaign Form -->
+          <form id="createCampaignForm" class="hidden p-6 rounded-2xl bg-[#07080c] border border-white/10 space-y-4">
+            <div class="text-xs font-bold text-[#F59E0B]">Nova Campanha Promocional</div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Título Interno da Campanha</label>
+              <input type="text" id="campTitle" required placeholder="Ex: Terça das Mechas - 15% OFF" class="w-full bg-[#11131a] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white">
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1">Mensagem a ser enviada no WhatsApp</label>
+              <textarea id="campMessage" rows="4" required placeholder="Olá! A equipe do salão preparou uma promoção imperdível nesta semana..." class="w-full bg-[#11131a] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white"></textarea>
+              <div class="text-[11px] text-slate-500 mt-1">Aviso legal de descadastro *(Responda SAIR para não receber mais)* será anexado automaticamente no final.</div>
+            </div>
+
+            <!-- Mandatory Consent Checkbox (Requirement 3) -->
+            <div class="p-3.5 rounded-xl bg-[#11131a] border border-amber-500/20 flex items-start gap-3">
+              <input type="checkbox" id="consentCheckbox" required class="mt-0.5 rounded text-[#F59E0B] focus:ring-[#F59E0B]">
+              <label for="consentCheckbox" class="text-xs text-slate-300">
+                <strong class="text-white">Confirmação de Consentimento (LGPD):</strong> Confirmo expressamente que todos os destinatários desta campanha são clientes que autorizaram o recebimento de mensagens promocionais e que o mecanismo de cancelamento (opt-out) está ativo.
+              </label>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+              <button type="button" id="btnCancelCampaign" class="px-4 py-2 rounded-xl bg-white/5 text-slate-300 text-xs">Cancelar</button>
+              <button type="submit" class="px-5 py-2 rounded-xl bg-[#F59E0B] text-[#07080c] font-bold text-xs hover:brightness-110">Programar Envio</button>
+            </div>
+          </form>
+
+          <div id="campaignsList" class="space-y-3"></div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Client Portal JavaScript Engine -->
+  <script>
+    lucide.createIcons();
+
+    let clientData = null;
+
+    // Toast Alert
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.className = type === 'success'
+        ? 'fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl text-xs font-bold shadow-2xl flex items-center gap-3 border border-emerald-500/30 bg-emerald-950/90 text-emerald-200'
+        : 'fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl text-xs font-bold shadow-2xl flex items-center gap-3 border border-red-500/30 bg-red-950/90 text-red-200';
+      toast.innerHTML = `<i data-lucide="${type === 'success' ? 'check-circle' : 'alert-triangle'}" class="w-4 h-4"></i><span>${message}</span>`;
+      toast.classList.remove('hidden');
+      lucide.createIcons();
+      setTimeout(() => toast.classList.add('hidden'), 4000);
+    }
+
+    // Tabs Navigation
+    const navButtons = document.querySelectorAll('.nav-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    const pageTitle = document.getElementById('pageTitle');
+    const pageSubtitle = document.getElementById('pageSubtitle');
+
+    const tabMeta = {
+      'overview': { title: 'Visão Geral & Assistente Jéssica', subtitle: 'Status em tempo real da sua secretária de IA' },
+      'salon': { title: 'Meu Salão & Horários de Atendimento', subtitle: 'Personalize horários e informações do estabelecimento' },
+      'services': { title: 'Tabela de Serviços & Preços', subtitle: 'Procedimentos conhecidos e informados pela Jéssica' },
+      'staff': { title: 'Equipe de Profissionais', subtitle: 'Cadastre cabeleireiros, manicures e especialistas' },
+      'appointments': { title: 'Agenda de Atendimentos', subtitle: 'Histórico e novos agendamentos confirmados' },
+      'dashboard-pro': { title: 'Dashboard Gerencial', subtitle: 'Indicadores financeiros e lucratividade em tempo real' },
+      'campaigns-pro': { title: 'Campanhas Promocionais', subtitle: 'Disparo de novidades com consentimento e opt-out' },
+    };
+
+    function switchTab(tabId) {
+      navButtons.forEach(btn => {
+        if (btn.dataset.tab === tabId) {
+          btn.className = 'nav-btn active w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/20';
+        } else {
+          btn.className = 'nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all';
+        }
+      });
+
+      tabContents.forEach(content => {
+        if (content.id === `tab-${tabId}`) content.classList.remove('hidden');
+        else content.classList.add('hidden');
+      });
+
+      if (tabMeta[tabId]) {
+        pageTitle.innerHTML = `<span>${tabMeta[tabId].title}</span>`;
+        pageSubtitle.innerText = tabMeta[tabId].subtitle;
+      }
+
+      // Close mobile sidebar if open
+      document.getElementById('sidebar').classList.add('-translate-x-full');
+      lucide.createIcons();
+
+      // Trigger data loads
+      if (tabId === 'services') loadServices();
+      else if (tabId === 'staff') loadStaff();
+      else if (tabId === 'appointments') loadAppointments();
+      else if (tabId === 'dashboard-pro') loadProDashboard();
+      else if (tabId === 'campaigns-pro') loadProCampaigns();
+    }
+
+    navButtons.forEach(btn => {
+      btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+
+    // Mobile menu toggle
+    document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+      const sb = document.getElementById('sidebar');
+      sb.classList.toggle('-translate-x-full');
+    });
+
+    // 1. Initial Profile Loading
+    async function loadProfile() {
+      try {
+        const res = await fetch('/api/cliente/profile');
+        if (res.status === 401) {
+          window.location.href = '/cliente/login';
+          return;
+        }
+
+        const data = await res.json();
+        if (!data.success || !data.profile) {
+          window.location.href = '/cliente/login';
+          return;
+        }
+
+        clientData = data.profile;
+        renderProfileData(clientData);
+      } catch (err) {
+        window.location.href = '/cliente/login';
+      }
+    }
+
+    function renderProfileData(p) {
+      document.getElementById('sidebarSalonName').innerText = p.salon?.name || 'Salão de Beleza';
+      document.getElementById('footerUserName').innerText = p.name || 'Cliente';
+      document.getElementById('footerUserEmail').innerText = p.email || '';
+
+      const isPro = p.planTier === 'JESSICA_PRO';
+      const badgeText = isPro ? 'JÉSSICA PRO 🌟' : 'JÉSSICA START ✂️';
+      const badgeClass = isPro
+        ? 'text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40'
+        : 'text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-[#00F59B]/20 text-[#00F59B] border border-[#00F59B]/40';
+
+      document.getElementById('planBadgeText').innerHTML = `<span>${badgeText}</span>`;
+      document.getElementById('headerPlanBadge').innerText = badgeText;
+      document.getElementById('headerPlanBadge').className = badgeClass;
+      document.getElementById('mobilePlanBadge').innerText = isPro ? 'PRO 🌟' : 'START ✂️';
+
+      // Demo Account notice
+      if (p.isDemo) {
+        document.getElementById('demoNoticeBanner').classList.remove('hidden');
+      }
+
+      // WhatsApp Status
+      const waStatus = p.salon?.whatsappStatus || 'DISCONNECTED';
+      const isConnected = waStatus === 'CONNECTED';
+      document.getElementById('waStatusBadge').innerText = isConnected ? 'CONECTADO' : 'DESCONECTADO';
+      document.getElementById('waStatusBadge').className = isConnected
+        ? 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+        : 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-500/10 text-red-400 border border-red-500/30';
+      document.getElementById('waStatusText').innerText = isConnected ? 'Pronto para Atender' : 'Aguardando Conexão';
+
+      // Populate Salon Form
+      document.getElementById('salonName').value = p.salon?.name || '';
+      document.getElementById('salonPhone').value = p.salon?.phone || '';
+      document.getElementById('salonAddress').value = p.salon?.address || '';
+      document.getElementById('salonCustomInstructions').value = p.salon?.customInstructions || '';
+
+      // Populate Hours
+      renderHoursInputs(p.salon?.openingHours);
+
+      // Trigger initial counts
+      loadServices();
+    }
+
+    // 2. Salon Hours Form
+    const dayNames = { seg: 'Segunda', ter: 'Terça', qua: 'Quarta', qui: 'Quinta', sex: 'Sexta', sab: 'Sábado', dom: 'Domingo' };
+    function renderHoursInputs(hours) {
+      const container = document.getElementById('hoursContainer');
+      container.innerHTML = '';
+      const defaultHours = hours || {
+        seg: { open: '09:00', close: '19:00', active: true },
+        ter: { open: '09:00', close: '19:00', active: true },
+        qua: { open: '09:00', close: '19:00', active: true },
+        qui: { open: '09:00', close: '19:00', active: true },
+        sex: { open: '09:00', close: '19:00', active: true },
+        sab: { open: '09:00', close: '18:00', active: true },
+        dom: { open: '09:00', close: '14:00', active: false },
+      };
+
+      Object.keys(dayNames).forEach(dayKey => {
+        const item = defaultHours[dayKey] || { open: '09:00', close: '19:00', active: true };
+        const card = document.createElement('div');
+        card.className = 'p-3 rounded-xl bg-[#07080c] border border-white/5 space-y-2';
+        card.innerHTML = `
+          <div class="flex items-center justify-between font-bold text-white">
+            <span>${dayNames[dayKey]}</span>
+            <input type="checkbox" data-day="${dayKey}" class="day-active rounded text-[#00F59B]" ${item.active ? 'checked' : ''}>
+          </div>
+          <div class="flex items-center gap-1.5 text-slate-300">
+            <input type="time" data-day-open="${dayKey}" value="${item.open}" class="bg-[#11131a] border border-white/10 rounded px-1.5 py-1 text-xs w-full">
+            <span>-</span>
+            <input type="time" data-day-close="${dayKey}" value="${item.close}" class="bg-[#11131a] border border-white/10 rounded px-1.5 py-1 text-xs w-full">
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    document.getElementById('salonForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const openingHours = {};
+      Object.keys(dayNames).forEach(k => {
+        const active = document.querySelector(`[data-day="${k}"]`)?.checked || false;
+        const open = document.querySelector(`[data-day-open="${k}"]`)?.value || '09:00';
+        const close = document.querySelector(`[data-day-close="${k}"]`)?.value || '19:00';
+        openingHours[k] = { active, open, close };
+      });
+
+      try {
+        const res = await fetch('/api/cliente/salon', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            salonName: document.getElementById('salonName').value.trim(),
+            phone: document.getElementById('salonPhone').value.trim(),
+            address: document.getElementById('salonAddress').value.trim(),
+            customInstructions: document.getElementById('salonCustomInstructions').value.trim(),
+            openingHours,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Configurações do salão salvas com sucesso!');
+          document.getElementById('sidebarSalonName').innerText = document.getElementById('salonName').value;
+        } else {
+          showToast(data.error || 'Erro ao salvar salão.', 'error');
+        }
+      } catch (err) {
+        showToast('Erro de conexão.', 'error');
+      }
+    });
+
+    // 3. Services Management
+    async function loadServices() {
+      try {
+        const res = await fetch('/api/cliente/services');
+        const data = await res.json();
+        const tbody = document.getElementById('servicesTableBody');
+        tbody.innerHTML = '';
+
+        if (!data.success || !data.services || data.services.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-500">Nenhum serviço cadastrado ainda. Clique em "Novo Serviço".</td></tr>';
+          document.getElementById('servicesCountOverview').innerText = '0 Serviços';
+          return;
+        }
+
+        document.getElementById('servicesCountOverview').innerText = `${data.services.length} Serviços Ativos`;
+
+        data.services.forEach(s => {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-white/[0.02] transition-colors';
+          tr.innerHTML = `
+            <td class="py-3 px-3 font-bold text-white">${s.name}</td>
+            <td class="py-3 px-3 text-slate-400">${s.category || 'Geral'}</td>
+            <td class="py-3 px-3 text-slate-400">${s.duration_min} min</td>
+            <td class="py-3 px-3 font-extrabold text-[#00F59B]">R$ ${Number(s.price).toFixed(2).replace('.', ',')}</td>
+            <td class="py-3 px-3 text-right">
+              <button onclick="deleteService(${s.id})" class="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+        lucide.createIcons();
+      } catch (err) {}
+    }
+
+    document.getElementById('btnOpenNewService').addEventListener('click', () => {
+      document.getElementById('newServiceForm').classList.toggle('hidden');
+    });
+    document.getElementById('btnCancelService').addEventListener('click', () => {
+      document.getElementById('newServiceForm').classList.add('hidden');
+    });
+
+    document.getElementById('newServiceForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('svcName').value.trim();
+      const price = document.getElementById('svcPrice').value;
+      const durationMin = document.getElementById('svcDuration').value;
+
+      try {
+        const res = await fetch('/api/cliente/services', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, price, durationMin }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Serviço adicionado com sucesso!');
+          document.getElementById('newServiceForm').reset();
+          document.getElementById('newServiceForm').classList.add('hidden');
+          loadServices();
+        } else {
+          showToast(data.error || 'Erro ao adicionar.', 'error');
+        }
+      } catch (e) {
+        showToast('Erro de conexão.', 'error');
+      }
+    });
+
+    window.deleteService = async function(id) {
+      if (!confirm('Deseja realmente remover este serviço?')) return;
+      try {
+        const res = await fetch(`/api/cliente/services/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Serviço removido.');
+          loadServices();
+        }
+      } catch (e) {}
+    };
+
+    // 4. Staff Management
+    async function loadStaff() {
+      try {
+        const res = await fetch('/api/cliente/staff');
+        const data = await res.json();
+        const list = document.getElementById('staffList');
+        list.innerHTML = '';
+
+        if (!data.success || !data.staff || data.staff.length === 0) {
+          list.innerHTML = '<div class="col-span-full py-8 text-center text-slate-500 text-xs">Nenhum profissional cadastrado na equipe.</div>';
+          return;
+        }
+
+        data.staff.forEach(st => {
+          const card = document.createElement('div');
+          card.className = 'p-4 rounded-xl bg-[#07080c] border border-white/10 flex items-center justify-between';
+          card.innerHTML = `
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-[#8B5CF6]/20 border border-[#8B5CF6]/40 flex items-center justify-center font-bold text-[#8B5CF6]">
+                ${st.name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <div class="text-xs font-bold text-white">${st.name}</div>
+                <div class="text-[11px] text-slate-400">${st.specialty || 'Profissional'}</div>
+              </div>
+            </div>
+            <button onclick="deleteStaff(${st.id})" class="p-1.5 rounded-lg text-slate-400 hover:text-red-400 transition-colors">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          `;
+          list.appendChild(card);
+        });
+        lucide.createIcons();
+      } catch (e) {}
+    }
+
+    document.getElementById('btnOpenStaffForm').addEventListener('click', () => {
+      document.getElementById('newStaffForm').classList.toggle('hidden');
+    });
+    document.getElementById('btnCancelStaff').addEventListener('click', () => {
+      document.getElementById('newStaffForm').classList.add('hidden');
+    });
+
+    document.getElementById('newStaffForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('staffName').value.trim();
+      const specialty = document.getElementById('staffSpecialty').value.trim();
+
+      try {
+        const res = await fetch('/api/cliente/staff', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, specialty }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Profissional adicionado!');
+          document.getElementById('newStaffForm').reset();
+          document.getElementById('newStaffForm').classList.add('hidden');
+          loadStaff();
+        }
+      } catch (e) {}
+    });
+
+    window.deleteStaff = async function(id) {
+      if (!confirm('Remover este profissional?')) return;
+      try {
+        await fetch(`/api/cliente/staff/${id}`, { method: 'DELETE' });
+        showToast('Profissional removido.');
+        loadStaff();
+      } catch (e) {}
+    };
+
+    // 5. Appointments Schedule
+    async function loadAppointments() {
+      try {
+        const res = await fetch('/api/cliente/appointments');
+        const data = await res.json();
+        const list = document.getElementById('appointmentsList');
+        list.innerHTML = '';
+
+        if (!data.success || !data.appointments || data.appointments.length === 0) {
+          list.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">Nenhum atendimento agendado no momento.</div>';
+          return;
+        }
+
+        data.appointments.forEach(a => {
+          const dt = new Date(a.start_datetime);
+          const dateStr = dt.toLocaleDateString('pt-BR');
+          const timeStr = dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+          const item = document.createElement('div');
+          item.className = 'p-3.5 rounded-xl bg-[#07080c] border border-white/5 flex items-center justify-between text-xs';
+          item.innerHTML = `
+            <div class="flex items-center gap-3">
+              <div class="text-center px-2 py-1 bg-white/5 rounded-lg border border-white/10">
+                <div class="font-bold text-white">${timeStr}</div>
+                <div class="text-[10px] text-slate-400">${dateStr}</div>
+              </div>
+              <div>
+                <div class="font-bold text-white">${a.title}</div>
+                <div class="text-[11px] text-slate-400">${a.description || 'Confirmado'}</div>
+              </div>
+            </div>
+            <button onclick="cancelAppointment(${a.id})" class="p-1.5 rounded-lg text-slate-400 hover:text-red-400">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          `;
+          list.appendChild(item);
+        });
+        lucide.createIcons();
+      } catch (e) {}
+    }
+
+    document.getElementById('btnOpenNewAppt').addEventListener('click', () => {
+      document.getElementById('newApptForm').classList.toggle('hidden');
+    });
+    document.getElementById('btnCancelAppt').addEventListener('click', () => {
+      document.getElementById('newApptForm').classList.add('hidden');
+    });
+
+    document.getElementById('newApptForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        const res = await fetch('/api/cliente/appointments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientName: document.getElementById('apptClientName').value.trim(),
+            serviceName: document.getElementById('apptServiceName').value.trim(),
+            date: document.getElementById('apptDate').value,
+            time: document.getElementById('apptTime').value,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Atendimento agendado!');
+          document.getElementById('newApptForm').reset();
+          document.getElementById('newApptForm').classList.add('hidden');
+          loadAppointments();
+        }
+      } catch (e) {}
+    });
+
+    window.cancelAppointment = async function(id) {
+      if (!confirm('Cancelar este agendamento?')) return;
+      await fetch(`/api/cliente/appointments/${id}`, { method: 'DELETE' });
+      showToast('Agendamento cancelado.');
+      loadAppointments();
+    };
+
+    // 6. Pro Plan Dashboard
+    async function loadProDashboard() {
+      try {
+        const res = await fetch('/api/cliente/pro/dashboard');
+        const lock = document.getElementById('proUpgradeLockDashboard');
+        const content = document.getElementById('proDashboardContent');
+
+        if (res.status === 403) {
+          lock.classList.remove('hidden');
+          content.classList.add('hidden');
+          lucide.createIcons();
+          return;
+        }
+
+        const data = await res.json();
+        lock.classList.add('hidden');
+        content.classList.remove('hidden');
+
+        const m = data.metrics;
+        document.getElementById('dashRevenue').innerText = `R$ ${Number(m.faturamentoMes || 0).toFixed(2).replace('.', ',')}`;
+        document.getElementById('dashGrowth').innerText = `${m.faturamentoCrescimento || '+10%'} vs mês anterior`;
+        document.getElementById('dashAppointments').innerText = m.atendimentosMes || 0;
+        document.getElementById('dashTicket').innerText = `R$ ${Number(m.ticketMedio || 0).toFixed(2).replace('.', ',')}`;
+        document.getElementById('dashRetention').innerText = m.taxaRetencao || '70%';
+
+        // Staff breakdown
+        const staffList = document.getElementById('staffRevenueList');
+        staffList.innerHTML = '';
+        if (m.receitaPorProfissional && m.receitaPorProfissional.length > 0) {
+          m.receitaPorProfissional.forEach(st => {
+            const row = document.createElement('div');
+            row.className = 'p-3 rounded-xl bg-[#07080c] border border-white/5 flex items-center justify-between text-xs';
+            row.innerHTML = `
+              <div class="font-bold text-white">${st.nome}</div>
+              <div class="text-slate-400">${st.atendimentos} atendimentos</div>
+              <div class="font-extrabold text-[#00F59B]">R$ ${Number(st.valor).toFixed(2).replace('.', ',')}</div>
+            `;
+            staffList.appendChild(row);
+          });
+        } else {
+          staffList.innerHTML = '<div class="text-xs text-slate-500 py-3 text-center">Nenhum dado por profissional registrado ainda.</div>';
+        }
+      } catch (e) {}
+    }
+
+    // 7. Pro Campaigns
+    async function loadProCampaigns() {
+      try {
+        const res = await fetch('/api/cliente/pro/campaigns');
+        const lock = document.getElementById('proUpgradeLockCampaigns');
+        const content = document.getElementById('proCampaignsContent');
+
+        if (res.status === 403) {
+          lock.classList.remove('hidden');
+          content.classList.add('hidden');
+          lucide.createIcons();
+          return;
+        }
+
+        const data = await res.json();
+        lock.classList.add('hidden');
+        content.classList.remove('hidden');
+
+        const list = document.getElementById('campaignsList');
+        list.innerHTML = '';
+        if (!data.campaigns || data.campaigns.length === 0) {
+          list.innerHTML = '<div class="text-xs text-slate-500 py-6 text-center">Nenhuma campanha criada. Clique em "Criar Nova Campanha".</div>';
+          return;
+        }
+
+        data.campaigns.forEach(c => {
+          const item = document.createElement('div');
+          item.className = 'p-4 rounded-xl bg-[#07080c] border border-white/10 space-y-2 text-xs';
+          item.innerHTML = `
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-white text-sm">${c.title}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">DISPARO PROGRAMADO</span>
+            </div>
+            <p class="text-slate-300 italic bg-[#11131a] p-3 rounded-lg border border-white/5">${c.message}</p>
+            <div class="text-[11px] text-slate-400 flex items-center justify-between">
+              <span>Público: <strong>${c.target_audience}</strong></span>
+              <span class="text-emerald-400 flex items-center gap-1"><i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Opt-in Consentido</span>
+            </div>
+          `;
+          list.appendChild(item);
+        });
+        lucide.createIcons();
+      } catch (e) {}
+    }
+
+    document.getElementById('btnOpenCampaignModal').addEventListener('click', () => {
+      document.getElementById('createCampaignForm').classList.toggle('hidden');
+    });
+    document.getElementById('btnCancelCampaign').addEventListener('click', () => {
+      document.getElementById('createCampaignForm').classList.add('hidden');
+    });
+
+    document.getElementById('createCampaignForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = document.getElementById('campTitle').value.trim();
+      const message = document.getElementById('campMessage').value.trim();
+      const consentConfirmed = document.getElementById('consentCheckbox').checked;
+
+      try {
+        const res = await fetch('/api/cliente/pro/campaigns', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, message, consentConfirmed }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Campanha criada com consentimento validado!');
+          document.getElementById('createCampaignForm').reset();
+          document.getElementById('createCampaignForm').classList.add('hidden');
+          loadProCampaigns();
+        } else {
+          showToast(data.error || 'Erro ao criar campanha.', 'error');
+        }
+      } catch (e) {
+        showToast('Erro de conexão.', 'error');
+      }
+    });
+
+    // WhatsApp Pairing Simulation
+    document.getElementById('btnPairWhatsApp').addEventListener('click', () => {
+      document.getElementById('pairingBox').classList.toggle('hidden');
+    });
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await fetch('/api/cliente/auth/logout', { method: 'POST' });
+      sessionStorage.removeItem('raia_client_token');
+      window.location.href = '/cliente/login';
+    });
+
+    // Run on startup
+    loadProfile();
+  </script>
+</body>
+</html>

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Recuperação de Senha • RAIA AGENTES</title>
+  <link rel="icon" type="image/png" href="/raia-emblem-small.png">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            raia: {
+              black: '#07080c',
+              card: '#11131a',
+              cardHover: '#181b24',
+              border: 'rgba(255, 255, 255, 0.08)',
+              neon: '#00F59B',
+              lime: '#ccff00',
+              violet: '#8B5CF6',
+              gold: '#F59E0B',
+            }
+          },
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+          }
+        }
+      }
+    };
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body class="bg-[#07080c] text-slate-100 min-h-screen flex items-center justify-center p-4 relative overflow-x-hidden selection:bg-[#00F59B]/20 selection:text-[#00F59B]">
+
+  <!-- Glow -->
+  <div class="fixed top-[-150px] left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-b from-[#00F59B]/15 via-[#8B5CF6]/10 to-transparent blur-[120px] pointer-events-none -z-10"></div>
+
+  <div class="w-full max-w-md">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <a href="/" class="inline-flex items-center gap-3 group mb-4">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#00F59B]/20 to-[#8B5CF6]/20 border border-white/10 flex items-center justify-center shadow-lg shadow-[#00F59B]/10">
+          <img src="/raia-emblem-small.png" alt="RAIA" class="w-7 h-7 object-contain">
+        </div>
+        <div class="text-left">
+          <div class="text-xl font-extrabold tracking-tight text-white flex items-center gap-1.5">
+            RAIA <span class="text-xs px-2 py-0.5 rounded-full bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30 font-semibold tracking-normal">SEGURANÇA</span>
+          </div>
+          <div class="text-[11px] text-slate-400 font-medium tracking-wide">RECUPERAÇÃO DE ACESSO</div>
+        </div>
+      </a>
+      <h1 class="text-2xl font-bold text-white tracking-tight" id="mainTitle">Recuperar Senha</h1>
+      <p class="text-sm text-slate-400 mt-1.5" id="mainSubtitle">Informe seu e-mail cadastrado para redefinir seu acesso</p>
+    </div>
+
+    <!-- Card -->
+    <div class="bg-[#11131a] border border-white/10 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl relative">
+      <div id="alertBox" class="hidden mb-5 p-3.5 rounded-xl text-sm border flex items-start gap-3"></div>
+
+      <!-- Step 1: Request Reset Form (Email) -->
+      <form id="requestForm" class="space-y-5">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">E-mail Cadastrado na Hotmart</label>
+          <div class="relative">
+            <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input
+              type="email"
+              id="reqEmail"
+              required
+              placeholder="seuemail@exemplo.com"
+              class="w-full bg-[#07080c] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] focus:ring-1 focus:ring-[#00F59B] transition-all"
+            >
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          id="reqBtn"
+          class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#00F59B] to-[#00D284] text-[#07080c] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all shadow-lg shadow-[#00F59B]/20 flex items-center justify-center gap-2"
+        >
+          <span>Enviar Link de Recuperação</span>
+          <i data-lucide="send" class="w-4 h-4"></i>
+        </button>
+      </form>
+
+      <!-- Step 2: Set New Password Form (when token in URL) -->
+      <form id="resetForm" class="hidden space-y-5">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Nova Senha</label>
+          <div class="relative">
+            <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input
+              type="password"
+              id="newPassword"
+              required
+              minlength="8"
+              placeholder="Mínimo 8 caracteres"
+              class="w-full bg-[#07080c] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] focus:ring-1 focus:ring-[#00F59B] transition-all"
+            >
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Confirme a Nova Senha</label>
+          <div class="relative">
+            <i data-lucide="check" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+            <input
+              type="password"
+              id="confirmNewPassword"
+              required
+              minlength="8"
+              placeholder="Digite a mesma senha"
+              class="w-full bg-[#07080c] border border-white/10 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] focus:ring-1 focus:ring-[#00F59B] transition-all"
+            >
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          id="resetBtn"
+          class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#00F59B] to-[#00D284] text-[#07080c] font-bold text-sm hover:brightness-110 active:scale-[0.99] transition-all shadow-lg shadow-[#00F59B]/20 flex items-center justify-center gap-2"
+        >
+          <span>Redefinir Senha & Entrar</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
+      </form>
+
+      <div class="mt-6 pt-5 border-t border-white/5 text-center">
+        <a href="/cliente/login" class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+          <span>Voltar para o login</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+
+    const requestForm = document.getElementById('requestForm');
+    const resetForm = document.getElementById('resetForm');
+    const alertBox = document.getElementById('alertBox');
+    const mainTitle = document.getElementById('mainTitle');
+    const mainSubtitle = document.getElementById('mainSubtitle');
+
+    function showAlert(message, type = 'error') {
+      alertBox.className = type === 'error'
+        ? 'mb-5 p-3.5 rounded-xl text-sm border border-red-500/30 bg-red-500/10 text-red-300 flex items-start gap-3'
+        : 'mb-5 p-3.5 rounded-xl text-sm border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 flex items-start gap-3';
+      alertBox.innerHTML = `
+        <i data-lucide="${type === 'error' ? 'alert-triangle' : 'check-circle-2'}" class="w-5 h-5 flex-shrink-0 mt-0.5"></i>
+        <div>${message}</div>
+      `;
+      alertBox.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    if (token) {
+      // Step 2: Show New Password Form
+      mainTitle.innerText = 'Redefinir Nova Senha';
+      mainSubtitle.innerText = 'Crie uma nova senha segura para o seu salão';
+      requestForm.classList.add('hidden');
+      resetForm.classList.remove('hidden');
+    }
+
+    // Step 1: Submit Request
+    requestForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alertBox.classList.add('hidden');
+      const email = document.getElementById('reqEmail').value.trim();
+      const btn = document.getElementById('reqBtn');
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="inline-block animate-spin mr-2">⟳</span> Enviando...';
+
+      try {
+        const res = await fetch('/api/cliente/auth/request-reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const data = await res.json();
+
+        showAlert(data.message || 'Se o e-mail estiver cadastrado, enviamos o link de recuperação.', 'success');
+        btn.disabled = false;
+        btn.innerHTML = '<span>Enviar Link de Recuperação</span><i data-lucide="send" class="w-4 h-4"></i>';
+        lucide.createIcons();
+      } catch (err) {
+        showAlert('Erro de conexão ao solicitar recuperação.');
+        btn.disabled = false;
+        btn.innerHTML = '<span>Enviar Link de Recuperação</span><i data-lucide="send" class="w-4 h-4"></i>';
+        lucide.createIcons();
+      }
+    });
+
+    // Step 2: Submit Reset
+    resetForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      alertBox.classList.add('hidden');
+
+      const newPass = document.getElementById('newPassword').value;
+      const confirmPass = document.getElementById('confirmNewPassword').value;
+      const btn = document.getElementById('resetBtn');
+
+      if (newPass.length < 8) {
+        showAlert('A nova senha deve ter no mínimo 8 caracteres.');
+        return;
+      }
+
+      if (newPass !== confirmPass) {
+        showAlert('As senhas digitadas não conferem.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="inline-block animate-spin mr-2">⟳</span> Redefinindo...';
+
+      try {
+        const res = await fetch('/api/cliente/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, newPassword: newPass }),
+        });
+        const data = await res.json();
+
+        if (!res.ok || !data.success) {
+          showAlert(data.error || 'Erro ao redefinir senha.');
+          btn.disabled = false;
+          btn.innerHTML = '<span>Redefinir Senha & Entrar</span><i data-lucide="arrow-right" class="w-4 h-4"></i>';
+          lucide.createIcons();
+          return;
+        }
+
+        showAlert('Senha alterada com sucesso! Redirecionando para o login...', 'success');
+        setTimeout(() => {
+          window.location.href = '/cliente/login';
+        }, 1200);
+      } catch (err) {
+        showAlert('Erro ao conectar ao servidor.');
+        btn.disabled = false;
+        btn.innerHTML = '<span>Redefinir Senha & Entrar</span><i data-lucide="arrow-right" class="w-4 h-4"></i>';
+        lucide.createIcons();
+      }
+    });
+  </script>
+</body>
+</html>
