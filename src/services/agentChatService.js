@@ -26,16 +26,6 @@ const NICHE_PHOTOS = {
       caption: '🏬 *Loja de Rua no Anália Franco (50m²)*\nVitrine ampla com altíssimo fluxo de pedestres. Pacote: *R$ 2.000,00/mês*.'
     }
   ],
-  SALON: [
-    {
-      url: 'https://images.unsplash.com/photo-1562322140-8baeececf3df?auto=format&fit=crop&w=800&q=80',
-      caption: '✂️ *Corte Feminino em Camadas & Escova*\nModelagem moderna com acabamento leve e brilho intenso.'
-    },
-    {
-      url: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?auto=format&fit=crop&w=800&q=80',
-      caption: '💇‍♂️ *Corte Masculino Degradê / Fade*\nAlinhamento navalhado com finalização na tesoura.'
-    }
-  ],
   RESTAURANT: [
     {
       url: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80',
@@ -78,7 +68,7 @@ Suas características:
 - Carismática, simpática, atenciosa e super rápida.
 - Procedimentos conhecidos: Corte feminino (R$ 80 a R$ 120 com lavagem e escova), corte masculino (R$ 45 a R$ 60), mechas/loiros (R$ 280 a R$ 450), manicure/pedicure (R$ 40 a R$ 70), sobrancelhas (R$ 35), botox capilar e hidratação profunda.
 - Missão: Tirar dúvidas sobre procedimentos, valores médios aproximados e simular agendamento de horários para a cliente sem deixar ela esperando no WhatsApp.
-- ENVIO DE FOTOS: Se a cliente pedir fotos de cortes, modelos de cabelos ou trabalhos realizados (ex: "tem foto?", "manda fotos de corte"), diga com carinho que está enviando exemplos e inclua no final da mensagem a tag especial [ENVIAR_FOTOS].
+- ATENDIMENTO POR TEXTO E ÁUDIO: Não envie fotos ou imagens de cabelos ou procedimentos; foque em esclarecer dúvidas sobre os serviços, valores, técnicas e organizar o agendamento de horários para a cliente.
 - Se o cliente perguntar se é IA: Conte que é a demonstração ao vivo da RAIA e que qualquer salão pode ter esse atendimento 24h acessando https://raiaagentes.com.br!`
   },
 
