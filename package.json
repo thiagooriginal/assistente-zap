@@ -5,6 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
+    "start:staging": "node src/server/start-staging.js",
     "tunnel": ".\\cloudflared.exe tunnel --url http://localhost:3333",
     "auth-calendar": "node src/scripts/authCalendar.js",
     "push-calendar": "node src/scripts/pushCalendarCredentials.js",

@@ -36,6 +36,46 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+// Staging HTTP Basic Auth Gate (Protection against unauthorized indexing & public probing)
+function stagingProtectionMiddleware(req, res, next) {
+  const isStagingProtected = process.env.STAGING_PROTECTION_ENABLED === 'true' ||
+                             process.env.STAGING_AUTH_ENABLED === 'true' ||
+                             Boolean(process.env.STAGING_PASSWORD);
+
+  if (!isStagingProtected) {
+    return next();
+  }
+
+  // Bypass health checks, diagnostics and webhooks
+  const bypassPaths = [
+    '/api/health',
+    '/api/health/ready',
+    '/api/webhooks/asaas',
+    '/api/webhooks/hotmart',
+    '/api/analytics/event'
+  ];
+  if (bypassPaths.includes(req.path) || req.path.startsWith('/api/webhooks/')) {
+    return next();
+  }
+
+  const expectedUser = process.env.STAGING_USER || 'raia-staging';
+  const expectedPassword = process.env.STAGING_PASSWORD || 'raia2026staging!';
+
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Basic ')) {
+    const credentials = Buffer.from(authHeader.slice(6), 'base64').toString('utf8');
+    const [user, pass] = credentials.split(':');
+    if (user === expectedUser && pass === expectedPassword) {
+      return next();
+    }
+  }
+
+  res.setHeader('WWW-Authenticate', 'Basic realm="RAIA AGENTES Homologacao"');
+  return res.status(401).send('Acesso restrito ao ambiente de homologacao RAIA AGENTES. Autenticacao basica necessaria.');
+}
+
+app.use(stagingProtectionMiddleware);
 app.use(express.static(path.resolve(__dirname, '../../public')));
 
 // Mount Client Portal APIs
@@ -215,6 +255,48 @@ function requireAdmin(req, res, next) {
     return next();
   });
 }
+
+// ==========================================
+// READY HEALTH CHECK ENDPOINT (EASYPANEL / DOCKER)
+// Returns HTTP 200 ONLY when DB & core schema are fully operational
+// ==========================================
+app.get('/api/health/ready', (req, res) => {
+  try {
+    const dbCheck = db.prepare('SELECT 1 AS alive').get();
+    if (!dbCheck || dbCheck.alive !== 1) {
+      return res.status(503).json({
+        status: 'not_ready',
+        ready: false,
+        error: 'Database connection failed'
+      });
+    }
+
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('users', 'products', 'product_plans', 'customer_subscriptions')").all();
+    if (tables.length < 4) {
+      return res.status(503).json({
+        status: 'not_ready',
+        ready: false,
+        error: `Database schema incomplete (found ${tables.length}/4 core tables)`
+      });
+    }
+
+    return res.status(200).json({
+      status: 'ready',
+      ready: true,
+      timestamp: new Date().toISOString(),
+      uptime: Math.floor(process.uptime()),
+      mode: process.env.APP_MODE || (process.env.HOMOLOGACAO === 'true' ? 'homologacao' : 'standard'),
+      database: 'connected',
+      version: '1.0.0-staging'
+    });
+  } catch (err) {
+    return res.status(503).json({
+      status: 'not_ready',
+      ready: false,
+      error: err.message
+    });
+  }
+});
 
 // ==========================================
 // SYSTEM HEALTH CHECK & DIAGNOSTICS ENDPOINT

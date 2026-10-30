@@ -709,13 +709,22 @@ router.post('/pro/campaigns', clientAuthMiddleware, requireProductAccess('JESSIC
 // WHATSAPP DISPATCH & DEMO SECURITY GUARDS
 // ==========================================
 
-// Test WhatsApp Message (Strictly blocked on Demo Account)
+// Test WhatsApp Message (Strictly blocked on Demo Account & Homologation)
 router.post('/test-whatsapp', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
   if (req.isDemo || req.clientUser.is_demo) {
     return res.status(403).json({
       success: false,
       isDemoBlocked: true,
       error: 'Ambiente de Homologação / Demonstração: O envio de mensagens reais via WhatsApp está estritamente bloqueado para a conta de homologação Hotmart.',
+    });
+  }
+
+  const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging' || process.env.APP_MODE === 'homologacao';
+  if (isStaging) {
+    return res.status(403).json({
+      success: false,
+      isDemoBlocked: true,
+      error: 'Ambiente de Homologação: O envio de mensagens reais via WhatsApp está estritamente desativado no ambiente de homologação.',
     });
   }
 
@@ -730,7 +739,7 @@ router.post('/test-whatsapp', clientAuthMiddleware, requireProductAccess('JESSIC
   });
 });
 
-// Dispatch Campaign (Strictly blocked on Demo Account)
+// Dispatch Campaign (Strictly blocked on Demo Account & Homologation)
 router.post('/pro/campaigns/:id/send', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
   const isPro = req.clientUser.plan_tier === 'JESSICA_PRO' || req.isDemo;
   if (!isPro) {
@@ -742,6 +751,15 @@ router.post('/pro/campaigns/:id/send', clientAuthMiddleware, requireProductAcces
       success: false,
       isDemoBlocked: true,
       error: 'Ambiente de Homologação / Demonstração: O disparo de campanhas para números reais de WhatsApp está estritamente bloqueado para a conta de homologação Hotmart.',
+    });
+  }
+
+  const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging' || process.env.APP_MODE === 'homologacao';
+  if (isStaging) {
+    return res.status(403).json({
+      success: false,
+      isDemoBlocked: true,
+      error: 'Ambiente de Homologação: O disparo de campanhas para números reais de WhatsApp está estritamente desativado no ambiente de homologação.',
     });
   }
 

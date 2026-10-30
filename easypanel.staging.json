@@ -5,7 +5,7 @@
     "type": "github",
     "owner": "thiagooriginal",
     "repo": "assistente-zap",
-    "ref": "staging",
+    "ref": "raia-hotmart-homologacao",
     "path": "/"
   },
   "build": {
@@ -16,32 +16,46 @@
     { "key": "NODE_ENV", "value": "production" },
     { "key": "PORT", "value": "3333" },
     { "key": "BASE_URL", "value": "https://staging.raiaagentes.com.br" },
+    { "key": "APP_MODE", "value": "staging" },
+    { "key": "HOMOLOGACAO", "value": "true" },
+    { "key": "DISABLE_WHATSAPP", "value": "true" },
     { "key": "PAUSE_PERSONAL_ASSISTANT", "value": "true" },
+    { "key": "ASAAS_ENV", "value": "sandbox" },
+    { "key": "ASAAS_API_KEY", "value": "" },
+    { "key": "ASAAS_WEBHOOK_SECRET", "value": "" },
     { "key": "HOTMART_PRODUCT_ID", "value": "8840376" },
     { "key": "HOTMART_WEBHOOK_SECRET", "value": "" },
     { "key": "HOTMART_PLAN_START_ID", "value": "" },
     { "key": "HOTMART_PLAN_PRO_ID", "value": "" },
     { "key": "DEMO_ACCOUNT_EMAIL", "value": "homologacao.hotmart@raiaagentes.com.br" },
-    { "key": "DEMO_ACCOUNT_PASSWORD", "value": "" }
+    { "key": "DEMO_ACCOUNT_PASSWORD", "value": "" },
+    { "key": "STAGING_PROTECTION_ENABLED", "value": "false" },
+    { "key": "STAGING_USER", "value": "raia-staging" },
+    { "key": "STAGING_PASSWORD", "value": "" }
   ],
   "mounts": [
     {
       "type": "volume",
-      "name": "raia_staging_data",
+      "name": "raia_staging_sqlite_data",
       "mountPath": "/app/data"
     },
     {
       "type": "volume",
-      "name": "raia_staging_baileys",
+      "name": "raia_staging_baileys_auth",
       "mountPath": "/app/auth_info_baileys"
     }
   ],
   "domains": [
     {
       "host": "staging.raiaagentes.com.br",
-      "https": true
+      "https": true,
+      "port": 3333
     }
   ],
+  "healthCheck": {
+    "path": "/api/health/ready",
+    "status": 200
+  },
   "resources": {
     "memoryReservation": 256,
     "memoryLimit": 1024,

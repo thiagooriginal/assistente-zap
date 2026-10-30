@@ -13,22 +13,36 @@ services:
       - NODE_ENV=production
       - PORT=3333
       - BASE_URL=https://staging.raiaagentes.com.br
+      - APP_MODE=staging
+      - HOMOLOGACAO=true
+      - DISABLE_WHATSAPP=true
       - PAUSE_PERSONAL_ASSISTANT=true
+      # Asaas Sandbox (Exclusivo para testes, NUNCA tokens de produção)
+      - ASAAS_ENV=sandbox
+      - ASAAS_API_KEY=${ASAAS_SANDBOX_API_KEY:-}
+      - ASAAS_WEBHOOK_SECRET=${ASAAS_SANDBOX_WEBHOOK_SECRET:-}
+      # Hotmart Testes
       - HOTMART_PRODUCT_ID=8840376
       - HOTMART_WEBHOOK_SECRET=${HOTMART_WEBHOOK_SECRET:-}
       - HOTMART_PLAN_START_ID=${HOTMART_PLAN_START_ID:-}
       - HOTMART_PLAN_PRO_ID=${HOTMART_PLAN_PRO_ID:-}
+      # Conta Demonstrativa Homologação
       - DEMO_ACCOUNT_EMAIL=homologacao.hotmart@raiaagentes.com.br
       - DEMO_ACCOUNT_PASSWORD=${DEMO_ACCOUNT_PASSWORD:-}
+      # Proteção HTTP Basic Auth Opcional para Homologação
+      - STAGING_PROTECTION_ENABLED=${STAGING_PROTECTION_ENABLED:-false}
+      - STAGING_USER=${STAGING_USER:-raia-staging}
+      - STAGING_PASSWORD=${STAGING_PASSWORD:-}
     volumes:
-      # Volumes isolados: Não tocam no banco de produção
+      # Volumes isolados: NUNCA tocam no banco ou sessões de produção
       - staging_sqlite_data:/app/data
       - staging_baileys_auth:/app/auth_info_baileys
     healthcheck:
-      test: ["CMD", "node", "-e", "fetch('http://localhost:3333/api/cliente/auth/login').then(() => process.exit(0)).catch(() => process.exit(1))"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3333/api/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 20s
+      timeout: 5s
       retries: 3
+      start_period: 5s
 
 volumes:
   staging_sqlite_data:
