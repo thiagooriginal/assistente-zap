@@ -566,6 +566,18 @@ async function handleWebhookEvent(eventData) {
           console.warn('[Asaas Webhook] Erro ao gravar evento direto:', e.message);
         }
       }
+
+      // Sync customer_subscriptions for multiproduct
+      try {
+        const subStatus = user.password_hash ? 'ACTIVE' : 'PENDING';
+        db.prepare(`
+          UPDATE customer_subscriptions
+          SET status = ?, paid_until = ?, access_expires_at = ?,
+              gateway_payment_id = COALESCE(?, gateway_payment_id),
+              updated_at = CURRENT_TIMESTAMP
+          WHERE (gateway_subscription_id = ? OR gateway_payment_id = ? OR (user_id = ? AND origin = 'ASAAS'))
+        `).run(subStatus, paidUntilDate, paidUntilDate, payment?.id || null, subId || null, payment?.id || null, user.id);
+      } catch (e) {}
     } else if (event === 'PAYMENT_OVERDUE') {
       db.prepare(`
         UPDATE users SET subscription_status = 'OVERDUE', updated_at = CURRENT_TIMESTAMP WHERE id = ?
@@ -573,6 +585,14 @@ async function handleWebhookEvent(eventData) {
       db.prepare(`
         UPDATE direct_sales_contracts SET payment_status = 'OVERDUE', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?
       `).run(user.id);
+
+      try {
+        db.prepare(`
+          UPDATE customer_subscriptions
+          SET status = 'OVERDUE', updated_at = CURRENT_TIMESTAMP
+          WHERE (gateway_subscription_id = ? OR gateway_payment_id = ? OR (user_id = ? AND origin = 'ASAAS'))
+        `).run(subId || null, payment?.id || null, user.id);
+      } catch (e) {}
 
       const contract = db.prepare('SELECT id FROM direct_sales_contracts WHERE user_id = ?').get(user.id);
       if (contract) {
@@ -585,16 +605,24 @@ async function handleWebhookEvent(eventData) {
       db.prepare(`
         UPDATE users
         SET subscription_status = 'REFUNDED',
-            magic_token = NULL,
-            magic_token_expires_at = NULL,
-            reset_token = NULL,
-            reset_expires_at = NULL,
-            updated_at = CURRENT_TIMESTAMP
+        magic_token = NULL,
+        magic_token_expires_at = NULL,
+        reset_token = NULL,
+        reset_expires_at = NULL,
+        updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(user.id);
       db.prepare(`
         UPDATE direct_sales_contracts SET payment_status = 'REFUNDED', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?
       `).run(user.id);
+
+      try {
+        db.prepare(`
+          UPDATE customer_subscriptions
+          SET status = 'REFUNDED', updated_at = CURRENT_TIMESTAMP
+          WHERE (gateway_subscription_id = ? OR gateway_payment_id = ? OR (user_id = ? AND origin = 'ASAAS'))
+        `).run(subId || null, payment?.id || null, user.id);
+      } catch (e) {}
 
       const contract = db.prepare('SELECT id FROM direct_sales_contracts WHERE user_id = ?').get(user.id);
       if (contract) {
@@ -610,6 +638,14 @@ async function handleWebhookEvent(eventData) {
       db.prepare(`
         UPDATE direct_sales_contracts SET payment_status = 'PAID', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?
       `).run(user.id);
+
+      try {
+        db.prepare(`
+          UPDATE customer_subscriptions
+          SET status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
+          WHERE (gateway_subscription_id = ? OR (user_id = ? AND origin = 'ASAAS'))
+        `).run(subId || null, user.id);
+      } catch (e) {}
     } else if (event === 'SUBSCRIPTION_DELETED' || event === 'SUBSCRIPTION_INACTIVATED') {
       // Cancellation without penalty (sem fidelidade) -> keeps access until paid_until expires
       db.prepare(`
@@ -618,6 +654,14 @@ async function handleWebhookEvent(eventData) {
       db.prepare(`
         UPDATE direct_sales_contracts SET payment_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?
       `).run(user.id);
+
+      try {
+        db.prepare(`
+          UPDATE customer_subscriptions
+          SET status = 'CANCELLED', cancelled_at = CURRENT_TIMESTAMP, cancellation_reason = 'Assinatura cancelada no Asaas', updated_at = CURRENT_TIMESTAMP
+          WHERE (gateway_subscription_id = ? OR (user_id = ? AND origin = 'ASAAS'))
+        `).run(subId || null, user.id);
+      } catch (e) {}
 
       const contract = db.prepare('SELECT id FROM direct_sales_contracts WHERE user_id = ?').get(user.id);
       if (contract) {

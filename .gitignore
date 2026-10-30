@@ -8,4 +8,5 @@ qrcode.png
 *.log
 cloudflared.exe
 scratch/
+raia_multicanal_patch/
 

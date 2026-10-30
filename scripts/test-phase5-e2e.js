@@ -119,6 +119,8 @@ async function main() {
 
   runTest('3.1 Criação de novo comprador inicia com status PENDING e token seguro', () => {
     // Limpar usuários de teste anteriores caso existam
+    db.prepare("DELETE FROM subscription_audit_logs WHERE user_id IN (SELECT id FROM users WHERE email IN ('test_cliente_a@salao.com', 'test_cliente_b@salao.com'))").run();
+    db.prepare("DELETE FROM customer_subscriptions WHERE user_id IN (SELECT id FROM users WHERE email IN ('test_cliente_a@salao.com', 'test_cliente_b@salao.com'))").run();
     db.prepare("DELETE FROM users WHERE email IN ('test_cliente_a@salao.com', 'test_cliente_b@salao.com')").run();
 
     activationTokenA = crypto.randomBytes(24).toString('hex');
@@ -280,6 +282,8 @@ async function main() {
 
   await runAsyncTest('6.2 Webhook v2 processa compra de Jéssica Pro e salva atribuição de afiliado', async () => {
     // Limpar comprador de teste caso exista
+    db.prepare("DELETE FROM subscription_audit_logs WHERE user_id IN (SELECT id FROM users WHERE email = 'novo_comprador_hotmart@salao.com')").run();
+    db.prepare("DELETE FROM customer_subscriptions WHERE user_id IN (SELECT id FROM users WHERE email = 'novo_comprador_hotmart@salao.com')").run();
     db.prepare("DELETE FROM users WHERE email = 'novo_comprador_hotmart@salao.com'").run();
 
     const testTxId = 'HP_E2E_' + Date.now();

@@ -141,6 +141,30 @@ async function createDirectContract(input, adminId) {
         firstPayment?.invoiceUrl || null, pixData?.payload || null
       );
     const contractId = Number(contract.lastInsertRowid);
+
+    try {
+      const jessica = db.prepare("SELECT id FROM products WHERE code = 'JESSICA'").get();
+      let planCode = 'START';
+      if (quoted.planTier.includes('PRO')) planCode = 'PRO';
+      else if (quoted.planTier.includes('INTERMEDIATE')) planCode = 'INTERMEDIATE';
+      const plan = jessica ? db.prepare('SELECT id FROM product_plans WHERE product_id = ? AND code = ?').get(jessica.id, planCode) : null;
+
+      db.prepare(`
+        INSERT INTO customer_subscriptions (
+          user_id, product_id, plan_id, origin, gateway, gateway_subscription_id,
+          gateway_customer_id, gateway_payment_id, status, price_cents, setup_fee_cents,
+          billing_cycle, promotional_fair, extra_professionals, contracted_at
+        ) VALUES (?, ?, ?, 'ASAAS', 'ASAAS', ?, ?, ?, 'PENDING', ?, ?, 'MONTHLY', ?, ?, CURRENT_TIMESTAMP)
+      `).run(
+        userId, jessica?.id || 1, plan?.id || null,
+        asaasSub?.id || null, asaasCustomer?.id || null, firstPayment?.id || null,
+        quoted.monthlyCents, quoted.setupCents, quoted.promotion === 'FAIR_2026' ? 1 : 0,
+        quoted.extraProfessionals || 0
+      );
+    } catch (csErr) {
+      console.warn('[directSalesService] Aviso ao criar customer_subscriptions:', csErr.message);
+    }
+
     db.prepare(`INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
        VALUES (?, ?, 'CREATED_PENDING_PAYMENT', ?)`)
       .run(contractId, adminId, asaasSub ? `Assinatura Asaas criada: ${asaasSub.id}. Aguardando primeiro pagamento.` : 'Contrato direto registrado.');
@@ -196,6 +220,13 @@ function confirmPayment({ contractId, paymentReference, paidUntil, adminId }) {
         activation_token = ?, activation_expires_at = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?`)
       .run(date, token, new Date(Date.now() + 48 * 3600000).toISOString(), row.user_id);
+    try {
+      db.prepare(`
+        UPDATE customer_subscriptions
+        SET status = 'PENDING', paid_until = ?, access_expires_at = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ? AND product_id = (SELECT id FROM products WHERE code = 'JESSICA')
+      `).run(date, date, row.user_id);
+    } catch (e) {}
     db.prepare(`INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
       VALUES (?, ?, 'PAYMENT_CONFIRMED', ?)`)
       .run(row.id, adminId, `Referência verificada: ${reference}`);
@@ -230,6 +261,13 @@ function renewContract({ contractId, paymentReference, paidUntil, adminId }) {
     const status = row.subscription_status === 'PENDING' ? 'PENDING' : 'ACTIVE';
     db.prepare(`UPDATE users SET paid_until = ?, subscription_status = ?,
       updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(date, status, row.user_id);
+    try {
+      db.prepare(`
+        UPDATE customer_subscriptions
+        SET status = ?, paid_until = ?, access_expires_at = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ? AND product_id = (SELECT id FROM products WHERE code = 'JESSICA')
+      `).run(status, date, date, row.user_id);
+    } catch (e) {}
     db.prepare(`INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
       VALUES (?, ?, 'RENEWAL_CONFIRMED', ?)`)
       .run(row.id, adminId, `Referência verificada: ${reference}`);
@@ -256,6 +294,13 @@ async function cancelContract({ contractId, adminId }) {
   return runTransaction(() => {
     db.prepare("UPDATE users SET subscription_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
       .run(row.user_id);
+    try {
+      db.prepare(`
+        UPDATE customer_subscriptions
+        SET status = 'CANCELLED', cancelled_at = CURRENT_TIMESTAMP, cancellation_reason = 'Cancelamento sem fidelidade', updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ? AND product_id = (SELECT id FROM products WHERE code = 'JESSICA')
+      `).run(row.user_id);
+    } catch (e) {}
     db.prepare("UPDATE direct_sales_contracts SET payment_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
       .run(row.id);
     db.prepare(`INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)

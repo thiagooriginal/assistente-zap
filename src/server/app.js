@@ -21,6 +21,7 @@ const analyticsService = require('../services/analyticsService');
 const metaCapiService = require('../services/metaCapiService');
 const clientAuth = require('../services/clientAuthService');
 const directSales = require('../services/directSalesService');
+const productService = require('../services/productService');
 const { PLANS } = require('../services/planCatalog');
 const { adminLoginLimiter } = require('../middlewares/rateLimiter');
 
@@ -555,6 +556,133 @@ app.post('/api/admin/direct-sales/:id/cancel', requireAdmin, async (req, res) =>
     return res.json({ success: true, contract });
   } catch (e) {
     return res.status(e.status || 500).json({ success: false, error: e.status ? e.message : 'Erro interno.' });
+  }
+});
+
+// ==========================================
+// CENTRAL DE PRODUTOS & MULTIPRODUTO ADMIN
+// ==========================================
+
+// 1. List all products and their plans (Catalog)
+app.get('/api/admin/products', requireAdmin, (req, res) => {
+  try {
+    const products = productService.listProducts({ activeOnly: false, includePlans: true });
+    return res.json({ success: true, products });
+  } catch (err) {
+    console.error('Erro em GET /api/admin/products:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 2. Create new product in catalog
+app.post('/api/admin/products', requireAdmin, (req, res) => {
+  try {
+    const product = productService.createProduct(req.body || {});
+    return res.status(201).json({ success: true, product });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 3. Update existing product
+app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
+  try {
+    const product = productService.updateProduct(Number(req.params.id), req.body || {});
+    return res.json({ success: true, product });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 4. Create new plan for a product
+app.post('/api/admin/products/:id/plans', requireAdmin, (req, res) => {
+  try {
+    const plan = productService.createPlan(Number(req.params.id), req.body || {});
+    return res.status(201).json({ success: true, plan });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 5. Update existing plan
+app.put('/api/admin/plans/:id', requireAdmin, (req, res) => {
+  try {
+    const plan = productService.updatePlan(Number(req.params.id), req.body || {});
+    return res.json({ success: true, plan });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 6. Multiproduct Metrics & Financial Reporting
+app.get('/api/admin/multiproduct/metrics', requireAdmin, (req, res) => {
+  try {
+    const metrics = productService.getMultiproductMetrics();
+    return res.json({ success: true, metrics });
+  } catch (err) {
+    console.error('Erro em /api/admin/multiproduct/metrics:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 7. List Subscriptions Across Products
+app.get('/api/admin/multiproduct/subscriptions', requireAdmin, (req, res) => {
+  try {
+    const { productId, status, origin, limit } = req.query;
+    const subscriptions = productService.listAllSubscriptions({
+      productId: productId ? Number(productId) : undefined,
+      status: status || undefined,
+      origin: origin || undefined,
+      limit: limit ? Number(limit) : 100,
+    });
+    return res.json({ success: true, subscriptions });
+  } catch (err) {
+    console.error('Erro em /api/admin/multiproduct/subscriptions:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 8. Create Customer Subscription (Multi-Product Contract)
+app.post('/api/admin/multiproduct/subscriptions', requireAdmin, (req, res) => {
+  try {
+    const sub = productService.createCustomerSubscription({
+      ...req.body,
+      adminId: req.user.id,
+    });
+    return res.status(201).json({ success: true, subscription: sub });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 9. Cancel Specific Product Subscription
+app.post('/api/admin/multiproduct/subscriptions/:id/cancel', requireAdmin, (req, res) => {
+  try {
+    const sub = productService.cancelSubscription(Number(req.params.id), {
+      reason: req.body?.reason,
+      adminId: req.user.id,
+    });
+    return res.json({ success: true, subscription: sub });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// 10. Renew Specific Product Subscription
+app.post('/api/admin/multiproduct/subscriptions/:id/renew', requireAdmin, (req, res) => {
+  try {
+    const { paidUntil, gatewayPaymentId, reason } = req.body || {};
+    if (!paidUntil) {
+      return res.status(400).json({ success: false, error: 'paidUntil é obrigatório para renovação.' });
+    }
+    const sub = productService.renewSubscription(Number(req.params.id), paidUntil, {
+      gatewayPaymentId,
+      reason,
+      adminId: req.user.id,
+    });
+    return res.json({ success: true, subscription: sub });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
   }
 });
 

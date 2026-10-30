@@ -641,6 +641,51 @@ async function processWebhook(payload, whatsappSender = null) {
         break;
     }
 
+    // Sync customer_subscriptions for multiproduct
+    try {
+      const targetUser = existingUser?.id ? db.prepare('SELECT * FROM users WHERE id = ?').get(existingUser.id) : null;
+      if (targetUser) {
+        const jessica = db.prepare("SELECT id FROM products WHERE code = 'JESSICA'").get();
+        if (jessica) {
+          let pCode = 'START';
+          if (targetUser.plan_tier?.includes('PRO')) pCode = 'PRO';
+          else if (targetUser.plan_tier?.includes('INTERMEDIATE')) pCode = 'INTERMEDIATE';
+          const pl = db.prepare('SELECT id, price_cents FROM product_plans WHERE product_id = ? AND code = ?').get(jessica.id, pCode);
+
+          const existingSub = db.prepare('SELECT id FROM customer_subscriptions WHERE user_id = ? AND product_id = ?').get(targetUser.id, jessica.id);
+          const subStatus = ['ACTIVE', 'PENDING', 'OVERDUE', 'CANCELLED', 'REFUNDED'].includes(targetUser.subscription_status)
+            ? targetUser.subscription_status
+            : (targetUser.subscription_status === 'CANCELED' ? 'CANCELLED' : 'PENDING');
+
+          if (existingSub) {
+            db.prepare(`
+              UPDATE customer_subscriptions
+              SET status = ?, paid_until = ?, access_expires_at = ?, plan_id = COALESCE(?, plan_id),
+                  gateway_subscription_id = COALESCE(?, gateway_subscription_id),
+                  gateway_payment_id = COALESCE(?, gateway_payment_id),
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(subStatus, targetUser.paid_until || null, targetUser.paid_until || null, pl?.id || null, targetUser.hotmart_subscriber_code || null, targetUser.hotmart_transaction || null, existingSub.id);
+          } else {
+            db.prepare(`
+              INSERT INTO customer_subscriptions (
+                user_id, product_id, plan_id, origin, gateway, gateway_subscription_id,
+                gateway_payment_id, status, price_cents, setup_fee_cents, billing_cycle,
+                contracted_at, paid_until, access_expires_at
+              ) VALUES (?, ?, ?, 'HOTMART', 'HOTMART', ?, ?, ?, ?, 0, 'MONTHLY', CURRENT_TIMESTAMP, ?, ?)
+            `).run(
+              targetUser.id, jessica.id, pl?.id || null,
+              targetUser.hotmart_subscriber_code || null, targetUser.hotmart_transaction || null,
+              subStatus, pl?.price_cents || 8900,
+              targetUser.paid_until || null, targetUser.paid_until || null
+            );
+          }
+        }
+      }
+    } catch (csErr) {
+      console.warn('[Hotmart Webhook] Aviso ao sincronizar customer_subscriptions:', csErr.message);
+    }
+
     // Mark event as processed in audit table
     db.prepare("UPDATE hotmart_webhook_events SET status = 'PROCESSED' WHERE event_id = ?").run(eventId);
 

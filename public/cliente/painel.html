@@ -96,6 +96,14 @@
 
       <!-- Nav Items -->
       <nav class="space-y-1.5 mt-4">
+        <button data-tab="my-products" class="nav-btn w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+          <div class="flex items-center gap-3">
+            <i data-lucide="boxes" class="w-4 h-4 text-[#00F59B]"></i>
+            <span>Meus Produtos</span>
+          </div>
+          <span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30">HUB</span>
+        </button>
+
         <button data-tab="overview" class="nav-btn active w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/20">
           <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
           <span>Visão Geral & WhatsApp</span>
@@ -184,6 +192,44 @@
 
     <!-- Content Sections Container -->
     <div class="p-6 md:p-8 space-y-8 flex-1">
+
+      <!-- ============================================== -->
+      <!-- TAB 0: CENTRAL MEUS PRODUTOS                   -->
+      <!-- ============================================== -->
+      <section id="tab-my-products" class="tab-content hidden space-y-6">
+        <div class="border-b border-white/5 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="boxes" class="w-5 h-5 text-[#00F59B]"></i>
+              <span>Meus Produtos & Assinaturas</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">Visão individual de cada agente de IA contratado, status financeiro e períodos vigentes.</p>
+          </div>
+          <a href="https://wa.me/5511951364159?text=Ol%C3%A1%21+Gostaria+de+conhecer+outros+produtos+da+RAIA+AGENTES" target="_blank" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs border border-white/10 transition-all flex items-center gap-2 w-fit">
+            <i data-lucide="sparkles" class="w-4 h-4 text-[#00F59B]"></i>
+            <span>Contratar Mais Agentes</span>
+          </a>
+        </div>
+
+        <!-- Produtos Contratados Grid -->
+        <div class="space-y-3">
+          <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Produtos Contratados</div>
+          <div id="myProductsGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div class="p-8 text-center text-slate-400 text-xs">Carregando seus produtos...</div>
+          </div>
+        </div>
+
+        <!-- Catálogo de Agentes Disponíveis -->
+        <div class="space-y-3 pt-4 border-t border-white/5">
+          <div class="flex items-center justify-between">
+            <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Catálogo de Agentes RAIA</div>
+            <span class="text-[10px] text-slate-500">Expanda sua operação com novos agentes modulares</span>
+          </div>
+          <div id="availableProductsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="p-6 text-center text-slate-400 text-xs col-span-full">Carregando catálogo...</div>
+          </div>
+        </div>
+      </section>
 
       <!-- ============================================== -->
       <!-- TAB 1: VISÃO GERAL & WHATSAPP                   -->
@@ -619,6 +665,7 @@
     const pageSubtitle = document.getElementById('pageSubtitle');
 
     const tabMeta = {
+      'my-products': { title: 'Meus Produtos & Assinaturas', subtitle: 'Central unificada de agentes de IA, contratos ativos e renovações' },
       'overview': { title: 'Visão Geral & Assistente Jéssica', subtitle: 'Status em tempo real da sua secretária de IA' },
       'salon': { title: 'Meu Salão & Horários de Atendimento', subtitle: 'Personalize horários e informações do estabelecimento' },
       'services': { title: 'Tabela de Serviços & Preços', subtitle: 'Procedimentos conhecidos e informados pela Jéssica' },
@@ -652,7 +699,8 @@
       lucide.createIcons();
 
       // Trigger data loads
-      if (tabId === 'services') loadServices();
+      if (tabId === 'my-products') loadMyProducts();
+      else if (tabId === 'services') loadServices();
       else if (tabId === 'staff') loadStaff();
       else if (tabId === 'appointments') loadAppointments();
       else if (tabId === 'dashboard-pro') loadProDashboard();
@@ -668,6 +716,144 @@
       const sb = document.getElementById('sidebar');
       sb.classList.toggle('-translate-x-full');
     });
+
+    // 0. Meus Produtos Hub Loader
+    async function loadMyProducts() {
+      try {
+        const [subRes, catRes] = await Promise.all([
+          fetch('/api/cliente/my-products'),
+          fetch('/api/cliente/products-catalog'),
+        ]);
+        const subData = await subRes.json();
+        const catData = await catRes.json();
+
+        const grid = document.getElementById('myProductsGrid');
+        grid.innerHTML = '';
+
+        if (!subData.subscriptions || subData.subscriptions.length === 0) {
+          grid.innerHTML = '<div class="col-span-full p-8 text-center text-slate-400 text-xs">Nenhum produto contratado no momento.</div>';
+        } else {
+          subData.subscriptions.forEach(sub => {
+            const card = document.createElement('div');
+            card.className = 'p-5 rounded-2xl bg-[#11131a] border border-white/10 space-y-4 hover:border-white/20 transition-all';
+
+            const statusColors = {
+              ACTIVE: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+              PENDING: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+              OVERDUE: 'bg-rose-500/10 text-rose-400 border-rose-500/30',
+              CANCELLED: 'bg-slate-500/10 text-slate-400 border-slate-500/30',
+            };
+            const statusLabels = {
+              ACTIVE: 'Ativo',
+              PENDING: 'Aguardando Ativação',
+              OVERDUE: 'Em Atraso',
+              CANCELLED: sub.isAccessActive ? 'Cancelado (Acesso Válido até Fim do Ciclo)' : 'Cancelado',
+            };
+
+            const statusClass = statusColors[sub.status] || 'bg-slate-500/10 text-slate-400 border-slate-500/30';
+            const statusLabel = statusLabels[sub.status] || sub.status;
+
+            const paidUntilText = sub.paidUntil
+              ? new Date(sub.paidUntil).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+              : 'Período contratado em vigor';
+
+            const originBadge = sub.origin === 'HOTMART' ? 'HOTMART' : 'ASAAS (DIRETO)';
+
+            card.innerHTML = `
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-white/5 text-slate-400 border border-white/10">${sub.productCategory}</span>
+                  <h3 class="text-base font-extrabold text-white mt-1.5 flex items-center gap-2">
+                    <i data-lucide="${sub.productIcon || 'bot'}" class="w-4 h-4 text-[#00F59B]"></i>
+                    <span>${sub.productName}</span>
+                  </h3>
+                  <div class="text-xs text-slate-400 mt-0.5 font-medium">Plano: <span class="text-white font-bold">${sub.planName}</span> • ${sub.priceFormatted} / mês</div>
+                </div>
+                <span class="text-[10px] px-2.5 py-1 rounded-full font-bold border ${statusClass} whitespace-nowrap">
+                  ${statusLabel}
+                </span>
+              </div>
+
+              <div class="p-3 rounded-xl bg-[#07080c] border border-white/5 text-xs space-y-1.5">
+                <div class="flex items-center justify-between text-slate-400">
+                  <span>Canal de Cobrança:</span>
+                  <span class="font-bold text-white">${originBadge}</span>
+                </div>
+                <div class="flex items-center justify-between text-slate-400">
+                  <span>Vigência Contratual:</span>
+                  <span class="font-bold ${sub.isAccessActive ? 'text-emerald-400' : 'text-rose-400'}">${paidUntilText}</span>
+                </div>
+                <div class="flex items-center justify-between text-slate-400">
+                  <span>Condição Contratual:</span>
+                  <span class="text-slate-300">Sem fidelidade • Preço garantido</span>
+                </div>
+              </div>
+
+              <div class="pt-2 flex items-center justify-between gap-3">
+                ${sub.productCode === 'JESSICA' ? `
+                  <button onclick="switchTab('overview')" class="flex-1 px-4 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#00F59B]/20">
+                    <i data-lucide="scissors" class="w-4 h-4"></i>
+                    <span>Acessar Módulo Jéssica</span>
+                  </button>
+                ` : `
+                  <button class="flex-1 px-4 py-2.5 rounded-xl bg-white/10 text-white font-bold text-xs hover:bg-white/20 transition-all flex items-center justify-center gap-2">
+                    <i data-lucide="external-link" class="w-4 h-4"></i>
+                    <span>Acessar Módulo</span>
+                  </button>
+                `}
+              </div>
+            `;
+            grid.appendChild(card);
+          });
+        }
+
+        // Render catalog
+        const catGrid = document.getElementById('availableProductsGrid');
+        catGrid.innerHTML = '';
+        if (catData.products && catData.products.length > 0) {
+          const userProdCodes = (subData.subscriptions || []).map(s => s.productCode);
+          catData.products.forEach(p => {
+            const alreadyContracted = userProdCodes.includes(p.code);
+            const card = document.createElement('div');
+            card.className = 'p-5 rounded-2xl bg-[#0c0e15] border border-white/5 space-y-3';
+            const lowestPlan = p.plans && p.plans.length > 0 ? p.plans[0] : null;
+            const priceFrom = lowestPlan ? (lowestPlan.price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Consulte';
+
+            card.innerHTML = `
+              <div class="flex items-center justify-between">
+                <span class="text-[10px] uppercase font-bold text-slate-500">${p.category}</span>
+                ${alreadyContracted ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">CONTRATADO</span>' : ''}
+              </div>
+              <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="${p.icon || 'bot'}" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>${p.name}</span>
+              </h4>
+              <p class="text-xs text-slate-400 line-clamp-2">${p.description || ''}</p>
+              <div class="pt-2 flex items-center justify-between border-t border-white/5 text-xs">
+                <div>
+                  <span class="text-[10px] text-slate-500">A partir de</span>
+                  <div class="font-bold text-white">${priceFrom} <span class="text-[10px] font-normal text-slate-400">/mês</span></div>
+                </div>
+                ${alreadyContracted ? `
+                  <button onclick="switchTab('overview')" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-semibold transition-colors">
+                    Gerenciar
+                  </button>
+                ` : `
+                  <a href="https://wa.me/5511951364159?text=Ol%C3%A1%21+Gostaria+de+contratar+o+${encodeURIComponent(p.name)}" target="_blank" class="px-3 py-1.5 rounded-lg bg-[#00F59B]/20 hover:bg-[#00F59B]/30 text-[#00F59B] text-xs font-bold transition-colors flex items-center gap-1.5">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                    <span>Contratar</span>
+                  </a>
+                `}
+              </div>
+            `;
+            catGrid.appendChild(card);
+          });
+        }
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Erro ao carregar Meus Produtos:', err);
+      }
+    }
 
     // 1. Initial Profile Loading
     async function loadProfile() {

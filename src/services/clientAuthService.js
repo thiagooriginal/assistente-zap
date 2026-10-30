@@ -90,6 +90,14 @@ function activateAccount(token, password) {
     WHERE id = ?
   `).run(hash, salt, newStatus, user.id);
 
+  try {
+    db.prepare(`
+      UPDATE customer_subscriptions
+      SET status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ? AND status = 'PENDING' AND paid_until IS NOT NULL
+    `).run(user.id);
+  } catch (e) {}
+
   // Ensure salon entry exists
   ensureSalonForUser(user.id, user.name);
 

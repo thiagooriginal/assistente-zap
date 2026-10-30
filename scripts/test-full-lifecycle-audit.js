@@ -17,7 +17,15 @@ async function testFullLifecycle() {
   const initialNextCharge = Date.now() + 30 * 24 * 60 * 60 * 1000;
 
   // Cleanup if exists
-  db.prepare('DELETE FROM users WHERE LOWER(email) = ? OR phone_number = ?').run(buyerEmail, buyerPhone);
+  const prevBuyerIds = db.prepare('SELECT id FROM users WHERE LOWER(email) = ? OR phone_number = ?').all(buyerEmail, buyerPhone).map(r => r.id);
+  if (prevBuyerIds.length > 0) {
+    const p = prevBuyerIds.map(() => '?').join(',');
+    db.prepare(`DELETE FROM subscription_audit_logs WHERE user_id IN (${p})`).run(...prevBuyerIds);
+    db.prepare(`DELETE FROM customer_subscriptions WHERE user_id IN (${p})`).run(...prevBuyerIds);
+    db.prepare(`DELETE FROM direct_sales_contracts WHERE user_id IN (${p})`).run(...prevBuyerIds);
+    db.prepare(`DELETE FROM client_salons WHERE user_id IN (${p})`).run(...prevBuyerIds);
+    db.prepare(`DELETE FROM users WHERE id IN (${p})`).run(...prevBuyerIds);
+  }
 
   try {
     // -------------------------------------------------------------
@@ -223,8 +231,15 @@ async function testFullLifecycle() {
     console.log('====================================================\n');
   } finally {
     // Clean test user
-    db.prepare('DELETE FROM client_salons WHERE user_id IN (SELECT id FROM users WHERE LOWER(email) = ?)').run(buyerEmail);
-    db.prepare('DELETE FROM users WHERE LOWER(email) = ?').run(buyerEmail);
+    const buyerIds = db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').all(buyerEmail).map(r => r.id);
+    if (buyerIds.length > 0) {
+      const p = buyerIds.map(() => '?').join(',');
+      db.prepare(`DELETE FROM subscription_audit_logs WHERE user_id IN (${p})`).run(...buyerIds);
+      db.prepare(`DELETE FROM customer_subscriptions WHERE user_id IN (${p})`).run(...buyerIds);
+      db.prepare(`DELETE FROM direct_sales_contracts WHERE user_id IN (${p})`).run(...buyerIds);
+      db.prepare(`DELETE FROM client_salons WHERE user_id IN (${p})`).run(...buyerIds);
+      db.prepare(`DELETE FROM users WHERE id IN (${p})`).run(...buyerIds);
+    }
   }
 }
 

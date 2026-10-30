@@ -352,6 +352,8 @@ async function runHotmart2Suite() {
   console.log('  ✅ [PASS] Reconciliação via API Hotmart concluiu com sucesso e atualizou vigência real.');
 
   // Clean test 10
+  db.prepare('DELETE FROM subscription_audit_logs WHERE user_id = ?').run(userNoDate.id);
+  db.prepare('DELETE FROM customer_subscriptions WHERE user_id = ?').run(userNoDate.id);
   db.prepare('DELETE FROM users WHERE id = ?').run(userNoDate.id);
 
   console.log('\n==================================================================');

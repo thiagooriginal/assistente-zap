@@ -4,6 +4,7 @@ const path = require('path');
 const db = require('../database/db');
 const clientAuth = require('../services/clientAuthService');
 const config = require('../config');
+const productService = require('../services/productService');
 const { getPlan } = require('../services/planCatalog');
 const whatsappClient = require('../whatsapp/client');
 const {
@@ -98,85 +99,131 @@ function clientAuthMiddleware(req, res, next) {
     }
   }
 
-  // 2. Subscription status verification
-  const subStatus = user.subscription_status || 'INACTIVE';
   const isDemo = Boolean(user.is_demo);
-  if (!isDemo && ['DIRECT', 'ASAAS'].includes(user.subscription_origin) &&
-      (!user.paid_until || !Number.isFinite(Date.parse(user.paid_until)) ||
-       Date.parse(user.paid_until) <= Date.now())) {
-    return res.status(403).json({ success: false, code: 'PAYMENT_REQUIRED',
-      error: 'Pagamento não confirmado ou período contratado encerrado.' });
-  }
+  req.clientUser = user;
+  req.isDemo = isDemo;
 
-  if (subStatus === 'REFUNDED' || subStatus === 'CHARGEBACK') {
-    return res.status(403).json({
-      success: false,
-      error: 'Acesso suspenso por reembolso ou contestação de pagamento.',
-      code: 'SUBSCRIPTION_REFUNDED',
-    });
-  }
+  // 2. Global account state check
+  // If the user has any active product in customer_subscriptions, account access is always allowed.
+  let hasAnyActiveSub = false;
+  try {
+    const activeSub = db.prepare(`
+      SELECT id FROM customer_subscriptions
+      WHERE user_id = ? AND (
+        (status = 'ACTIVE' AND (paid_until IS NULL OR datetime(paid_until) >= datetime('now')))
+        OR (status = 'CANCELLED' AND paid_until IS NOT NULL AND datetime(paid_until) >= datetime('now'))
+      ) LIMIT 1
+    `).get(user.id);
+    if (activeSub) hasAnyActiveSub = true;
+  } catch (e) {}
 
-  if (subStatus === 'OVERDUE') {
-    const paidUntilMs = user.paid_until ? Date.parse(user.paid_until) : 0;
-    if (!Number.isFinite(paidUntilMs) || paidUntilMs <= Date.now()) {
+  if (!hasAnyActiveSub && !isDemo && user.role !== 'ADMIN') {
+    const subStatus = user.subscription_status || 'INACTIVE';
+
+    if (['DIRECT', 'ASAAS'].includes(user.subscription_origin) &&
+        (!user.paid_until || !Number.isFinite(Date.parse(user.paid_until)) ||
+         Date.parse(user.paid_until) <= Date.now())) {
+      return res.status(403).json({ success: false, code: 'PAYMENT_REQUIRED',
+        error: 'Pagamento não confirmado ou período contratado encerrado.' });
+    }
+
+    if (subStatus === 'REFUNDED' || subStatus === 'CHARGEBACK') {
       return res.status(403).json({
         success: false,
-        error: 'Sua assinatura está em atraso. Regularize seu pagamento para reativar o acesso.',
-        code: 'SUBSCRIPTION_OVERDUE',
+        error: 'Acesso suspenso por reembolso ou contestação de pagamento.',
+        code: 'SUBSCRIPTION_REFUNDED',
       });
     }
-  }
 
-  if (subStatus === 'CANCELED') {
-    const paidUntilMs = user.paid_until ? Date.parse(user.paid_until) : 0;
-    if (!Number.isFinite(paidUntilMs) || paidUntilMs <= Date.now()) {
-      return res.status(403).json({
-        success: false,
-        error: 'Sua assinatura foi cancelada e o período contratado encerrou.',
-        code: 'SUBSCRIPTION_CANCELED',
-      });
-    }
-  }
-
-  if (subStatus === 'INACTIVE') {
-    return res.status(403).json({
-      success: false,
-      error: 'Assinatura inativa. Confirme o pagamento para liberar seu acesso.',
-      code: 'SUBSCRIPTION_INACTIVE',
-    });
-  }
-
-  if (subStatus === 'PENDING') {
-    return res.status(403).json({
-      success: false,
-      error: 'Conta pendente de ativação. Ative sua conta pelo link enviado para criar sua senha.',
-      code: 'ACCOUNT_PENDING_ACTIVATION',
-    });
-  }
-
-  // 3. Paid period verification (paid_until)
-  if (!isDemo && user.paid_until) {
-    const paidUntil = new Date(user.paid_until);
-    const now = new Date();
-    if (paidUntil < now) {
-      if (subStatus === 'CANCELED') {
+    if (subStatus === 'OVERDUE') {
+      const paidUntilMs = user.paid_until ? Date.parse(user.paid_until) : 0;
+      if (!Number.isFinite(paidUntilMs) || paidUntilMs <= Date.now()) {
         return res.status(403).json({
           success: false,
-          error: 'Sua assinatura foi cancelada e o período pago já expirou. Renove para continuar acessando.',
+          error: 'Sua assinatura está em atraso. Regularize seu pagamento para reativar o acesso.',
+          code: 'SUBSCRIPTION_OVERDUE',
+        });
+      }
+    }
+
+    if (subStatus === 'CANCELED') {
+      const paidUntilMs = user.paid_until ? Date.parse(user.paid_until) : 0;
+      if (!Number.isFinite(paidUntilMs) || paidUntilMs <= Date.now()) {
+        return res.status(403).json({
+          success: false,
+          error: 'Sua assinatura foi cancelada e o período contratado encerrou.',
+          code: 'SUBSCRIPTION_CANCELED',
+        });
+      }
+    }
+
+    if (subStatus === 'INACTIVE') {
+      return res.status(403).json({
+        success: false,
+        error: 'Assinatura inativa. Confirme o pagamento para liberar seu acesso.',
+        code: 'SUBSCRIPTION_INACTIVE',
+      });
+    }
+
+    if (subStatus === 'PENDING') {
+      return res.status(403).json({
+        success: false,
+        error: 'Conta pendente de ativação. Ative sua conta pelo link enviado para criar sua senha.',
+        code: 'ACCOUNT_PENDING_ACTIVATION',
+      });
+    }
+
+    if (user.paid_until) {
+      const paidUntil = new Date(user.paid_until);
+      const now = new Date();
+      if (paidUntil < now) {
+        return res.status(403).json({
+          success: false,
+          error: subStatus === 'CANCELED'
+            ? 'Sua assinatura foi cancelada e o período pago já expirou. Renove para continuar acessando.'
+            : 'O período da sua assinatura expirou.',
           code: 'SUBSCRIPTION_EXPIRED',
         });
       }
-      return res.status(403).json({
-        success: false,
-        error: 'O período da sua assinatura expirou. Renove na Hotmart para continuar utilizando a Jéssica.',
-        code: 'SUBSCRIPTION_EXPIRED',
-      });
     }
   }
 
-  req.clientUser = user;
-  req.isDemo = isDemo;
   return next();
+}
+
+/**
+ * Enforces per-product access permission based on independent product contracts
+ */
+function requireProductAccess(productCode) {
+  return function (req, res, next) {
+    if (!req.clientUser) {
+      return res.status(401).json({
+        success: false,
+        error: 'Sessão expirada ou não autenticada.',
+        code: 'UNAUTHORIZED',
+      });
+    }
+
+    const access = productService.hasProductAccess(req.clientUser.id, productCode);
+    if (!access.hasAccess) {
+      const code = access.status === 'EXPIRED' ? 'SUBSCRIPTION_EXPIRED'
+        : access.status === 'OVERDUE' ? 'SUBSCRIPTION_OVERDUE'
+        : access.status === 'PENDING' ? 'PAYMENT_PENDING'
+        : access.status === 'CANCELLED' ? 'SUBSCRIPTION_CANCELED'
+        : `PRODUCT_${access.status || 'ACCESS_DENIED'}`;
+
+      return res.status(403).json({
+        success: false,
+        code,
+        error: access.reason || `Acesso ao produto ${productCode} indisponível ou suspenso.`,
+        product: productCode,
+        subscription: access.subscription || null,
+      });
+    }
+
+    req.productAccess = access;
+    return next();
+  };
 }
 
 // ==========================================
@@ -273,7 +320,23 @@ router.get('/profile', clientAuthMiddleware, (req, res) => {
   res.json({ success: true, profile: data });
 });
 
-router.put('/salon', clientAuthMiddleware, (req, res) => {
+// MULTIPRODUCT CLIENT PORTAL: "Meus Produtos" Hub
+router.get('/my-products', clientAuthMiddleware, (req, res) => {
+  const subscriptions = productService.getUserSubscriptions(req.clientUser.id);
+  res.json({ success: true, subscriptions });
+});
+
+router.get('/products-catalog', clientAuthMiddleware, (req, res) => {
+  const products = productService.listProducts({ activeOnly: true, includePlans: true });
+  res.json({ success: true, products });
+});
+
+router.get('/products/:code/access', clientAuthMiddleware, (req, res) => {
+  const access = productService.hasProductAccess(req.clientUser.id, req.params.code);
+  res.json({ success: true, access });
+});
+
+router.put('/salon', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { salonName, phone, address, openingHours, customInstructions } = req.body || {};
   const userId = req.clientUser.id;
 
@@ -290,7 +353,14 @@ router.put('/salon', clientAuthMiddleware, (req, res) => {
         agent_custom_instructions = COALESCE(?, agent_custom_instructions),
         updated_at = CURRENT_TIMESTAMP
     WHERE user_id = ?
-  `).run(salonName, phone, address, hoursStr, customInstructions, userId);
+  `).run(
+    salonName || null,
+    phone || null,
+    address || null,
+    hoursStr || null,
+    customInstructions || null,
+    userId
+  );
 
   const updated = clientAuth.getSanitizedUser(userId);
   res.json({ success: true, message: 'Dados do salão atualizados com sucesso!', salon: updated.salon });
@@ -300,7 +370,7 @@ router.put('/salon', clientAuthMiddleware, (req, res) => {
 // SERVICES & PRICING MANAGEMENT
 // ==========================================
 
-router.get('/services', clientAuthMiddleware, (req, res) => {
+router.get('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const rows = db.prepare(`
     SELECT id, name, price, duration_min, category, active
     FROM client_services
@@ -311,7 +381,7 @@ router.get('/services', clientAuthMiddleware, (req, res) => {
   res.json({ success: true, services: rows });
 });
 
-router.post('/services', clientAuthMiddleware, (req, res) => {
+router.post('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { name, price, durationMin, category } = req.body || {};
 
   if (!name || !price) {
@@ -348,7 +418,7 @@ router.post('/services', clientAuthMiddleware, (req, res) => {
   });
 });
 
-router.put('/services/:id', clientAuthMiddleware, (req, res) => {
+router.put('/services/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { id } = req.params;
   const { name, price, durationMin, category, active } = req.body || {};
 
@@ -378,7 +448,7 @@ router.put('/services/:id', clientAuthMiddleware, (req, res) => {
   res.json({ success: true, message: 'Serviço atualizado com sucesso!' });
 });
 
-router.delete('/services/:id', clientAuthMiddleware, (req, res) => {
+router.delete('/services/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { id } = req.params;
   const result = db.prepare('DELETE FROM client_services WHERE id = ? AND user_id = ?').run(id, req.clientUser.id);
 
@@ -393,7 +463,7 @@ router.delete('/services/:id', clientAuthMiddleware, (req, res) => {
 // STAFF & TEAM MEMBERS
 // ==========================================
 
-router.get('/staff', clientAuthMiddleware, (req, res) => {
+router.get('/staff', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const rows = db.prepare(`
     SELECT id, name, specialty, active
     FROM client_staff
@@ -404,13 +474,16 @@ router.get('/staff', clientAuthMiddleware, (req, res) => {
   res.json({ success: true, staff: rows });
 });
 
-router.post('/staff', clientAuthMiddleware, (req, res) => {
+router.post('/staff', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { name, specialty } = req.body || {};
   if (!name || !name.trim()) {
     return res.status(400).json({ success: false, error: 'Nome do profissional é obrigatório.' });
   }
+  const jessicaSub = productService.getUserSubscriptionForProduct(req.clientUser.id, 'JESSICA');
   const plan = getPlan(req.clientUser.plan_tier);
-  const available = (plan?.includedProfessionals || 1) + Math.max(0, Number(req.clientUser.extra_professionals) || 0);
+  const baseProfessionals = jessicaSub?.maxProfessionals !== undefined ? jessicaSub.maxProfessionals : (plan?.includedProfessionals || 1);
+  const extraProfessionals = Math.max(Number(jessicaSub?.extraProfessionals || 0), Number(req.clientUser.extra_professionals || 0));
+  const available = baseProfessionals + extraProfessionals;
   const total = db.prepare('SELECT COUNT(*) AS n FROM client_staff WHERE user_id = ? AND active = 1')
     .get(req.clientUser.id)?.n || 0;
   if (!req.isDemo && total >= available) {
@@ -430,7 +503,7 @@ router.post('/staff', clientAuthMiddleware, (req, res) => {
   });
 });
 
-router.delete('/staff/:id', clientAuthMiddleware, (req, res) => {
+router.delete('/staff/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { id } = req.params;
   const result = db.prepare('DELETE FROM client_staff WHERE id = ? AND user_id = ?').run(id, req.clientUser.id);
 
@@ -445,7 +518,7 @@ router.delete('/staff/:id', clientAuthMiddleware, (req, res) => {
 // APPOINTMENTS & SCHEDULE
 // ==========================================
 
-router.get('/appointments', clientAuthMiddleware, (req, res) => {
+router.get('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const rows = db.prepare(`
     SELECT id, title, description, start_datetime, end_datetime, status
     FROM appointments
@@ -457,7 +530,7 @@ router.get('/appointments', clientAuthMiddleware, (req, res) => {
   res.json({ success: true, appointments: rows });
 });
 
-router.post('/appointments', clientAuthMiddleware, (req, res) => {
+router.post('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { clientName, serviceName, date, time } = req.body || {};
 
   if (!clientName || !date || !time) {
@@ -475,7 +548,7 @@ router.post('/appointments', clientAuthMiddleware, (req, res) => {
   res.json({ success: true, id: info.lastInsertRowid, message: 'Agendamento registrado com sucesso!' });
 });
 
-router.delete('/appointments/:id', clientAuthMiddleware, (req, res) => {
+router.delete('/appointments/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { id } = req.params;
   const result = db.prepare('DELETE FROM appointments WHERE id = ? AND user_id = ?').run(id, req.clientUser.id);
 
@@ -490,7 +563,7 @@ router.delete('/appointments/:id', clientAuthMiddleware, (req, res) => {
 // PRO PLAN EXCLUSIVE: MANAGERIAL DASHBOARD
 // ==========================================
 
-router.get('/pro/dashboard', clientAuthMiddleware, (req, res) => {
+router.get('/pro/dashboard', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const canAccessDashboard = ['JESSICA_INTERMEDIATE', 'JESSICA_PRO'].includes(req.clientUser.plan_tier) || req.isDemo;
 
   if (!canAccessDashboard) {
@@ -564,7 +637,7 @@ router.get('/pro/dashboard', clientAuthMiddleware, (req, res) => {
 // PRO PLAN EXCLUSIVE: PROMOTIONAL CAMPAIGNS
 // ==========================================
 
-router.get('/pro/campaigns', clientAuthMiddleware, (req, res) => {
+router.get('/pro/campaigns', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const isPro = req.clientUser.plan_tier === 'JESSICA_PRO' || req.isDemo;
 
   if (!isPro) {
@@ -585,7 +658,7 @@ router.get('/pro/campaigns', clientAuthMiddleware, (req, res) => {
   res.json({ success: true, campaigns: rows });
 });
 
-router.post('/pro/campaigns', clientAuthMiddleware, (req, res) => {
+router.post('/pro/campaigns', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const isPro = req.clientUser.plan_tier === 'JESSICA_PRO' || req.isDemo;
 
   if (!isPro) {
@@ -637,7 +710,7 @@ router.post('/pro/campaigns', clientAuthMiddleware, (req, res) => {
 // ==========================================
 
 // Test WhatsApp Message (Strictly blocked on Demo Account)
-router.post('/test-whatsapp', clientAuthMiddleware, async (req, res) => {
+router.post('/test-whatsapp', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
   if (req.isDemo || req.clientUser.is_demo) {
     return res.status(403).json({
       success: false,
@@ -658,7 +731,7 @@ router.post('/test-whatsapp', clientAuthMiddleware, async (req, res) => {
 });
 
 // Dispatch Campaign (Strictly blocked on Demo Account)
-router.post('/pro/campaigns/:id/send', clientAuthMiddleware, async (req, res) => {
+router.post('/pro/campaigns/:id/send', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
   const isPro = req.clientUser.plan_tier === 'JESSICA_PRO' || req.isDemo;
   if (!isPro) {
     return res.status(403).json({ success: false, error: 'Exclusivo do Plano Pro.' });

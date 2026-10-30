@@ -35,8 +35,29 @@ async function runSecurityAudit() {
     // Reset rate limiters at start
     Object.values(rateLimiters).forEach(l => l && typeof l.reset === 'function' && l.reset());
 
+    // Helper for cascading cleanup of test users
+    function cleanSecUsers() {
+      const secUserIds = db.prepare(`
+        SELECT id FROM users 
+        WHERE email IN ('sec.client.a@raia.test', 'sec.client.b@raia.test', 'sec.inactive@raia.test', 'sec.refunded@raia.test', 'sec.expired@raia.test', 'sec.pro@raia.test')
+           OR phone_number IN ('5511999990001', '5511999990002', '5511999990003', '5511999990004', '5511999990005')
+           OR email LIKE 'sec.%@raia.test'
+      `).all().map(r => r.id);
+
+      if (secUserIds.length > 0) {
+        const placeholders = secUserIds.map(() => '?').join(',');
+        db.prepare(`DELETE FROM subscription_audit_logs WHERE user_id IN (${placeholders})`).run(...secUserIds);
+        db.prepare(`DELETE FROM customer_subscriptions WHERE user_id IN (${placeholders})`).run(...secUserIds);
+        db.prepare(`DELETE FROM client_services WHERE user_id IN (${placeholders})`).run(...secUserIds);
+        db.prepare(`DELETE FROM client_staff WHERE user_id IN (${placeholders})`).run(...secUserIds);
+        db.prepare(`DELETE FROM appointments WHERE user_id IN (${placeholders})`).run(...secUserIds);
+        db.prepare(`DELETE FROM direct_sales_contracts WHERE user_id IN (${placeholders})`).run(...secUserIds);
+        db.prepare(`DELETE FROM users WHERE id IN (${placeholders})`).run(...secUserIds);
+      }
+    }
+
     // Clean up test users from any previous runs
-    db.prepare("DELETE FROM users WHERE email IN ('sec.client.a@raia.test', 'sec.client.b@raia.test', 'sec.inactive@raia.test', 'sec.refunded@raia.test', 'sec.expired@raia.test', 'sec.pro@raia.test') OR phone_number IN ('5511999990001', '5511999990002', '5511999990003', '5511999990004', '5511999990005')").run();
+    cleanSecUsers();
 
     // -------------------------------------------------------------
     // TEST 1: Password reset response must NEVER leak tokens or phone
@@ -417,7 +438,7 @@ async function runSecurityAudit() {
 
   } finally {
     // Cleanup test users
-    db.prepare("DELETE FROM users WHERE email IN ('sec.client.a@raia.test', 'sec.client.b@raia.test', 'sec.inactive@raia.test', 'sec.refunded@raia.test', 'sec.expired@raia.test', 'sec.pro@raia.test') OR phone_number IN ('5511999990001', '5511999990002', '5511999990003', '5511999990004', '5511999990005')").run();
+    cleanSecUsers();
     await new Promise(resolve => server.close(resolve));
   }
 }

@@ -48,6 +48,8 @@ async function runAsaasMultichannelTests() {
     Object.values(rateLimiters).forEach(l => l && typeof l.reset === 'function' && l.reset());
 
     // Clean test data from DB respecting Foreign Keys
+    db.prepare("DELETE FROM subscription_audit_logs WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@asaas.test' OR email LIKE '%@multichannel.test')").run();
+    db.prepare("DELETE FROM customer_subscriptions WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@asaas.test' OR email LIKE '%@multichannel.test')").run();
     db.prepare("DELETE FROM direct_sales_events WHERE contract_id IN (SELECT id FROM direct_sales_contracts WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@asaas.test' OR email LIKE '%@multichannel.test'))").run();
     db.prepare("DELETE FROM direct_sales_payments WHERE contract_id IN (SELECT id FROM direct_sales_contracts WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@asaas.test' OR email LIKE '%@multichannel.test'))").run();
     db.prepare("DELETE FROM direct_sales_contracts WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@asaas.test' OR email LIKE '%@multichannel.test')").run();
@@ -462,6 +464,7 @@ async function runAsaasMultichannelTests() {
 
       // Se paid_until expirar -> acesso é bloqueado
       db.prepare("UPDATE users SET paid_until = '2020-01-01T00:00:00.000Z' WHERE id = ?").run(testUserId);
+      db.prepare("UPDATE customer_subscriptions SET paid_until = '2020-01-01T00:00:00.000Z' WHERE user_id = ?").run(testUserId);
       const blockedRes = await fetch(`${baseUrl}/api/cliente/profile`, {
         headers: { 'Cookie': clientCookie }
       });
@@ -539,6 +542,7 @@ async function runAsaasMultichannelTests() {
 
       // Quando a vigência termina, acesso é revogado
       db.prepare("UPDATE users SET paid_until = '2020-01-01T00:00:00.000Z' WHERE id = ?").run(testUserId);
+      db.prepare("UPDATE customer_subscriptions SET paid_until = '2020-01-01T00:00:00.000Z' WHERE user_id = ?").run(testUserId);
       const postExpiredRes = await fetch(`${baseUrl}/api/cliente/profile`, {
         headers: { 'Cookie': clientCookie }
       });

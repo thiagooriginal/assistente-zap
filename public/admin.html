@@ -203,6 +203,10 @@
         <i data-lucide="credit-card" class="w-4 h-4 text-[#00F59B]"></i>
         <span>💳 Clientes & Pagamentos Asaas</span>
       </button>
+      <button onclick="switchAdminTab('products')" id="tabBtnProducts" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
+        <i data-lucide="boxes" class="w-4 h-4 text-amber-400"></i>
+        <span>📦 Central de Produtos & Planos</span>
+      </button>
       <button onclick="switchAdminTab('users')" id="tabBtnUsers" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
         <i data-lucide="users" class="w-4 h-4"></i>
         <span>Convites ZAP</span>
@@ -901,8 +905,245 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- SECTION 2: CLIENTES & CONVITES ZAP                            -->
+    <!-- SECTION PRODUCTS: CENTRAL DE PRODUTOS & MULTIPRODUTO RAIA     -->
     <!-- ============================================================ -->
+    <div id="sectionProducts" class="hidden space-y-6">
+
+      <!-- BANNER SUPERIOR CENTRAL DE PRODUTOS -->
+      <div class="p-6 rounded-3xl bg-gradient-to-br from-[#0c1322] via-[#090f1d] to-[#040711] border border-amber-500/20 shadow-xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-black uppercase tracking-wider mb-2">
+              <i data-lucide="boxes" class="w-3.5 h-3.5"></i>
+              <span>Arquitetura Modular Multiproduto</span>
+            </div>
+            <h2 class="text-xl sm:text-2xl font-black text-white">Central de Produtos & Planos</h2>
+            <p class="text-xs text-zinc-400">Gerencie catálogo dinâmico de agentes de IA, planos comerciais, contratos por cliente e regras sem fidelidade.</p>
+          </div>
+          <button onclick="loadProductsDashboard()" class="px-4 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs flex items-center gap-2 border border-zinc-700 self-start transition cursor-pointer">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            <span>Atualizar Métricas</span>
+          </button>
+        </div>
+
+        <!-- KPI CARDS MULTIPRODUTO -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+          <div class="p-4 rounded-2xl bg-[#070b14] border border-zinc-800">
+            <p class="text-[10px] text-zinc-400 uppercase font-black tracking-wider">MRR Ativo Consolidado</p>
+            <p class="text-xl sm:text-2xl font-black text-[#00F59B]" id="prodTotalMrr">R$ 0,00</p>
+            <p class="text-[10px] text-zinc-500 mt-1">Receita recorrente mensal</p>
+          </div>
+          <div class="p-4 rounded-2xl bg-[#070b14] border border-zinc-800">
+            <p class="text-[10px] text-zinc-400 uppercase font-black tracking-wider">Contratos Ativos</p>
+            <p class="text-xl sm:text-2xl font-black text-white" id="prodTotalActive">0</p>
+            <p class="text-[10px] text-emerald-400 mt-1">Assinaturas com acesso liberado</p>
+          </div>
+          <div class="p-4 rounded-2xl bg-[#070b14] border border-zinc-800">
+            <p class="text-[10px] text-zinc-400 uppercase font-black tracking-wider">Inadimplência</p>
+            <p class="text-xl sm:text-2xl font-black text-rose-400" id="prodTotalOverdue">0</p>
+            <p class="text-[10px] text-zinc-500 mt-1">Contratos em atraso</p>
+          </div>
+          <div class="p-4 rounded-2xl bg-[#070b14] border border-zinc-800">
+            <p class="text-[10px] text-zinc-400 uppercase font-black tracking-wider">Cancelados (Sem Fidelidade)</p>
+            <p class="text-xl sm:text-2xl font-black text-slate-300" id="prodTotalCancelled">0</p>
+            <p class="text-[10px] text-zinc-500 mt-1">Acesso até o fim da vigência</p>
+          </div>
+        </div>
+
+        <!-- BREAKDOWN POR CANAL (ASAAS vs HOTMART) -->
+        <div id="prodChannelStatsBox" class="flex flex-wrap gap-3 pt-2 border-t border-zinc-800/80">
+          <div class="text-xs text-zinc-400 flex items-center gap-2">
+            <span class="font-bold text-white">Canais de Venda:</span>
+            <span id="channelBadgesList" class="flex gap-2">Carregando...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- DESEMPENHO POR PRODUTO -->
+      <div class="p-6 rounded-3xl bg-[#0c1322] border border-zinc-800 space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-extrabold text-white">Desempenho & Inadimplência por Produto</h3>
+            <p class="text-xs text-zinc-400">Visão isolada da carteira de cada agente de IA na RAIA AGENTES</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="border-b border-zinc-800 text-[11px] text-zinc-400 uppercase font-black tracking-wider">
+                <th class="py-2.5 px-3">Código</th>
+                <th class="py-2.5 px-3">Produto</th>
+                <th class="py-2.5 px-3">Categoria</th>
+                <th class="py-2.5 px-3 text-center">Contratos</th>
+                <th class="py-2.5 px-3 text-center">Ativos</th>
+                <th class="py-2.5 px-3 text-center">Inadimplentes</th>
+                <th class="py-2.5 px-3 text-center">Cancelados</th>
+                <th class="py-2.5 px-3 text-right">MRR Ativo</th>
+              </tr>
+            </thead>
+            <tbody id="productsMetricsTableBody" class="divide-y divide-zinc-800/60">
+              <tr><td colspan="8" class="py-4 text-center text-zinc-500">Carregando métricas...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CATÁLOGO DE PRODUTOS & CRIAÇÃO DE NOVOS AGENTES -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- FORMULARIO NOVO PRODUTO -->
+        <div class="p-6 rounded-3xl bg-[#0c1322] border border-zinc-800 space-y-4">
+          <div class="border-b border-zinc-800 pb-3">
+            <h3 class="text-base font-extrabold text-white">Cadastrar Novo Produto</h3>
+            <p class="text-xs text-zinc-400">Adicione novos agentes sem alterar a estrutura central do banco</p>
+          </div>
+          <form id="createProductForm" onsubmit="handleCreateProduct(event)" class="space-y-3">
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Código Único (Identificador)</label>
+              <input type="text" id="npCode" required placeholder="Ex: BOT_IMOBILIARIO" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs uppercase font-mono outline-none focus:border-amber-400">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Nome Comercial</label>
+              <input type="text" id="npName" required placeholder="Ex: Lucas Corretor IA" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-amber-400">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Categoria</label>
+              <select id="npCategory" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-amber-400">
+                <option value="BELEZA">Beleza & Estética</option>
+                <option value="FINANCEIRO">Financeiro & MEI</option>
+                <option value="SAUDE">Saúde & Clínicas</option>
+                <option value="IMOBILIARIO">Imobiliário & Vendas</option>
+                <option value="JURIDICO">Jurídico & Compliance</option>
+                <option value="GERAL">Geral / Automações</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Ícone</label>
+              <select id="npIcon" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-amber-400">
+                <option value="bot">Robô (Padrão)</option>
+                <option value="scissors">Tesoura (Salão)</option>
+                <option value="wallet">Carteira (Financeiro)</option>
+                <option value="stethoscope">Estetoscópio (Saúde)</option>
+                <option value="building">Prédio (Imobiliário)</option>
+                <option value="scale">Balança (Jurídico)</option>
+                <option value="sparkles">Brilho (Especial)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Descrição</label>
+              <textarea id="npDescription" rows="2" placeholder="Descreva as competências e especialidades deste agente..." class="w-full px-3.5 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-amber-400"></textarea>
+            </div>
+            <button type="submit" id="btnCreateProduct" class="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-[#00F59B] text-black font-extrabold text-xs shadow-lg transition cursor-pointer">
+              + Cadastrar Produto no Catálogo
+            </button>
+          </form>
+        </div>
+
+        <!-- LISTA DE PRODUTOS & PLANOS EXISTENTES -->
+        <div class="lg:col-span-2 p-6 rounded-3xl bg-[#0c1322] border border-zinc-800 space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div>
+              <h3 class="text-base font-extrabold text-white">Produtos & Planos Cadastrados</h3>
+              <p class="text-xs text-zinc-400">Planos, limites e condições comerciais de cada produto</p>
+            </div>
+          </div>
+          <div id="productsCatalogContainer" class="space-y-4 max-h-[520px] overflow-y-auto pr-1">
+            <p class="text-xs text-zinc-500 py-4 text-center">Carregando catálogo de produtos...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- MODAL / FORM ADICIONAR PLANO A PRODUTO -->
+      <div id="addPlanModal" class="hidden p-6 rounded-3xl bg-zinc-900 border border-amber-500/40 space-y-4">
+        <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+          <div>
+            <h4 class="text-sm font-extrabold text-white">Adicionar Novo Plano ao Produto: <span id="modalPlanProductName" class="text-amber-400"></span></h4>
+            <p class="text-xs text-zinc-400">Crie variações comerciais preservando os contratos anteriores</p>
+          </div>
+          <button type="button" onclick="closeAddPlanModal()" class="text-zinc-400 hover:text-white text-xs cursor-pointer">✕ Fechar</button>
+        </div>
+        <form id="createPlanForm" onsubmit="handleCreatePlan(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <input type="hidden" id="modalPlanProductId">
+          <div>
+            <label class="block text-xs font-bold text-zinc-300 mb-1">Código do Plano</label>
+            <input type="text" id="nplCode" required placeholder="Ex: ENTERPRISE" class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-xs uppercase font-mono outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-zinc-300 mb-1">Nome do Plano</label>
+            <input type="text" id="nplName" required placeholder="Ex: Empresarial Pro" class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-xs outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-zinc-300 mb-1">Preço Regular (R$)</label>
+            <input type="number" step="0.01" id="nplPrice" required placeholder="149.00" class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-xs outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-zinc-300 mb-1">Preço Feira / Promo (R$)</label>
+            <input type="number" step="0.01" id="nplPromoPrice" placeholder="99.00" class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-xs outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-zinc-300 mb-1">Taxa Implantação (R$)</label>
+            <input type="number" step="0.01" id="nplSetupFee" value="0.00" class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-xs outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-zinc-300 mb-1">Ciclo de Cobrança</label>
+            <select id="nplCycle" class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-xs outline-none">
+              <option value="MONTHLY">Mensal</option>
+              <option value="YEARLY">Anual</option>
+              <option value="ONEOFF">Pagamento Único</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-zinc-300 mb-1">Profissionais Inclusos</label>
+            <input type="number" id="nplMaxProf" value="1" min="1" max="100" class="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-xs outline-none">
+          </div>
+          <div class="flex items-end">
+            <button type="submit" class="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs shadow transition cursor-pointer">
+              Salvar Plano
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- TABELA GESTÃO MULTICONTRATOS DE CLIENTES -->
+      <div class="p-6 rounded-3xl bg-[#0c1322] border border-zinc-800 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-zinc-800 pb-3">
+          <div>
+            <h3 class="text-base font-extrabold text-white">Contratos & Assinaturas da Carteira</h3>
+            <p class="text-xs text-zinc-400">Contratos individuais por produto com termos de preço imutáveis</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="filterSubProduct" onchange="loadSubscriptionsList()" class="px-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none">
+              <option value="">Todos os Produtos</option>
+            </select>
+            <select id="filterSubOrigin" onchange="loadSubscriptionsList()" class="px-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none">
+              <option value="">Todos os Canais</option>
+              <option value="ASAAS">Asaas</option>
+              <option value="HOTMART">Hotmart</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="border-b border-zinc-800 text-[11px] text-zinc-400 uppercase font-black tracking-wider">
+                <th class="py-2.5 px-3">Cliente</th>
+                <th class="py-2.5 px-3">Produto</th>
+                <th class="py-2.5 px-3">Plano</th>
+                <th class="py-2.5 px-3">Canal</th>
+                <th class="py-2.5 px-3">Valor Contratado</th>
+                <th class="py-2.5 px-3">Status</th>
+                <th class="py-2.5 px-3">Vigência</th>
+                <th class="py-2.5 px-3 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="subscriptionsTableBody" class="divide-y divide-zinc-800/60">
+              <tr><td colspan="8" class="py-4 text-center text-zinc-500">Carregando assinaturas...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
     <div id="sectionUsers" class="hidden space-y-5">
       <div class="p-5 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
         <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
@@ -1639,6 +1880,7 @@
       const sections = {
         studio: document.getElementById('sectionStudio'),
         asaas: document.getElementById('sectionAsaas'),
+        products: document.getElementById('sectionProducts'),
         users: document.getElementById('sectionUsers'),
         finance: document.getElementById('sectionFinance'),
         system: document.getElementById('sectionSystem'),
@@ -1648,6 +1890,7 @@
       const buttons = {
         studio: document.getElementById('tabBtnStudio'),
         asaas: document.getElementById('tabBtnAsaas'),
+        products: document.getElementById('tabBtnProducts'),
         users: document.getElementById('tabBtnUsers'),
         finance: document.getElementById('tabBtnFinance'),
         system: document.getElementById('tabBtnSystem'),
@@ -1670,10 +1913,343 @@
       if (tab === 'asaas') {
         loadAsaasDashboard();
         updateAsaasSubPricePreview();
+      } else if (tab === 'products') {
+        loadProductsDashboard();
       } else if (tab === 'analyzer') {
         loadBusinessAnalyses();
       }
       lucide.createIcons();
+    }
+
+    // -------------------------------------------------------------
+    // CENTRAL DE PRODUTOS & MULTIPRODUTO RAIA
+    // -------------------------------------------------------------
+    let cachedAdminProducts = [];
+
+    async function loadProductsDashboard() {
+      try {
+        const [metricsRes, prodRes] = await Promise.all([
+          fetch('/api/admin/multiproduct/metrics'),
+          fetch('/api/admin/products'),
+        ]);
+
+        const metricsData = await metricsRes.json();
+        const prodData = await prodRes.json();
+
+        if (metricsData.success && metricsData.metrics) {
+          const m = metricsData.metrics;
+          document.getElementById('prodTotalMrr').innerText = m.totalMrrFormatted || 'R$ 0,00';
+
+          const totalActive = m.metricsByProduct.reduce((acc, p) => acc + (p.activeCount || 0), 0);
+          const totalOverdue = m.metricsByProduct.reduce((acc, p) => acc + (p.overdueCount || 0), 0);
+          const totalCancelled = m.metricsByProduct.reduce((acc, p) => acc + (p.cancelledCount || 0), 0);
+
+          document.getElementById('prodTotalActive').innerText = totalActive;
+          document.getElementById('prodTotalOverdue').innerText = totalOverdue;
+          document.getElementById('prodTotalCancelled').innerText = totalCancelled;
+
+          // Channels breakdown
+          const chContainer = document.getElementById('channelBadgesList');
+          if (m.channelStats && m.channelStats.length > 0) {
+            chContainer.innerHTML = m.channelStats.map(c => `
+              <span class="px-2.5 py-1 rounded-lg text-xs font-bold ${c.origin === 'HOTMART' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'}">
+                ${c.origin}: ${c.totalContracts} contratos (${c.activeCount} ativos • ${c.mrrFormatted})
+              </span>
+            `).join('');
+          } else {
+            chContainer.innerHTML = '<span class="text-xs text-zinc-500">Nenhum contrato ativo.</span>';
+          }
+
+          // Table metrics by product
+          const tbody = document.getElementById('productsMetricsTableBody');
+          tbody.innerHTML = '';
+          m.metricsByProduct.forEach(p => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-zinc-800/40 transition';
+            tr.innerHTML = `
+              <td class="py-2.5 px-3 font-mono font-bold text-amber-400">${p.productCode}</td>
+              <td class="py-2.5 px-3 font-bold text-white">${p.productName}</td>
+              <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400">${p.category}</span></td>
+              <td class="py-2.5 px-3 text-center text-zinc-300 font-bold">${p.totalContracts}</td>
+              <td class="py-2.5 px-3 text-center text-emerald-400 font-bold">${p.activeCount}</td>
+              <td class="py-2.5 px-3 text-center ${p.overdueCount > 0 ? 'text-rose-400 font-bold' : 'text-zinc-500'}">${p.overdueCount}</td>
+              <td class="py-2.5 px-3 text-center text-zinc-400">${p.cancelledCount}</td>
+              <td class="py-2.5 px-3 text-right font-black text-[#00F59B]">${p.activeMrrFormatted}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+
+        if (prodData.success && prodData.products) {
+          cachedAdminProducts = prodData.products;
+          renderProductsCatalog(prodData.products);
+
+          // Populate filter select
+          const filterSel = document.getElementById('filterSubProduct');
+          filterSel.innerHTML = '<option value="">Todos os Produtos</option>' + prodData.products.map(p => `
+            <option value="${p.id}">${p.name} (${p.code})</option>
+          `).join('');
+        }
+
+        loadSubscriptionsList();
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Erro ao carregar Dashboard Multiproduto:', err);
+      }
+    }
+
+    function renderProductsCatalog(products) {
+      const container = document.getElementById('productsCatalogContainer');
+      container.innerHTML = '';
+
+      if (!products || products.length === 0) {
+        container.innerHTML = '<p class="text-xs text-zinc-500 py-4 text-center">Nenhum produto cadastrado.</p>';
+        return;
+      }
+
+      products.forEach(prod => {
+        const item = document.createElement('div');
+        item.className = 'p-4 rounded-2xl bg-[#070b14] border border-zinc-800 space-y-3';
+
+        const plansHtml = (prod.plans || []).map(pl => `
+          <div class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-between text-xs">
+            <div>
+              <span class="font-extrabold text-white">${pl.name}</span>
+              <span class="text-zinc-500 text-[10px] font-mono ml-1">(${pl.code})</span>
+              <div class="text-[11px] text-zinc-400">Regular: <strong class="text-white">${(pl.price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>${pl.promo_fair_price_cents ? ` • Feira: <strong class="text-[#00F59B]">${(pl.promo_fair_price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>` : ''}${pl.setup_fee_cents > 0 ? ` • Implantação: ${(pl.setup_fee_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ' • Implantação Grátis'}</div>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] px-2 py-0.5 rounded font-bold ${pl.is_active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-800 text-zinc-500'}">${pl.is_active ? 'Comercializável' : 'Inativo'}</span>
+            </div>
+          </div>
+        `).join('');
+
+        item.innerHTML = `
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">${prod.code}</span>
+                <span class="px-2 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400">${prod.category}</span>
+                <span class="text-[10px] font-bold ${prod.is_active ? 'text-emerald-400' : 'text-zinc-500'}">● ${prod.is_active ? 'Ativo' : 'Desativado'}</span>
+              </div>
+              <h4 class="text-sm font-extrabold text-white mt-1.5 flex items-center gap-2">
+                <i data-lucide="${prod.icon || 'bot'}" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>${prod.name}</span>
+              </h4>
+              <p class="text-xs text-zinc-400 mt-0.5">${prod.description || 'Sem descrição.'}</p>
+            </div>
+            <button onclick="openAddPlanModal(${prod.id}, '${escapeHtml(prod.name)}')" class="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30 flex items-center gap-1 transition cursor-pointer">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>Novo Plano</span>
+            </button>
+          </div>
+
+          <div class="space-y-1.5 pt-2 border-t border-zinc-800/60">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Planos & Condições Comerciais:</div>
+            ${plansHtml || '<p class="text-xs text-zinc-500 italic">Nenhum plano cadastrado para este produto.</p>'}
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    function openAddPlanModal(productId, productName) {
+      document.getElementById('modalPlanProductId').value = productId;
+      document.getElementById('modalPlanProductName').innerText = productName;
+      document.getElementById('addPlanModal').classList.remove('hidden');
+      document.getElementById('addPlanModal').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function closeAddPlanModal() {
+      document.getElementById('addPlanModal').classList.add('hidden');
+      document.getElementById('createPlanForm').reset();
+    }
+
+    async function handleCreateProduct(e) {
+      e.preventDefault();
+      const code = document.getElementById('npCode').value.trim();
+      const name = document.getElementById('npName').value.trim();
+      const category = document.getElementById('npCategory').value;
+      const icon = document.getElementById('npIcon').value;
+      const description = document.getElementById('npDescription').value.trim();
+
+      const btn = document.getElementById('btnCreateProduct');
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/admin/products', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, name, category, icon, description }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          alert(`Produto '${json.product.name}' cadastrado com sucesso!`);
+          document.getElementById('createProductForm').reset();
+          loadProductsDashboard();
+        } else {
+          alert('Erro ao cadastrar produto: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro ao cadastrar produto: ' + err.message);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function handleCreatePlan(e) {
+      e.preventDefault();
+      const productId = document.getElementById('modalPlanProductId').value;
+      const code = document.getElementById('nplCode').value.trim();
+      const name = document.getElementById('nplName').value.trim();
+      const priceCents = Math.round(parseFloat(document.getElementById('nplPrice').value || 0) * 100);
+      const promoFairPriceCents = document.getElementById('nplPromoPrice').value
+        ? Math.round(parseFloat(document.getElementById('nplPromoPrice').value) * 100)
+        : null;
+      const setupFeeCents = Math.round(parseFloat(document.getElementById('nplSetupFee').value || 0) * 100);
+      const billingCycle = document.getElementById('nplCycle').value;
+      const maxProfessionals = parseInt(document.getElementById('nplMaxProf').value, 10) || 1;
+
+      try {
+        const res = await fetch(`/api/admin/products/${productId}/plans`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, name, priceCents, promoFairPriceCents, setupFeeCents, billingCycle, maxProfessionals }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          alert(`Plano '${json.plan.name}' criado com sucesso!`);
+          closeAddPlanModal();
+          loadProductsDashboard();
+        } else {
+          alert('Erro ao criar plano: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro ao criar plano: ' + err.message);
+      }
+    }
+
+    async function loadSubscriptionsList() {
+      const tbody = document.getElementById('subscriptionsTableBody');
+      const productId = document.getElementById('filterSubProduct')?.value || '';
+      const origin = document.getElementById('filterSubOrigin')?.value || '';
+
+      tbody.innerHTML = '<tr><td colspan="8" class="py-4 text-center text-zinc-500">Buscando assinaturas...</td></tr>';
+
+      try {
+        let url = '/api/admin/multiproduct/subscriptions?limit=100';
+        if (productId) url += `&productId=${productId}`;
+        if (origin) url += `&origin=${origin}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (!data.success || !data.subscriptions || data.subscriptions.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="py-4 text-center text-zinc-500">Nenhuma assinatura encontrada para os filtros selecionados.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = '';
+        data.subscriptions.forEach(sub => {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-zinc-800/40 transition';
+
+          const statusColors = {
+            ACTIVE: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',
+            PENDING: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
+            OVERDUE: 'bg-rose-500/20 text-rose-400 border border-rose-500/30',
+            CANCELLED: 'bg-zinc-700/40 text-zinc-300 border border-zinc-600',
+          };
+          const statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold ${statusColors[sub.status] || 'bg-zinc-800 text-zinc-400'}">${sub.status}</span>`;
+
+          const paidUntilStr = sub.paidUntil
+            ? new Date(sub.paidUntil).toLocaleDateString('pt-BR')
+            : '—';
+
+          tr.innerHTML = `
+            <td class="py-2.5 px-3">
+              <div class="font-bold text-white">${escapeHtml(sub.userName || 'Cliente')}</div>
+              <div class="text-[11px] text-zinc-400">${escapeHtml(sub.userEmail || '')}</div>
+            </td>
+            <td class="py-2.5 px-3">
+              <span class="font-bold text-amber-400">${sub.productName}</span>
+            </td>
+            <td class="py-2.5 px-3 font-medium text-white">${sub.planName}</td>
+            <td class="py-2.5 px-3">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold ${sub.origin === 'HOTMART' ? 'bg-amber-500/10 text-amber-400' : 'bg-cyan-500/10 text-cyan-400'}">${sub.origin}</span>
+            </td>
+            <td class="py-2.5 px-3 font-mono font-bold text-white">${sub.priceFormatted}</td>
+            <td class="py-2.5 px-3">${statusBadge}</td>
+            <td class="py-2.5 px-3 text-zinc-300 font-mono text-[11px]">${paidUntilStr}</td>
+            <td class="py-2.5 px-3 text-right space-x-1.5 whitespace-nowrap">
+              ${sub.status !== 'CANCELLED' ? `
+                <button onclick="cancelCustomerSubscription(${sub.id})" class="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[11px] font-bold border border-rose-500/20 cursor-pointer">
+                  Cancelar
+                </button>
+              ` : ''}
+              <button onclick="renewCustomerSubscription(${sub.id})" class="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[11px] font-bold border border-emerald-500/20 cursor-pointer">
+                Renovar
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="8" class="py-4 text-center text-rose-400">Erro: ${err.message}</td></tr>`;
+      }
+    }
+
+    async function cancelCustomerSubscription(subId) {
+      if (!confirm('Deseja realmente cancelar esta assinatura? Conforme a política sem fidelidade, o acesso permanece liberado até o término do período já pago.')) return;
+      try {
+        const res = await fetch(`/api/admin/multiproduct/subscriptions/${subId}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'Cancelamento administrativo sem fidelidade' }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('Assinatura cancelada com sucesso! Acesso mantido até a vigência contratada.');
+          loadProductsDashboard();
+        } else {
+          alert('Erro ao cancelar: ' + data.error);
+        }
+      } catch (e) {
+        alert('Erro ao comunicar com o servidor: ' + e.message);
+      }
+    }
+
+    async function renewCustomerSubscription(subId) {
+      const defaultDate = new Date();
+      defaultDate.setDate(defaultDate.getDate() + 30);
+      const isoStr = defaultDate.toISOString().split('T')[0];
+
+      const newDateStr = prompt('Informe a nova data de vigência (YYYY-MM-DD):', isoStr);
+      if (!newDateStr) return;
+
+      try {
+        const paidUntil = new Date(newDateStr + 'T23:59:59-03:00').toISOString();
+        const res = await fetch(`/api/admin/multiproduct/subscriptions/${subId}/renew`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paidUntil, reason: 'Renovação administrativa confirmada' }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('Assinatura renovada com sucesso!');
+          loadProductsDashboard();
+        } else {
+          alert('Erro ao renovar: ' + data.error);
+        }
+      } catch (e) {
+        alert('Erro ao renovar: ' + e.message);
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str || '').replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+      }[m]));
     }
 
     // -------------------------------------------------------------

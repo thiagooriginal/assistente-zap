@@ -357,6 +357,92 @@ db.exec(`
     processed_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
   CREATE INDEX IF NOT EXISTS idx_asaas_events_event_id ON asaas_webhook_events(event_id);
+
+  -- MULTIPRODUCT ARCHITECTURE: Products Catalog
+  CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    category TEXT NOT NULL DEFAULT 'GERAL',
+    is_active INTEGER NOT NULL DEFAULT 1,
+    icon TEXT DEFAULT 'bot',
+    metadata_json TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_products_code ON products(code);
+  CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+
+  -- MULTIPRODUCT ARCHITECTURE: Plans per Product
+  CREATE TABLE IF NOT EXISTS product_plans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    code TEXT NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    billing_cycle TEXT NOT NULL DEFAULT 'MONTHLY',
+    price_cents INTEGER NOT NULL CHECK(price_cents >= 0),
+    setup_fee_cents INTEGER NOT NULL DEFAULT 0,
+    promo_fair_price_cents INTEGER,
+    max_professionals INTEGER DEFAULT 1,
+    features_json TEXT,
+    has_loyalty INTEGER DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(product_id, code)
+  );
+  CREATE INDEX IF NOT EXISTS idx_product_plans_prod ON product_plans(product_id);
+  CREATE INDEX IF NOT EXISTS idx_product_plans_code ON product_plans(code);
+
+  -- MULTIPRODUCT ARCHITECTURE: Customer Contracts & Subscriptions
+  CREATE TABLE IF NOT EXISTS customer_subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    plan_id INTEGER REFERENCES product_plans(id),
+    origin TEXT NOT NULL DEFAULT 'ASAAS',
+    gateway TEXT NOT NULL DEFAULT 'ASAAS',
+    gateway_subscription_id TEXT,
+    gateway_customer_id TEXT,
+    gateway_payment_id TEXT,
+    status TEXT NOT NULL DEFAULT 'PENDING',
+    price_cents INTEGER NOT NULL,
+    setup_fee_cents INTEGER NOT NULL DEFAULT 0,
+    billing_cycle TEXT NOT NULL DEFAULT 'MONTHLY',
+    promotional_fair INTEGER NOT NULL DEFAULT 0,
+    extra_professionals INTEGER NOT NULL DEFAULT 0,
+    contracted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    paid_until TEXT,
+    access_expires_at TEXT,
+    cancelled_at TEXT,
+    cancellation_reason TEXT,
+    custom_settings_json TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_cust_sub_user ON customer_subscriptions(user_id);
+  CREATE INDEX IF NOT EXISTS idx_cust_sub_prod ON customer_subscriptions(product_id);
+  CREATE INDEX IF NOT EXISTS idx_cust_sub_gw_sub ON customer_subscriptions(gateway_subscription_id);
+  CREATE INDEX IF NOT EXISTS idx_cust_sub_gw_cust ON customer_subscriptions(gateway_customer_id);
+  CREATE INDEX IF NOT EXISTS idx_cust_sub_status ON customer_subscriptions(status);
+
+  -- MULTIPRODUCT ARCHITECTURE: Audit Trail for Subscription Changes
+  CREATE TABLE IF NOT EXISTS subscription_audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    subscription_id INTEGER NOT NULL REFERENCES customer_subscriptions(id),
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    old_status TEXT,
+    new_status TEXT NOT NULL,
+    action TEXT NOT NULL,
+    reason TEXT,
+    details_json TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_sub_audit_sub ON subscription_audit_logs(subscription_id);
+  CREATE INDEX IF NOT EXISTS idx_sub_audit_user ON subscription_audit_logs(user_id);
 `);
 
 // 2. Run migrations for existing databases
@@ -471,5 +557,215 @@ try {
 } catch (err) {
   console.error('[Database] Erro ao verificar/criar usuário master:', err.message);
 }
+
+// 4. Seed Default Products & Plans for Multiproduct Architecture
+try {
+  const seedProducts = [
+    {
+      code: 'JESSICA',
+      name: 'Jéssica - Assistente Virtual para Salões e Barbearias',
+      description: 'Agente de IA especializado em agendamentos, catálogo de serviços, confirmações automáticas e atendimento 24/7 via WhatsApp.',
+      category: 'BELEZA',
+      icon: 'scissors',
+      metadata_json: JSON.stringify({ module: 'salon', whatsappCapable: true }),
+      plans: [
+        {
+          code: 'START',
+          name: 'Jéssica Entrada',
+          description: 'Plano Essencial com 1 profissional incluso',
+          billing_cycle: 'MONTHLY',
+          price_cents: 8900,
+          setup_fee_cents: 35000,
+          promo_fair_price_cents: 5900,
+          max_professionals: 1,
+          features_json: JSON.stringify(['AGENDAMENTO_WHATSAPP', 'CATALOGO_SERVICOS', 'LEMBRETES_AUTOMATICOS', 'PAINEL_GESTAO'])
+        },
+        {
+          code: 'INTERMEDIATE',
+          name: 'Jéssica Intermediário',
+          description: 'Plano Intermediário com 1 profissional incluso',
+          billing_cycle: 'MONTHLY',
+          price_cents: 10900,
+          setup_fee_cents: 35000,
+          promo_fair_price_cents: 7900,
+          max_professionals: 1,
+          features_json: JSON.stringify(['AGENDAMENTO_WHATSAPP', 'CATALOGO_SERVICOS', 'LEMBRETES_AUTOMATICOS', 'PAINEL_GESTAO', 'RELATORIOS_AVANCADOS'])
+        },
+        {
+          code: 'PRO',
+          name: 'Jéssica Pró',
+          description: 'Plano Completo com 2 profissionais inclusos e disparos em massa',
+          billing_cycle: 'MONTHLY',
+          price_cents: 13900,
+          setup_fee_cents: 35000,
+          promo_fair_price_cents: 9900,
+          max_professionals: 2,
+          features_json: JSON.stringify(['AGENDAMENTO_WHATSAPP', 'CATALOGO_SERVICOS', 'LEMBRETES_AUTOMATICOS', 'PAINEL_GESTAO', 'RELATORIOS_AVANCADOS', 'CAMPANHAS_PROMOCIONAIS_WHATSAPP', 'MULTI_PROFISSIONAIS'])
+        }
+      ]
+    },
+    {
+      code: 'JARVIS_FINANCEIRO',
+      name: 'Jarvis - Assistente Financeiro Inteligente',
+      description: 'Agente de IA para controle de receitas, despesas, contas a pagar, lembretes de vencimento e relatórios via WhatsApp.',
+      category: 'FINANCEIRO',
+      icon: 'wallet',
+      metadata_json: JSON.stringify({ module: 'finance', whatsappCapable: true }),
+      plans: [
+        {
+          code: 'START',
+          name: 'Jarvis Inicial',
+          description: 'Controle financeiro pessoal e MEI via WhatsApp',
+          billing_cycle: 'MONTHLY',
+          price_cents: 9900,
+          setup_fee_cents: 0,
+          promo_fair_price_cents: 7900,
+          max_professionals: 1,
+          features_json: JSON.stringify(['RECEITAS_DESPESAS', 'LEMBRETES_CONTAS', 'RELATORIOS_MENSAIS'])
+        },
+        {
+          code: 'PRO',
+          name: 'Jarvis Empresarial',
+          description: 'Gestão financeira avançada para PMEs com conciliação',
+          billing_cycle: 'MONTHLY',
+          price_cents: 19900,
+          setup_fee_cents: 0,
+          promo_fair_price_cents: 14900,
+          max_professionals: 5,
+          features_json: JSON.stringify(['RECEITAS_DESPESAS', 'LEMBRETES_CONTAS', 'RELATORIOS_AVANCADOS', 'CONCILIACAO_EXTRATOS', 'MULTI_USUARIOS'])
+        }
+      ]
+    },
+    {
+      code: 'ASSISTENTE_CLINICA',
+      name: 'Dra. Camila - Atendente para Clínicas e Consultórios',
+      description: 'Agente de IA especializado em triagem, agendamento de consultas médicas e odontológicas, orientações e retornos.',
+      category: 'SAUDE',
+      icon: 'stethoscope',
+      metadata_json: JSON.stringify({ module: 'clinic', whatsappCapable: true }),
+      plans: [
+        {
+          code: 'START',
+          name: 'Dra. Camila Clínicas Básica',
+          description: 'Agendamento e triagem para 1 consultório',
+          billing_cycle: 'MONTHLY',
+          price_cents: 11900,
+          setup_fee_cents: 35000,
+          promo_fair_price_cents: 9900,
+          max_professionals: 1,
+          features_json: JSON.stringify(['AGENDAMENTO_CONSULTAS', 'CONFIRMACOES_LEMBRETES', 'PRONTUARIO_INTEGRADO'])
+        },
+        {
+          code: 'PRO',
+          name: 'Dra. Camila Clínicas Avançada',
+          description: 'Triagem personalizada, múltiplos especialistas e retornos',
+          billing_cycle: 'MONTHLY',
+          price_cents: 24900,
+          setup_fee_cents: 35000,
+          promo_fair_price_cents: 18900,
+          max_professionals: 5,
+          features_json: JSON.stringify(['AGENDAMENTO_CONSULTAS', 'CONFIRMACOES_LEMBRETES', 'PRONTUARIO_INTEGRADO', 'MULTI_ESPECIALISTAS', 'TRIAGEM_INTELIGENTE'])
+        }
+      ]
+    }
+  ];
+
+  for (const prod of seedProducts) {
+    let pRow = db.prepare('SELECT id FROM products WHERE code = ?').get(prod.code);
+    if (!pRow) {
+      const res = db.prepare(`
+        INSERT INTO products (code, name, description, category, icon, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(prod.code, prod.name, prod.description, prod.category, prod.icon, prod.metadata_json);
+      pRow = { id: Number(res.lastInsertRowid) };
+      console.log(`[Database Seed] Produto criado: ${prod.code} (${prod.name})`);
+    }
+
+    if (pRow?.id && prod.plans) {
+      for (const pl of prod.plans) {
+        const existingPlan = db.prepare('SELECT id FROM product_plans WHERE product_id = ? AND code = ?').get(pRow.id, pl.code);
+        if (!existingPlan) {
+          db.prepare(`
+            INSERT INTO product_plans (
+              product_id, code, name, description, billing_cycle,
+              price_cents, setup_fee_cents, promo_fair_price_cents,
+              max_professionals, features_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            pRow.id, pl.code, pl.name, pl.description, pl.billing_cycle,
+            pl.price_cents, pl.setup_fee_cents, pl.promo_fair_price_cents,
+            pl.max_professionals || 1, pl.features_json
+          );
+          console.log(`[Database Seed] Plano criado: ${prod.code} -> ${pl.code} (${pl.name})`);
+        }
+      }
+    }
+  }
+
+  // 5. Backfill: Ensure existing users with contracts have customer_subscriptions for JESSICA
+  const jessica = db.prepare("SELECT id FROM products WHERE code = 'JESSICA'").get();
+  if (jessica) {
+    const plans = db.prepare('SELECT id, code, price_cents, setup_fee_cents, promo_fair_price_cents FROM product_plans WHERE product_id = ?').all(jessica.id);
+    const planMap = {};
+    for (const p of plans) planMap[p.code] = p;
+
+    const candidates = db.prepare(`
+      SELECT u.id, u.plan_tier, u.subscription_status, u.paid_until, u.subscription_origin,
+             u.extra_professionals, u.asaas_subscription_id, u.asaas_customer_id, u.asaas_payment_id,
+             u.hotmart_subscriber_code, u.hotmart_transaction,
+             c.promotion, c.monthly_cents, c.setup_cents, c.payment_status
+      FROM users u
+      LEFT JOIN direct_sales_contracts c ON c.user_id = u.id
+      WHERE u.role != 'ADMIN' AND (
+        u.plan_tier IS NOT NULL OR u.subscription_status IS NOT NULL OR c.id IS NOT NULL
+        OR EXISTS (SELECT 1 FROM client_salons s WHERE s.user_id = u.id)
+      )
+    `).all();
+
+    for (const u of candidates) {
+      const existingSub = db.prepare('SELECT id FROM customer_subscriptions WHERE user_id = ? AND product_id = ?').get(u.id, jessica.id);
+      if (!existingSub) {
+        let planCode = 'START';
+        if (u.plan_tier?.includes('PRO')) planCode = 'PRO';
+        else if (u.plan_tier?.includes('INTERMEDIATE')) planCode = 'INTERMEDIATE';
+        const plan = planMap[planCode] || plans[0];
+
+        const isFair = u.promotion === 'FAIR_2026';
+        let priceCents = u.monthly_cents || (isFair ? (plan?.promo_fair_price_cents || 5900) : (plan?.price_cents || 8900));
+        let setupCents = u.setup_cents !== undefined && u.setup_cents !== null ? u.setup_cents : (isFair ? 0 : 35000);
+
+        let gateway = 'MANUAL';
+        let origin = u.subscription_origin || 'LEGACY';
+        if (u.subscription_origin === 'HOTMART' || u.hotmart_subscriber_code) {
+          gateway = 'HOTMART';
+          origin = 'HOTMART';
+        } else if (u.subscription_origin === 'ASAAS' || u.asaas_subscription_id) {
+          gateway = 'ASAAS';
+          origin = 'ASAAS';
+        }
+
+        const subStatus = u.subscription_status || 'INACTIVE';
+        const subId = u.asaas_subscription_id || u.hotmart_subscriber_code || null;
+
+        db.prepare(`
+          INSERT INTO customer_subscriptions (
+            user_id, product_id, plan_id, origin, gateway, gateway_subscription_id,
+            gateway_customer_id, gateway_payment_id, status, price_cents, setup_fee_cents,
+            billing_cycle, promotional_fair, extra_professionals, contracted_at, paid_until,
+            access_expires_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'MONTHLY', ?, ?, CURRENT_TIMESTAMP, ?, ?)
+        `).run(
+          u.id, jessica.id, plan?.id || null, origin, gateway,
+          subId, u.asaas_customer_id || null, u.asaas_payment_id || null,
+          subStatus, priceCents, setupCents, isFair ? 1 : 0,
+          u.extra_professionals || 0, u.paid_until || null, u.paid_until || null
+        );
+      }
+    }
+  }
+} catch (seedErr) {
+  console.warn('[Database Seed] Aviso ao semear produtos ou migrar assinaturas:', seedErr.message);
+}
+
 
 module.exports = db;
