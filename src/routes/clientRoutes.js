@@ -4,6 +4,13 @@ const path = require('path');
 const db = require('../database/db');
 const clientAuth = require('../services/clientAuthService');
 const config = require('../config');
+const whatsappClient = require('../whatsapp/client');
+const {
+  clientLoginLimiter,
+  activationLimiter,
+  passwordResetRequestLimiter,
+  passwordResetSubmitLimiter,
+} = require('../middlewares/rateLimiter');
 
 // Helper to extract cookies from request header
 function getCookie(req, name) {
@@ -13,7 +20,34 @@ function getCookie(req, name) {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-// Client Multi-Tenant Authentication Middleware
+// Check if request is under HTTPS (direct or reverse proxy)
+function isSecureConnection(req) {
+  if (!req) return false;
+  if (req.secure) return true;
+  const proto = req.headers['x-forwarded-proto'];
+  if (proto && proto.toLowerCase() === 'https') return true;
+  const host = (req.headers.host || '').toLowerCase();
+  if (host.includes('trycloudflare.com') || host.includes('raiaagentes.com.br')) return true;
+  return false;
+}
+
+function setSessionCookie(res, name, token, maxAgeSeconds = 30 * 24 * 3600, req = null) {
+  const secureFlag = isSecureConnection(req) ? '; Secure' : '';
+  res.setHeader(
+    'Set-Cookie',
+    `${name}=${token}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Lax${secureFlag}`
+  );
+}
+
+function clearSessionCookie(res, name, req = null) {
+  const secureFlag = isSecureConnection(req) ? '; Secure' : '';
+  res.setHeader(
+    'Set-Cookie',
+    `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secureFlag}`
+  );
+}
+
+// Client Multi-Tenant Authentication & Subscription Enforcement Middleware
 function clientAuthMiddleware(req, res, next) {
   let token = null;
 
@@ -38,6 +72,7 @@ function clientAuthMiddleware(req, res, next) {
     return res.status(401).json({
       success: false,
       error: 'Sessão expirada ou não autenticada. Faça login para continuar.',
+      code: 'UNAUTHORIZED',
     });
   }
 
@@ -45,20 +80,73 @@ function clientAuthMiddleware(req, res, next) {
   if (!user) {
     return res.status(401).json({
       success: false,
-      error: 'Token inválido. Faça login novamente.',
+      error: 'Token inválido ou sessão revogada. Faça login novamente.',
+      code: 'INVALID_TOKEN',
     });
   }
 
-  // Subscription verification
-  if (user.subscription_status === 'REFUNDED' || user.subscription_status === 'CHARGEBACK') {
+  // 1. Session expiration verification
+  if (user.magic_token_expires_at) {
+    const expires = new Date(user.magic_token_expires_at);
+    if (expires < new Date()) {
+      return res.status(401).json({
+        success: false,
+        error: 'Sua sessão expirou. Faça login novamente.',
+        code: 'SESSION_EXPIRED',
+      });
+    }
+  }
+
+  // 2. Subscription status verification
+  const subStatus = user.subscription_status || 'INACTIVE';
+  const isDemo = Boolean(user.is_demo);
+
+  if (subStatus === 'REFUNDED' || subStatus === 'CHARGEBACK') {
     return res.status(403).json({
       success: false,
       error: 'Acesso suspenso por reembolso ou contestação de pagamento.',
+      code: 'SUBSCRIPTION_REFUNDED',
     });
   }
 
+  if (subStatus === 'INACTIVE') {
+    return res.status(403).json({
+      success: false,
+      error: 'Assinatura inativa. Confirme o pagamento na Hotmart para liberar seu acesso.',
+      code: 'SUBSCRIPTION_INACTIVE',
+    });
+  }
+
+  if (subStatus === 'PENDING') {
+    return res.status(403).json({
+      success: false,
+      error: 'Conta pendente de ativação. Ative sua conta pelo link enviado para criar sua senha.',
+      code: 'ACCOUNT_PENDING_ACTIVATION',
+    });
+  }
+
+  // 3. Paid period verification (paid_until)
+  if (!isDemo && user.paid_until) {
+    const paidUntil = new Date(user.paid_until);
+    const now = new Date();
+    if (paidUntil < now) {
+      if (subStatus === 'CANCELED') {
+        return res.status(403).json({
+          success: false,
+          error: 'Sua assinatura foi cancelada e o período pago já expirou. Renove para continuar acessando.',
+          code: 'SUBSCRIPTION_EXPIRED',
+        });
+      }
+      return res.status(403).json({
+        success: false,
+        error: 'O período da sua assinatura expirou. Renove na Hotmart para continuar utilizando a Jéssica.',
+        code: 'SUBSCRIPTION_EXPIRED',
+      });
+    }
+  }
+
   req.clientUser = user;
-  req.isDemo = Boolean(user.is_demo);
+  req.isDemo = isDemo;
   return next();
 }
 
@@ -66,7 +154,7 @@ function clientAuthMiddleware(req, res, next) {
 // PUBLIC AUTH ENDPOINTS (LOGIN, ACTIVATE, RESET)
 // ==========================================
 
-router.post('/auth/login', (req, res) => {
+router.post('/auth/login', clientLoginLimiter, (req, res) => {
   const { email, password } = req.body || {};
   const result = clientAuth.login(email, password);
 
@@ -74,11 +162,8 @@ router.post('/auth/login', (req, res) => {
     return res.status(401).json(result);
   }
 
-  // Set secure cookie (30 days)
-  res.setHeader(
-    'Set-Cookie',
-    `client_auth_token=${result.token}; Path=/; Max-Age=${30 * 24 * 3600}; SameSite=Lax; HttpOnly`
-  );
+  // Set secure cookie (30 days, HttpOnly, SameSite=Lax, Secure when on HTTPS)
+  setSessionCookie(res, 'client_auth_token', result.token, 30 * 24 * 3600, req);
 
   return res.json(result);
 });
@@ -101,7 +186,7 @@ router.get('/auth/validate-activation', (req, res) => {
   });
 });
 
-router.post('/auth/activate', (req, res) => {
+router.post('/auth/activate', activationLimiter, (req, res) => {
   const { token, password } = req.body || {};
   const result = clientAuth.activateAccount(token, password);
 
@@ -109,10 +194,7 @@ router.post('/auth/activate', (req, res) => {
     return res.status(400).json({ success: false, error: result.error });
   }
 
-  res.setHeader(
-    'Set-Cookie',
-    `client_auth_token=${result.token}; Path=/; Max-Age=${30 * 24 * 3600}; SameSite=Lax; HttpOnly`
-  );
+  setSessionCookie(res, 'client_auth_token', result.token, 30 * 24 * 3600, req);
 
   return res.json({
     success: true,
@@ -122,13 +204,17 @@ router.post('/auth/activate', (req, res) => {
   });
 });
 
-router.post('/auth/request-reset', (req, res) => {
+// Strict Password Reset Request: Never exposes tokens or phone numbers via HTTP response
+router.post('/auth/request-reset', passwordResetRequestLimiter, async (req, res) => {
   const { email } = req.body || {};
-  const result = clientAuth.requestPasswordReset(email);
-  return res.json(result);
+  await clientAuth.requestPasswordReset(email, whatsappClient?.sendWhatsAppMessage);
+  return res.json({
+    success: true,
+    message: 'Se o e-mail informado estiver cadastrado, as instruções de recuperação serão enviadas para o seu canal cadastrado.',
+  });
 });
 
-router.post('/auth/reset-password', (req, res) => {
+router.post('/auth/reset-password', passwordResetSubmitLimiter, (req, res) => {
   const { token, newPassword } = req.body || {};
   const result = clientAuth.resetPassword(token, newPassword);
 
@@ -139,8 +225,13 @@ router.post('/auth/reset-password', (req, res) => {
   return res.json(result);
 });
 
-router.post('/auth/logout', (req, res) => {
-  res.setHeader('Set-Cookie', 'client_auth_token=; Path=/; Max-Age=0');
+// Session Revocation & Logout
+router.post('/auth/logout', clientAuthMiddleware, (req, res) => {
+  if (req.clientUser?.id) {
+    db.prepare('UPDATE users SET magic_token = NULL, magic_token_expires_at = NULL WHERE id = ?').run(req.clientUser.id);
+  }
+  clearSessionCookie(res, 'client_auth_token', req);
+  clearSessionCookie(res, 'auth_token', req);
   return res.json({ success: true, message: 'Sessão encerrada com sucesso.' });
 });
 

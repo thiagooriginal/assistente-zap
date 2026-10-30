@@ -24,6 +24,11 @@ const config = {
   asaasApiUrl: process.env.ASAAS_API_URL || 'https://api.asaas.com/v3',
   asaasWebhookSecret: (process.env.ASAAS_WEBHOOK_SECRET || '').trim(),
 
+  // Security & Administrative Credentials
+  adminPassword: (process.env.ADMIN_PASSWORD || '').trim(),
+  adminPin: (process.env.ADMIN_PIN || '').trim(),
+  adminApiKey: (process.env.ADMIN_API_KEY || '').trim(),
+
   // Hotmart Integration
   hotmartWebhookSecret: (process.env.HOTMART_WEBHOOK_SECRET || process.env.HOTMART_HOTTOK || '').trim(),
   hotmartProductId: (process.env.HOTMART_PRODUCT_ID || '8840376').trim(),

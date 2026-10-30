@@ -1,5 +1,6 @@
 const assert = require('assert');
 const http = require('http');
+const config = require('../src/config');
 const { app } = require('../src/server/app');
 const db = require('../src/database/db');
 
@@ -77,7 +78,7 @@ async function testHttpEndpoints() {
     const adminLoginRes = await fetch(`${baseUrl}/api/auth/admin-login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: process.env.ADMIN_PASSWORD || 'admin123' })
+      body: JSON.stringify({ password: process.env.ADMIN_PASSWORD || config.adminPassword })
     });
     const adminLoginData = await adminLoginRes.json();
     if (adminLoginData.success && adminLoginData.token) {

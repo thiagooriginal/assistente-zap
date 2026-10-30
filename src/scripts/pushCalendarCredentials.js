@@ -22,7 +22,7 @@ async function pushCredentials() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-admin-key': config.geminiApiKey || 'assistente-zap-sync',
+        'x-admin-key': config.adminApiKey || '',
       },
       body: JSON.stringify({ credentials, token }),
     });

@@ -120,7 +120,7 @@
             <input 
               type="password" 
               id="adminPassInput" 
-              placeholder="Digite a senha (ex: admin123 ou 9513)" 
+              placeholder="Digite a senha ou PIN de administrador" 
               class="w-full px-4 py-3.5 bg-black/50 border border-zinc-700/80 rounded-2xl text-white text-sm focus:outline-none focus:border-[#00F59B] transition pr-12"
               autofocus
             >
@@ -129,10 +129,7 @@
             </button>
           </div>
           <p class="text-[11px] text-zinc-500">
-            💡 Clique para preencher: 
-            <button type="button" onclick="fillAdminPass('admin123')" class="text-zinc-300 bg-zinc-800 hover:bg-zinc-700 hover:text-[#00F59B] px-1.5 py-0.5 rounded cursor-pointer transition font-mono border border-zinc-700/60 text-[10px]">admin123</button> 
-            ou PIN 
-            <button type="button" onclick="fillAdminPass('9513')" class="text-zinc-300 bg-zinc-800 hover:bg-zinc-700 hover:text-[#00F59B] px-1.5 py-0.5 rounded cursor-pointer transition font-mono border border-zinc-700/60 text-[10px]">9513</button>
+            🔒 Acesso restrito a administradores autorizados da RAIA.
           </p>
         </div>
 
@@ -1438,14 +1435,6 @@
       lucide.createIcons();
     }
 
-    function fillAdminPass(pass) {
-      const inp = document.getElementById('adminPassInput');
-      if (inp) {
-        inp.value = pass;
-        executeAdminLogin();
-      }
-    }
-
     function togglePassPeek() {
       const inp = document.getElementById('adminPassInput');
       const icon = document.getElementById('peekIcon');
@@ -1487,7 +1476,7 @@
           hideAuthOverlay();
           loadAllAdminData();
         } else {
-          alertBox.innerText = json.error || 'Senha incorreta. Tente "admin123" ou "9513".';
+          alertBox.innerText = json.error || 'Senha ou PIN de administrador incorreto.';
           alertBox.classList.remove('hidden');
         }
       } catch (err) {
@@ -1498,8 +1487,14 @@
       }
     }
 
-    function handleLogout() {
+    async function handleLogout() {
       if (confirm('Deseja realmente sair do painel administrativo?')) {
+        try {
+          await fetch('/api/auth/logout', {
+            method: 'POST',
+            headers: authToken ? { 'Authorization': 'Bearer ' + authToken } : {}
+          });
+        } catch (e) {}
         try {
           localStorage.removeItem('auth_token');
           document.cookie = 'auth_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';

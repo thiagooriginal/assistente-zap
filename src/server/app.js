@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const crypto = require('crypto');
 const db = require('../database/db');
 const financeService = require('../services/financeService');
 const billService = require('../services/billService');
@@ -19,6 +20,7 @@ const hotmartService = require('../services/hotmartService');
 const analyticsService = require('../services/analyticsService');
 const metaCapiService = require('../services/metaCapiService');
 const clientAuth = require('../services/clientAuthService');
+const { adminLoginLimiter } = require('../middlewares/rateLimiter');
 
 // Initialize isolated demo account for Hotmart compliance
 try {
@@ -125,6 +127,25 @@ function getCookie(req, name) {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+// Cookie session helpers with HttpOnly, SameSite and dynamic Secure
+function setSessionCookie(res, name, value, req, maxAgeSeconds = 7 * 24 * 3600) {
+  const isHttps = req.secure || (req.headers['x-forwarded-proto'] || '').toLowerCase() === 'https';
+  let cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Lax`;
+  if (isHttps) {
+    cookie += '; Secure';
+  }
+  res.setHeader('Set-Cookie', cookie);
+}
+
+function clearSessionCookie(res, name, req) {
+  const isHttps = req.secure || (req.headers['x-forwarded-proto'] || '').toLowerCase() === 'https';
+  let cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; HttpOnly; SameSite=Lax`;
+  if (isHttps) {
+    cookie += '; Secure';
+  }
+  res.setHeader('Set-Cookie', cookie);
+}
+
 // Multi-Tenant Authentication Middleware
 function authMiddleware(req, res, next) {
   let token = null;
@@ -147,7 +168,7 @@ function authMiddleware(req, res, next) {
 
   // 4. Cookie
   if (!token) {
-    token = getCookie(req, 'auth_token');
+    token = getCookie(req, 'auth_token') || getCookie(req, 'client_auth_token');
   }
 
   if (token) {
@@ -158,28 +179,37 @@ function authMiddleware(req, res, next) {
     }
   }
 
-  const adminKey = req.headers['x-admin-key'] || req.query.adminKey;
-  if (adminKey && (adminKey === 'assistente-zap-sync' || adminKey === config.geminiApiKey)) {
-    req.user = userService.getUserById(1) || { id: 1, phone_number: '5511951364159', role: 'ADMIN', plan: 'PRO' };
-    return next();
-  }
-
-  // Fallback for localhost (local developer/owner access defaults to user 1)
-  const isLocalhost =
-    req.ip === '127.0.0.1' ||
-    req.ip === '::1' ||
-    req.ip === '::ffff:127.0.0.1' ||
-    req.hostname === 'localhost';
-
-  if (isLocalhost) {
-    req.user = userService.getUserById(1) || { id: 1, phone_number: '5511951364159', role: 'ADMIN', plan: 'PRO' };
-    return next();
+  // Admin API key via header (timing-safe comparison, env-configured only)
+  const apiKeyHeader = req.headers['x-admin-key'] || req.headers['x-api-key'];
+  if (apiKeyHeader && config.adminApiKey) {
+    const keyBuf = Buffer.from(String(apiKeyHeader));
+    const expectedBuf = Buffer.from(String(config.adminApiKey));
+    if (keyBuf.length === expectedBuf.length && crypto.timingSafeEqual(keyBuf, expectedBuf)) {
+      const admin = db.prepare("SELECT * FROM users WHERE role = 'ADMIN' ORDER BY id ASC LIMIT 1").get() || userService.getUserById(1);
+      if (admin) {
+        req.user = admin;
+        return next();
+      }
+    }
   }
 
   // If unauthorized for API routes
   return res.status(401).json({
     success: false,
-    error: 'Acesso não autorizado. Solicite o link exclusivo do seu painel no WhatsApp.',
+    error: 'Acesso não autorizado. Autenticação obrigatória.',
+  });
+}
+
+// Role-Based Access Control: Require Admin
+function requireAdmin(req, res, next) {
+  return authMiddleware(req, res, () => {
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        error: 'Acesso negado. Recurso exclusivo para administradores.',
+      });
+    }
+    return next();
   });
 }
 
@@ -241,7 +271,7 @@ app.get('/api/health', async (req, res) => {
 // ==========================================
 // PAUSE / RESUME PERSONAL ASSISTANT
 // ==========================================
-app.get('/api/assistant/pause-status', (req, res) => {
+app.get('/api/assistant/pause-status', requireAdmin, (req, res) => {
   const isPaused = whatsappClient.isPersonalAssistantPaused ? whatsappClient.isPersonalAssistantPaused() : true;
   res.json({
     success: true,
@@ -252,7 +282,7 @@ app.get('/api/assistant/pause-status', (req, res) => {
   });
 });
 
-app.post('/api/assistant/toggle-pause', (req, res) => {
+app.post('/api/assistant/toggle-pause', requireAdmin, (req, res) => {
   const current = whatsappClient.isPersonalAssistantPaused ? whatsappClient.isPersonalAssistantPaused() : true;
   const next = typeof req.body?.paused === 'boolean' ? req.body.paused : !current;
   if (whatsappClient.setPersonalAssistantPaused) {
@@ -270,7 +300,7 @@ app.post('/api/assistant/toggle-pause', (req, res) => {
 // ==========================================
 // ASAAS PAYMENT GATEWAY INTEGRATION
 // ==========================================
-app.get('/api/asaas/status', async (req, res) => {
+app.get('/api/asaas/status', requireAdmin, async (req, res) => {
   try {
     if (!asaasService.isConfigured()) {
       return res.json({ success: false, configured: false, message: 'Asaas não configurado.' });
@@ -297,7 +327,7 @@ app.get('/api/asaas/status', async (req, res) => {
   }
 });
 
-app.post('/api/asaas/create-pix', async (req, res) => {
+app.post('/api/asaas/create-pix', requireAdmin, async (req, res) => {
   try {
     const { name, phone, email, cpfCnpj, value, description } = req.body || {};
     if (!value || Number(value) <= 0) {
@@ -320,7 +350,7 @@ app.post('/api/asaas/create-pix', async (req, res) => {
   }
 });
 
-app.post('/api/asaas/create-link', async (req, res) => {
+app.post('/api/asaas/create-link', requireAdmin, async (req, res) => {
   try {
     const { name, description, value, maxInstallmentCount } = req.body || {};
     const link = await asaasService.createPaymentLink({
@@ -449,27 +479,21 @@ app.post('/api/analytics/event', (req, res) => {
   }
 });
 
-// Admin Analytics Overview & Funnel (Protected by authMiddleware)
-app.get('/api/admin/analytics/overview', authMiddleware, (req, res) => {
-  if (req.user?.role !== 'ADMIN' && req.user?.id !== 1) {
-    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
-  }
+// Admin Analytics Overview & Funnel (Protected by requireAdmin)
+app.get('/api/admin/analytics/overview', requireAdmin, (req, res) => {
   const days = parseInt(req.query.days, 10) || 30;
   const overview = analyticsService.getMarketingOverview(days);
   return res.json(overview);
 });
 
-// Admin Affiliate Sales Report (Protected by authMiddleware)
-app.get('/api/admin/analytics/affiliates', authMiddleware, (req, res) => {
-  if (req.user?.role !== 'ADMIN' && req.user?.id !== 1) {
-    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
-  }
+// Admin Affiliate Sales Report (Protected by requireAdmin)
+app.get('/api/admin/analytics/affiliates', requireAdmin, (req, res) => {
   const days = parseInt(req.query.days, 10) || 30;
   const report = analyticsService.getAffiliateSalesOverview(days);
   return res.json(report);
 });
 
-app.get('/api/asaas/payments', async (req, res) => {
+app.get('/api/asaas/payments', requireAdmin, async (req, res) => {
   try {
     const localPayments = db.prepare('SELECT * FROM asaas_payments ORDER BY created_at DESC LIMIT 50').all();
 
@@ -494,7 +518,7 @@ app.get('/api/asaas/payments', async (req, res) => {
   }
 });
 
-app.get('/api/admin/leads', (req, res) => {
+app.get('/api/admin/leads', requireAdmin, (req, res) => {
   try {
     const leads = db.prepare('SELECT * FROM leads ORDER BY created_at DESC LIMIT 100').all();
     res.json({
@@ -507,7 +531,7 @@ app.get('/api/admin/leads', (req, res) => {
   }
 });
 
-app.get('/api/admin/lead-conversation/:phone', (req, res) => {
+app.get('/api/admin/lead-conversation/:phone', requireAdmin, (req, res) => {
   try {
     const cleanPhone = String(req.params.phone || '').replace(/\D/g, '');
     const suffix = cleanPhone.length >= 8 ? cleanPhone.slice(-8) : cleanPhone;
@@ -525,7 +549,7 @@ app.get('/api/admin/lead-conversation/:phone', (req, res) => {
 // ==========================================
 // BUSINESS & OFFER ANALYZER (WISER STYLE)
 // ==========================================
-app.post('/api/admin/analyze-business', async (req, res) => {
+app.post('/api/admin/analyze-business', requireAdmin, async (req, res) => {
   try {
     const { url, description, niche, companyName } = req.body || {};
     if (!url && !description) {
@@ -539,7 +563,7 @@ app.post('/api/admin/analyze-business', async (req, res) => {
   }
 });
 
-app.get('/api/admin/business-analyses', (req, res) => {
+app.get('/api/admin/business-analyses', requireAdmin, (req, res) => {
   try {
     const list = businessAnalyzerService.listAnalyses(50);
     res.json({ success: true, analyses: list });
@@ -549,7 +573,7 @@ app.get('/api/admin/business-analyses', (req, res) => {
   }
 });
 
-app.delete('/api/admin/business-analyses/:id', (req, res) => {
+app.delete('/api/admin/business-analyses/:id', requireAdmin, (req, res) => {
   try {
     const success = businessAnalyzerService.deleteAnalysis(req.params.id);
     res.json({ success });
@@ -774,35 +798,39 @@ app.get('/auth/magic', (req, res) => {
     `);
   }
 
-  // Set auth cookie for 10 years (permanent)
-  res.setHeader('Set-Cookie', `auth_token=${token}; Path=/; Max-Age=${10 * 365 * 24 * 3600}; SameSite=Lax`);
+  // Set secure auth cookie with HttpOnly & SameSite=Lax (7 days)
+  setSessionCookie(res, 'auth_token', token, req, 7 * 24 * 3600);
   return res.redirect(`/admin?token=${token}`);
 });
 
 // ==========================================
 // DIRECT ADMIN LOGIN VIA API (PASSWORD / PIN)
 // ==========================================
-app.post('/api/auth/admin-login', (req, res) => {
+app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
   const { password } = req.body || {};
-  const input = (password || '').trim();
+  const input = typeof password === 'string' ? password.trim() : '';
 
   if (!input) {
     return res.status(400).json({ success: false, error: 'Por favor, informe a senha de administrador.' });
   }
 
-  // Accepted master passwords/PINs
-  const validSecrets = [
-    (process.env.ADMIN_PASSWORD || 'admin123').trim(),
-    (process.env.ADMIN_PIN || '9513').trim(),
-    'admin123',
-    '9513',
-    'admin',
-    'assistente-zap-sync',
-    '5511951364159',
-    '11951364159'
-  ];
+  const configuredPass = (config.adminPassword || '').trim();
+  const configuredPin = (config.adminPin || '').trim();
 
-  const isValid = validSecrets.some(secret => secret.toLowerCase() === input.toLowerCase());
+  let isValid = false;
+
+  const timingSafeMatch = (candidate, secret) => {
+    if (!secret || !candidate) return false;
+    const a = crypto.createHash('sha256').update(candidate).digest();
+    const b = crypto.createHash('sha256').update(secret).digest();
+    return crypto.timingSafeEqual(a, b);
+  };
+
+  if (configuredPass && timingSafeMatch(input, configuredPass)) {
+    isValid = true;
+  } else if (configuredPin && timingSafeMatch(input, configuredPin)) {
+    isValid = true;
+  }
 
   if (!isValid) {
     return res.status(401).json({
@@ -823,15 +851,12 @@ app.post('/api/auth/admin-login', (req, res) => {
     db.prepare("UPDATE users SET role = 'ADMIN', plan = 'PRO' WHERE id = ?").run(admin.id);
   }
 
-  // Ensure magic token is generated and permanent
-  let token = admin.magic_token;
-  if (!token) {
-    const gen = userService.generateMagicToken(admin.id, config.baseUrl);
-    token = gen.token;
-  }
+  // Generate 7-day session token
+  const token = crypto.randomBytes(32).toString('hex');
+  db.prepare("UPDATE users SET magic_token = ?, magic_token_expires_at = datetime('now', '+7 days') WHERE id = ?").run(token, admin.id);
 
-  // Set permanent auth cookie (10 years)
-  res.setHeader('Set-Cookie', `auth_token=${token}; Path=/; Max-Age=${10 * 365 * 24 * 3600}; SameSite=Lax`);
+  // Set secure HttpOnly cookie
+  setSessionCookie(res, 'auth_token', token, req, 7 * 24 * 3600);
 
   return res.json({
     success: true,
@@ -847,41 +872,15 @@ app.post('/api/auth/admin-login', (req, res) => {
 });
 
 // ==========================================
-// DIRECT ADMIN SHORTCUT: /admin
+// ADMIN LOGOUT (REVOKES TOKEN IN DB & CLEARS COOKIE)
 // ==========================================
-app.get('/admin', (req, res) => {
-  const host = (req.headers.host || '').toLowerCase();
-  const isTunnelOrExternal = host.includes('trycloudflare.com') || host.includes('loca.lt') || host.includes('ngrok');
-
-  // If accessed via public tunnel, strictly prevent automatic admin token elevation
-  if (isTunnelOrExternal) {
-    const cookieToken = getCookie(req, 'auth_token') || getCookie(req, 'client_auth_token');
-    const existingAdmin = cookieToken ? db.prepare("SELECT * FROM users WHERE magic_token = ? AND role = 'ADMIN'").get(cookieToken) : null;
-    if (!existingAdmin) {
-      console.warn(`[Segurança Homologação] Acesso a /admin bloqueado no túnel público (${host}). Redirecionando para login.`);
-      return res.redirect('/cliente/login');
-    }
+app.post('/api/auth/logout', authMiddleware, (req, res) => {
+  if (req.user?.id) {
+    db.prepare('UPDATE users SET magic_token = NULL, magic_token_expires_at = NULL WHERE id = ?').run(req.user.id);
   }
-
-  let admin = db.prepare("SELECT * FROM users WHERE role = 'ADMIN' ORDER BY id ASC LIMIT 1").get();
-  if (!admin) {
-    admin = userService.getUserById(1);
-  }
-  if (!admin) {
-    const defaultPhone = '5511951364159';
-    const created = userService.getOrCreateUser({ phoneNumber: defaultPhone, name: 'Administrador' });
-    admin = created.user;
-    db.prepare("UPDATE users SET role = 'ADMIN', plan = 'PRO' WHERE id = ?").run(admin.id);
-  }
-
-  let token = admin.magic_token;
-  if (!token) {
-    const gen = userService.generateMagicToken(admin.id, config.baseUrl);
-    token = gen.token;
-  }
-
-  res.setHeader('Set-Cookie', `auth_token=${token}; Path=/; Max-Age=${10 * 365 * 24 * 3600}; SameSite=Lax`);
-  return res.redirect(`/?token=${token}&admin=1`);
+  clearSessionCookie(res, 'auth_token', req);
+  clearSessionCookie(res, 'client_auth_token', req);
+  return res.json({ success: true, message: 'Sessão encerrada com sucesso.' });
 });
 
 // ==========================================
@@ -924,28 +923,19 @@ app.get('/api/me', authMiddleware, (req, res) => {
 // ==========================================
 // ADMIN MANAGEMENT (ONLY ROLE = ADMIN)
 // ==========================================
-app.get('/api/admin/users', authMiddleware, (req, res) => {
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
-  }
+app.get('/api/admin/users', requireAdmin, (req, res) => {
   const users = userService.getAllUsers();
   res.json({ success: true, count: users.length, data: users });
 });
 
-app.put('/api/admin/users/:id/plan', authMiddleware, (req, res) => {
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
-  }
+app.put('/api/admin/users/:id/plan', requireAdmin, (req, res) => {
   const { id } = req.params;
   const { plan, role } = req.body;
   const updated = userService.updateUser(id, { plan, role });
   res.json({ success: true, data: updated });
 });
 
-app.post('/api/admin/users/:id/extend-trial', authMiddleware, (req, res) => {
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
-  }
+app.post('/api/admin/users/:id/extend-trial', requireAdmin, (req, res) => {
   const { id } = req.params;
   const { days } = req.body;
   try {
@@ -956,10 +946,7 @@ app.post('/api/admin/users/:id/extend-trial', authMiddleware, (req, res) => {
   }
 });
 
-app.delete('/api/admin/users/:id', authMiddleware, (req, res) => {
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
-  }
+app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
   try {
     userService.deleteUser(Number(req.params.id));
     res.json({ success: true, message: 'Usuário removido com sucesso' });
@@ -968,18 +955,12 @@ app.delete('/api/admin/users/:id', authMiddleware, (req, res) => {
   }
 });
 
-app.get('/api/admin/invites', authMiddleware, (req, res) => {
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
-  }
+app.get('/api/admin/invites', requireAdmin, (req, res) => {
   const invites = userService.getAllInvites();
   res.json({ success: true, count: invites.length, data: invites });
 });
 
-app.post('/api/admin/invites', authMiddleware, (req, res) => {
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
-  }
+app.post('/api/admin/invites', requireAdmin, (req, res) => {
   const trialDays = req.body.trialDays || 7;
   const invite = userService.createInviteCode({ createdBy: req.user.id, trialDays });
   res.status(201).json({ success: true, data: invite });
@@ -988,10 +969,7 @@ app.post('/api/admin/invites', authMiddleware, (req, res) => {
 // ==========================================
 // MARKETING STUDIO API (ADMIN ONLY)
 // ==========================================
-app.get('/api/admin/marketing/data', authMiddleware, (req, res) => {
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
-  }
+app.get('/api/admin/marketing/data', requireAdmin, (req, res) => {
 
   const hooks = [
     {
@@ -1085,11 +1063,7 @@ app.get('/api/admin/marketing/data', authMiddleware, (req, res) => {
   });
 });
 
-app.post('/api/admin/marketing/generate-script', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
-  }
-
+app.post('/api/admin/marketing/generate-script', requireAdmin, async (req, res) => {
   const { format, duration, focusTopic, niche, customPrompt } = req.body || {};
   try {
     const script = await aiService.generateMarketingScript({ format, duration, focusTopic, niche, customPrompt });
@@ -1132,11 +1106,7 @@ app.get('/api/tts', async (req, res) => {
 // ==========================================
 // AVATAR VIDEO GENERATION (D-ID / HEYGEN)
 // ==========================================
-app.post('/api/admin/marketing/generate-avatar-video', authMiddleware, async (req, res) => {
-  if (req.user.role !== 'ADMIN') {
-    return res.status(403).json({ success: false, error: 'Acesso restrito ao administrador.' });
-  }
-
+app.post('/api/admin/marketing/generate-avatar-video', requireAdmin, async (req, res) => {
   const { text, avatarUrl, voiceId, apiKey } = req.body || {};
   const cleanText = (text || '').trim();
 
@@ -1239,35 +1209,9 @@ app.post('/api/admin/marketing/generate-avatar-video', authMiddleware, async (re
 // ==========================================
 // GOOGLE CALENDAR SETUP & SYNC API
 // ==========================================
-app.post('/api/admin/calendar/setup', async (req, res) => {
+app.post('/api/admin/calendar/setup', requireAdmin, async (req, res) => {
   try {
-    const adminKey = req.headers['x-admin-key'] || req.query.adminKey || req.body?.adminKey;
-    const isLocal =
-      req.ip === '127.0.0.1' ||
-      req.ip === '::1' ||
-      req.ip === '::ffff:127.0.0.1' ||
-      req.hostname === 'localhost';
-
-    let authorized = isLocal;
-    if (!authorized && adminKey && (adminKey === config.geminiApiKey || adminKey === 'assistente-zap-sync')) {
-      authorized = true;
-    }
-    if (!authorized) {
-      const authHeader = req.headers.authorization;
-      const token = authHeader?.replace('Bearer ', '') || req.query.token || req.body?.token;
-      if (token) {
-        const user = userService.getUserByMagicToken(token);
-        if (user && (user.role === 'ADMIN' || user.id === 1)) {
-          authorized = true;
-        }
-      }
-    }
-
-    if (!authorized) {
-      return res.status(401).json({ success: false, error: 'Acesso não autorizado para configurar o Calendar.' });
-    }
-
-    const { credentials, token } = req.body;
+    const { credentials, token } = req.body || {};
     if (!credentials && !token) {
       return res.status(400).json({ success: false, error: 'Credenciais ou token não fornecidos.' });
     }
@@ -1293,7 +1237,7 @@ app.post('/api/admin/calendar/setup', async (req, res) => {
   }
 });
 
-app.post('/api/admin/calendar/sync', async (req, res) => {
+app.post('/api/admin/calendar/sync', requireAdmin, async (req, res) => {
   try {
     const appointmentService = require('../services/appointmentService');
     const syncResult = await appointmentService.syncPendingAdminAppointmentsToGoogle();
@@ -1304,11 +1248,7 @@ app.post('/api/admin/calendar/sync', async (req, res) => {
 });
 
 // List all registered clients
-app.get('/api/admin/users-list', (req, res) => {
-  const adminKey = req.headers['x-admin-key'] || req.query.adminKey;
-  if (!adminKey || (adminKey !== 'assistente-zap-sync' && adminKey !== config.geminiApiKey)) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+app.get('/api/admin/users-list', requireAdmin, (req, res) => {
   try {
     const users = db.prepare('SELECT id, phone_number, name, role, plan, trial_ends_at, created_at FROM users ORDER BY id DESC').all();
     res.json({ success: true, count: users.length, users });
@@ -1318,34 +1258,8 @@ app.get('/api/admin/users-list', (req, res) => {
 });
 
 // Resolve a failed user request: register expense and send WhatsApp confirmation
-app.post('/api/admin/fix-user-expense', async (req, res) => {
+app.post('/api/admin/fix-user-expense', requireAdmin, async (req, res) => {
   try {
-    const adminKey = req.headers['x-admin-key'] || req.query.adminKey || req.body?.adminKey;
-    const isLocal =
-      req.ip === '127.0.0.1' ||
-      req.ip === '::1' ||
-      req.ip === '::ffff:127.0.0.1' ||
-      req.hostname === 'localhost';
-
-    let authorized = isLocal;
-    if (!authorized && adminKey && (adminKey === config.geminiApiKey || adminKey === 'assistente-zap-sync')) {
-      authorized = true;
-    }
-    if (!authorized) {
-      const authHeader = req.headers.authorization;
-      const token = authHeader?.replace('Bearer ', '') || req.query.token || req.body?.token;
-      if (token) {
-        const user = userService.getUserByMagicToken(token);
-        if (user && (user.role === 'ADMIN' || user.id === 1)) {
-          authorized = true;
-        }
-      }
-    }
-
-    if (!authorized) {
-      return res.status(401).json({ success: false, error: 'Acesso não autorizado.' });
-    }
-
     // 1. Auto-fix Gemini API key in memory if there is a known typo or new key provided
     if (config.geminiApiKey && config.geminiApiKey.includes('B8tpfH0')) {
       config.geminiApiKey = config.geminiApiKey.replace('B8tpfH0', 'B8tpFh0');

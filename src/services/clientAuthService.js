@@ -87,9 +87,10 @@ function activateAccount(token, password) {
   // Ensure salon entry exists
   ensureSalonForUser(user.id, user.name);
 
-  // Generate session token
+  // Generate session token with 30-day expiration
   const sessionToken = generateSecureToken(24);
-  db.prepare(`UPDATE users SET magic_token = ? WHERE id = ?`).run(sessionToken, user.id);
+  const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  db.prepare(`UPDATE users SET magic_token = ?, magic_token_expires_at = ? WHERE id = ?`).run(sessionToken, sessionExpiresAt, user.id);
 
   return {
     valid: true,
@@ -165,14 +166,16 @@ function login(email, password) {
     warning = 'Identificamos uma pendência na renovação da sua assinatura. Regularize para não perder o atendimento da Jéssica.';
   }
 
-  // Update session & last login
+  // Update session with 30-day expiration & last login
   const sessionToken = generateSecureToken(24);
+  const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   db.prepare(`
     UPDATE users
     SET magic_token = ?,
+        magic_token_expires_at = ?,
         last_login_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(sessionToken, user.id);
+  `).run(sessionToken, sessionExpiresAt, user.id);
 
   // Ensure salon entry exists
   ensureSalonForUser(user.id, user.name);
@@ -187,18 +190,20 @@ function login(email, password) {
 
 /**
  * Request password reset
+ * Strict Security: Never exposes tokens, user IDs, or phone numbers in HTTP response.
+ * Sends recovery link strictly via verified out-of-band communication channel (WhatsApp/SMS).
  */
-function requestPasswordReset(email) {
+function requestPasswordReset(email, channelSender = null) {
   if (!email) return { success: false, error: 'Informe seu e-mail.' };
 
   const cleanEmail = String(email).trim().toLowerCase();
   const user = db.prepare('SELECT id, name, phone_number FROM users WHERE LOWER(email) = ?').get(cleanEmail);
 
-  // Always return success to prevent email enumeration
+  // Always return success to prevent user/email enumeration
   if (!user) {
     return {
       success: true,
-      message: 'Se o e-mail estiver cadastrado, as instruções de recuperação serão enviadas.',
+      message: 'Se o e-mail informado estiver cadastrado, as instruções de recuperação serão enviadas para o seu canal cadastrado.',
     };
   }
 
@@ -212,13 +217,30 @@ function requestPasswordReset(email) {
     WHERE id = ?
   `).run(resetToken, expiresAt, user.id);
 
+  // Dispatch link strictly via verified channel if available
+  if (user.phone_number && channelSender) {
+    try {
+      const resetUrl = `${config.baseUrl}/cliente/recuperar-senha?token=${resetToken}`;
+      const cleanPhone = user.phone_number.replace(/\D/g, '');
+      const targetJid = user.phone_number.includes('@') ? user.phone_number : `${cleanPhone}@s.whatsapp.net`;
+      const msg = `🔐 *RAIA AGENTES — Recuperação de Senha*\n\n` +
+        `Olá, *${(user.name || 'Cliente').split(' ')[0]}*! Recebemos uma solicitação para redefinir a sua senha de acesso.\n\n` +
+        `👉 *Acesse o link abaixo para criar sua nova senha (válido por 1 hora):*\n` +
+        `${resetUrl}\n\n` +
+        `_Se você não solicitou esta redefinição, desconsidere esta mensagem._`;
+
+      channelSender(targetJid, msg).catch((err) => {
+        console.warn('[Password Reset] Erro ao enviar WhatsApp de recuperação:', err.message);
+      });
+    } catch (err) {
+      console.warn('[Password Reset] Falha no disparo de recuperação:', err.message);
+    }
+  }
+
+  // Strictly generic response without leaking tokens or internal user details
   return {
     success: true,
-    resetToken, // For internal dispatch / testing
-    userId: user.id,
-    phone: user.phone_number,
-    name: user.name,
-    message: 'Se o e-mail estiver cadastrado, as instruções de recuperação serão enviadas.',
+    message: 'Se o e-mail informado estiver cadastrado, as instruções de recuperação serão enviadas para o seu canal cadastrado.',
   };
 }
 
