@@ -971,7 +971,7 @@ async function cancelSubscription(subscriptionId, options = {}) {
     adminSuspendOnly = Boolean(options.adminSuspendOnly);
     isTestRun = Boolean(options.isTestRun);
     skipGateway = Boolean(options.skipGateway);
-    isWebhookSync = Boolean(options.isWebhookSync || options.fromWebhook || (reason && /^(webhook|cancelamento via webhook|sync webhook)/i.test(reason.trim())));
+    isWebhookSync = Boolean(options.isWebhookSync || options.skipGateway || options.authorizedInternalSync);
     mockGatewayFailure = options.mockGatewayFailure || null;
     mockGatewayResponse = options.mockGatewayResponse || null;
   }
@@ -1041,12 +1041,38 @@ async function cancelSubscription(subscriptionId, options = {}) {
 
   // 2. GATEWAY: ASAAS (MANDATORY API CONFIRMATION & STRICT ISOLATION)
   if (isAsaas && !skipGateway) {
-    const asaasSubId = current.gateway_subscription_id ||
-      (current.contract_id ? db.prepare('SELECT asaas_subscription_id FROM direct_sales_contracts WHERE id = ?').get(current.contract_id)?.asaas_subscription_id : null) ||
-      db.prepare('SELECT asaas_subscription_id FROM direct_sales_contracts WHERE user_id = ? AND asaas_subscription_id IS NOT NULL').get(current.user_id)?.asaas_subscription_id ||
-      db.prepare('SELECT asaas_subscription_id FROM users WHERE id = ? AND asaas_subscription_id IS NOT NULL').get(current.user_id)?.asaas_subscription_id;
+    let asaasSubId = current.gateway_subscription_id || null;
+    let contractSubId = null;
 
-    // A) Missing Asaas Subscription ID: Block cancellation and audit
+    if (current.contract_id) {
+      const linkedContract = db.prepare('SELECT asaas_subscription_id FROM direct_sales_contracts WHERE id = ?').get(current.contract_id);
+      contractSubId = linkedContract?.asaas_subscription_id || null;
+    }
+
+    // A) Ambiguity Check: If both gateway_subscription_id and linked contract ID exist and conflict, block operation
+    if (asaasSubId && contractSubId && asaasSubId !== contractSubId) {
+      logSubscriptionAudit({
+        subscriptionId,
+        userId: current.user_id,
+        productId: current.product_id,
+        oldStatus,
+        newStatus: oldStatus,
+        action: 'GATEWAY_CANCEL_FAILED',
+        reason: `Identificação Asaas ambígua entre assinatura (${asaasSubId}) e contrato vinculado #${current.contract_id} (${contractSubId}).`,
+        details: { asaasSubId, contractSubId, contractId: current.contract_id, adminId, userId },
+      });
+      const err = new Error('Identificação do identificador Asaas ambígua entre a assinatura e o contrato vinculado.');
+      err.statusCode = 400;
+      err.gateway = 'ASAAS';
+      throw err;
+    }
+
+    // Use gateway_subscription_id or contract's asaas_subscription_id
+    if (!asaasSubId) {
+      asaasSubId = contractSubId;
+    }
+
+    // B) Inexistent Check: If neither exists, block operation immediately (no fallbacks by user_id!)
     if (!asaasSubId) {
       logSubscriptionAudit({
         subscriptionId,
@@ -1055,10 +1081,10 @@ async function cancelSubscription(subscriptionId, options = {}) {
         oldStatus,
         newStatus: oldStatus,
         action: 'GATEWAY_CANCEL_FAILED',
-        reason: 'Assinatura Asaas não possui identificador externo (gateway_subscription_id) para confirmação de cancelamento na API.',
-        details: { adminId, userId, origin, gateway },
+        reason: 'Assinatura Asaas não possui identificador externo (gateway_subscription_id) ou ID de contrato diretamente vinculado.',
+        details: { adminId, userId, origin, gateway, contractId: current.contract_id },
       });
-      const err = new Error('Assinatura Asaas não possui identificador externo (gateway_subscription_id) para confirmação de cancelamento na API.');
+      const err = new Error('Assinatura Asaas não possui identificador externo (gateway_subscription_id) ou contrato diretamente vinculado para confirmação de cancelamento na API.');
       err.statusCode = 400;
       err.gateway = 'ASAAS';
       throw err;

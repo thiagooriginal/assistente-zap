@@ -199,8 +199,18 @@ async function runRegressionSuite() {
       }
       assert.strictEqual(clientBlockedWithInstructions, true, 'Cliente deve receber instruções oficiais para Hotmart');
 
-      // Administrative cancellation or Webhook sync marks CANCELLED and preserves paid_until
-      const adminCancelled = await productService.cancelSubscription(subId, { adminId: 1, reason: 'Cancelamento via Webhook Hotmart' });
+      // Administrative cancellation without isWebhookSync is strictly blocked (no text matching on reason)
+      let textMatchingBlocked = false;
+      try {
+        await productService.cancelSubscription(subId, { adminId: 1, reason: 'Cancelamento via Webhook Hotmart' });
+      } catch (err) {
+        textMatchingBlocked = true;
+        assert.ok(err.message.includes('webhook autenticado') || err.message.includes('via webhook'));
+      }
+      assert.strictEqual(textMatchingBlocked, true, 'Detecção por texto no campo reason deve estar desativada');
+
+      // Webhook sync with explicit isWebhookSync: true marks CANCELLED and preserves paid_until
+      const adminCancelled = await productService.cancelSubscription(subId, { adminId: 1, isWebhookSync: true, reason: 'Webhook Hotmart confirmado' });
       assert.strictEqual(adminCancelled.status, 'CANCELLED');
       assert.strictEqual(adminCancelled.paidUntil, futureDate);
     });
@@ -629,6 +639,295 @@ async function runRegressionSuite() {
 
         const subHotDb3 = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(subHotmartId);
         assert.strictEqual(subHotDb3.status, 'CANCELLED');
+
+        // =============================================================
+        // --- SCENARIO 8.7: Unificação de /api/admin/direct-sales/:id/cancel ---
+        // =============================================================
+        const directSales = require('../src/services/directSalesService');
+        const userDsEmail = `ds_unif_${Date.now()}@teste.com`;
+        const uDsRes = db.prepare(`
+          INSERT INTO users (email, phone_number, name, role, subscription_status)
+          VALUES (?, ?, 'Cliente Direct Sales Unificado', 'USER', 'ACTIVE')
+        `).run(userDsEmail, `55119${Date.now().toString().slice(-8)}`);
+        const userDsId = Number(uDsRes.lastInsertRowid);
+
+        const dsContractRes = db.prepare(`
+          INSERT INTO direct_sales_contracts (user_id, plan_tier, promotion, monthly_cents, setup_cents, payment_method, payment_status, created_by, asaas_subscription_id)
+          VALUES (?, 'JESSICA_START', 'STANDARD', 8900, 35000, 'CARD_RECURRING', 'CONFIRMED', 1, 'sub_ds_direct_1')
+        `).run(userDsId);
+        const dsContractId = Number(dsContractRes.lastInsertRowid);
+
+        const subDsJessica = productService.createCustomerSubscription({
+          userId: userDsId,
+          productCode: 'JESSICA',
+          planCode: 'START',
+          origin: 'ASAAS',
+          gateway: 'ASAAS',
+          gatewaySubscriptionId: 'sub_ds_direct_1',
+          contractId: dsContractId,
+          priceCents: 8900,
+          status: 'ACTIVE',
+          paidUntil: futurePaid,
+        });
+
+        const subDsJarvis = productService.createCustomerSubscription({
+          userId: userDsId,
+          productCode: 'JARVIS_FINANCEIRO',
+          origin: 'ASAAS',
+          gateway: 'ASAAS',
+          gatewaySubscriptionId: 'sub_ds_jarvis_2',
+          priceCents: 9900,
+          status: 'ACTIVE',
+          paidUntil: futurePaid,
+          adminId: 1,
+        });
+
+        const subDsHotmart = productService.createCustomerSubscription({
+          userId: userDsId,
+          productCode: 'JESSICA',
+          planCode: 'PRO',
+          origin: 'HOTMART',
+          gateway: 'HOTMART',
+          gatewaySubscriptionId: 'SUB_HOT_MULTI_3',
+          priceCents: 13900,
+          status: 'ACTIVE',
+          paidUntil: futurePaid,
+          adminId: 1,
+        });
+
+        // 8.7.1: Asaas returns failure on cancelContract -> MUST NOT cancel in database
+        asaasService.cancelSubscription = async () => {
+          throw new Error('Falha simulada na API Asaas para cancelContract');
+        };
+
+        let dsFailBlocked = false;
+        try {
+          await directSales.cancelContract({ contractId: dsContractId, adminId: 1 });
+        } catch (err) {
+          dsFailBlocked = true;
+          assert.ok(err.status === 502 || err.statusCode === 502);
+        }
+        assert.strictEqual(dsFailBlocked, true, 'cancelContract deve falhar quando Asaas falha');
+
+        const dsContractAfterFail = db.prepare('SELECT payment_status FROM direct_sales_contracts WHERE id = ?').get(dsContractId);
+        assert.strictEqual(dsContractAfterFail.payment_status, 'CONFIRMED', 'Contrato deve permanecer CONFIRMED após falha do Asaas');
+
+        const subDsJessicaAfterFail = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(subDsJessica.id);
+        assert.strictEqual(subDsJessicaAfterFail.status, 'ACTIVE', 'Assinatura deve permanecer ACTIVE após falha do Asaas');
+
+        // 8.7.2: Asaas confirms deletion -> cancelContract marks contract and sub cancelled, preserves other contracts and user status
+        const dsCancelledAsaas = [];
+        asaasService.cancelSubscription = async (id) => {
+          dsCancelledAsaas.push(id);
+          return { deleted: true, id };
+        };
+
+        const dsSuccessRes = await directSales.cancelContract({ contractId: dsContractId, adminId: 1 });
+        assert.strictEqual(dsSuccessRes.paymentStatus, 'CANCELED');
+        assert.deepStrictEqual(dsCancelledAsaas, ['sub_ds_direct_1'], 'Asaas chamado exclusivamente para o contrato cancelado');
+
+        const subDsJessicaDb = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(subDsJessica.id);
+        assert.strictEqual(subDsJessicaDb.status, 'CANCELLED', 'Assinatura vinculada deve ser cancelada');
+
+        const subDsJarvisDb = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(subDsJarvis.id);
+        assert.strictEqual(subDsJarvisDb.status, 'ACTIVE', 'Jarvis deve permanecer ACTIVE');
+
+        const subDsHotmartDb = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(subDsHotmart.id);
+        assert.strictEqual(subDsHotmartDb.status, 'ACTIVE', 'Assinatura Hotmart deve permanecer ACTIVE');
+
+        const userDsDb = db.prepare('SELECT subscription_status FROM users WHERE id = ?').get(userDsId);
+        assert.strictEqual(userDsDb.subscription_status, 'ACTIVE', 'Status global deve permanecer ACTIVE devido a outros produtos vigentes');
+
+        // =============================================================
+        // --- SCENARIO 8.8: Remoção de Fallbacks por user_id e Bloqueio de Ambiguidade ---
+        // =============================================================
+        const userFallbackEmail = `fallback_test_${Date.now()}@teste.com`;
+        const uFbRes = db.prepare(`
+          INSERT INTO users (email, phone_number, name, role, subscription_status, asaas_subscription_id)
+          VALUES (?, ?, 'Cliente Fallback Test', 'USER', 'ACTIVE', 'sub_user_fallback_999')
+        `).run(userFallbackEmail, `55119${Date.now().toString().slice(-8)}`);
+        const userFbId = Number(uFbRes.lastInsertRowid);
+
+        // Old contract of the user
+        db.prepare(`
+          INSERT INTO direct_sales_contracts (user_id, plan_tier, promotion, monthly_cents, setup_cents, payment_method, payment_status, created_by, asaas_subscription_id)
+          VALUES (?, 'JESSICA_START', 'STANDARD', 8900, 35000, 'CARD_RECURRING', 'CONFIRMED', 1, 'sub_contract_fallback_888')
+        `).run(userFbId);
+
+        // 8.8.1: Subscription without gateway_subscription_id and without contract_id
+        // Must NOT use users.asaas_subscription_id or direct_sales_contracts by user_id!
+        const subNoLinkRes = db.prepare(`
+          INSERT INTO customer_subscriptions (
+            user_id, product_id, plan_id, origin, gateway, gateway_subscription_id, contract_id,
+            status, price_cents, paid_until
+          ) VALUES (?, ?, ?, 'ASAAS', 'ASAAS', NULL, NULL, 'ACTIVE', 8900, ?)
+        `).run(userFbId, jessica.id, jessicaPlan.id, futurePaid);
+        const subNoLinkId = Number(subNoLinkRes.lastInsertRowid);
+
+        let fbBlocked = false;
+        try {
+          await productService.cancelSubscription(subNoLinkId, { reason: 'Tentativa sem identificador próprio' });
+        } catch (err) {
+          fbBlocked = true;
+          assert.strictEqual(err.statusCode, 400);
+          assert.ok(err.message.includes('gateway_subscription_id') || err.message.includes('contrato diretamente vinculado'));
+        }
+        assert.strictEqual(fbBlocked, true, 'Cancelamento sem ID próprio não pode recorrer a fallbacks por user_id');
+
+        // 8.8.2: Ambiguous identification (gateway_subscription_id differs from contract's asaas_subscription_id)
+        const uConflictRes = db.prepare(`
+          INSERT INTO users (email, phone_number, name, role, subscription_status)
+          VALUES (?, ?, 'Cliente Conflito Test', 'USER', 'ACTIVE')
+        `).run(`conflict_test_${Date.now()}@teste.com`, `55119${Date.now().toString().slice(-8)}`);
+        const userConflictId = Number(uConflictRes.lastInsertRowid);
+
+        const conflictContractRes = db.prepare(`
+          INSERT INTO direct_sales_contracts (user_id, plan_tier, promotion, monthly_cents, setup_cents, payment_method, payment_status, created_by, asaas_subscription_id)
+          VALUES (?, 'JESSICA_START', 'STANDARD', 8900, 35000, 'CARD_RECURRING', 'CONFIRMED', 1, 'sub_conflict_contract_bbb')
+        `).run(userConflictId);
+        const conflictContractId = Number(conflictContractRes.lastInsertRowid);
+
+        const subConflictRes = db.prepare(`
+          INSERT INTO customer_subscriptions (
+            user_id, product_id, plan_id, origin, gateway, gateway_subscription_id, contract_id,
+            status, price_cents, paid_until
+          ) VALUES (?, ?, ?, 'ASAAS', 'ASAAS', 'sub_conflict_sub_aaa', ?, 'ACTIVE', 8900, ?)
+        `).run(userConflictId, jessica.id, jessicaPlan.id, conflictContractId, futurePaid);
+        const subConflictId = Number(subConflictRes.lastInsertRowid);
+
+        let conflictBlocked = false;
+        try {
+          await productService.cancelSubscription(subConflictId, { reason: 'Tentativa com IDs conflitantes' });
+        } catch (err) {
+          conflictBlocked = true;
+          assert.strictEqual(err.statusCode, 400);
+          assert.ok(err.message.includes('ambígua'));
+        }
+        assert.strictEqual(conflictBlocked, true, 'Identificação ambígua entre assinatura e contrato vinculado deve ser bloqueada');
+
+        const auditConflict = db.prepare('SELECT action, reason FROM subscription_audit_logs WHERE subscription_id = ? ORDER BY id DESC LIMIT 1').get(subConflictId);
+        assert.strictEqual(auditConflict.action, 'GATEWAY_CANCEL_FAILED');
+        assert.ok(auditConflict.reason.includes('ambígua'));
+
+        // =============================================================
+        // --- SCENARIO 8.9: hotmartService.processWebhook Isolamento de Canais e Sem Text Matching ---
+        // =============================================================
+        // 8.9.1: Text matching on reason does NOT grant webhook confirmation
+        const subHotmartTextRes = db.prepare(`
+          INSERT INTO customer_subscriptions (
+            user_id, product_id, plan_id, origin, gateway, gateway_subscription_id,
+            status, price_cents, paid_until
+          ) VALUES (?, ?, ?, 'HOTMART', 'HOTMART', 'SUB_HOTMART_REASON_TEXT', 'ACTIVE', 8900, ?)
+        `).run(user5Id, jessica.id, jessicaPlan.id, futurePaid);
+        const subHotmartTextId = Number(subHotmartTextRes.lastInsertRowid);
+
+        let reasonTextBlocked = false;
+        try {
+          await productService.cancelSubscription(subHotmartTextId, {
+            adminId: 1,
+            reason: 'Confirmado pelo Webhook Hotmart com certeza absoluta',
+          });
+        } catch (err) {
+          reasonTextBlocked = true;
+          assert.strictEqual(err.statusCode, 400);
+        }
+        assert.strictEqual(reasonTextBlocked, true, 'Detecção por texto no campo reason deve ser rigorosamente bloqueada');
+
+        // 8.9.2: Webhook Hotmart com múltiplos contratos de diferentes produtos e gateways
+        const hotmartService = require('../src/services/hotmartService');
+        const tsMgw = Date.now();
+        const userMultiGwEmail = `multi_gw_${tsMgw}@teste.com`;
+        const subCodeMgw = `SUB_MGW_${tsMgw}`;
+        const uMgwRes = db.prepare(`
+          INSERT INTO users (email, phone_number, name, role, subscription_status, hotmart_subscriber_code)
+          VALUES (?, ?, 'Cliente Multi Gateway', 'USER', 'ACTIVE', ?)
+        `).run(userMultiGwEmail, `55119${tsMgw.toString().slice(-8)}`, subCodeMgw);
+        const userMgwId = Number(uMgwRes.lastInsertRowid);
+
+        // Contract 1: Asaas Jéssica
+        const cMgwAsaasRes = db.prepare(`
+          INSERT INTO direct_sales_contracts (user_id, plan_tier, promotion, monthly_cents, setup_cents, payment_method, payment_status, created_by, asaas_subscription_id)
+          VALUES (?, 'JESSICA_START', 'STANDARD', 8900, 35000, 'CARD_RECURRING', 'CONFIRMED', 1, ?)
+        `).run(userMgwId, `sub_asaas_mgw_jess_${tsMgw}`);
+        const cMgwAsaasId = Number(cMgwAsaasRes.lastInsertRowid);
+
+        const subMgwAsaas = productService.createCustomerSubscription({
+          userId: userMgwId,
+          productCode: 'JESSICA',
+          planCode: 'START',
+          origin: 'ASAAS',
+          gateway: 'ASAAS',
+          gatewaySubscriptionId: `sub_asaas_mgw_jess_${tsMgw}`,
+          contractId: cMgwAsaasId,
+          priceCents: 8900,
+          status: 'ACTIVE',
+          paidUntil: futurePaid,
+        });
+
+        // Contract 2: Asaas Jarvis
+        const subMgwJarvis = productService.createCustomerSubscription({
+          userId: userMgwId,
+          productCode: 'JARVIS_FINANCEIRO',
+          origin: 'ASAAS',
+          gateway: 'ASAAS',
+          gatewaySubscriptionId: `sub_asaas_mgw_jarvis_${tsMgw}`,
+          priceCents: 9900,
+          status: 'ACTIVE',
+          paidUntil: futurePaid,
+          adminId: 1,
+        });
+
+        // Contract 3: Hotmart Jéssica
+        const subMgwHotmart = productService.createCustomerSubscription({
+          userId: userMgwId,
+          productCode: 'JESSICA',
+          planCode: 'START',
+          origin: 'HOTMART',
+          gateway: 'HOTMART',
+          gatewaySubscriptionId: subCodeMgw,
+          priceCents: 8900,
+          status: 'ACTIVE',
+          paidUntil: futurePaid,
+        });
+
+        // Process official Hotmart SUBSCRIPTION_CANCELLATION
+        const mgwCancelPayload = {
+          id: `evt_uuid_${crypto.randomUUID()}`,
+          creation_date: Date.now(),
+          event: 'SUBSCRIPTION_CANCELLATION',
+          version: '2.0.0',
+          data: {
+            cancellation_date: Date.now(),
+            date_next_charge: Date.now() + 15 * 86400000,
+            product: { id: 8840376 },
+            subscriber: {
+              code: subCodeMgw,
+              email: userMultiGwEmail,
+            }
+          }
+        };
+
+        const resMgwCancel = await hotmartService.processWebhook(mgwCancelPayload);
+        assert.strictEqual(resMgwCancel.success, true);
+
+        // Verify: Hotmart subscription is CANCELLED
+        const subMgwHotmartDb = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(subMgwHotmart.id);
+        assert.strictEqual(subMgwHotmartDb.status, 'CANCELLED', 'Assinatura Hotmart deve ser CANCELLED');
+
+        // Verify: Asaas Jéssica contract and subscription remain 100% CONFIRMED and ACTIVE
+        const cMgwAsaasDb = db.prepare('SELECT payment_status FROM direct_sales_contracts WHERE id = ?').get(cMgwAsaasId);
+        assert.strictEqual(cMgwAsaasDb.payment_status, 'CONFIRMED', 'Contrato Asaas Jéssica deve permanecer CONFIRMED');
+
+        const subMgwAsaasDb = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(subMgwAsaas.id);
+        assert.strictEqual(subMgwAsaasDb.status, 'ACTIVE', 'Assinatura Asaas Jéssica deve permanecer ACTIVE');
+
+        // Verify: Asaas Jarvis subscription remains 100% ACTIVE
+        const subMgwJarvisDb = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(subMgwJarvis.id);
+        assert.strictEqual(subMgwJarvisDb.status, 'ACTIVE', 'Assinatura Asaas Jarvis deve permanecer ACTIVE');
+
+        // Verify: Global user status remains ACTIVE because user has active Asaas contracts
+        const userMgwDb = db.prepare('SELECT subscription_status FROM users WHERE id = ?').get(userMgwId);
+        assert.strictEqual(userMgwDb.subscription_status, 'ACTIVE', 'Status global deve permanecer ACTIVE para cliente com contratos Asaas ativos');
 
       } finally {
         asaasService.cancelSubscription = origCancelSub;

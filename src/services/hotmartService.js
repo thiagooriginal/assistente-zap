@@ -530,13 +530,31 @@ async function processWebhook(payload, whatsappSender = null) {
       case 'PURCHASE_DELAYED':
       case 'SUBSCRIPTION_OVERDUE': {
         if (existingUser) {
-          db.prepare(`
-            UPDATE users
-            SET subscription_status = 'OVERDUE',
-                hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-          `).run(eventCreationDate, existingUser.id);
+          const otherActiveContracts = db.prepare(`
+            SELECT COUNT(*) AS count
+            FROM customer_subscriptions
+            WHERE user_id = ?
+              AND (gateway != 'HOTMART' AND origin != 'HOTMART')
+              AND status = 'ACTIVE'
+          `).get(existingUser.id)?.count || 0;
+
+          if (otherActiveContracts === 0) {
+            db.prepare(`
+              UPDATE users
+              SET subscription_status = 'OVERDUE',
+                  hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(eventCreationDate, existingUser.id);
+          } else {
+            db.prepare(`
+              UPDATE users
+              SET hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(eventCreationDate, existingUser.id);
+            console.log(`[Hotmart Webhook] Usuário #${existingUser.id} possui contratos ativos em outros canais. Status global mantido.`);
+          }
 
           console.log(`[Hotmart Webhook] Inadimplência marcada para assinante #${existingUser.id}`);
         }
@@ -551,14 +569,32 @@ async function processWebhook(payload, whatsappSender = null) {
           // If Hotmart sent the last date of access in date_next_charge, use it; otherwise preserve current paid_until
           const finalPaidUntil = paidUntil || existingUser.paid_until;
 
-          db.prepare(`
-            UPDATE users
-            SET subscription_status = 'CANCELED',
-                paid_until = ?,
-                hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-          `).run(finalPaidUntil, eventCreationDate, existingUser.id);
+          const otherActiveContracts = db.prepare(`
+            SELECT COUNT(*) AS count
+            FROM customer_subscriptions
+            WHERE user_id = ?
+              AND (gateway != 'HOTMART' AND origin != 'HOTMART')
+              AND status = 'ACTIVE'
+          `).get(existingUser.id)?.count || 0;
+
+          if (otherActiveContracts === 0) {
+            db.prepare(`
+              UPDATE users
+              SET subscription_status = 'CANCELED',
+                  paid_until = ?,
+                  hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(finalPaidUntil, eventCreationDate, existingUser.id);
+          } else {
+            db.prepare(`
+              UPDATE users
+              SET hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(eventCreationDate, existingUser.id);
+            console.log(`[Hotmart Webhook] Usuário #${existingUser.id} possui contratos ativos em outros canais. Status global da conta mantido.`);
+          }
 
           console.log(`[Hotmart Webhook] Cancelamento registrado para assinante #${existingUser.id}. Acesso mantido até ${finalPaidUntil}`);
         }
@@ -569,15 +605,33 @@ async function processWebhook(payload, whatsappSender = null) {
       // REEMBOLSO (Revogação imediata de acesso)
       case 'PURCHASE_REFUNDED': {
         if (existingUser) {
-          db.prepare(`
-            UPDATE users
-            SET subscription_status = 'REFUNDED',
-                paid_until = NULL,
-                magic_token = NULL,
-                hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-          `).run(eventCreationDate, existingUser.id);
+          const otherActiveContracts = db.prepare(`
+            SELECT COUNT(*) AS count
+            FROM customer_subscriptions
+            WHERE user_id = ?
+              AND (gateway != 'HOTMART' AND origin != 'HOTMART')
+              AND status = 'ACTIVE'
+          `).get(existingUser.id)?.count || 0;
+
+          if (otherActiveContracts === 0) {
+            db.prepare(`
+              UPDATE users
+              SET subscription_status = 'REFUNDED',
+                  paid_until = NULL,
+                  magic_token = NULL,
+                  hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(eventCreationDate, existingUser.id);
+          } else {
+            db.prepare(`
+              UPDATE users
+              SET hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(eventCreationDate, existingUser.id);
+            console.log(`[Hotmart Webhook] Usuário #${existingUser.id} possui contratos ativos em outros canais. Status global mantido.`);
+          }
 
           console.log(`[Hotmart Webhook] Acesso revogado imediatamente (Reembolso): #${existingUser.id} (${transactionCode})`);
         }
@@ -588,15 +642,33 @@ async function processWebhook(payload, whatsappSender = null) {
       // CHARGEBACK (Revogação imediata de acesso)
       case 'PURCHASE_CHARGEBACK': {
         if (existingUser) {
-          db.prepare(`
-            UPDATE users
-            SET subscription_status = 'CHARGEBACK',
-                paid_until = NULL,
-                magic_token = NULL,
-                hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-          `).run(eventCreationDate, existingUser.id);
+          const otherActiveContracts = db.prepare(`
+            SELECT COUNT(*) AS count
+            FROM customer_subscriptions
+            WHERE user_id = ?
+              AND (gateway != 'HOTMART' AND origin != 'HOTMART')
+              AND status = 'ACTIVE'
+          `).get(existingUser.id)?.count || 0;
+
+          if (otherActiveContracts === 0) {
+            db.prepare(`
+              UPDATE users
+              SET subscription_status = 'CHARGEBACK',
+                  paid_until = NULL,
+                  magic_token = NULL,
+                  hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(eventCreationDate, existingUser.id);
+          } else {
+            db.prepare(`
+              UPDATE users
+              SET hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(eventCreationDate, existingUser.id);
+            console.log(`[Hotmart Webhook] Usuário #${existingUser.id} possui contratos ativos em outros canais. Status global mantido.`);
+          }
 
           console.log(`[Hotmart Webhook] Acesso revogado imediatamente (Chargeback): #${existingUser.id} (${transactionCode})`);
         }
@@ -652,10 +724,42 @@ async function processWebhook(payload, whatsappSender = null) {
           else if (targetUser.plan_tier?.includes('INTERMEDIATE')) pCode = 'INTERMEDIATE';
           const pl = db.prepare('SELECT id, price_cents FROM product_plans WHERE product_id = ? AND code = ?').get(jessica.id, pCode);
 
-          const existingSub = db.prepare('SELECT id FROM customer_subscriptions WHERE user_id = ? AND product_id = ?').get(targetUser.id, jessica.id);
-          const subStatus = ['ACTIVE', 'PENDING', 'OVERDUE', 'CANCELLED', 'REFUNDED'].includes(targetUser.subscription_status)
-            ? targetUser.subscription_status
-            : (targetUser.subscription_status === 'CANCELED' ? 'CANCELLED' : 'PENDING');
+          // Find existing subscription EXCLUSIVELY for HOTMART channel and target product
+          let existingSub = null;
+          if (subscriberCode) {
+            existingSub = db.prepare(`
+              SELECT id, origin, gateway, status
+              FROM customer_subscriptions
+              WHERE user_id = ? AND product_id = ? AND gateway = 'HOTMART' AND gateway_subscription_id = ?
+            `).get(targetUser.id, jessica.id, subscriberCode);
+          }
+          if (!existingSub) {
+            existingSub = db.prepare(`
+              SELECT id, origin, gateway, status
+              FROM customer_subscriptions
+              WHERE user_id = ? AND product_id = ? AND (gateway = 'HOTMART' OR origin = 'HOTMART')
+            `).get(targetUser.id, jessica.id);
+          }
+
+          // Compute status for the Hotmart product specifically
+          let subStatus = 'PENDING';
+          if (['SUBSCRIPTION_CANCELLATION'].includes(eventName)) {
+            subStatus = 'CANCELLED';
+          } else if (['PURCHASE_REFUNDED', 'PURCHASE_CHARGEBACK'].includes(eventName)) {
+            subStatus = 'REFUNDED';
+          } else if (['PURCHASE_DELAYED', 'SUBSCRIPTION_OVERDUE', 'PURCHASE_PROTEST'].includes(eventName)) {
+            subStatus = 'OVERDUE';
+          } else if (['PURCHASE_APPROVED', 'ORDER_APPROVED', 'SWITCH_PLAN'].includes(eventName)) {
+            subStatus = 'ACTIVE';
+          } else {
+            subStatus = ['ACTIVE', 'PENDING', 'OVERDUE', 'CANCELLED', 'REFUNDED'].includes(targetUser.subscription_status)
+              ? targetUser.subscription_status
+              : (targetUser.subscription_status === 'CANCELED' ? 'CANCELLED' : 'PENDING');
+          }
+
+          const effectivePaidUntil = ['PURCHASE_REFUNDED', 'PURCHASE_CHARGEBACK'].includes(eventName)
+            ? null
+            : (targetUser.paid_until || null);
 
           if (existingSub) {
             db.prepare(`
@@ -665,7 +769,7 @@ async function processWebhook(payload, whatsappSender = null) {
                   gateway_payment_id = COALESCE(?, gateway_payment_id),
                   updated_at = CURRENT_TIMESTAMP
               WHERE id = ?
-            `).run(subStatus, targetUser.paid_until || null, targetUser.paid_until || null, pl?.id || null, targetUser.hotmart_subscriber_code || null, targetUser.hotmart_transaction || null, existingSub.id);
+            `).run(subStatus, effectivePaidUntil, effectivePaidUntil, pl?.id || null, targetUser.hotmart_subscriber_code || null, targetUser.hotmart_transaction || null, existingSub.id);
           } else {
             db.prepare(`
               INSERT INTO customer_subscriptions (
@@ -677,7 +781,7 @@ async function processWebhook(payload, whatsappSender = null) {
               targetUser.id, jessica.id, pl?.id || null,
               targetUser.hotmart_subscriber_code || null, targetUser.hotmart_transaction || null,
               subStatus, pl?.price_cents || 8900,
-              targetUser.paid_until || null, targetUser.paid_until || null
+              effectivePaidUntil, effectivePaidUntil
             );
           }
         }

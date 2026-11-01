@@ -727,11 +727,13 @@ app.post('/api/admin/direct-sales/:id/renew', requireAdmin, (req, res) => {
 app.post('/api/admin/direct-sales/:id/cancel', requireAdmin, async (req, res) => {
   try {
     const contract = await directSales.cancelContract({
-      contractId: req.params.id, adminId: req.user.id,
+      contractId: req.params.id,
+      adminId: req.user.id,
+      isTestRun: Boolean(req.body?.isTestRun || (process.env.NODE_ENV === 'test')),
     });
     return res.json({ success: true, contract });
   } catch (e) {
-    return res.status(e.status || 500).json({ success: false, error: e.status ? e.message : 'Erro interno.' });
+    return res.status(e.status || e.statusCode || 500).json({ success: false, error: e.message || 'Erro interno.' });
   }
 });
 

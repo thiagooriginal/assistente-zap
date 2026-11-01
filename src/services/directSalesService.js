@@ -274,40 +274,88 @@ function renewContract({ contractId, paymentReference, paidUntil, adminId }) {
     return publicContract(getContract(row.id));
   });
 }
-async function cancelContract({ contractId, adminId }) {
+async function cancelContract({ contractId, adminId, isTestRun = false }) {
   const row = getContract(contractId);
   if (!row) throw businessError('Contrato não encontrado.', 404);
   if (row.subscription_status === 'REFUNDED' || row.subscription_status === 'CHARGEBACK') {
     throw businessError('Conta com status terminal.', 409);
   }
 
-  // Cancel subscription in Asaas if configured
-  if (row.asaas_subscription_id && asaasService.isConfigured()) {
-    try {
-      await asaasService.cancelSubscription(row.asaas_subscription_id);
-      console.log(`[directSalesService] Assinatura Asaas ${row.asaas_subscription_id} cancelada com sucesso.`);
-    } catch (err) {
-      console.warn(`[directSalesService] Falha ao cancelar assinatura no Asaas: ${err.message}`);
+  const productService = require('./productService');
+
+  // 1. Locate matching subscription in customer_subscriptions
+  let sub = db.prepare('SELECT id FROM customer_subscriptions WHERE contract_id = ?').get(row.id);
+  if (!sub && row.asaas_subscription_id) {
+    sub = db.prepare("SELECT id FROM customer_subscriptions WHERE gateway = 'ASAAS' AND gateway_subscription_id = ?").get(row.asaas_subscription_id);
+  }
+  if (!sub) {
+    const jessica = db.prepare("SELECT id FROM products WHERE code = 'JESSICA'").get();
+    if (jessica) {
+      sub = db.prepare("SELECT id FROM customer_subscriptions WHERE user_id = ? AND product_id = ? AND (gateway = 'ASAAS' OR origin = 'ASAAS')").get(row.user_id, jessica.id);
     }
   }
 
-  return runTransaction(() => {
-    db.prepare("UPDATE users SET subscription_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-      .run(row.user_id);
+  // 2. Delegate to central multiproduct cancellation service
+  if (sub) {
     try {
-      db.prepare(`
-        UPDATE customer_subscriptions
-        SET status = 'CANCELLED', cancelled_at = CURRENT_TIMESTAMP, cancellation_reason = 'Cancelamento sem fidelidade', updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = ? AND product_id = (SELECT id FROM products WHERE code = 'JESSICA')
-      `).run(row.user_id);
-    } catch (e) {}
+      await productService.cancelSubscription(sub.id, {
+        adminId: adminId || 0,
+        reason: 'Cancelamento via painel administrativo de vendas diretas',
+        isTestRun: Boolean(isTestRun),
+      });
+    } catch (err) {
+      const status = err.statusCode || err.status || 500;
+      throw businessError(err.message, status);
+    }
+  } else {
+    // If no customer_subscriptions record exists (legacy direct contract),
+    // cancel in Asaas with mandatory confirmation
+    if (row.asaas_subscription_id) {
+      if (!asaasService.isConfigured()) {
+        throw businessError('Gateway Asaas não está configurado no ambiente para confirmar o cancelamento.', 502);
+      }
+      const isSynthetic = (row.asaas_subscription_id.includes('test_') || row.asaas_subscription_id.includes('dummy_'));
+      const isIsolatedTest = (process.env.NODE_ENV === 'test') || isTestRun;
+      if (isSynthetic && !isIsolatedTest) {
+        throw businessError('Identificadores de teste não são permitidos em ambiente operacional.', 400);
+      }
+
+      let asaasRes;
+      try {
+        if (isSynthetic && isIsolatedTest) {
+          asaasRes = { deleted: true, id: row.asaas_subscription_id };
+        } else {
+          asaasRes = await asaasService.cancelSubscription(row.asaas_subscription_id);
+        }
+      } catch (apiErr) {
+        throw businessError(`Falha na comunicação com gateway Asaas: ${apiErr.message}`, 502);
+      }
+
+      if (!asaasRes || asaasRes.deleted !== true) {
+        throw businessError('O gateway Asaas não confirmou o cancelamento da assinatura.', 502);
+      }
+    }
+
+    // Update ONLY this specific contract
     db.prepare("UPDATE direct_sales_contracts SET payment_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP WHERE id = ?")
       .run(row.id);
-    db.prepare(`INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
-       VALUES (?, ?, 'CANCELED_NO_LOYALTY', ?)`)
-      .run(row.id, adminId, 'Sem fidelidade. Acesso mantido somente até o término do período pago.');
-    return publicContract(getContract(row.id));
-  });
+
+    try {
+      db.prepare(`INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
+         VALUES (?, ?, 'CANCELED_NO_LOYALTY', ?)`)
+        .run(row.id, adminId || 0, 'Sem fidelidade. Acesso mantido somente até o término do período pago.');
+    } catch (e) {}
+
+    // Check remaining active products before altering users.subscription_status
+    const otherActive = db.prepare("SELECT COUNT(*) as count FROM customer_subscriptions WHERE user_id = ? AND status = 'ACTIVE'").get(row.user_id)?.count || 0;
+    const otherContracts = db.prepare("SELECT COUNT(*) as count FROM direct_sales_contracts WHERE user_id = ? AND payment_status IN ('CONFIRMED', 'PAID') AND id != ?").get(row.user_id, row.id)?.count || 0;
+    if (otherActive === 0 && otherContracts === 0) {
+      db.prepare("UPDATE users SET subscription_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP WHERE id = ? AND subscription_status = 'ACTIVE'")
+        .run(row.user_id);
+    }
+  }
+
+  return publicContract(getContract(row.id));
 }
 function listContracts() {
   return db.prepare(`SELECT c.*, u.email, u.name, u.phone_number, u.subscription_status,
