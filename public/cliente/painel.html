@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Painel do Salão • RAIA AGENTES | Área do Cliente</title>
+  <title>Central do Cliente • RAIA AGENTES | HUB Multiproduto</title>
   <link rel="icon" type="image/png" href="/raia-emblem-small.png">
 
   <!-- Tailwind CSS CDN -->
@@ -52,7 +52,7 @@
   <!-- Demo Notice Banner if Demo Account -->
   <div id="demoNoticeBanner" class="hidden fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 text-white text-xs font-bold py-2 px-4 text-center shadow-lg flex items-center justify-center gap-2">
     <i data-lucide="shield-alert" class="w-4 h-4"></i>
-    <span>CONTA DE HOMOLOGAÇÃO HOTMART: Ambiente Sandbox Isolado com dados ilustrativos. Disparos reais de WhatsApp desativados para segurança.</span>
+    <span>CONTA DE HOMOLOGAÇÃO: Ambiente Sandbox com dados ilustrativos. Operações financeiras e disparos reais de WhatsApp desativados para segurança.</span>
   </div>
 
   <!-- Mobile Top Bar -->
@@ -62,7 +62,7 @@
       <span class="font-extrabold text-white text-sm">RAIA AGENTES</span>
     </div>
     <div class="flex items-center gap-2">
-      <span id="mobilePlanBadge" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30">START</span>
+      <span id="mobilePlanBadge" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30">CENTRAL</span>
       <button id="mobileMenuBtn" class="p-2 rounded-lg bg-white/5 text-slate-300 hover:text-white">
         <i data-lucide="menu" class="w-5 h-5"></i>
       </button>
@@ -73,83 +73,116 @@
   <aside id="sidebar" class="fixed md:sticky top-0 inset-y-0 left-0 z-50 w-72 bg-[#0c0e15] border-r border-white/10 flex flex-col justify-between transition-transform duration-300 -translate-x-full md:translate-x-0 h-screen">
     <div class="p-5 overflow-y-auto">
       <!-- Logo & Establishment -->
-      <div class="flex items-center gap-3 pb-6 border-b border-white/10">
+      <div class="flex items-center gap-3 pb-5 border-b border-white/10">
         <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#00F59B]/20 to-[#8B5CF6]/20 border border-white/10 flex items-center justify-center shadow-md">
           <img src="/raia-emblem-small.png" alt="RAIA" class="w-6 h-6 object-contain">
         </div>
         <div class="min-w-0 flex-1">
-          <div class="text-xs font-semibold text-slate-400 tracking-wider uppercase">Painel do Salão</div>
-          <div id="sidebarSalonName" class="text-sm font-bold text-white truncate">Carregando...</div>
+          <div class="text-[10px] font-bold text-[#00F59B] tracking-wider uppercase">Central RAIA AGENTES</div>
+          <div id="sidebarClientName" class="text-sm font-bold text-white truncate">Minha Empresa</div>
+          <div id="sidebarSalonName" class="hidden"></div>
         </div>
       </div>
 
-      <!-- Plan Status Card -->
-      <div class="my-4 p-3.5 rounded-xl bg-[#11131a] border border-white/5 flex items-center justify-between">
+      <!-- Account Status Badge -->
+      <div class="my-4 p-3 rounded-xl bg-[#11131a] border border-white/5 flex items-center justify-between">
         <div>
-          <div class="text-[10px] uppercase font-bold text-slate-400">Assinatura</div>
+          <div class="text-[9px] uppercase font-bold text-slate-500 tracking-wider">Conta Central</div>
           <div id="planBadgeText" class="text-xs font-extrabold text-white flex items-center gap-1.5 mt-0.5">
-            <span>JÉSSICA START</span>
+            <span>CLIENTE MULTIPRODUTO</span>
           </div>
         </div>
-        <div id="planStatusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-emerald-400/20"></div>
+        <div id="planStatusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-emerald-400/20" title="Conta Ativa"></div>
       </div>
 
-      <!-- Nav Items -->
-      <nav class="space-y-1.5 mt-4">
-        <button data-tab="my-products" class="nav-btn w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+      <!-- PRIMARY NAV: Universal Central RAIA AGENTES Hub -->
+      <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3 mb-2">Central de Gestão</div>
+      <nav class="space-y-1">
+        <button data-tab="my-products" class="nav-btn active w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/20">
           <div class="flex items-center gap-3">
             <i data-lucide="boxes" class="w-4 h-4 text-[#00F59B]"></i>
             <span>Meus Produtos</span>
           </div>
-          <span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30">HUB</span>
+          <span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-[#00F59B]/20 text-[#00F59B]">HUB</span>
         </button>
 
-        <button data-tab="overview" class="nav-btn active w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/20">
-          <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
-          <span>Visão Geral & WhatsApp</span>
+        <button data-tab="my-subscriptions" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+          <span>Minhas Assinaturas</span>
         </button>
 
-        <button data-tab="salon" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-          <i data-lucide="store" class="w-4 h-4"></i>
-          <span>Meu Salão & Horários</span>
+        <button data-tab="my-invoices" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+          <i data-lucide="receipt" class="w-4 h-4"></i>
+          <span>Pagamentos e Faturas</span>
         </button>
 
-        <button data-tab="services" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-          <i data-lucide="scissors" class="w-4 h-4"></i>
-          <span>Serviços & Preços</span>
-        </button>
-
-        <button data-tab="staff" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-          <i data-lucide="users" class="w-4 h-4"></i>
-          <span>Equipe & Profissionais</span>
-        </button>
-
-        <button data-tab="appointments" class="nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-          <i data-lucide="calendar" class="w-4 h-4"></i>
-          <span>Agenda de Atendimentos</span>
-        </button>
-
-        <!-- Pro Features (Highlighted) -->
-        <div class="pt-3 pb-1">
-          <div class="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-3">Exclusivos Pro</div>
-        </div>
-
-        <button data-tab="dashboard-pro" class="nav-btn w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+        <button data-tab="explore-solutions" class="nav-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
           <div class="flex items-center gap-3">
-            <i data-lucide="bar-chart-3" class="w-4 h-4 text-[#F59E0B]"></i>
-            <span>Dashboard Gerencial</span>
+            <i data-lucide="compass" class="w-4 h-4 text-[#8B5CF6]"></i>
+            <span>Explorar Soluções</span>
           </div>
-          <span class="pro-tag text-[9px] px-1.5 py-0.5 rounded font-extrabold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30">PRO</span>
+          <span class="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-[#8B5CF6]/20 text-[#8B5CF6]">PORTFÓLIO</span>
         </button>
 
-        <button data-tab="campaigns-pro" class="nav-btn w-full flex items-center justify-between px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-          <div class="flex items-center gap-3">
-            <i data-lucide="megaphone" class="w-4 h-4 text-[#F59E0B]"></i>
-            <span>Campanhas Promocionais</span>
-          </div>
-          <span class="pro-tag text-[9px] px-1.5 py-0.5 rounded font-extrabold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30">PRO</span>
+        <button data-tab="profile-security" class="nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+          <i data-lucide="shield-check" class="w-4 h-4"></i>
+          <span>Perfil & Segurança</span>
         </button>
       </nav>
+
+      <!-- SECONDARY NAV: Módulos de Operação (Jéssica Salões) -->
+      <div id="salonModuleNavSection" class="mt-6 pt-4 border-t border-white/10 space-y-1">
+        <button id="toggleSalonNavBtn" class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-white/5 transition-all">
+          <div class="flex items-center gap-2.5">
+            <i data-lucide="scissors" class="w-4 h-4 text-[#00F59B]"></i>
+            <span>Módulo Jéssica (Salão)</span>
+          </div>
+          <i id="jessicaNavChevron" data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-500 transition-transform"></i>
+        </button>
+
+        <div id="salonNavSubitems" class="hidden pl-2.5 space-y-1 pt-1 border-l-2 border-[#00F59B]/20 ml-3">
+          <button data-tab="overview" class="nav-btn w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
+            <span>Visão Geral & WhatsApp</span>
+          </button>
+
+          <button data-tab="salon" class="nav-btn w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+            <i data-lucide="store" class="w-3.5 h-3.5"></i>
+            <span>Meu Salão & Horários</span>
+          </button>
+
+          <button data-tab="services" class="nav-btn w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+            <i data-lucide="scissors" class="w-3.5 h-3.5"></i>
+            <span>Serviços & Preços</span>
+          </button>
+
+          <button data-tab="staff" class="nav-btn w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+            <i data-lucide="users" class="w-3.5 h-3.5"></i>
+            <span>Equipe & Profissionais</span>
+          </button>
+
+          <button data-tab="appointments" class="nav-btn w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+            <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+            <span>Agenda de Atendimentos</span>
+          </button>
+
+          <button data-tab="dashboard-pro" class="nav-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+            <div class="flex items-center gap-2">
+              <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-[#F59E0B]"></i>
+              <span>Dashboard Pro</span>
+            </div>
+            <span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30">PRO</span>
+          </button>
+
+          <button data-tab="campaigns-pro" class="nav-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+            <div class="flex items-center gap-2">
+              <i data-lucide="megaphone" class="w-3.5 h-3.5 text-[#F59E0B]"></i>
+              <span>Campanhas Pro</span>
+            </div>
+            <span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30">PRO</span>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- User Footer & Logout -->
@@ -169,20 +202,28 @@
 
     <!-- Topbar Header -->
     <header class="bg-[#11131a]/80 backdrop-blur-md border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
-      <div>
-        <h1 id="pageTitle" class="text-lg font-bold text-white flex items-center gap-2">
-          <span>Visão Geral & Assistente Jéssica</span>
-        </h1>
-        <p id="pageSubtitle" class="text-xs text-slate-400">Status em tempo real da sua secretária de IA</p>
+      <div class="flex items-center gap-4">
+        <!-- Back to Hub button (visible when inside a specific product module) -->
+        <button id="btnBackToHub" class="hidden px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center gap-2 border border-white/10">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+          <span>Voltar ao HUB Central</span>
+        </button>
+
+        <div>
+          <h1 id="pageTitle" class="text-lg font-bold text-white flex items-center gap-2">
+            <span>Meus Produtos</span>
+          </h1>
+          <p id="pageSubtitle" class="text-xs text-slate-400">Central unificada de agentes inteligentes contratados e status de operação</p>
+        </div>
       </div>
 
       <div class="flex items-center gap-3">
-        <a href="/" target="_blank" class="hidden sm:inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg transition-colors">
-          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-          <span>Ver Vitrine Oficial</span>
-        </a>
+        <button onclick="switchTab('explore-solutions')" class="hidden sm:inline-flex items-center gap-1.5 text-xs text-white bg-gradient-to-r from-[#8B5CF6]/20 to-[#00F59B]/20 hover:from-[#8B5CF6]/30 hover:to-[#00F59B]/30 border border-white/10 px-3.5 py-1.5 rounded-lg transition-all font-bold">
+          <i data-lucide="compass" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+          <span>Ver Portfólio Completo</span>
+        </button>
         <div id="headerPlanBadge" class="text-xs px-3 py-1 rounded-full font-bold bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30">
-          PLANO START
+          CENTRAL RAIA
         </div>
       </div>
     </header>
@@ -194,47 +235,269 @@
     <div class="p-6 md:p-8 space-y-8 flex-1">
 
       <!-- ============================================== -->
-      <!-- TAB 0: CENTRAL MEUS PRODUTOS                   -->
+      <!-- TAB: MEUS PRODUTOS (CENTRAL HUB DEFAULT)       -->
       <!-- ============================================== -->
-      <section id="tab-my-products" class="tab-content hidden space-y-6">
-        <div class="border-b border-white/5 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h2 class="text-base font-bold text-white flex items-center gap-2">
-              <i data-lucide="boxes" class="w-5 h-5 text-[#00F59B]"></i>
-              <span>Meus Produtos & Assinaturas</span>
-            </h2>
-            <p class="text-xs text-slate-400 mt-1">Visão individual de cada agente de IA contratado, status financeiro e períodos vigentes.</p>
+      <section id="tab-my-products" class="tab-content space-y-6">
+        <!-- Welcome Hub Banner -->
+        <div class="p-6 rounded-3xl bg-gradient-to-br from-[#11131a] via-[#161a26] to-[#11131a] border border-white/10 relative overflow-hidden">
+          <div class="absolute -right-10 -top-10 w-44 h-44 bg-[#00F59B]/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+            <div>
+              <span class="text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-1 rounded bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30">HUB COMERCIAL UNIFICADO</span>
+              <h2 class="text-xl md:text-2xl font-black text-white mt-2">Central de Agentes de IA da sua Empresa</h2>
+              <p class="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
+                Gerencie todos os seus produtos contratados, monitore a vigência individual de cada assinatura e adicione novos agentes especializados sem burocracia.
+              </p>
+            </div>
+            <div class="flex items-center gap-3 flex-wrap">
+              <button onclick="switchTab('explore-solutions')" class="px-4 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-[#00F59B]/20">
+                <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                <span>Explorar Novos Agentes</span>
+              </button>
+              <button onclick="switchTab('my-subscriptions')" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs border border-white/10 transition-all flex items-center gap-2">
+                <i data-lucide="file-text" class="w-4 h-4 text-slate-400"></i>
+                <span>Ver Assinaturas</span>
+              </button>
+            </div>
           </div>
-          <a href="https://wa.me/5511951364159?text=Ol%C3%A1%21+Gostaria+de+conhecer+outros+produtos+da+RAIA+AGENTES" target="_blank" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs border border-white/10 transition-all flex items-center gap-2 w-fit">
-            <i data-lucide="sparkles" class="w-4 h-4 text-[#00F59B]"></i>
-            <span>Contratar Mais Agentes</span>
-          </a>
         </div>
 
         <!-- Produtos Contratados Grid -->
-        <div class="space-y-3">
-          <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Produtos Contratados</div>
+        <div class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+              <i data-lucide="check-circle" class="w-4 h-4 text-[#00F59B]"></i>
+              <span>Produtos Contratados & Acessos Ativos</span>
+            </div>
+            <span id="contractedCountBadge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/5 text-slate-400 border border-white/10">0 produto(s)</span>
+          </div>
+
           <div id="myProductsGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <div class="p-8 text-center text-slate-400 text-xs">Carregando seus produtos...</div>
           </div>
         </div>
 
-        <!-- Catálogo de Agentes Disponíveis -->
-        <div class="space-y-3 pt-4 border-t border-white/5">
+        <!-- Destaques do Portfólio / Vitrine Rápida -->
+        <div class="space-y-4 pt-4 border-t border-white/5">
           <div class="flex items-center justify-between">
-            <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Catálogo de Agentes RAIA</div>
-            <span class="text-[10px] text-slate-500">Expanda sua operação com novos agentes modulares</span>
+            <div>
+              <div class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                <i data-lucide="sparkles" class="w-4 h-4 text-[#8B5CF6]"></i>
+                <span>Soluções Disponíveis para Ampliar seu Negócio</span>
+              </div>
+              <p class="text-[11px] text-slate-500 mt-0.5">Automatize outros setores da sua empresa com inteligência artificial especializada.</p>
+            </div>
+            <button onclick="switchTab('explore-solutions')" class="text-xs font-bold text-[#8B5CF6] hover:underline flex items-center gap-1">
+              <span>Ver catálogo completo</span>
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+            </button>
           </div>
-          <div id="availableProductsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+          <div id="hubSpotlightGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div class="p-6 text-center text-slate-400 text-xs col-span-full">Carregando catálogo...</div>
           </div>
         </div>
       </section>
 
       <!-- ============================================== -->
-      <!-- TAB 1: VISÃO GERAL & WHATSAPP                   -->
+      <!-- TAB: EXPLORAR SOLUÇÕES (CATÁLOGO COMERCIAL)     -->
       <!-- ============================================== -->
-      <section id="tab-overview" class="tab-content space-y-6">
+      <section id="tab-explore-solutions" class="tab-content hidden space-y-6">
+        <!-- Catalog Header & Search -->
+        <div class="p-6 rounded-3xl bg-[#11131a] border border-white/10 space-y-5">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-black text-white flex items-center gap-2.5">
+                <i data-lucide="compass" class="w-6 h-6 text-[#8B5CF6]"></i>
+                <span>Catálogo Completo de Soluções RAIA AGENTES</span>
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">Conheça nosso portfólio completo por segmento e tipo de solução operacional.</p>
+            </div>
+            <div class="w-full md:w-80 relative">
+              <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+              <input type="text" id="catalogSearchInput" placeholder="Buscar por produto ou recurso..." class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#8B5CF6] transition-all">
+            </div>
+          </div>
+
+          <!-- Filtro por Tipo de Solução (Operational Category) -->
+          <div class="space-y-2 pt-2 border-t border-white/5">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Filtrar por Tipo de Solução:</div>
+            <div id="solutionTypeFilters" class="flex items-center gap-2 flex-wrap">
+              <button data-type="ALL" class="sol-type-btn active px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30">Todos</button>
+              <button data-type="AGENDA" class="sol-type-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5 border border-white/5 transition-all">Agenda & Atendimento</button>
+              <button data-type="CAIXA" class="sol-type-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5 border border-white/5 transition-all">Caixa & Financeiro</button>
+              <button data-type="MARKETING" class="sol-type-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5 border border-white/5 transition-all">Marketing & Growth</button>
+            </div>
+          </div>
+
+          <!-- Filtro por 10 Segmentos Oficiais -->
+          <div class="space-y-2 pt-2 border-t border-white/5">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Segmentos de Mercado (10 Categorias Oficiais):</div>
+            <div id="segmentFiltersBar" class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+              <button data-segment="ALL" class="seg-btn active px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap bg-[#8B5CF6] text-white transition-all shadow-md">Todos os Segmentos</button>
+              <!-- Populated dynamically via JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Catalog Product Grid -->
+        <div id="catalogProductsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div class="col-span-full p-12 text-center text-slate-400 text-xs">Carregando catálogo de soluções...</div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- TAB: MINHAS ASSINATURAS (CONTRATOS & PLANOS)    -->
+      <!-- ============================================== -->
+      <section id="tab-my-subscriptions" class="tab-content hidden space-y-6">
+        <div class="p-6 rounded-3xl bg-[#11131a] border border-white/10 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/5">
+            <div>
+              <h2 class="text-lg font-black text-white flex items-center gap-2">
+                <i data-lucide="file-text" class="w-5 h-5 text-[#00F59B]"></i>
+                <span>Minhas Assinaturas & Contratos</span>
+              </h2>
+              <p class="text-xs text-slate-400 mt-0.5">Histórico completo de contratos firmados, preços garantidos e periodicidade de cobrança.</p>
+            </div>
+            <div class="p-2.5 rounded-xl bg-white/5 border border-white/5 text-[11px] text-slate-300 flex items-center gap-2">
+              <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+              <span>Garantia de Preço Contratado • Sem Fidelidade</span>
+            </div>
+          </div>
+
+          <div id="subscriptionsTableContainer" class="overflow-x-auto">
+            <div class="p-8 text-center text-slate-400 text-xs">Carregando assinaturas...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- TAB: PAGAMENTOS & FATURAS                       -->
+      <!-- ============================================== -->
+      <section id="tab-my-invoices" class="tab-content hidden space-y-6">
+        <div class="p-6 rounded-3xl bg-[#11131a] border border-white/10 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/5">
+            <div>
+              <h2 class="text-lg font-black text-white flex items-center gap-2">
+                <i data-lucide="receipt" class="w-5 h-5 text-[#00F59B]"></i>
+                <span>Pagamentos & Faturas</span>
+              </h2>
+              <p class="text-xs text-slate-400 mt-0.5">Histórico de cobranças, comprovantes de Pix, boletos e transações Hotmart / Asaas.</p>
+            </div>
+            <span class="text-[10px] font-bold px-3 py-1 rounded-full bg-white/5 text-slate-400 border border-white/10">Histórico Financeiro</span>
+          </div>
+
+          <div id="invoicesListContainer" class="space-y-3">
+            <div class="p-8 text-center text-slate-400 text-xs">Carregando faturas...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- TAB: PERFIL & SEGURANÇA                         -->
+      <!-- ============================================== -->
+      <section id="tab-profile-security" class="tab-content hidden space-y-6">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Coluna 1 & 2: Dados Cadastrais & Alteração de Senha -->
+          <div class="lg:col-span-2 space-y-6">
+            <!-- Dados da Conta -->
+            <div class="p-6 rounded-3xl bg-[#11131a] border border-white/10 space-y-4">
+              <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="user" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>Dados do Cliente & Contato</span>
+              </h3>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div>
+                  <label class="block text-slate-400 font-semibold mb-1">Nome Completo</label>
+                  <input type="text" id="profUserName" readonly class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white font-medium">
+                </div>
+                <div>
+                  <label class="block text-slate-400 font-semibold mb-1">E-mail Cadastrado</label>
+                  <input type="text" id="profUserEmail" readonly class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white font-medium">
+                </div>
+                <div>
+                  <label class="block text-slate-400 font-semibold mb-1">Telefone Principal (WhatsApp)</label>
+                  <input type="text" id="profUserPhone" readonly class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white font-medium">
+                </div>
+                <div>
+                  <label class="block text-slate-400 font-semibold mb-1">Identificador de Cliente</label>
+                  <input type="text" id="profUserId" readonly class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-slate-400 font-mono">
+                </div>
+              </div>
+            </div>
+
+            <!-- Alteração de Senha -->
+            <div class="p-6 rounded-3xl bg-[#11131a] border border-white/10 space-y-4">
+              <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="key" class="w-4 h-4 text-[#F59E0B]"></i>
+                <span>Segurança de Acesso & Senha</span>
+              </h3>
+              <form id="changePasswordForm" class="space-y-4 text-xs">
+                <div>
+                  <label class="block text-slate-400 font-semibold mb-1">Senha Atual</label>
+                  <input type="password" id="currentPassInput" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#F59E0B]">
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Nova Senha (mínimo 8 caracteres)</label>
+                    <input type="password" id="newPassInput" required minlength="8" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#F59E0B]">
+                  </div>
+                  <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Confirmar Nova Senha</label>
+                    <input type="password" id="confirmNewPassInput" required minlength="8" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#F59E0B]">
+                  </div>
+                </div>
+                <div class="flex justify-end pt-2">
+                  <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#F59E0B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2">
+                    <i data-lucide="lock" class="w-3.5 h-3.5"></i>
+                    <span>Atualizar Senha com Segurança</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Coluna 3: Auditoria & Políticas de Isolamento -->
+          <div class="space-y-6">
+            <div class="p-6 rounded-3xl bg-[#11131a] border border-white/10 space-y-4 text-xs">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="shield" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>Políticas de Proteção RAIA</span>
+              </h3>
+              <div class="space-y-3 text-slate-400 leading-relaxed">
+                <div class="p-3 rounded-xl bg-[#07080c] border border-white/5 space-y-1">
+                  <div class="text-white font-bold flex items-center gap-1.5">
+                    <i data-lucide="database" class="w-3.5 h-3.5 text-emerald-400"></i>
+                    <span>Isolamento Multi-Tenant</span>
+                  </div>
+                  <p class="text-[11px]">Seus agendamentos, clientes e transações estão blindados e inacessíveis para qualquer outra empresa.</p>
+                </div>
+
+                <div class="p-3 rounded-xl bg-[#07080c] border border-white/5 space-y-1">
+                  <div class="text-white font-bold flex items-center gap-1.5">
+                    <i data-lucide="lock" class="w-3.5 h-3.5 text-emerald-400"></i>
+                    <span>Sessão Criptografada</span>
+                  </div>
+                  <p class="text-[11px]">Cookies HttpOnly seguros em HTTPS com algoritmo scrypt de alta derivação de chave.</p>
+                </div>
+
+                <div class="p-3 rounded-xl bg-[#07080c] border border-white/5 space-y-1">
+                  <div class="text-white font-bold flex items-center gap-1.5">
+                    <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i>
+                    <span>Sem Fidelidade Obrigatória</span>
+                  </div>
+                  <p class="text-[11px]">Cancele qualquer agente a qualquer momento preservando o acesso até o fim da vigência paga.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- TAB 1: VISÃO GERAL & WHATSAPP (MÓDULO JÉSSICA) -->
+      <!-- ============================================== -->
+      <section id="tab-overview" class="tab-content hidden space-y-6">
         <!-- Status Hero -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
           <!-- Card 1: Assistente Jéssica -->
@@ -259,53 +522,57 @@
               </span>
             </div>
             <div id="waStatusText" class="text-xl font-extrabold text-white">Aguardando Conexão</div>
-            <p class="text-xs text-slate-400 mt-1">Conecte o número do seu salão para a Jéssica atender suas clientes.</p>
+            <p class="text-xs text-slate-400 mt-1">Conecte o número do seu salão para ativar o atendimento.</p>
           </div>
 
-          <!-- Card 3: Serviços Cadastrados -->
+          <!-- Card 3: Agendamentos Hoje -->
           <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 relative overflow-hidden group">
             <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Catálogo Ativo</span>
-              <i data-lucide="check-check" class="w-4 h-4 text-[#00F59B]"></i>
+              <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Atendimentos Hoje</span>
+              <i data-lucide="calendar" class="w-4 h-4 text-[#00F59B]"></i>
             </div>
-            <div id="servicesCountOverview" class="text-xl font-extrabold text-white">0 Serviços</div>
-            <p class="text-xs text-slate-400 mt-1">Preços e durações informados automaticamente pela IA.</p>
+            <div id="todayCount" class="text-2xl font-extrabold text-white">0</div>
+            <p class="text-xs text-slate-400 mt-1">Agendamentos confirmados para hoje.</p>
           </div>
         </div>
 
-        <!-- WhatsApp Connection Guidance Card -->
-        <div class="p-6 rounded-2xl bg-gradient-to-br from-[#11131a] to-[#0c0e15] border border-white/10 space-y-4">
-          <div class="flex items-start justify-between flex-wrap gap-4">
+        <!-- WhatsApp Pairing & Testing Block -->
+        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 class="text-base font-bold text-white flex items-center gap-2">
-                <i data-lucide="smartphone" class="w-5 h-5 text-[#00F59B]"></i>
-                <span>Conectar WhatsApp do Salão</span>
-              </h2>
-              <p class="text-xs text-slate-400 mt-1 max-w-xl">
-                O assistente utiliza conexão oficial via QR Code Multi-Device, permitindo que a Jéssica responda em tempo real sem interferir no uso normal do celular da sua equipe.
-              </p>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="qr-code" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>Conexão do WhatsApp Comercial</span>
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">Vincule o WhatsApp do salão para a Jéssica responder imediatamente.</p>
             </div>
-            <button id="btnPairWhatsApp" class="px-4 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2 shadow-lg shadow-[#00F59B]/20">
-              <i data-lucide="qr-code" class="w-4 h-4"></i>
-              <span>Gerar QR Code de Pareamento</span>
+            <button id="btnPairWhatsApp" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs border border-white/10 transition-all flex items-center gap-2 w-fit">
+              <i data-lucide="smartphone" class="w-4 h-4"></i>
+              <span>Gerar QR Code de Conexão</span>
             </button>
           </div>
 
-          <!-- Pairing Modal Simulation -->
-          <div id="pairingBox" class="hidden p-5 rounded-xl bg-[#07080c] border border-white/10 space-y-3">
-            <div class="text-xs font-bold text-[#00F59B] flex items-center gap-2">
-              <i data-lucide="info" class="w-4 h-4"></i>
-              <span>Instruções para Conexão</span>
+          <!-- Pairing Box (Hidden initially) -->
+          <div id="pairingBox" class="hidden p-6 rounded-xl bg-[#07080c] border border-white/5 flex flex-col md:flex-row items-center gap-6">
+            <div class="w-48 h-48 bg-white rounded-xl p-2 flex items-center justify-center">
+              <img id="qrCodeImg" src="/qrcode.png" alt="QR Code WhatsApp" class="w-full h-full object-contain" onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=RAIA_HOMOLOGACAO_SIMULATOR'">
             </div>
-            <ol class="text-xs text-slate-300 list-decimal list-inside space-y-1.5">
-              <li>Abra o WhatsApp no celular do seu salão.</li>
-              <li>Acesse <strong>Aparelhos Conectados</strong> > <strong>Conectar um Aparelho</strong>.</li>
-              <li>Aponte a câmera para o QR Code abaixo:</li>
-            </ol>
-            <div class="p-4 bg-white rounded-xl inline-block mx-auto text-center shadow-lg">
-              <img id="qrCodeImg" src="https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=RAIA_JESSICA_SALON_SETUP" alt="QR Code" class="w-44 h-44">
-              <div class="text-[10px] text-slate-800 font-bold mt-2">RAIA JÉSSICA • ESCANEIE NO WHATSAPP</div>
+            <div class="space-y-2 text-xs text-slate-300">
+              <p class="font-bold text-white">Instruções de Conexão:</p>
+              <ol class="list-decimal pl-4 space-y-1 text-slate-400">
+                <li>Abra o WhatsApp no celular do salão.</li>
+                <li>Acesse <strong>Aparelhos Conectados</strong>.</li>
+                <li>Toque em <strong>Conectar um Aparelho</strong> e aponte para o QR Code.</li>
+              </ol>
             </div>
+          </div>
+
+          <!-- Test WhatsApp message dispatch -->
+          <div class="pt-4 border-t border-white/5 flex flex-col sm:flex-row sm:items-center gap-3">
+            <input type="text" id="testPhoneInput" placeholder="DDD + Telefone (ex: 11999998888)" class="px-3.5 py-2 rounded-xl bg-[#07080c] border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+            <button id="btnSendTestMessage" class="px-4 py-2 rounded-xl bg-[#00F59B]/20 hover:bg-[#00F59B]/30 text-[#00F59B] font-bold text-xs border border-[#00F59B]/30 transition-all">
+              Enviar Mensagem de Teste
+            </button>
           </div>
         </div>
       </section>
@@ -316,42 +583,42 @@
       <section id="tab-salon" class="tab-content hidden space-y-6">
         <form id="salonForm" class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-6">
           <div class="border-b border-white/5 pb-4">
-            <h2 class="text-base font-bold text-white">Dados do Estabelecimento</h2>
-            <p class="text-xs text-slate-400 mt-1">Essas informações serão utilizadas pela Jéssica para informar localização e contatos às clientes.</p>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="store" class="w-4 h-4 text-[#00F59B]"></i>
+              <span>Configurações Básicas do Salão</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">Essas informações são utilizadas pela Jéssica ao tirar dúvidas com clientes.</p>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-5 text-xs">
             <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Nome do Salão / Barbearia</label>
-              <input type="text" id="salonName" required class="w-full bg-[#07080c] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+              <label class="block text-slate-400 font-semibold mb-1.5">Nome do Estabelecimento</label>
+              <input type="text" id="salonName" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
             </div>
-
             <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Telefone Comercial / WhatsApp</label>
-              <input type="text" id="salonPhone" placeholder="(11) 99999-8888" class="w-full bg-[#07080c] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+              <label class="block text-slate-400 font-semibold mb-1.5">Telefone de Contato</label>
+              <input type="text" id="salonPhone" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
             </div>
-
             <div class="md:col-span-2">
-              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Endereço Completo</label>
-              <input type="text" id="salonAddress" placeholder="Rua das Flores, 123 - Bairro, Cidade - SP" class="w-full bg-[#07080c] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+              <label class="block text-slate-400 font-semibold mb-1.5">Endereço Completo</label>
+              <input type="text" id="salonAddress" placeholder="Rua, Número, Bairro, Cidade - SP" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
             </div>
-
             <div class="md:col-span-2">
-              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Instruções Especiais para a IA (Opcional)</label>
-              <textarea id="salonCustomInstructions" rows="3" placeholder="Ex: Sempre oferecer café na recepção; Não atendemos químicas sem teste de mecha prévio; Estacionamento conveniado ao lado." class="w-full bg-[#07080c] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]"></textarea>
+              <label class="block text-slate-400 font-semibold mb-1.5">Instruções Personalizadas para a Jéssica</label>
+              <textarea id="salonCustomInstructions" rows="3" placeholder="Ex: Trabalhamos com café e drinks cortesia. Não atendemos sem agendamento prévio aos sábados." class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]"></textarea>
             </div>
           </div>
 
-          <!-- Opening Hours Table -->
+          <!-- Horários de Funcionamento -->
           <div class="border-t border-white/5 pt-5 space-y-3">
-            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Horários de Atendimento Semanal</h3>
-            <div id="hoursContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs"></div>
+            <h4 class="text-xs font-bold text-white uppercase tracking-wider">Horários de Atendimento Semanal</h4>
+            <div id="openingHoursList" class="space-y-2 text-xs"></div>
           </div>
 
           <div class="flex justify-end pt-4 border-t border-white/5">
-            <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2">
+            <button type="submit" class="px-6 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2">
               <i data-lucide="save" class="w-4 h-4"></i>
-              <span>Salvar Configurações</span>
+              <span>Salvar Alterações</span>
             </button>
           </div>
         </form>
@@ -361,58 +628,33 @@
       <!-- TAB 3: SERVIÇOS & PREÇOS                        -->
       <!-- ============================================== -->
       <section id="tab-services" class="tab-content hidden space-y-6">
-        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-5">
-          <div class="flex items-center justify-between flex-wrap gap-4 border-b border-white/5 pb-4">
+        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
             <div>
-              <h2 class="text-base font-bold text-white">Tabela de Procedimentos & Preços</h2>
-              <p class="text-xs text-slate-400 mt-1">A Jéssica consultará essa lista sempre que uma cliente perguntar valores no WhatsApp.</p>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="scissors" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>Tabela de Procedimentos e Valores</span>
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">A Jéssica informa preços e durações cadastradas aqui.</p>
             </div>
-            <button id="btnOpenNewService" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5">
+            <button id="btnNewService" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2">
               <i data-lucide="plus" class="w-4 h-4"></i>
               <span>Novo Serviço</span>
             </button>
           </div>
 
-          <!-- New Service Form (Modal / Collapse) -->
-          <form id="newServiceForm" class="hidden p-4 rounded-xl bg-[#07080c] border border-white/10 space-y-4">
-            <div class="text-xs font-bold text-[#00F59B]">Cadastrar Novo Serviço</div>
-            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-              <div class="sm:col-span-2">
-                <label class="block text-slate-400 mb-1">Nome do Procedimento</label>
-                <input type="text" id="svcName" required placeholder="Ex: Botox Capilar" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
-              </div>
-              <div>
-                <label class="block text-slate-400 mb-1">Valor (R$)</label>
-                <input type="number" step="0.01" id="svcPrice" required placeholder="Ex: 150.00" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
-              </div>
-              <div>
-                <label class="block text-slate-400 mb-1">Duração (Min)</label>
-                <input type="number" id="svcDuration" value="45" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
-              </div>
-            </div>
-            <div class="flex justify-end gap-2">
-              <button type="button" id="btnCancelService" class="px-3 py-1.5 rounded-lg bg-white/5 text-slate-300 text-xs">Cancelar</button>
-              <button type="submit" class="px-4 py-1.5 rounded-lg bg-[#00F59B] text-[#07080c] font-bold text-xs">Adicionar</button>
+          <!-- New Service Form (Hidden initially) -->
+          <form id="newServiceForm" class="hidden p-4 rounded-xl bg-[#07080c] border border-white/5 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+            <input type="text" id="svcName" placeholder="Nome do Serviço (ex: Corte Feminino)" required class="sm:col-span-2 px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white">
+            <input type="number" id="svcPrice" placeholder="Preço (R$)" step="0.5" required class="px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white">
+            <input type="number" id="svcDuration" placeholder="Duração (min)" value="45" class="px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white">
+            <div class="sm:col-span-4 flex justify-end gap-2">
+              <button type="button" id="btnCancelService" class="px-3 py-1.5 rounded-lg bg-white/5 text-slate-400">Cancelar</button>
+              <button type="submit" class="px-4 py-1.5 rounded-lg bg-[#00F59B] text-[#07080c] font-bold">Adicionar</button>
             </div>
           </form>
 
-          <!-- Services Table -->
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs">
-              <thead>
-                <tr class="border-b border-white/10 text-slate-400 uppercase text-[10px] tracking-wider">
-                  <th class="py-3 px-3">Serviço</th>
-                  <th class="py-3 px-3">Categoria</th>
-                  <th class="py-3 px-3">Duração</th>
-                  <th class="py-3 px-3">Valor</th>
-                  <th class="py-3 px-3 text-right">Ação</th>
-                </tr>
-              </thead>
-              <tbody id="servicesTableBody" class="divide-y divide-white/5 text-slate-300">
-                <tr><td colspan="5" class="py-6 text-center text-slate-500">Carregando serviços...</td></tr>
-              </tbody>
-            </table>
-          </div>
+          <div id="servicesList" class="space-y-2"></div>
         </div>
       </section>
 
@@ -420,38 +662,40 @@
       <!-- TAB 4: EQUIPE & PROFISSIONAIS                   -->
       <!-- ============================================== -->
       <section id="tab-staff" class="tab-content hidden space-y-6">
-        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-5">
-          <div class="flex items-center justify-between flex-wrap gap-4 border-b border-white/5 pb-4">
+        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
             <div>
-              <h2 class="text-base font-bold text-white">Equipe do Salão</h2>
-              <p class="text-xs text-slate-400 mt-1">A Jéssica pode direcionar clientes para profissionais específicos da sua equipe.</p>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="users" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>Profissionais Cadastrados</span>
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">Controle de limites conforme seu plano contratado.</p>
             </div>
-            <button id="btnOpenStaffForm" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5">
+            <button id="btnNewStaff" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2">
               <i data-lucide="user-plus" class="w-4 h-4"></i>
-              <span>Adicionar Profissional</span>
+              <span>Novo Profissional</span>
             </button>
           </div>
 
-          <!-- New Staff Form -->
-          <form id="newStaffForm" class="hidden p-4 rounded-xl bg-[#07080c] border border-white/10 space-y-3">
-            <div class="text-xs font-bold text-[#00F59B]">Cadastrar Profissional</div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div>
-                <label class="block text-slate-400 mb-1">Nome Completo</label>
-                <input type="text" id="staffName" required placeholder="Ex: Camila Santos" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
-              </div>
-              <div>
-                <label class="block text-slate-400 mb-1">Especialidade</label>
-                <input type="text" id="staffSpecialty" placeholder="Ex: Colorista / Mechas" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
-              </div>
+          <!-- Limite Card -->
+          <div id="staffLimitBanner" class="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2 text-slate-300">
+              <i data-lucide="info" class="w-4 h-4 text-[#00F59B]"></i>
+              <span id="staffLimitText">Vagas de Profissionais: Carregando...</span>
             </div>
-            <div class="flex justify-end gap-2">
-              <button type="button" id="btnCancelStaff" class="px-3 py-1.5 rounded-lg bg-white/5 text-slate-300 text-xs">Cancelar</button>
-              <button type="submit" class="px-4 py-1.5 rounded-lg bg-[#00F59B] text-[#07080c] font-bold text-xs">Salvar</button>
+          </div>
+
+          <!-- New Staff Form -->
+          <form id="newStaffForm" class="hidden p-4 rounded-xl bg-[#07080c] border border-white/5 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <input type="text" id="staffName" placeholder="Nome do Especialista" required class="px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white">
+            <input type="text" id="staffSpecialty" placeholder="Especialidade (ex: Colorista, Barbeiro)" class="px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white">
+            <div class="sm:col-span-2 flex justify-end gap-2">
+              <button type="button" id="btnCancelStaff" class="px-3 py-1.5 rounded-lg bg-white/5 text-slate-400">Cancelar</button>
+              <button type="submit" class="px-4 py-1.5 rounded-lg bg-[#00F59B] text-[#07080c] font-bold">Salvar</button>
             </div>
           </form>
 
-          <div id="staffList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
+          <div id="staffList" class="space-y-2"></div>
         </div>
       </section>
 
@@ -459,167 +703,95 @@
       <!-- TAB 5: AGENDA DE ATENDIMENTOS                   -->
       <!-- ============================================== -->
       <section id="tab-appointments" class="tab-content hidden space-y-6">
-        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-5">
-          <div class="flex items-center justify-between flex-wrap gap-4 border-b border-white/5 pb-4">
+        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
             <div>
-              <h2 class="text-base font-bold text-white">Agenda de Atendimentos</h2>
-              <p class="text-xs text-slate-400 mt-1">Horários agendados pela Jéssica no WhatsApp ou adicionados manualmente.</p>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="calendar" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>Histórico de Agendamentos</span>
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">Visualização de marcações feitas pelos clientes via Jéssica.</p>
             </div>
-            <button id="btnOpenNewAppt" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5">
-              <i data-lucide="plus" class="w-4 h-4"></i>
-              <span>Novo Agendamento Manual</span>
-            </button>
           </div>
 
-          <!-- New Appointment Form -->
-          <form id="newApptForm" class="hidden p-4 rounded-xl bg-[#07080c] border border-white/10 space-y-3">
-            <div class="text-xs font-bold text-[#00F59B]">Marcar Atendimento Manual</div>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div>
-                <label class="block text-slate-400 mb-1">Nome da Cliente</label>
-                <input type="text" id="apptClientName" required placeholder="Ex: Juliana Mendes" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
-              </div>
-              <div>
-                <label class="block text-slate-400 mb-1">Procedimento</label>
-                <input type="text" id="apptServiceName" placeholder="Ex: Corte e Escova" class="w-full bg-[#11131a] border border-white/10 rounded-lg px-3 py-2 text-white">
-              </div>
-              <div class="grid grid-cols-2 gap-2">
-                <div>
-                  <label class="block text-slate-400 mb-1">Data</label>
-                  <input type="date" id="apptDate" required class="w-full bg-[#11131a] border border-white/10 rounded-lg px-2 py-2 text-white">
-                </div>
-                <div>
-                  <label class="block text-slate-400 mb-1">Horário</label>
-                  <input type="time" id="apptTime" required class="w-full bg-[#11131a] border border-white/10 rounded-lg px-2 py-2 text-white">
-                </div>
-              </div>
-            </div>
-            <div class="flex justify-end gap-2">
-              <button type="button" id="btnCancelAppt" class="px-3 py-1.5 rounded-lg bg-white/5 text-slate-300 text-xs">Cancelar</button>
-              <button type="submit" class="px-4 py-1.5 rounded-lg bg-[#00F59B] text-[#07080c] font-bold text-xs">Agendar</button>
-            </div>
-          </form>
-
-          <div id="appointmentsList" class="space-y-3"></div>
+          <div id="appointmentsList" class="space-y-2"></div>
         </div>
       </section>
 
       <!-- ============================================== -->
-      <!-- TAB 6: DASHBOARD GERENCIAL (PRO EXCLUSIVO)     -->
+      <!-- TAB 6: DASHBOARD PRO (EXCLUSIVE PRO)           -->
       <!-- ============================================== -->
       <section id="tab-dashboard-pro" class="tab-content hidden space-y-6">
-        <!-- Upgrade Card for Start Plan -->
-        <div id="proUpgradeLockDashboard" class="hidden p-8 rounded-3xl bg-gradient-to-br from-[#11131a] via-[#1a1408] to-[#11131a] border border-[#F59E0B]/30 text-center space-y-4 max-w-2xl mx-auto shadow-2xl">
-          <div class="w-16 h-16 rounded-2xl bg-[#F59E0B]/10 border border-[#F59E0B]/30 flex items-center justify-center mx-auto text-[#F59E0B]">
-            <i data-lucide="crown" class="w-8 h-8"></i>
+        <!-- Upgrade Banner if not PRO -->
+        <div id="proDashboardLocked" class="hidden p-8 rounded-2xl bg-gradient-to-br from-amber-950/40 via-[#11131a] to-[#11131a] border border-amber-500/30 text-center space-y-4">
+          <div class="w-12 h-12 rounded-full bg-[#F59E0B]/10 text-[#F59E0B] flex items-center justify-center mx-auto">
+            <i data-lucide="lock" class="w-6 h-6"></i>
           </div>
-          <div>
-            <span class="text-xs px-3 py-1 rounded-full font-bold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40">RECURSO DOS PLANOS INTERMEDIÁRIO E PRÓ</span>
-            <h2 class="text-2xl font-black text-white mt-3">Dashboard Gerencial & Financeiro</h2>
-            <p class="text-sm text-slate-300 mt-2 max-w-md mx-auto">
-              Tenha controle total do faturamento do seu salão, comissões por profissional, ticket médio e lucratividade em tempo real.
-            </p>
-          </div>
-          <div class="pt-2">
-            <a href="/planos" target="_blank" class="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#F59E0B] to-amber-500 text-[#07080c] font-extrabold text-sm shadow-lg shadow-[#F59E0B]/30 hover:brightness-110 transition-all">
-              <span>Conhecer os planos Intermediário e Pró</span>
-              <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
-            </a>
-          </div>
+          <h3 class="text-base font-extrabold text-white">Recurso Exclusivo do Plano Jéssica Pró</h3>
+          <p class="text-xs text-slate-400 max-w-md mx-auto">O Dashboard Gerencial com métricas de faturamento, ticket médio e ticket por profissional é reservado aos assinantes do Plano Pró.</p>
+          <a href="https://wa.me/5511951364159?text=Ol%C3%A1%2C+gostaria+de+fazer+upgrade+para+o+Plano+J%C3%A9ssica+Pr%C3%B3" target="_blank" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#F59E0B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all">
+            <span>Fazer Upgrade para o Pró</span>
+          </a>
         </div>
 
-        <!-- Real Pro Dashboard Metrics (Shown if Pro) -->
-        <div id="proDashboardContent" class="hidden space-y-6">
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div id="proDashboardContent" class="space-y-6">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
             <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10">
-              <span class="text-xs font-semibold text-slate-400">Faturamento Mensal</span>
-              <div id="dashRevenue" class="text-2xl font-black text-[#00F59B] mt-1">R$ 0,00</div>
-              <div id="dashGrowth" class="text-[11px] text-emerald-400 font-semibold mt-1">+18.4% vs mês anterior</div>
+              <span class="text-xs text-slate-400">Total de Agendamentos</span>
+              <div id="metricTotalAppts" class="text-2xl font-bold text-white mt-1">0</div>
             </div>
-
             <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10">
-              <span class="text-xs font-semibold text-slate-400">Atendimentos Concluídos</span>
-              <div id="dashAppointments" class="text-2xl font-black text-white mt-1">0</div>
-              <div class="text-[11px] text-slate-400 mt-1">Média de 5 por dia</div>
+              <span class="text-xs text-slate-400">Volume Total Estimado</span>
+              <div id="metricRevenue" class="text-2xl font-bold text-[#00F59B] mt-1">R$ 0,00</div>
             </div>
-
             <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10">
-              <span class="text-xs font-semibold text-slate-400">Ticket Médio</span>
-              <div id="dashTicket" class="text-2xl font-black text-[#F59E0B] mt-1">R$ 0,00</div>
-              <div class="text-[11px] text-slate-400 mt-1">Por cliente atendido</div>
+              <span class="text-xs text-slate-400">Ticket Médio por Cliente</span>
+              <div id="metricAvgTicket" class="text-2xl font-bold text-white mt-1">R$ 0,00</div>
             </div>
-
-            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10">
-              <span class="text-xs font-semibold text-slate-400">Taxa de Retenção</span>
-              <div id="dashRetention" class="text-2xl font-black text-[#8B5CF6] mt-1">0%</div>
-              <div class="text-[11px] text-slate-400 mt-1">Clientes recorrentes</div>
-            </div>
-          </div>
-
-          <!-- Staff Revenue Breakdown -->
-          <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-4">
-            <h3 class="text-sm font-bold text-white flex items-center gap-2">
-              <i data-lucide="award" class="w-4 h-4 text-[#F59E0B]"></i>
-              <span>Faturamento por Profissional da Equipe</span>
-            </h3>
-            <div id="staffRevenueList" class="space-y-3"></div>
           </div>
         </div>
       </section>
 
       <!-- ============================================== -->
-      <!-- TAB 7: CAMPANHAS PROMOCIONAIS (PRO EXCLUSIVO)   -->
+      <!-- TAB 7: CAMPANHAS PRO (EXCLUSIVE PRO + LGPD)    -->
       <!-- ============================================== -->
       <section id="tab-campaigns-pro" class="tab-content hidden space-y-6">
-        <!-- Upgrade Lock for Start Plan -->
-        <div id="proUpgradeLockCampaigns" class="hidden p-8 rounded-3xl bg-gradient-to-br from-[#11131a] via-[#1a1408] to-[#11131a] border border-[#F59E0B]/30 text-center space-y-4 max-w-2xl mx-auto shadow-2xl">
-          <div class="w-16 h-16 rounded-2xl bg-[#F59E0B]/10 border border-[#F59E0B]/30 flex items-center justify-center mx-auto text-[#F59E0B]">
-            <i data-lucide="megaphone" class="w-8 h-8"></i>
+        <!-- Upgrade Banner if not PRO -->
+        <div id="proCampaignsLocked" class="hidden p-8 rounded-2xl bg-gradient-to-br from-amber-950/40 via-[#11131a] to-[#11131a] border border-amber-500/30 text-center space-y-4">
+          <div class="w-12 h-12 rounded-full bg-[#F59E0B]/10 text-[#F59E0B] flex items-center justify-center mx-auto">
+            <i data-lucide="lock" class="w-6 h-6"></i>
           </div>
-          <div>
-            <span class="text-xs px-3 py-1 rounded-full font-bold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40">RECURSO EXCLUSIVO DO PLANO PRO</span>
-            <h2 class="text-2xl font-black text-white mt-3">Campanhas Promocionais via WhatsApp</h2>
-            <p class="text-sm text-slate-300 mt-2 max-w-md mx-auto">
-              Dispare novidades, lembretes de retorno e promoções em massa para reaquecer clientes sumidas do seu salão de forma 100% consentida.
-            </p>
-          </div>
-          <div class="pt-2">
-            <a href="/planos" target="_blank" class="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#F59E0B] to-amber-500 text-[#07080c] font-extrabold text-sm shadow-lg shadow-[#F59E0B]/30 hover:brightness-110 transition-all">
-              <span>Desbloquear Campanhas com o Plano Pro</span>
-              <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
-            </a>
-          </div>
+          <h3 class="text-base font-extrabold text-white">Disparo de Campanhas Promocionais</h3>
+          <p class="text-xs text-slate-400 max-w-md mx-auto">Envie novidades e cupons aos seus clientes com consentimento validado via LGPD. Exclusivo do Plano Pró.</p>
         </div>
 
-        <!-- Pro Campaigns Content -->
-        <div id="proCampaignsContent" class="hidden space-y-6">
-          <div class="flex items-center justify-between flex-wrap gap-4 p-6 rounded-2xl bg-[#11131a] border border-white/10">
+        <div id="proCampaignsContent" class="space-y-6">
+          <div class="flex items-center justify-between border-b border-white/5 pb-4">
             <div>
-              <h2 class="text-base font-bold text-white">Disparador de Campanhas & Promoções</h2>
-              <p class="text-xs text-slate-400 mt-1">Envie comunicados para reativar clientes antigas com total conformidade LGPD.</p>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="megaphone" class="w-4 h-4 text-[#F59E0B]"></i>
+                <span>Campanhas Promocionais & Broadcast</span>
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">Em conformidade estrita com LGPD e opt-out automático.</p>
             </div>
-            <button id="btnOpenCampaignModal" class="px-4 py-2 rounded-xl bg-[#F59E0B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2">
+            <button id="btnNewCampaign" class="px-4 py-2 rounded-xl bg-[#F59E0B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2">
               <i data-lucide="plus" class="w-4 h-4"></i>
-              <span>Criar Nova Campanha</span>
+              <span>Nova Campanha</span>
             </button>
           </div>
 
-          <!-- Create Campaign Form -->
-          <form id="createCampaignForm" class="hidden p-6 rounded-2xl bg-[#07080c] border border-white/10 space-y-4">
-            <div class="text-xs font-bold text-[#F59E0B]">Nova Campanha Promocional</div>
-
+          <!-- New Campaign Form with Consent Checkbox -->
+          <form id="createCampaignForm" class="hidden p-5 rounded-2xl bg-[#07080c] border border-white/10 space-y-4 text-xs">
             <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">Título Interno da Campanha</label>
-              <input type="text" id="campTitle" required placeholder="Ex: Terça das Mechas - 15% OFF" class="w-full bg-[#11131a] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white">
+              <label class="block text-slate-400 font-semibold mb-1">Título Interno da Campanha</label>
+              <input type="text" id="campTitle" placeholder="Ex: Promoção de Terça e Quarta" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#11131a] border border-white/10 text-white">
+            </div>
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Mensagem para os Clientes</label>
+              <textarea id="campMessage" rows="4" placeholder="Ex: Olá! Esta semana estamos com 15% de desconto em hidratações..." required class="w-full px-3.5 py-2.5 rounded-xl bg-[#11131a] border border-white/10 text-white"></textarea>
             </div>
 
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">Mensagem a ser enviada no WhatsApp</label>
-              <textarea id="campMessage" rows="4" required placeholder="Olá! A equipe do salão preparou uma promoção imperdível nesta semana..." class="w-full bg-[#11131a] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white"></textarea>
-              <div class="text-[11px] text-slate-500 mt-1">Aviso legal de descadastro *(Responda SAIR para não receber mais)* será anexado automaticamente no final.</div>
-            </div>
-
-            <!-- Mandatory Consent Checkbox (Requirement 3) -->
+            <!-- Mandatory Consent Checkbox -->
             <div class="p-3.5 rounded-xl bg-[#11131a] border border-amber-500/20 flex items-start gap-3">
               <input type="checkbox" id="consentCheckbox" required class="mt-0.5 rounded text-[#F59E0B] focus:ring-[#F59E0B]">
               <label for="consentCheckbox" class="text-xs text-slate-300">
@@ -640,11 +812,69 @@
     </div>
   </main>
 
+  <!-- Product Details Modal (Commercial Exploration) -->
+  <div id="productDetailsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#11131a] border border-white/10 rounded-3xl max-w-xl w-full p-6 md:p-8 space-y-6 max-h-[90vh] overflow-y-auto relative">
+      <button onclick="closeProductDetailsModal()" class="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white bg-white/5">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+
+      <div class="flex items-start gap-4">
+        <div id="modalProductIconBox" class="w-14 h-14 rounded-2xl bg-[#00F59B]/10 border border-[#00F59B]/20 flex items-center justify-center text-[#00F59B] shrink-0">
+          <i data-lucide="bot" class="w-7 h-7"></i>
+        </div>
+        <div>
+          <div id="modalProductStatus" class="mb-1"></div>
+          <h3 id="modalProductName" class="text-xl font-black text-white">Nome do Produto</h3>
+          <p id="modalProductSummary" class="text-xs text-slate-400 mt-1"></p>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-2xl bg-[#07080c] border border-white/5 space-y-3 text-xs">
+        <div class="flex items-center justify-between text-slate-400">
+          <span>Tipo de Solução:</span>
+          <span id="modalProductType" class="font-bold text-white uppercase"></span>
+        </div>
+        <div class="flex items-center justify-between text-slate-400">
+          <span>Segmentos Recomendados:</span>
+          <span id="modalProductSegments" class="font-bold text-[#8B5CF6]"></span>
+        </div>
+        <div id="modalTargetAudienceRow" class="text-slate-400">
+          <span class="block text-slate-500 mb-0.5 font-semibold">Público-Alvo:</span>
+          <span id="modalProductAudience" class="text-slate-300"></span>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Recursos & Funcionalidades</h4>
+        <div id="modalFeaturesList" class="space-y-1.5 text-xs text-slate-300"></div>
+      </div>
+
+      <!-- Pricing / Offer Section -->
+      <div id="modalPricingSection" class="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Condições Comerciais</h4>
+        <div id="modalPricingContent" class="text-xs text-slate-300"></div>
+      </div>
+
+      <div id="modalActionFooter" class="flex items-center justify-end gap-3 pt-2">
+        <button onclick="closeProductDetailsModal()" class="px-4 py-2.5 rounded-xl bg-white/5 text-slate-300 hover:text-white text-xs font-bold">Fechar</button>
+        <div id="modalActionBtnContainer"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Client Portal JavaScript Engine -->
   <script>
     lucide.createIcons();
 
     let clientData = null;
+    let catalogState = {
+      products: [],
+      segments: [],
+      selectedSegment: 'ALL',
+      selectedType: 'ALL',
+      searchQuery: ''
+    };
 
     // Toast Alert
     function showToast(message, type = 'success') {
@@ -658,29 +888,37 @@
       setTimeout(() => toast.classList.add('hidden'), 4000);
     }
 
-    // Tabs Navigation
-    const navButtons = document.querySelectorAll('.nav-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-    const pageTitle = document.getElementById('pageTitle');
-    const pageSubtitle = document.getElementById('pageSubtitle');
-
+    // Tabs Navigation Meta
     const tabMeta = {
-      'my-products': { title: 'Meus Produtos & Assinaturas', subtitle: 'Central unificada de agentes de IA, contratos ativos e renovações' },
-      'overview': { title: 'Visão Geral & Assistente Jéssica', subtitle: 'Status em tempo real da sua secretária de IA' },
-      'salon': { title: 'Meu Salão & Horários de Atendimento', subtitle: 'Personalize horários e informações do estabelecimento' },
-      'services': { title: 'Tabela de Serviços & Preços', subtitle: 'Procedimentos conhecidos e informados pela Jéssica' },
-      'staff': { title: 'Equipe de Profissionais', subtitle: 'Cadastre cabeleireiros, manicures e especialistas' },
-      'appointments': { title: 'Agenda de Atendimentos', subtitle: 'Histórico e novos agendamentos confirmados' },
-      'dashboard-pro': { title: 'Dashboard Gerencial', subtitle: 'Indicadores financeiros e lucratividade em tempo real' },
-      'campaigns-pro': { title: 'Campanhas Promocionais', subtitle: 'Disparo de novidades com consentimento e opt-out' },
+      'my-products': { title: 'Meus Produtos', subtitle: 'Central unificada de agentes inteligentes contratados e status de operação' },
+      'my-subscriptions': { title: 'Minhas Assinaturas', subtitle: 'Gestão de contratos, valores garantidos, renovações e cancelamentos sem fidelidade' },
+      'my-invoices': { title: 'Pagamentos & Faturas', subtitle: 'Histórico financeiro, comprovantes de Pix, boletos e transações' },
+      'explore-solutions': { title: 'Explorar Soluções & Portfólio', subtitle: 'Catálogo completo de inteligência artificial especializada por segmento de mercado' },
+      'profile-security': { title: 'Perfil & Segurança', subtitle: 'Dados cadastrais, alteração de senha e controles de acesso' },
+      'overview': { title: 'Módulo Jéssica • Visão Geral & WhatsApp', subtitle: 'Status em tempo real da sua secretária de IA para salões e barbearias' },
+      'salon': { title: 'Módulo Jéssica • Meu Salão & Horários', subtitle: 'Personalize horários e informações do estabelecimento' },
+      'services': { title: 'Módulo Jéssica • Serviços & Preços', subtitle: 'Procedimentos conhecidos e informados pela Jéssica' },
+      'staff': { title: 'Módulo Jéssica • Equipe & Profissionais', subtitle: 'Profissionais habilitados para agendamento automático' },
+      'appointments': { title: 'Módulo Jéssica • Agenda de Atendimentos', subtitle: 'Histórico e novos agendamentos confirmados' },
+      'dashboard-pro': { title: 'Módulo Jéssica • Dashboard Gerencial', subtitle: 'Indicadores financeiros e lucratividade em tempo real' },
+      'campaigns-pro': { title: 'Módulo Jéssica • Campanhas Promocionais', subtitle: 'Disparo de novidades com consentimento e opt-out' },
     };
 
+    const isSalonTab = (tabId) => ['overview', 'salon', 'services', 'staff', 'appointments', 'dashboard-pro', 'campaigns-pro'].includes(tabId);
+
     function switchTab(tabId) {
+      const navButtons = document.querySelectorAll('.nav-btn');
+      const tabContents = document.querySelectorAll('.tab-content');
+      const pageTitle = document.getElementById('pageTitle');
+      const pageSubtitle = document.getElementById('pageSubtitle');
+      const btnBackToHub = document.getElementById('btnBackToHub');
+      const salonNavSubitems = document.getElementById('salonNavSubitems');
+
       navButtons.forEach(btn => {
         if (btn.dataset.tab === tabId) {
-          btn.className = 'nav-btn active w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-bold transition-all bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/20';
+          btn.className = 'nav-btn active w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/20';
         } else {
-          btn.className = 'nav-btn w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all';
+          btn.className = 'nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all';
         }
       });
 
@@ -694,12 +932,24 @@
         pageSubtitle.innerText = tabMeta[tabId].subtitle;
       }
 
+      // Contextual Header: Back to Hub
+      if (isSalonTab(tabId)) {
+        btnBackToHub.classList.remove('hidden');
+        salonNavSubitems.classList.remove('hidden');
+      } else {
+        btnBackToHub.classList.add('hidden');
+      }
+
       // Close mobile sidebar if open
       document.getElementById('sidebar').classList.add('-translate-x-full');
       lucide.createIcons();
 
       // Trigger data loads
       if (tabId === 'my-products') loadMyProducts();
+      else if (tabId === 'my-subscriptions') loadMySubscriptions();
+      else if (tabId === 'my-invoices') loadMyInvoices();
+      else if (tabId === 'explore-solutions') loadExploreSolutions();
+      else if (tabId === 'profile-security') populateProfileTab();
       else if (tabId === 'services') loadServices();
       else if (tabId === 'staff') loadStaff();
       else if (tabId === 'appointments') loadAppointments();
@@ -707,8 +957,17 @@
       else if (tabId === 'campaigns-pro') loadProCampaigns();
     }
 
-    navButtons.forEach(btn => {
+    document.querySelectorAll('.nav-btn').forEach(btn => {
       btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+
+    document.getElementById('btnBackToHub').addEventListener('click', () => switchTab('my-products'));
+
+    document.getElementById('toggleSalonNavBtn').addEventListener('click', () => {
+      const sub = document.getElementById('salonNavSubitems');
+      const chev = document.getElementById('jessicaNavChevron');
+      sub.classList.toggle('hidden');
+      chev.classList.toggle('rotate-180');
     });
 
     // Mobile menu toggle
@@ -717,7 +976,9 @@
       sb.classList.toggle('-translate-x-full');
     });
 
-    // 0. Meus Produtos Hub Loader
+    // ==========================================
+    // 0. MEUS PRODUTOS HUB LOADER
+    // ==========================================
     async function loadMyProducts() {
       try {
         const [subRes, catRes] = await Promise.all([
@@ -730,12 +991,22 @@
         const grid = document.getElementById('myProductsGrid');
         grid.innerHTML = '';
 
-        if (!subData.subscriptions || subData.subscriptions.length === 0) {
-          grid.innerHTML = '<div class="col-span-full p-8 text-center text-slate-400 text-xs">Nenhum produto contratado no momento.</div>';
+        const subs = subData.subscriptions || [];
+        document.getElementById('contractedCountBadge').innerText = `${subs.length} produto(s)`;
+
+        if (subs.length === 0) {
+          grid.innerHTML = `
+            <div class="col-span-full p-8 rounded-2xl bg-[#11131a] border border-dashed border-white/10 text-center space-y-3">
+              <i data-lucide="package-open" class="w-8 h-8 text-slate-500 mx-auto"></i>
+              <div class="text-sm font-bold text-white">Nenhum produto ativado no momento</div>
+              <p class="text-xs text-slate-400 max-w-sm mx-auto">Explore nosso catálogo para contratar assistentes de IA especializados no seu ramo de negócio.</p>
+              <button onclick="switchTab('explore-solutions')" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110">Explorar Portfólio</button>
+            </div>
+          `;
         } else {
-          subData.subscriptions.forEach(sub => {
+          subs.forEach(sub => {
             const card = document.createElement('div');
-            card.className = 'p-5 rounded-2xl bg-[#11131a] border border-white/10 space-y-4 hover:border-white/20 transition-all';
+            card.className = 'p-5 rounded-2xl bg-[#11131a] border border-white/10 space-y-4 hover:border-white/20 transition-all shadow-md';
 
             const statusColors = {
               ACTIVE: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
@@ -747,7 +1018,7 @@
               ACTIVE: 'Ativo',
               PENDING: 'Aguardando Ativação',
               OVERDUE: 'Em Atraso',
-              CANCELLED: sub.isAccessActive ? 'Cancelado (Acesso Válido até Fim do Ciclo)' : 'Cancelado',
+              CANCELLED: sub.isAccessActive ? 'Cancelado (Acesso até Fim do Ciclo)' : 'Cancelado',
             };
 
             const statusClass = statusColors[sub.status] || 'bg-slate-500/10 text-slate-400 border-slate-500/30';
@@ -761,22 +1032,22 @@
 
             card.innerHTML = `
               <div class="flex items-start justify-between gap-3">
-                <div>
-                  <span class="text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-white/5 text-slate-400 border border-white/10">${sub.productCategory}</span>
-                  <h3 class="text-base font-extrabold text-white mt-1.5 flex items-center gap-2">
-                    <i data-lucide="${sub.productIcon || 'bot'}" class="w-4 h-4 text-[#00F59B]"></i>
-                    <span>${sub.productName}</span>
+                <div class="min-w-0">
+                  <span class="text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-white/5 text-slate-400 border border-white/10">${sub.productCategory}</span>
+                  <h3 class="text-base font-extrabold text-white mt-1.5 flex items-center gap-2 truncate">
+                    <i data-lucide="${sub.productIcon || 'bot'}" class="w-4 h-4 text-[#00F59B] shrink-0"></i>
+                    <span class="truncate">${sub.productName}</span>
                   </h3>
                   <div class="text-xs text-slate-400 mt-0.5 font-medium">Plano: <span class="text-white font-bold">${sub.planName}</span> • ${sub.priceFormatted} / mês</div>
                 </div>
-                <span class="text-[10px] px-2.5 py-1 rounded-full font-bold border ${statusClass} whitespace-nowrap">
+                <span class="text-[10px] px-2.5 py-1 rounded-full font-bold border ${statusClass} whitespace-nowrap shrink-0">
                   ${statusLabel}
                 </span>
               </div>
 
               <div class="p-3 rounded-xl bg-[#07080c] border border-white/5 text-xs space-y-1.5">
                 <div class="flex items-center justify-between text-slate-400">
-                  <span>Canal de Cobrança:</span>
+                  <span>Canal de Origem:</span>
                   <span class="font-bold text-white">${originBadge}</span>
                 </div>
                 <div class="flex items-center justify-between text-slate-400">
@@ -785,18 +1056,18 @@
                 </div>
                 <div class="flex items-center justify-between text-slate-400">
                   <span>Condição Contratual:</span>
-                  <span class="text-slate-300">Sem fidelidade • Preço garantido</span>
+                  <span class="text-slate-300">Sem fidelidade • Preço congelado</span>
                 </div>
               </div>
 
-              <div class="pt-2 flex items-center justify-between gap-3">
+              <div class="pt-1 flex items-center justify-between gap-3">
                 ${sub.productCode === 'JESSICA' ? `
                   <button onclick="switchTab('overview')" class="flex-1 px-4 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#00F59B]/20">
                     <i data-lucide="scissors" class="w-4 h-4"></i>
                     <span>Acessar Módulo Jéssica</span>
                   </button>
                 ` : `
-                  <button class="flex-1 px-4 py-2.5 rounded-xl bg-white/10 text-white font-bold text-xs hover:bg-white/20 transition-all flex items-center justify-center gap-2">
+                  <button onclick="showToast('Módulo operacional em homologação.', 'info')" class="flex-1 px-4 py-2.5 rounded-xl bg-white/10 text-white font-bold text-xs hover:bg-white/20 transition-all flex items-center justify-center gap-2">
                     <i data-lucide="external-link" class="w-4 h-4"></i>
                     <span>Acessar Módulo</span>
                   </button>
@@ -807,55 +1078,536 @@
           });
         }
 
-        // Render catalog
-        const catGrid = document.getElementById('availableProductsGrid');
-        catGrid.innerHTML = '';
-        if (catData.products && catData.products.length > 0) {
-          const userProdCodes = (subData.subscriptions || []).map(s => s.productCode);
-          catData.products.forEach(p => {
-            const alreadyContracted = userProdCodes.includes(p.code);
+        // Spotlight in Hub
+        const spotGrid = document.getElementById('hubSpotlightGrid');
+        spotGrid.innerHTML = '';
+        const allProducts = catData.products || [];
+        const contractedCodes = subs.map(s => s.productCode);
+        const spotlightProducts = allProducts.filter(p => !contractedCodes.includes(p.code)).slice(0, 3);
+
+        if (spotlightProducts.length === 0) {
+          spotGrid.innerHTML = '<div class="col-span-full p-4 text-center text-slate-500 text-xs">Todos os produtos ativos já estão contratados!</div>';
+        } else {
+          spotlightProducts.forEach(p => {
             const card = document.createElement('div');
-            card.className = 'p-5 rounded-2xl bg-[#0c0e15] border border-white/5 space-y-3';
-            const lowestPlan = p.plans && p.plans.length > 0 ? p.plans[0] : null;
-            const priceFrom = lowestPlan ? (lowestPlan.price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Consulte';
+            card.className = 'p-4 rounded-2xl bg-[#0c0e15] border border-white/5 space-y-3';
+            const statusLabel = p.commercialStatus === 'AVAILABLE' ? 'Disponível' : 'Em Preparação';
+            const statusColor = p.commercialStatus === 'AVAILABLE' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20';
 
             card.innerHTML = `
               <div class="flex items-center justify-between">
-                <span class="text-[10px] uppercase font-bold text-slate-500">${p.category}</span>
-                ${alreadyContracted ? '<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">CONTRATADO</span>' : ''}
+                <span class="text-[9px] font-bold px-2 py-0.5 rounded uppercase tracking-wider bg-white/5 text-slate-400">${p.category}</span>
+                <span class="text-[9px] font-bold px-2 py-0.5 rounded border ${statusColor}">${statusLabel}</span>
               </div>
               <h4 class="text-sm font-bold text-white flex items-center gap-2">
-                <i data-lucide="${p.icon || 'bot'}" class="w-4 h-4 text-[#00F59B]"></i>
-                <span>${p.name}</span>
+                <i data-lucide="${p.icon || 'bot'}" class="w-4 h-4 text-[#8B5CF6]"></i>
+                <span class="truncate">${p.name}</span>
               </h4>
-              <p class="text-xs text-slate-400 line-clamp-2">${p.description || ''}</p>
-              <div class="pt-2 flex items-center justify-between border-t border-white/5 text-xs">
-                <div>
-                  <span class="text-[10px] text-slate-500">A partir de</span>
-                  <div class="font-bold text-white">${priceFrom} <span class="text-[10px] font-normal text-slate-400">/mês</span></div>
-                </div>
-                ${alreadyContracted ? `
-                  <button onclick="switchTab('overview')" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-semibold transition-colors">
-                    Gerenciar
-                  </button>
-                ` : `
-                  <a href="https://wa.me/5511951364159?text=Ol%C3%A1%21+Gostaria+de+contratar+o+${encodeURIComponent(p.name)}" target="_blank" class="px-3 py-1.5 rounded-lg bg-[#00F59B]/20 hover:bg-[#00F59B]/30 text-[#00F59B] text-xs font-bold transition-colors flex items-center gap-1.5">
-                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-                    <span>Contratar</span>
-                  </a>
-                `}
+              <p class="text-xs text-slate-400 line-clamp-2">${p.summary || p.description || ''}</p>
+              <div class="pt-2 flex items-center justify-between border-t border-white/5">
+                <span class="text-[10px] text-slate-400">${p.hasApprovedOffer ? 'Oferta Aprovada' : 'Em breve'}</span>
+                <button onclick="openProductDetailsModal('${p.code}')" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white text-xs font-semibold transition-colors">
+                  Ver Detalhes
+                </button>
               </div>
             `;
-            catGrid.appendChild(card);
+            spotGrid.appendChild(card);
           });
         }
+
         lucide.createIcons();
       } catch (err) {
         console.error('Erro ao carregar Meus Produtos:', err);
       }
     }
 
-    // 1. Initial Profile Loading
+    // ==========================================
+    // 1. EXPLORAR SOLUÇÕES (COMMERCIAL CATALOG)
+    // ==========================================
+    async function loadExploreSolutions() {
+      try {
+        const [catRes, segRes] = await Promise.all([
+          fetch('/api/cliente/products-catalog'),
+          fetch('/api/cliente/segments'),
+        ]);
+        const catData = await catRes.json();
+        const segData = await segRes.json();
+
+        catalogState.products = catData.products || [];
+        catalogState.segments = segData.segments || [];
+
+        renderSegmentFiltersBar();
+        renderCatalogProducts();
+      } catch (err) {
+        console.error('Erro ao carregar catálogo comercial:', err);
+      }
+    }
+
+    function renderSegmentFiltersBar() {
+      const container = document.getElementById('segmentFiltersBar');
+      container.innerHTML = `
+        <button data-segment="ALL" class="seg-btn ${catalogState.selectedSegment === 'ALL' ? 'active bg-[#8B5CF6] text-white shadow-md' : 'bg-white/5 text-slate-400 hover:text-white'} px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all">
+          Todos os Segmentos
+        </button>
+      `;
+
+      catalogState.segments.forEach(seg => {
+        const btn = document.createElement('button');
+        const isActive = catalogState.selectedSegment === seg.code;
+        btn.dataset.segment = seg.code;
+        btn.className = `seg-btn ${isActive ? 'active bg-[#8B5CF6] text-white shadow-md' : 'bg-white/5 text-slate-400 hover:text-white'} px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5`;
+        btn.innerHTML = `<i data-lucide="${seg.icon || 'layers'}" class="w-3.5 h-3.5"></i><span>${seg.name}</span>`;
+        container.appendChild(btn);
+      });
+
+      // Bind click events
+      container.querySelectorAll('.seg-btn').forEach(b => {
+        b.addEventListener('click', () => {
+          catalogState.selectedSegment = b.dataset.segment;
+          renderSegmentFiltersBar();
+          renderCatalogProducts();
+        });
+      });
+
+      lucide.createIcons();
+    }
+
+    // Bind Solution Type filter clicks
+    document.querySelectorAll('.sol-type-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.sol-type-btn').forEach(b => {
+          b.className = 'sol-type-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5 border border-white/5 transition-all';
+        });
+        btn.className = 'sol-type-btn active px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30';
+        catalogState.selectedType = btn.dataset.type;
+        renderCatalogProducts();
+      });
+    });
+
+    // Bind search input
+    document.getElementById('catalogSearchInput').addEventListener('input', (e) => {
+      catalogState.searchQuery = e.target.value.toLowerCase().trim();
+      renderCatalogProducts();
+    });
+
+    function renderCatalogProducts() {
+      const grid = document.getElementById('catalogProductsGrid');
+      grid.innerHTML = '';
+
+      let filtered = catalogState.products.filter(p => {
+        // Segment filter
+        if (catalogState.selectedSegment !== 'ALL') {
+          const hasSeg = (p.segments || []).some(s => s.code === catalogState.selectedSegment);
+          if (!hasSeg) return false;
+        }
+        // Solution Type filter
+        if (catalogState.selectedType !== 'ALL') {
+          if (p.solutionType !== catalogState.selectedType) return false;
+        }
+        // Search query
+        if (catalogState.searchQuery) {
+          const term = catalogState.searchQuery;
+          const matchName = (p.name || '').toLowerCase().includes(term);
+          const matchDesc = (p.description || '').toLowerCase().includes(term);
+          const matchSumm = (p.summary || '').toLowerCase().includes(term);
+          const matchSeg = (p.segments || []).some(s => s.name.toLowerCase().includes(term));
+          if (!matchName && !matchDesc && !matchSumm && !matchSeg) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full p-12 text-center text-slate-400 text-xs space-y-2">
+            <i data-lucide="filter" class="w-8 h-8 text-slate-500 mx-auto"></i>
+            <div class="font-bold text-white text-sm">Nenhum produto encontrado com os filtros selecionados</div>
+            <p>Tente selecionar outro segmento ou limpar o campo de busca.</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      filtered.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'p-6 rounded-3xl bg-[#11131a] border border-white/10 space-y-4 hover:border-white/20 transition-all flex flex-col justify-between';
+
+        const statusMap = {
+          AVAILABLE: { label: 'Disponível', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
+          COMING_SOON: { label: 'Em Breve', color: 'bg-blue-500/10 text-blue-400 border-blue-500/30' },
+          IN_PREPARATION: { label: 'Em Preparação', color: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+          UNAVAILABLE: { label: 'Indisponível', color: 'bg-slate-500/10 text-slate-400 border-slate-500/30' },
+        };
+        const statusObj = statusMap[p.commercialStatus] || statusMap.AVAILABLE;
+
+        const segmentBadges = (p.segments || []).slice(0, 2).map(s => `
+          <span class="text-[9px] font-bold px-2 py-0.5 rounded bg-white/5 text-slate-300 border border-white/5">${s.name}</span>
+        `).join('');
+
+        const lowestPlan = p.plans && p.plans.length > 0 ? p.plans[0] : null;
+        let priceDisplay = 'Consulte';
+        if (p.hasApprovedOffer && lowestPlan) {
+          priceDisplay = `A partir de <strong>${lowestPlan.priceFormatted}</strong>/mês`;
+        } else {
+          priceDisplay = `<span class="text-slate-400 italic">Preço sob consulta</span>`;
+        }
+
+        card.innerHTML = `
+          <div class="space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[9px] font-extrabold px-2 py-0.5 rounded uppercase tracking-wider bg-[#8B5CF6]/10 text-[#8B5CF6] border border-[#8B5CF6]/20">${p.solutionType || 'SOLUÇÃO'}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusObj.color}">${statusObj.label}</span>
+            </div>
+
+            <div class="flex items-start gap-3">
+              <div class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[#00F59B] shrink-0">
+                <i data-lucide="${p.icon || 'bot'}" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h3 class="text-base font-extrabold text-white">${p.name}</h3>
+                <div class="flex items-center gap-1.5 flex-wrap mt-1">${segmentBadges}</div>
+              </div>
+            </div>
+
+            <p class="text-xs text-slate-400 line-clamp-3 leading-relaxed">${p.summary || p.description || ''}</p>
+          </div>
+
+          <div class="space-y-3 pt-3 border-t border-white/5">
+            <div class="flex items-center justify-between text-xs">
+              <div class="text-slate-300">${priceDisplay}</div>
+              ${p.isContracted ? '<span class="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">CONTRATADO</span>' : ''}
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button onclick="openProductDetailsModal('${p.code}')" class="flex-1 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs border border-white/10 transition-all flex items-center justify-center gap-1.5">
+                <i data-lucide="eye" class="w-3.5 h-3.5"></i>
+                <span>Ver Detalhes</span>
+              </button>
+
+              ${p.isContracted ? `
+                <button onclick="${p.code === 'JESSICA' ? "switchTab('overview')" : "showToast('Módulo operacional em homologação.', 'info')"}" class="px-3.5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5">
+                  <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                  <span>Acessar</span>
+                </button>
+              ` : (p.hasApprovedOffer ? `
+                <a href="https://wa.me/5511951364159?text=Ol%C3%A1%21+Gostaria+de+contratar+o+${encodeURIComponent(p.name)}" target="_blank" class="px-3.5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  <span>Contratar</span>
+                </a>
+              ` : `
+                <!-- No buy button for products in preparation without approved offer -->
+              `)}
+            </div>
+          </div>
+        `;
+
+        grid.appendChild(card);
+      });
+
+      lucide.createIcons();
+    }
+
+    // Product Details Modal
+    async function openProductDetailsModal(productCode) {
+      try {
+        const res = await fetch(`/api/cliente/products/${encodeURIComponent(productCode)}/details`);
+        const data = await res.json();
+        if (!data.success || !data.product) {
+          showToast('Detalhes não encontrados.', 'error');
+          return;
+        }
+
+        const p = data.product;
+        const modal = document.getElementById('productDetailsModal');
+
+        document.getElementById('modalProductName').innerText = p.name;
+        document.getElementById('modalProductSummary').innerText = p.summary || p.description || '';
+        document.getElementById('modalProductType').innerText = p.solutionType || 'SOLUÇÃO';
+        document.getElementById('modalProductSegments').innerText = (p.segments || []).map(s => s.name).join(', ') || 'Multisegmento';
+        document.getElementById('modalProductAudience').innerText = p.targetAudience || 'Profissionais e empresas do setor';
+
+        // Icon
+        const iconBox = document.getElementById('modalProductIconBox');
+        iconBox.innerHTML = `<i data-lucide="${p.icon || 'bot'}" class="w-7 h-7"></i>`;
+
+        // Status badge
+        const statusMap = {
+          AVAILABLE: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
+          IN_PREPARATION: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+          COMING_SOON: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
+        };
+        const statusColor = statusMap[p.commercialStatus] || 'bg-slate-500/10 text-slate-400 border-slate-500/30';
+        document.getElementById('modalProductStatus').innerHTML = `
+          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border ${statusColor}">
+            ${p.commercialStatus === 'AVAILABLE' ? 'Disponível para Implantação' : 'Em Preparação / Homologação'}
+          </span>
+        `;
+
+        // Features list
+        const featList = document.getElementById('modalFeaturesList');
+        featList.innerHTML = '';
+        const plannedFeatures = p.metadata?.plannedFeatures || [];
+        if (plannedFeatures.length > 0) {
+          plannedFeatures.forEach(f => {
+            featList.innerHTML += `<div class="flex items-center gap-2"><i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B]"></i><span>${f}</span></div>`;
+          });
+        } else if (p.plans && p.plans.length > 0) {
+          const sampleFeatures = p.plans[0].features || ['Atendimento Inteligente 24/7', 'Integração oficial WhatsApp', 'Painel de Gerenciamento'];
+          sampleFeatures.forEach(f => {
+            featList.innerHTML += `<div class="flex items-center gap-2"><i data-lucide="check" class="w-3.5 h-3.5 text-[#00F59B]"></i><span>${f}</span></div>`;
+          });
+        } else {
+          featList.innerHTML = `<div class="text-slate-500 italic">Recursos e automações em fase de integração operacional.</div>`;
+        }
+
+        // Pricing Content
+        const priceContent = document.getElementById('modalPricingContent');
+        if (p.hasApprovedOffer && p.plans && p.plans.length > 0) {
+          priceContent.innerHTML = p.plans.map(pl => `
+            <div class="flex items-center justify-between py-1 border-b border-white/5 last:border-0">
+              <span class="font-bold text-white">${pl.name}</span>
+              <span class="text-[#00F59B] font-extrabold">${pl.priceFormatted} / mês</span>
+            </div>
+          `).join('');
+        } else {
+          priceContent.innerHTML = `
+            <div class="text-xs text-amber-300 flex items-center gap-2">
+              <i data-lucide="clock" class="w-4 h-4 shrink-0"></i>
+              <span>Valores e condições em fase de aprovação comercial. O produto estará disponível para contratação em breve.</span>
+            </div>
+          `;
+        }
+
+        // Action button in modal
+        const actionContainer = document.getElementById('modalActionBtnContainer');
+        if (p.isContracted) {
+          actionContainer.innerHTML = `
+            <button onclick="closeProductDetailsModal(); ${p.code === 'JESSICA' ? "switchTab('overview')" : "showToast('Módulo em homologação.', 'info')"};" class="px-5 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110">
+              Acessar Módulo
+            </button>
+          `;
+        } else if (p.hasApprovedOffer) {
+          actionContainer.innerHTML = `
+            <a href="https://wa.me/5511951364159?text=Ol%C3%A1%21+Gostaria+de+contratar+o+${encodeURIComponent(p.name)}" target="_blank" class="px-5 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110">
+              Solicitar Ativação
+            </a>
+          `;
+        } else {
+          actionContainer.innerHTML = `
+            <button disabled class="px-5 py-2.5 rounded-xl bg-white/5 text-slate-500 font-bold text-xs cursor-not-allowed">
+              Aguardando Lançamento
+            </button>
+          `;
+        }
+
+        modal.classList.remove('hidden');
+        lucide.createIcons();
+      } catch (err) {
+        showToast('Erro ao carregar detalhes.', 'error');
+      }
+    }
+
+    function closeProductDetailsModal() {
+      document.getElementById('productDetailsModal').classList.add('hidden');
+    }
+
+    // ==========================================
+    // 2. MINHAS ASSINATURAS (CONTRACTS)
+    // ==========================================
+    async function loadMySubscriptions() {
+      try {
+        const res = await fetch('/api/cliente/my-subscriptions');
+        const data = await res.json();
+        const container = document.getElementById('subscriptionsTableContainer');
+        const subs = data.subscriptions || [];
+
+        if (subs.length === 0) {
+          container.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Nenhuma assinatura ativa encontrada.</div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="text-[10px] uppercase font-bold text-slate-500 border-b border-white/5">
+              <tr>
+                <th class="py-3 px-3">Produto & Agente</th>
+                <th class="py-3 px-3">Plano</th>
+                <th class="py-3 px-3">Valor / Ciclo</th>
+                <th class="py-3 px-3">Canal</th>
+                <th class="py-3 px-3">Status</th>
+                <th class="py-3 px-3">Próximo Vencimento</th>
+                <th class="py-3 px-3 text-right">Ações</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-white/5">
+              ${subs.map(s => {
+                const isPaidValid = s.isAccessActive;
+                const statusColor = s.status === 'ACTIVE' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                  : (s.status === 'OVERDUE' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                  : 'text-slate-400 bg-slate-500/10 border-slate-500/20');
+
+                const paidDate = s.paidUntil ? new Date(s.paidUntil).toLocaleDateString('pt-BR') : 'Vigente';
+
+                return `
+                  <tr class="hover:bg-white/[0.02] transition-colors">
+                    <td class="py-3.5 px-3">
+                      <div class="font-bold text-white flex items-center gap-2">
+                        <i data-lucide="${s.productIcon || 'bot'}" class="w-4 h-4 text-[#00F59B]"></i>
+                        <span>${s.productName}</span>
+                      </div>
+                      <span class="text-[10px] text-slate-500">${s.productCategory}</span>
+                    </td>
+                    <td class="py-3.5 px-3 font-semibold text-white">${s.planName}</td>
+                    <td class="py-3.5 px-3">
+                      <div class="font-bold text-[#00F59B]">${s.priceFormatted}</div>
+                      <span class="text-[10px] text-slate-500">${s.billingCycle === 'MONTHLY' ? 'Mensal' : 'Anual'}</span>
+                    </td>
+                    <td class="py-3.5 px-3">
+                      <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10">${s.origin}</span>
+                    </td>
+                    <td class="py-3.5 px-3">
+                      <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${statusColor}">${s.status}</span>
+                    </td>
+                    <td class="py-3.5 px-3 font-medium ${isPaidValid ? 'text-slate-300' : 'text-rose-400'}">${paidDate}</td>
+                    <td class="py-3.5 px-3 text-right">
+                      ${s.status === 'ACTIVE' ? `
+                        <button onclick="requestCancelSubscription(${s.id}, '${s.productName}')" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 text-xs font-semibold transition-all">
+                          Cancelar
+                        </button>
+                      ` : `
+                        <span class="text-slate-500 text-[11px]">—</span>
+                      `}
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        `;
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Erro ao carregar assinaturas:', err);
+      }
+    }
+
+    async function requestCancelSubscription(subId, prodName) {
+      if (!confirm(`Deseja cancelar a assinatura de "${prodName}"?\n\nConforme nossa política sem fidelidade, seu acesso continuará 100% liberado até o final do período pago atual.`)) {
+        return;
+      }
+      try {
+        const res = await fetch(`/api/cliente/subscriptions/${subId}/cancel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason: 'Solicitado pelo cliente via Central RAIA' }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Assinatura cancelada com sucesso. Acesso preservado até o fim do ciclo!');
+          loadMySubscriptions();
+          loadMyProducts();
+        } else {
+          showToast(data.error || 'Erro ao cancelar assinatura.', 'error');
+        }
+      } catch (e) {
+        showToast('Erro de conexão.', 'error');
+      }
+    }
+
+    // ==========================================
+    // 3. PAGAMENTOS & FATURAS
+    // ==========================================
+    async function loadMyInvoices() {
+      try {
+        const res = await fetch('/api/cliente/my-invoices');
+        const data = await res.json();
+        const container = document.getElementById('invoicesListContainer');
+        const invoices = data.invoices || [];
+
+        if (invoices.length === 0) {
+          container.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Nenhuma fatura registrada no histórico recente.</div>`;
+          return;
+        }
+
+        container.innerHTML = invoices.map(inv => {
+          const valFormatted = Number(inv.value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          const dateStr = inv.created_at ? new Date(inv.created_at).toLocaleDateString('pt-BR') : 'Data recente';
+          const isPaid = inv.status === 'RECEIVED' || inv.status === 'CONFIRMED' || inv.status === 'PAID';
+
+          return `
+            <div class="p-4 rounded-xl bg-[#07080c] border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-slate-400">
+                  <i data-lucide="receipt" class="w-4 h-4"></i>
+                </div>
+                <div>
+                  <div class="font-bold text-white">${inv.description || 'Mensalidade RAIA AGENTES'}</div>
+                  <div class="text-[11px] text-slate-500">${dateStr} • Método: ${inv.billing_type || 'PIX'} • Origem: ${inv.origin}</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-4 justify-between sm:justify-end">
+                <div class="font-extrabold text-white text-sm">${valFormatted}</div>
+                <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${isPaid ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'}">
+                  ${inv.status}
+                </span>
+                ${inv.invoice_url ? `
+                  <a href="${inv.invoice_url}" target="_blank" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors" title="Visualizar Fatura">
+                    <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                  </a>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Erro ao carregar faturas:', err);
+      }
+    }
+
+    // ==========================================
+    // 4. PERFIL & SEGURANÇA
+    // ==========================================
+    function populateProfileTab() {
+      if (!clientData) return;
+      document.getElementById('profUserName').value = clientData.name || '';
+      document.getElementById('profUserEmail').value = clientData.email || '';
+      document.getElementById('profUserPhone').value = clientData.phoneNumber || '';
+      document.getElementById('profUserId').value = `RAIA-USR-${clientData.id || 0}`;
+    }
+
+    document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const currentPassword = document.getElementById('currentPassInput').value;
+      const newPassword = document.getElementById('newPassInput').value;
+      const confirmNew = document.getElementById('confirmNewPassInput').value;
+
+      if (newPassword !== confirmNew) {
+        showToast('A confirmação da nova senha não confere.', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/cliente/profile/password', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentPassword, newPassword }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Senha alterada com sucesso!');
+          document.getElementById('changePasswordForm').reset();
+        } else {
+          showToast(data.error || 'Erro ao alterar senha.', 'error');
+        }
+      } catch (err) {
+        showToast('Erro de conexão.', 'error');
+      }
+    });
+
+    // ==========================================
+    // 5. PROFILE INITIALIZER & JÉSSICA MODULE DATA
+    // ==========================================
     async function loadProfile() {
       try {
         const res = await fetch('/api/cliente/profile');
@@ -872,12 +1624,27 @@
 
         clientData = data.profile;
         renderProfileData(clientData);
+
+        // Check if URL specifies module or tab
+        const urlParams = new URLSearchParams(window.location.search);
+        const requestedModulo = urlParams.get('modulo');
+        const requestedTab = urlParams.get('tab');
+
+        if (requestedModulo === 'jessica' || requestedTab === 'overview') {
+          switchTab('overview');
+        } else if (requestedTab && tabMeta[requestedTab]) {
+          switchTab(requestedTab);
+        } else {
+          switchTab('my-products');
+        }
       } catch (err) {
         window.location.href = '/cliente/login';
       }
     }
 
     function renderProfileData(p) {
+      const companyOrSalon = p.salon?.name || p.name || 'Minha Empresa';
+      document.getElementById('sidebarClientName').innerText = companyOrSalon;
       document.getElementById('sidebarSalonName').innerText = p.salon?.name || 'Salão de Beleza';
       document.getElementById('footerUserName').innerText = p.name || 'Cliente';
       document.getElementById('footerUserEmail').innerText = p.email || '';
@@ -892,14 +1659,14 @@
       document.getElementById('planBadgeText').innerHTML = `<span>${badgeText}</span>`;
       document.getElementById('headerPlanBadge').innerText = badgeText;
       document.getElementById('headerPlanBadge').className = badgeClass;
-      document.getElementById('mobilePlanBadge').innerText = isPro ? 'PRÓ 🌟' : (isIntermediate ? 'INTERMEDIÁRIO 📊' : 'ENTRADA ✂️');
+      document.getElementById('mobilePlanBadge').innerText = isPro ? 'PRÓ 🌟' : (isIntermediate ? 'INTERM 📊' : 'ENTRADA ✂️');
 
       // Demo Account notice
       if (p.isDemo) {
         document.getElementById('demoNoticeBanner').classList.remove('hidden');
       }
 
-      // WhatsApp Status
+      // WhatsApp Status in Jessica module
       const waStatus = p.salon?.whatsappStatus || 'DISCONNECTED';
       const isConnected = waStatus === 'CONNECTED';
       document.getElementById('waStatusBadge').innerText = isConnected ? 'CONECTADO' : 'DESCONECTADO';
@@ -917,115 +1684,117 @@
       // Populate Hours
       renderHoursInputs(p.salon?.openingHours);
 
-      // Trigger initial counts
-      loadServices();
+      // Check Pro lock
+      if (!isPro && !p.isDemo) {
+        document.getElementById('proDashboardLocked').classList.remove('hidden');
+        document.getElementById('proDashboardContent').classList.add('hidden');
+        document.getElementById('proCampaignsLocked').classList.remove('hidden');
+        document.getElementById('proCampaignsContent').classList.add('hidden');
+      } else {
+        document.getElementById('proDashboardLocked').classList.add('hidden');
+        document.getElementById('proDashboardContent').classList.remove('hidden');
+        document.getElementById('proCampaignsLocked').classList.add('hidden');
+        document.getElementById('proCampaignsContent').classList.remove('hidden');
+      }
     }
 
-    // 2. Salon Hours Form
-    const dayNames = { seg: 'Segunda', ter: 'Terça', qua: 'Quarta', qui: 'Quinta', sex: 'Sexta', sab: 'Sábado', dom: 'Domingo' };
-    function renderHoursInputs(hours) {
-      const container = document.getElementById('hoursContainer');
-      container.innerHTML = '';
-      const defaultHours = hours || {
-        seg: { open: '09:00', close: '19:00', active: true },
-        ter: { open: '09:00', close: '19:00', active: true },
-        qua: { open: '09:00', close: '19:00', active: true },
-        qui: { open: '09:00', close: '19:00', active: true },
-        sex: { open: '09:00', close: '19:00', active: true },
-        sab: { open: '09:00', close: '18:00', active: true },
-        dom: { open: '09:00', close: '14:00', active: false },
-      };
+    // Opening Hours Table
+    const dayNames = {
+      seg: 'Segunda-feira', ter: 'Terça-feira', qua: 'Quarta-feira',
+      qui: 'Quinta-feira', sex: 'Sexta-feira', sab: 'Sábado', dom: 'Domingo'
+    };
 
-      Object.keys(dayNames).forEach(dayKey => {
-        const item = defaultHours[dayKey] || { open: '09:00', close: '19:00', active: true };
-        const card = document.createElement('div');
-        card.className = 'p-3 rounded-xl bg-[#07080c] border border-white/5 space-y-2';
-        card.innerHTML = `
-          <div class="flex items-center justify-between font-bold text-white">
-            <span>${dayNames[dayKey]}</span>
-            <input type="checkbox" data-day="${dayKey}" class="day-active rounded text-[#00F59B]" ${item.active ? 'checked' : ''}>
-          </div>
-          <div class="flex items-center gap-1.5 text-slate-300">
-            <input type="time" data-day-open="${dayKey}" value="${item.open}" class="bg-[#11131a] border border-white/10 rounded px-1.5 py-1 text-xs w-full">
-            <span>-</span>
-            <input type="time" data-day-close="${dayKey}" value="${item.close}" class="bg-[#11131a] border border-white/10 rounded px-1.5 py-1 text-xs w-full">
+    function renderHoursInputs(hours = {}) {
+      const list = document.getElementById('openingHoursList');
+      list.innerHTML = '';
+      const defaultDays = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
+
+      defaultDays.forEach(day => {
+        const item = hours[day] || { open: day === 'dom' ? 'FECHADO' : '09:00', close: day === 'dom' ? 'FECHADO' : '19:00' };
+        const isClosed = item.open === 'FECHADO' || item.close === 'FECHADO';
+
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between p-2.5 rounded-xl bg-[#07080c] border border-white/5';
+        row.innerHTML = `
+          <span class="w-32 font-bold text-white">${dayNames[day]}</span>
+          <div class="flex items-center gap-2">
+            <input type="text" data-day="${day}" data-field="open" value="${item.open}" class="hour-input w-20 px-2 py-1 rounded bg-[#11131a] border border-white/10 text-center font-mono">
+            <span class="text-slate-500">às</span>
+            <input type="text" data-day="${day}" data-field="close" value="${item.close}" class="hour-input w-20 px-2 py-1 rounded bg-[#11131a] border border-white/10 text-center font-mono">
           </div>
         `;
-        container.appendChild(card);
+        list.appendChild(row);
       });
     }
 
+    // Salon Form Submit
     document.getElementById('salonForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const salonName = document.getElementById('salonName').value;
+      const phone = document.getElementById('salonPhone').value;
+      const address = document.getElementById('salonAddress').value;
+      const customInstructions = document.getElementById('salonCustomInstructions').value;
+
       const openingHours = {};
-      Object.keys(dayNames).forEach(k => {
-        const active = document.querySelector(`[data-day="${k}"]`)?.checked || false;
-        const open = document.querySelector(`[data-day-open="${k}"]`)?.value || '09:00';
-        const close = document.querySelector(`[data-day-close="${k}"]`)?.value || '19:00';
-        openingHours[k] = { active, open, close };
+      document.querySelectorAll('.hour-input').forEach(input => {
+        const day = input.dataset.day;
+        const field = input.dataset.field;
+        if (!openingHours[day]) openingHours[day] = {};
+        openingHours[day][field] = input.value;
       });
 
       try {
         const res = await fetch('/api/cliente/salon', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            salonName: document.getElementById('salonName').value.trim(),
-            phone: document.getElementById('salonPhone').value.trim(),
-            address: document.getElementById('salonAddress').value.trim(),
-            customInstructions: document.getElementById('salonCustomInstructions').value.trim(),
-            openingHours,
-          }),
+          body: JSON.stringify({ salonName, phone, address, customInstructions, openingHours }),
         });
         const data = await res.json();
         if (data.success) {
-          showToast('Configurações do salão salvas com sucesso!');
-          document.getElementById('sidebarSalonName').innerText = document.getElementById('salonName').value;
+          showToast('Dados do salão salvos com sucesso!');
+          loadProfile();
         } else {
-          showToast(data.error || 'Erro ao salvar salão.', 'error');
+          showToast(data.error || 'Erro ao salvar.', 'error');
         }
       } catch (err) {
-        showToast('Erro de conexão.', 'error');
+        showToast('Erro de conexão ao salvar.', 'error');
       }
     });
 
-    // 3. Services Management
+    // Services CRUD
     async function loadServices() {
       try {
         const res = await fetch('/api/cliente/services');
         const data = await res.json();
-        const tbody = document.getElementById('servicesTableBody');
-        tbody.innerHTML = '';
+        const list = document.getElementById('servicesList');
+        list.innerHTML = '';
 
-        if (!data.success || !data.services || data.services.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="5" class="py-6 text-center text-slate-500">Nenhum serviço cadastrado ainda. Clique em "Novo Serviço".</td></tr>';
-          document.getElementById('servicesCountOverview').innerText = '0 Serviços';
+        if (!data.services || data.services.length === 0) {
+          list.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">Nenhum serviço cadastrado ainda.</div>';
           return;
         }
 
-        document.getElementById('servicesCountOverview').innerText = `${data.services.length} Serviços Ativos`;
-
-        data.services.forEach(s => {
-          const tr = document.createElement('tr');
-          tr.className = 'hover:bg-white/[0.02] transition-colors';
-          tr.innerHTML = `
-            <td class="py-3 px-3 font-bold text-white">${s.name}</td>
-            <td class="py-3 px-3 text-slate-400">${s.category || 'Geral'}</td>
-            <td class="py-3 px-3 text-slate-400">${s.duration_min} min</td>
-            <td class="py-3 px-3 font-extrabold text-[#00F59B]">R$ ${Number(s.price).toFixed(2).replace('.', ',')}</td>
-            <td class="py-3 px-3 text-right">
-              <button onclick="deleteService(${s.id})" class="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
-                <i data-lucide="trash-2" class="w-4 h-4"></i>
-              </button>
-            </td>
+        data.services.forEach(svc => {
+          const item = document.createElement('div');
+          item.className = 'flex items-center justify-between p-3.5 rounded-xl bg-[#07080c] border border-white/5 text-xs';
+          item.innerHTML = `
+            <div>
+              <span class="font-bold text-white text-sm">${svc.name}</span>
+              <div class="text-slate-400 mt-0.5">${svc.duration_minutes} min • R$ ${Number(svc.price).toFixed(2).replace('.', ',')}</div>
+            </div>
+            <button onclick="deleteService(${svc.id})" class="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
           `;
-          tbody.appendChild(tr);
+          list.appendChild(item);
         });
         lucide.createIcons();
-      } catch (err) {}
+      } catch (e) {
+        showToast('Erro ao carregar serviços.', 'error');
+      }
     }
 
-    document.getElementById('btnOpenNewService').addEventListener('click', () => {
+    document.getElementById('btnNewService').addEventListener('click', () => {
       document.getElementById('newServiceForm').classList.toggle('hidden');
     });
     document.getElementById('btnCancelService').addEventListener('click', () => {
@@ -1034,19 +1803,19 @@
 
     document.getElementById('newServiceForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = document.getElementById('svcName').value.trim();
-      const price = document.getElementById('svcPrice').value;
-      const durationMin = document.getElementById('svcDuration').value;
+      const name = document.getElementById('svcName').value;
+      const price = parseFloat(document.getElementById('svcPrice').value);
+      const duration = parseInt(document.getElementById('svcDuration').value, 10);
 
       try {
         const res = await fetch('/api/cliente/services', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, price, durationMin }),
+          body: JSON.stringify({ name, price, durationMinutes: duration }),
         });
         const data = await res.json();
         if (data.success) {
-          showToast('Serviço adicionado com sucesso!');
+          showToast('Serviço adicionado!');
           document.getElementById('newServiceForm').reset();
           document.getElementById('newServiceForm').classList.add('hidden');
           loadServices();
@@ -1058,55 +1827,51 @@
       }
     });
 
-    window.deleteService = async function(id) {
-      if (!confirm('Deseja realmente remover este serviço?')) return;
-      try {
-        const res = await fetch(`/api/cliente/services/${id}`, { method: 'DELETE' });
-        const data = await res.json();
-        if (data.success) {
-          showToast('Serviço removido.');
-          loadServices();
-        }
-      } catch (e) {}
-    };
+    async function deleteService(id) {
+      if (!confirm('Deseja excluir este serviço?')) return;
+      await fetch(`/api/cliente/services/${id}`, { method: 'DELETE' });
+      showToast('Serviço excluído.');
+      loadServices();
+    }
 
-    // 4. Staff Management
+    // Staff CRUD
     async function loadStaff() {
       try {
-        const res = await fetch('/api/cliente/staff');
-        const data = await res.json();
+        const [staffRes, profileRes] = await Promise.all([
+          fetch('/api/cliente/staff'),
+          fetch('/api/cliente/profile')
+        ]);
+        const staffData = await staffRes.json();
+        const profileData = await profileRes.json();
+
         const list = document.getElementById('staffList');
         list.innerHTML = '';
 
-        if (!data.success || !data.staff || data.staff.length === 0) {
-          list.innerHTML = '<div class="col-span-full py-8 text-center text-slate-500 text-xs">Nenhum profissional cadastrado na equipe.</div>';
-          return;
-        }
+        const totalActive = (staffData.staff || []).filter(s => s.active).length;
+        const available = profileData.profile?.professionalsLimit || 1;
+        document.getElementById('staffLimitText').innerText = `Profissionais: ${totalActive} de ${available} em uso.`;
 
-        data.staff.forEach(st => {
-          const card = document.createElement('div');
-          card.className = 'p-4 rounded-xl bg-[#07080c] border border-white/10 flex items-center justify-between';
-          card.innerHTML = `
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-full bg-[#8B5CF6]/20 border border-[#8B5CF6]/40 flex items-center justify-center font-bold text-[#8B5CF6]">
-                ${st.name.charAt(0).toUpperCase()}
-              </div>
-              <div>
-                <div class="text-xs font-bold text-white">${st.name}</div>
-                <div class="text-[11px] text-slate-400">${st.specialty || 'Profissional'}</div>
-              </div>
+        (staffData.staff || []).forEach(stf => {
+          const item = document.createElement('div');
+          item.className = 'flex items-center justify-between p-3.5 rounded-xl bg-[#07080c] border border-white/5 text-xs';
+          item.innerHTML = `
+            <div>
+              <span class="font-bold text-white text-sm">${stf.name}</span>
+              <div class="text-slate-400 mt-0.5">${stf.specialty || 'Atendimento Geral'}</div>
             </div>
-            <button onclick="deleteStaff(${st.id})" class="p-1.5 rounded-lg text-slate-400 hover:text-red-400 transition-colors">
+            <button onclick="deleteStaff(${stf.id})" class="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10">
               <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>
           `;
-          list.appendChild(card);
+          list.appendChild(item);
         });
         lucide.createIcons();
-      } catch (e) {}
+      } catch (e) {
+        showToast('Erro ao carregar equipe.', 'error');
+      }
     }
 
-    document.getElementById('btnOpenStaffForm').addEventListener('click', () => {
+    document.getElementById('btnNewStaff').addEventListener('click', () => {
       document.getElementById('newStaffForm').classList.toggle('hidden');
     });
     document.getElementById('btnCancelStaff').addEventListener('click', () => {
@@ -1115,8 +1880,8 @@
 
     document.getElementById('newStaffForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = document.getElementById('staffName').value.trim();
-      const specialty = document.getElementById('staffSpecialty').value.trim();
+      const name = document.getElementById('staffName').value;
+      const specialty = document.getElementById('staffSpecialty').value;
 
       try {
         const res = await fetch('/api/cliente/staff', {
@@ -1130,20 +1895,22 @@
           document.getElementById('newStaffForm').reset();
           document.getElementById('newStaffForm').classList.add('hidden');
           loadStaff();
+        } else {
+          showToast(data.error || 'Erro ao adicionar.', 'error');
         }
-      } catch (e) {}
+      } catch (e) {
+        showToast('Erro de conexão.', 'error');
+      }
     });
 
-    window.deleteStaff = async function(id) {
-      if (!confirm('Remover este profissional?')) return;
-      try {
-        await fetch(`/api/cliente/staff/${id}`, { method: 'DELETE' });
-        showToast('Profissional removido.');
-        loadStaff();
-      } catch (e) {}
-    };
+    async function deleteStaff(id) {
+      if (!confirm('Deseja desativar este profissional?')) return;
+      await fetch(`/api/cliente/staff/${id}`, { method: 'DELETE' });
+      showToast('Profissional removido.');
+      loadStaff();
+    }
 
-    // 5. Appointments Schedule
+    // Appointments History
     async function loadAppointments() {
       try {
         const res = await fetch('/api/cliente/appointments');
@@ -1151,167 +1918,76 @@
         const list = document.getElementById('appointmentsList');
         list.innerHTML = '';
 
-        if (!data.success || !data.appointments || data.appointments.length === 0) {
-          list.innerHTML = '<div class="py-8 text-center text-slate-500 text-xs">Nenhum atendimento agendado no momento.</div>';
+        if (!data.appointments || data.appointments.length === 0) {
+          list.innerHTML = '<div class="p-8 text-center text-slate-400 text-xs">Nenhum atendimento agendado no momento.</div>';
           return;
         }
 
         data.appointments.forEach(a => {
           const dt = new Date(a.start_datetime);
-          const dateStr = dt.toLocaleDateString('pt-BR');
-          const timeStr = dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-          const item = document.createElement('div');
-          item.className = 'p-3.5 rounded-xl bg-[#07080c] border border-white/5 flex items-center justify-between text-xs';
-          item.innerHTML = `
-            <div class="flex items-center gap-3">
-              <div class="text-center px-2 py-1 bg-white/5 rounded-lg border border-white/10">
-                <div class="font-bold text-white">${timeStr}</div>
-                <div class="text-[10px] text-slate-400">${dateStr}</div>
-              </div>
-              <div>
-                <div class="font-bold text-white">${a.title}</div>
-                <div class="text-[11px] text-slate-400">${a.description || 'Confirmado'}</div>
-              </div>
+          const dtFormatted = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+          const card = document.createElement('div');
+          card.className = 'p-4 rounded-xl bg-[#07080c] border border-white/5 flex items-center justify-between text-xs';
+          card.innerHTML = `
+            <div>
+              <span class="font-bold text-white text-sm">${a.title}</span>
+              <div class="text-slate-400 mt-0.5">${dtFormatted} • Cliente: ${a.description || 'WhatsApp'}</div>
             </div>
-            <button onclick="cancelAppointment(${a.id})" class="p-1.5 rounded-lg text-slate-400 hover:text-red-400">
-              <i data-lucide="x" class="w-4 h-4"></i>
-            </button>
+            <span class="px-2.5 py-1 rounded-full font-bold text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">CONFIRMADO</span>
           `;
-          list.appendChild(item);
+          list.appendChild(card);
         });
         lucide.createIcons();
-      } catch (e) {}
+      } catch (e) {
+        showToast('Erro ao carregar agenda.', 'error');
+      }
     }
 
-    document.getElementById('btnOpenNewAppt').addEventListener('click', () => {
-      document.getElementById('newApptForm').classList.toggle('hidden');
-    });
-    document.getElementById('btnCancelAppt').addEventListener('click', () => {
-      document.getElementById('newApptForm').classList.add('hidden');
-    });
-
-    document.getElementById('newApptForm').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      try {
-        const res = await fetch('/api/cliente/appointments', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientName: document.getElementById('apptClientName').value.trim(),
-            serviceName: document.getElementById('apptServiceName').value.trim(),
-            date: document.getElementById('apptDate').value,
-            time: document.getElementById('apptTime').value,
-          }),
-        });
-        const data = await res.json();
-        if (data.success) {
-          showToast('Atendimento agendado!');
-          document.getElementById('newApptForm').reset();
-          document.getElementById('newApptForm').classList.add('hidden');
-          loadAppointments();
-        }
-      } catch (e) {}
-    });
-
-    window.cancelAppointment = async function(id) {
-      if (!confirm('Cancelar este agendamento?')) return;
-      await fetch(`/api/cliente/appointments/${id}`, { method: 'DELETE' });
-      showToast('Agendamento cancelado.');
-      loadAppointments();
-    };
-
-    // 6. Pro Plan Dashboard
+    // Pro Dashboard
     async function loadProDashboard() {
       try {
         const res = await fetch('/api/cliente/pro/dashboard');
-        const lock = document.getElementById('proUpgradeLockDashboard');
-        const content = document.getElementById('proDashboardContent');
-
-        if (res.status === 403) {
-          lock.classList.remove('hidden');
-          content.classList.add('hidden');
-          lucide.createIcons();
-          return;
-        }
-
+        if (res.status === 403) return;
         const data = await res.json();
-        lock.classList.add('hidden');
-        content.classList.remove('hidden');
-
-        const m = data.metrics;
-        document.getElementById('dashRevenue').innerText = `R$ ${Number(m.faturamentoMes || 0).toFixed(2).replace('.', ',')}`;
-        document.getElementById('dashGrowth').innerText = `${m.faturamentoCrescimento || '+10%'} vs mês anterior`;
-        document.getElementById('dashAppointments').innerText = m.atendimentosMes || 0;
-        document.getElementById('dashTicket').innerText = `R$ ${Number(m.ticketMedio || 0).toFixed(2).replace('.', ',')}`;
-        document.getElementById('dashRetention').innerText = m.taxaRetencao || '70%';
-
-        // Staff breakdown
-        const staffList = document.getElementById('staffRevenueList');
-        staffList.innerHTML = '';
-        if (m.receitaPorProfissional && m.receitaPorProfissional.length > 0) {
-          m.receitaPorProfissional.forEach(st => {
-            const row = document.createElement('div');
-            row.className = 'p-3 rounded-xl bg-[#07080c] border border-white/5 flex items-center justify-between text-xs';
-            row.innerHTML = `
-              <div class="font-bold text-white">${st.nome}</div>
-              <div class="text-slate-400">${st.atendimentos} atendimentos</div>
-              <div class="font-extrabold text-[#00F59B]">R$ ${Number(st.valor).toFixed(2).replace('.', ',')}</div>
-            `;
-            staffList.appendChild(row);
-          });
-        } else {
-          staffList.innerHTML = '<div class="text-xs text-slate-500 py-3 text-center">Nenhum dado por profissional registrado ainda.</div>';
+        if (data.metrics) {
+          document.getElementById('metricTotalAppts').innerText = data.metrics.totalAppointments || 0;
+          document.getElementById('metricRevenue').innerText = `R$ ${(data.metrics.totalRevenue || 0).toFixed(2).replace('.', ',')}`;
+          document.getElementById('metricAvgTicket').innerText = `R$ ${(data.metrics.averageTicket || 0).toFixed(2).replace('.', ',')}`;
         }
       } catch (e) {}
     }
 
-    // 7. Pro Campaigns
+    // Pro Campaigns
     async function loadProCampaigns() {
       try {
         const res = await fetch('/api/cliente/pro/campaigns');
-        const lock = document.getElementById('proUpgradeLockCampaigns');
-        const content = document.getElementById('proCampaignsContent');
-
-        if (res.status === 403) {
-          lock.classList.remove('hidden');
-          content.classList.add('hidden');
-          lucide.createIcons();
-          return;
-        }
-
+        if (res.status === 403) return;
         const data = await res.json();
-        lock.classList.add('hidden');
-        content.classList.remove('hidden');
-
         const list = document.getElementById('campaignsList');
         list.innerHTML = '';
+
         if (!data.campaigns || data.campaigns.length === 0) {
-          list.innerHTML = '<div class="text-xs text-slate-500 py-6 text-center">Nenhuma campanha criada. Clique em "Criar Nova Campanha".</div>';
+          list.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">Nenhuma campanha realizada ainda.</div>';
           return;
         }
 
         data.campaigns.forEach(c => {
-          const item = document.createElement('div');
-          item.className = 'p-4 rounded-xl bg-[#07080c] border border-white/10 space-y-2 text-xs';
-          item.innerHTML = `
+          const card = document.createElement('div');
+          card.className = 'p-4 rounded-xl bg-[#07080c] border border-white/5 space-y-2 text-xs';
+          card.innerHTML = `
             <div class="flex items-center justify-between">
-              <span class="font-bold text-white text-sm">${c.title}</span>
-              <span class="text-[10px] px-2 py-0.5 rounded font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">DISPARO PROGRAMADO</span>
+              <span class="font-bold text-white">${c.title}</span>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">LGPD OK</span>
             </div>
-            <p class="text-slate-300 italic bg-[#11131a] p-3 rounded-lg border border-white/5">${c.message}</p>
-            <div class="text-[11px] text-slate-400 flex items-center justify-between">
-              <span>Público: <strong>${c.target_audience}</strong></span>
-              <span class="text-emerald-400 flex items-center gap-1"><i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Opt-in Consentido</span>
-            </div>
+            <p class="text-slate-400">${c.message}</p>
           `;
-          list.appendChild(item);
+          list.appendChild(card);
         });
         lucide.createIcons();
       } catch (e) {}
     }
 
-    document.getElementById('btnOpenCampaignModal').addEventListener('click', () => {
+    document.getElementById('btnNewCampaign').addEventListener('click', () => {
       document.getElementById('createCampaignForm').classList.toggle('hidden');
     });
     document.getElementById('btnCancelCampaign').addEventListener('click', () => {
@@ -1320,9 +1996,14 @@
 
     document.getElementById('createCampaignForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const title = document.getElementById('campTitle').value.trim();
-      const message = document.getElementById('campMessage').value.trim();
+      const title = document.getElementById('campTitle').value;
+      const message = document.getElementById('campMessage').value;
       const consentConfirmed = document.getElementById('consentCheckbox').checked;
+
+      if (!consentConfirmed) {
+        showToast('É obrigatório confirmar o consentimento dos clientes.', 'error');
+        return;
+      }
 
       try {
         const res = await fetch('/api/cliente/pro/campaigns', {
@@ -1341,6 +2022,30 @@
         }
       } catch (e) {
         showToast('Erro de conexão.', 'error');
+      }
+    });
+
+    // Test WhatsApp
+    document.getElementById('btnSendTestMessage').addEventListener('click', async () => {
+      const targetPhone = document.getElementById('testPhoneInput').value;
+      if (!targetPhone) {
+        showToast('Informe o telefone para teste.', 'error');
+        return;
+      }
+      try {
+        const res = await fetch('/api/cliente/test-whatsapp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ targetPhone, message: 'Olá! Teste de mensagem da Jéssica.' }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message || 'Mensagem enviada com sucesso!');
+        } else {
+          showToast(data.error || 'Erro ao enviar mensagem.', 'error');
+        }
+      } catch (e) {
+        showToast('Erro de comunicação.', 'error');
       }
     });
 

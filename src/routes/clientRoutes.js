@@ -110,7 +110,7 @@ function clientAuthMiddleware(req, res, next) {
     const activeSub = db.prepare(`
       SELECT id FROM customer_subscriptions
       WHERE user_id = ? AND (
-        (status = 'ACTIVE' AND (paid_until IS NULL OR datetime(paid_until) >= datetime('now')))
+        (status = 'ACTIVE' AND paid_until IS NOT NULL AND datetime(paid_until) >= datetime('now'))
         OR (status = 'CANCELLED' AND paid_until IS NOT NULL AND datetime(paid_until) >= datetime('now'))
       ) LIMIT 1
     `).get(user.id);
@@ -187,6 +187,51 @@ function clientAuthMiddleware(req, res, next) {
       }
     }
   }
+
+  return next();
+}
+
+// Optional Client Authentication (allows public access, attaches user if present)
+function optionalClientAuthMiddleware(req, res, next) {
+  let token = null;
+
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.slice(7).trim();
+  }
+
+  if (!token && req.headers['x-auth-token']) {
+    token = req.headers['x-auth-token'];
+  }
+
+  if (!token && req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) {
+    token = getCookie(req, 'client_auth_token') || getCookie(req, 'auth_token');
+  }
+
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const user = db.prepare('SELECT * FROM users WHERE magic_token = ?').get(token);
+    if (!user) {
+      return next();
+    }
+
+    if (user.magic_token_expires_at) {
+      const expires = new Date(user.magic_token_expires_at);
+      if (expires < new Date()) {
+        return next();
+      }
+    }
+
+    req.clientUser = user;
+    req.isDemo = Boolean(user.is_demo);
+  } catch (e) {}
 
   return next();
 }
@@ -320,15 +365,110 @@ router.get('/profile', clientAuthMiddleware, (req, res) => {
   res.json({ success: true, profile: data });
 });
 
-// MULTIPRODUCT CLIENT PORTAL: "Meus Produtos" Hub
+// MULTIPRODUCT CLIENT PORTAL: "Meus Produtos" Hub & Portfolio
 router.get('/my-products', clientAuthMiddleware, (req, res) => {
   const subscriptions = productService.getUserSubscriptions(req.clientUser.id);
   res.json({ success: true, subscriptions });
 });
 
-router.get('/products-catalog', clientAuthMiddleware, (req, res) => {
-  const products = productService.listProducts({ activeOnly: true, includePlans: true });
+router.get('/segments', optionalClientAuthMiddleware, (req, res) => {
+  const segments = productService.listSegments({ activeOnly: true });
+  res.json({ success: true, segments });
+});
+
+router.get('/products-catalog', optionalClientAuthMiddleware, (req, res) => {
+  const { segment, solution_type, search } = req.query || {};
+  const products = productService.listProducts({
+    activeOnly: true,
+    includePlans: true,
+    segmentCode: segment || null,
+    solutionType: solution_type || null,
+    search: search || null,
+    contractedByUserId: req.clientUser ? req.clientUser.id : null
+  });
   res.json({ success: true, products });
+});
+
+router.get('/products/:code/details', optionalClientAuthMiddleware, (req, res) => {
+  const details = productService.getProductCatalogDetails(req.params.code, { userId: req.clientUser ? req.clientUser.id : null });
+  if (!details) {
+    return res.status(404).json({ success: false, error: 'Produto não encontrado.' });
+  }
+  res.json({ success: true, product: details });
+});
+
+router.get('/my-subscriptions', clientAuthMiddleware, (req, res) => {
+  const subscriptions = productService.getUserSubscriptions(req.clientUser.id);
+  res.json({ success: true, subscriptions });
+});
+
+router.get('/my-invoices', clientAuthMiddleware, (req, res) => {
+  const userId = req.clientUser.id;
+  
+  // Asaas payments for user
+  const asaasRows = db.prepare(`
+    SELECT asaas_id as id, value, net_value, billing_type, status, description, invoice_url, pix_payload, created_at, 'ASAAS' as origin
+    FROM asaas_payments
+    WHERE user_id = ?
+    ORDER BY id DESC LIMIT 50
+  `).all(userId);
+
+  // Direct sales contract payments
+  const directRows = db.prepare(`
+    SELECT c.id, (c.monthly_cents / 100.0) as value, c.payment_status as status, 'ASAAS' as origin, c.asaas_invoice_url as invoice_url, c.created_at, 'DIRETO' as type
+    FROM direct_sales_contracts c
+    WHERE c.user_id = ?
+    ORDER BY c.id DESC LIMIT 50
+  `).all(userId);
+
+  res.json({
+    success: true,
+    invoices: asaasRows,
+    directContracts: directRows
+  });
+});
+
+router.post('/subscriptions/:id/cancel', clientAuthMiddleware, (req, res) => {
+  const subId = Number(req.params.id);
+  const sub = productService.getUserSubscriptionById(subId);
+  if (!sub || sub.userId !== req.clientUser.id) {
+    return res.status(404).json({ success: false, error: 'Assinatura não encontrada ou não pertence a este usuário.' });
+  }
+
+  const { reason } = req.body || {};
+  const updated = productService.cancelSubscription(subId, null, reason || 'Solicitado pelo cliente via Central RAIA');
+  res.json({
+    success: true,
+    message: 'Assinatura cancelada com sucesso. O acesso ao produto continuará liberado até o final do período pago.',
+    subscription: updated
+  });
+});
+
+router.put('/profile/password', clientAuthMiddleware, async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!newPassword || newPassword.length < 8) {
+    return res.status(400).json({ success: false, error: 'A nova senha deve ter no mínimo 8 caracteres.' });
+  }
+
+  const user = db.prepare('SELECT password_hash, password_salt FROM users WHERE id = ?').get(req.clientUser.id);
+  if (user && user.password_hash) {
+    if (!currentPassword) {
+      return res.status(400).json({ success: false, error: 'Informe sua senha atual.' });
+    }
+    const valid = clientAuth.verifyPassword(currentPassword, user.password_hash, user.password_salt);
+    if (!valid) {
+      return res.status(401).json({ success: false, error: 'Senha atual incorreta.' });
+    }
+  }
+
+  const { hash, salt } = clientAuth.hashPassword(newPassword);
+  db.prepare(`
+    UPDATE users
+    SET password_hash = ?, password_salt = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(hash, salt, req.clientUser.id);
+
+  res.json({ success: true, message: 'Senha alterada com sucesso.' });
 });
 
 router.get('/products/:code/access', clientAuthMiddleware, (req, res) => {

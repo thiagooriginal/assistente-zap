@@ -2,44 +2,306 @@
 
 const db = require('../database/db');
 
+function safeJsonParse(val, fallback = null) {
+  if (!val) return fallback;
+  try {
+    return JSON.parse(val);
+  } catch (e) {
+    return fallback;
+  }
+}
+
 /**
  * Multi-Product & Subscription Management Service for RAIA AGENTES
- * Enables dynamic product & plan creation, multi-contract management per user,
+ * Enables dynamic product & plan creation, market segments, multi-contract management,
  * immutable contract terms, and independent access control per product.
  */
 
 // ==========================================
-// 1. PRODUCT & PLAN CATALOG MANAGEMENT
+// 1. MARKET SEGMENTS MANAGEMENT (10 CATEGORIES)
 // ==========================================
 
-function listProducts({ activeOnly = false, includePlans = true } = {}) {
+function listSegments({ activeOnly = false } = {}) {
   const where = activeOnly ? 'WHERE is_active = 1' : '';
-  const products = db.prepare(`SELECT * FROM products ${where} ORDER BY id ASC`).all();
+  const rows = db.prepare(`SELECT * FROM product_segments ${where} ORDER BY display_order ASC, name ASC`).all();
 
-  if (includePlans) {
-    const plansStmt = db.prepare(`SELECT * FROM product_plans ${activeOnly ? 'WHERE is_active = 1' : ''} ORDER BY price_cents ASC`);
-    const allPlans = plansStmt.all();
+  // Attach product counts to each segment
+  const countStmt = db.prepare(`
+    SELECT segment_id, COUNT(product_id) as count
+    FROM product_segment_relations r
+    JOIN products p ON p.id = r.product_id
+    WHERE p.is_active = 1
+    GROUP BY segment_id
+  `);
+  const counts = countStmt.all();
+  const countMap = {};
+  for (const c of counts) countMap[c.segment_id] = c.count;
 
-    return products.map(prod => {
-      const plans = allPlans.filter(p => p.product_id === prod.id).map(p => ({
-        ...p,
-        features: p.features_json ? safeJsonParse(p.features_json, []) : [],
-      }));
-      return {
-        ...prod,
-        metadata: prod.metadata_json ? safeJsonParse(prod.metadata_json, {}) : {},
-        plans,
-      };
-    });
-  }
-
-  return products.map(prod => ({
-    ...prod,
-    metadata: prod.metadata_json ? safeJsonParse(prod.metadata_json, {}) : {},
+  return rows.map(s => ({
+    id: s.id,
+    code: s.code,
+    name: s.name,
+    description: s.description,
+    icon: s.icon || 'layers',
+    displayOrder: s.display_order,
+    isActive: Boolean(s.is_active),
+    productCount: countMap[s.id] || 0,
+    createdAt: s.created_at,
+    updatedAt: s.updated_at,
   }));
 }
 
-function getProductByCode(code, { includePlans = true } = {}) {
+function getSegmentByCode(code) {
+  if (!code) return null;
+  const row = db.prepare('SELECT * FROM product_segments WHERE UPPER(code) = UPPER(?)').get(code.trim());
+  if (!row) return null;
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    description: row.description,
+    icon: row.icon || 'layers',
+    displayOrder: row.display_order,
+    isActive: Boolean(row.is_active),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function getSegmentById(id) {
+  if (!id) return null;
+  const row = db.prepare('SELECT * FROM product_segments WHERE id = ?').get(id);
+  if (!row) return null;
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    description: row.description,
+    icon: row.icon || 'layers',
+    displayOrder: row.display_order,
+    isActive: Boolean(row.is_active),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function createSegment({ code, name, description, icon = 'layers', displayOrder = 0 }) {
+  if (!code || !name) {
+    throw new Error('Código e nome do segmento são obrigatórios.');
+  }
+  const cleanCode = String(code).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  const cleanName = String(name).trim();
+
+  const existing = db.prepare('SELECT id FROM product_segments WHERE code = ?').get(cleanCode);
+  if (existing) {
+    throw new Error(`Segmento com código '${cleanCode}' já existe.`);
+  }
+
+  const res = db.prepare(`
+    INSERT INTO product_segments (code, name, description, icon, display_order)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(cleanCode, cleanName, description ? String(description).trim() : null, icon || 'layers', Number(displayOrder || 0));
+
+  return getSegmentById(Number(res.lastInsertRowid));
+}
+
+function updateSegment(id, updates = {}) {
+  const existing = db.prepare('SELECT * FROM product_segments WHERE id = ?').get(id);
+  if (!existing) {
+    throw new Error('Segmento não encontrado.');
+  }
+
+  const name = updates.name !== undefined ? String(updates.name).trim() : existing.name;
+  const description = updates.description !== undefined ? String(updates.description).trim() : existing.description;
+  const icon = updates.icon !== undefined ? String(updates.icon).trim() : existing.icon;
+  const displayOrder = updates.displayOrder !== undefined ? Number(updates.displayOrder) : existing.display_order;
+  const isActive = updates.isActive !== undefined ? (updates.isActive ? 1 : 0) : existing.is_active;
+
+  db.prepare(`
+    UPDATE product_segments
+    SET name = ?, description = ?, icon = ?, display_order = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(name, description, icon, displayOrder, isActive, id);
+
+  return getSegmentById(id);
+}
+
+function deleteSegment(id) {
+  const existing = db.prepare('SELECT * FROM product_segments WHERE id = ?').get(id);
+  if (!existing) {
+    throw new Error('Segmento não encontrado.');
+  }
+  db.prepare('DELETE FROM product_segment_relations WHERE segment_id = ?').run(id);
+  db.prepare('DELETE FROM product_segments WHERE id = ?').run(id);
+  return { success: true };
+}
+
+function getProductSegments(productId) {
+  return db.prepare(`
+    SELECT s.id, s.code, s.name, s.description, s.icon, s.display_order
+    FROM product_segments s
+    JOIN product_segment_relations r ON r.segment_id = s.id
+    WHERE r.product_id = ? AND s.is_active = 1
+    ORDER BY s.display_order ASC, s.name ASC
+  `).all(productId);
+}
+
+function setProductSegments(productId, segmentCodesOrIds = []) {
+  db.prepare('DELETE FROM product_segment_relations WHERE product_id = ?').run(productId);
+  if (!Array.isArray(segmentCodesOrIds) || segmentCodesOrIds.length === 0) return [];
+
+  const insertStmt = db.prepare('INSERT OR IGNORE INTO product_segment_relations (product_id, segment_id) VALUES (?, ?)');
+  for (const item of segmentCodesOrIds) {
+    let segId = null;
+    if (typeof item === 'number' || /^\d+$/.test(item)) {
+      segId = Number(item);
+    } else if (typeof item === 'string') {
+      const segRow = db.prepare('SELECT id FROM product_segments WHERE code = ?').get(item.trim().toLowerCase());
+      if (segRow) segId = segRow.id;
+    } else if (item && item.id) {
+      segId = item.id;
+    }
+    if (segId) {
+      insertStmt.run(productId, segId);
+    }
+  }
+
+  return getProductSegments(productId);
+}
+
+// ==========================================
+// 2. PRODUCT & PLAN CATALOG MANAGEMENT
+// ==========================================
+
+function listProducts({
+  activeOnly = false,
+  includePlans = true,
+  segmentCode = null,
+  solutionType = null,
+  search = null,
+  commercialStatus = null,
+  contractedByUserId = null
+} = {}) {
+  let query = `SELECT DISTINCT p.* FROM products p`;
+  const params = [];
+  const whereClauses = [];
+
+  if (activeOnly) {
+    whereClauses.push('p.is_active = 1');
+  }
+
+  if (segmentCode && segmentCode !== 'ALL' && segmentCode !== 'TODOS') {
+    query += ` JOIN product_segment_relations psr ON psr.product_id = p.id
+               JOIN product_segments ps ON ps.id = psr.segment_id `;
+    whereClauses.push('(UPPER(ps.code) = UPPER(?) OR ps.id = ?)');
+    params.push(segmentCode.trim(), Number(segmentCode) || 0);
+  }
+
+  if (solutionType && solutionType !== 'ALL' && solutionType !== 'TODOS') {
+    whereClauses.push('UPPER(p.solution_type) = UPPER(?)');
+    params.push(solutionType.trim());
+  }
+
+  if (commercialStatus) {
+    whereClauses.push('UPPER(p.commercial_status) = UPPER(?)');
+    params.push(commercialStatus.trim());
+  }
+
+  if (search && search.trim()) {
+    const term = `%${search.trim().toLowerCase()}%`;
+    whereClauses.push('(LOWER(p.name) LIKE ? OR LOWER(p.code) LIKE ? OR LOWER(COALESCE(p.description, \'\')) LIKE ? OR LOWER(COALESCE(p.summary, \'\')) LIKE ?)');
+    params.push(term, term, term, term);
+  }
+
+  if (whereClauses.length > 0) {
+    query += ' WHERE ' + whereClauses.join(' AND ');
+  }
+
+  query += ' ORDER BY p.has_approved_offer DESC, p.id ASC';
+
+  const products = db.prepare(query).all(...params);
+
+  let allPlans = [];
+  if (includePlans) {
+    allPlans = db.prepare(`SELECT * FROM product_plans ${activeOnly ? 'WHERE is_active = 1' : ''} ORDER BY price_cents ASC`).all();
+  }
+
+  const allRelations = db.prepare(`
+    SELECT r.product_id, s.id, s.code, s.name, s.icon
+    FROM product_segment_relations r
+    JOIN product_segments s ON s.id = r.segment_id
+    WHERE s.is_active = 1
+    ORDER BY s.display_order ASC
+  `).all();
+  const segmentMap = {};
+  for (const rel of allRelations) {
+    if (!segmentMap[rel.product_id]) segmentMap[rel.product_id] = [];
+    segmentMap[rel.product_id].push({
+      id: rel.id,
+      code: rel.code,
+      name: rel.name,
+      icon: rel.icon || 'layers'
+    });
+  }
+
+  const userSubsMap = {};
+  if (contractedByUserId) {
+    const userSubs = db.prepare(`
+      SELECT id, product_id, status, paid_until, price_cents, gateway
+      FROM customer_subscriptions
+      WHERE user_id = ?
+      ORDER BY id DESC
+    `).all(contractedByUserId);
+    for (const sub of userSubs) {
+      if (!userSubsMap[sub.product_id]) {
+        userSubsMap[sub.product_id] = sub;
+      }
+    }
+  }
+
+  return products.map(prod => {
+    let plans = [];
+    if (includePlans) {
+      plans = allPlans.filter(p => p.product_id === prod.id).map(p => ({
+        ...p,
+        priceFormatted: (p.price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+        setupFeeFormatted: (p.setup_fee_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+        promoFairPriceFormatted: p.promo_fair_price_cents !== null ? (p.promo_fair_price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : null,
+        features: p.features_json ? safeJsonParse(p.features_json, []) : [],
+      }));
+    }
+
+    const segments = segmentMap[prod.id] || [];
+    const userSub = userSubsMap[prod.id] || null;
+    const isPaidValid = Boolean(userSub && userSub.paid_until && new Date(userSub.paid_until) >= new Date());
+    const isContracted = Boolean(userSub && (userSub.status === 'ACTIVE' || (userSub.status === 'CANCELLED' && isPaidValid)));
+
+    return {
+      id: prod.id,
+      code: prod.code,
+      name: prod.name,
+      description: prod.description,
+      summary: prod.summary || prod.description,
+      targetAudience: prod.target_audience || null,
+      category: prod.category,
+      solutionType: prod.solution_type || 'AGENDA',
+      commercialStatus: prod.commercial_status || 'AVAILABLE',
+      hasApprovedOffer: Boolean(prod.has_approved_offer),
+      isActive: Boolean(prod.is_active),
+      icon: prod.icon || 'bot',
+      metadata: prod.metadata_json ? safeJsonParse(prod.metadata_json, {}) : {},
+      segments,
+      plans,
+      isContracted,
+      contractStatus: userSub ? userSub.status : null,
+      subscriptionId: userSub ? userSub.id : null,
+      paidUntil: userSub ? userSub.paid_until : null,
+      moduleRoute: prod.code === 'JESSICA' ? '/cliente/painel.html?modulo=jessica' : null
+    };
+  });
+}
+
+function getProductByCode(code, { includePlans = true, userId = null } = {}) {
   if (!code) return null;
   const prod = db.prepare('SELECT * FROM products WHERE UPPER(code) = UPPER(?)').get(code.trim());
   if (!prod) return null;
@@ -48,18 +310,40 @@ function getProductByCode(code, { includePlans = true } = {}) {
   if (includePlans) {
     plans = db.prepare('SELECT * FROM product_plans WHERE product_id = ? ORDER BY price_cents ASC').all(prod.id).map(p => ({
       ...p,
+      priceFormatted: (p.price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+      setupFeeFormatted: (p.setup_fee_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+      promoFairPriceFormatted: p.promo_fair_price_cents !== null ? (p.promo_fair_price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : null,
       features: p.features_json ? safeJsonParse(p.features_json, []) : [],
     }));
   }
 
+  const segments = getProductSegments(prod.id);
+
+  let isContracted = false;
+  let userSub = null;
+  if (userId) {
+    userSub = db.prepare('SELECT id, status, paid_until FROM customer_subscriptions WHERE user_id = ? AND product_id = ? ORDER BY id DESC LIMIT 1').get(userId, prod.id);
+    const isPaidValid = Boolean(userSub && userSub.paid_until && new Date(userSub.paid_until) >= new Date());
+    isContracted = Boolean(userSub && (userSub.status === 'ACTIVE' || (userSub.status === 'CANCELLED' && isPaidValid)));
+  }
+
   return {
     ...prod,
+    summary: prod.summary || prod.description,
+    targetAudience: prod.target_audience || null,
+    solutionType: prod.solution_type || 'AGENDA',
+    commercialStatus: prod.commercial_status || 'AVAILABLE',
+    hasApprovedOffer: Boolean(prod.has_approved_offer),
     metadata: prod.metadata_json ? safeJsonParse(prod.metadata_json, {}) : {},
+    segments,
     plans,
+    isContracted,
+    contractStatus: userSub ? userSub.status : null,
+    subscriptionId: userSub ? userSub.id : null,
   };
 }
 
-function getProductById(id, { includePlans = true } = {}) {
+function getProductById(id, { includePlans = true, userId = null } = {}) {
   if (!id) return null;
   const prod = db.prepare('SELECT * FROM products WHERE id = ?').get(id);
   if (!prod) return null;
@@ -68,18 +352,121 @@ function getProductById(id, { includePlans = true } = {}) {
   if (includePlans) {
     plans = db.prepare('SELECT * FROM product_plans WHERE product_id = ? ORDER BY price_cents ASC').all(prod.id).map(p => ({
       ...p,
+      priceFormatted: (p.price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+      setupFeeFormatted: (p.setup_fee_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+      promoFairPriceFormatted: p.promo_fair_price_cents !== null ? (p.promo_fair_price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : null,
       features: p.features_json ? safeJsonParse(p.features_json, []) : [],
     }));
   }
 
+  const segments = getProductSegments(prod.id);
+
+  let isContracted = false;
+  let userSub = null;
+  if (userId) {
+    userSub = db.prepare('SELECT id, status, paid_until FROM customer_subscriptions WHERE user_id = ? AND product_id = ? ORDER BY id DESC LIMIT 1').get(userId, prod.id);
+    const isPaidValid = Boolean(userSub && userSub.paid_until && new Date(userSub.paid_until) >= new Date());
+    isContracted = Boolean(userSub && (userSub.status === 'ACTIVE' || (userSub.status === 'CANCELLED' && isPaidValid)));
+  }
+
   return {
     ...prod,
+    summary: prod.summary || prod.description,
+    targetAudience: prod.target_audience || null,
+    solutionType: prod.solution_type || 'AGENDA',
+    commercialStatus: prod.commercial_status || 'AVAILABLE',
+    hasApprovedOffer: Boolean(prod.has_approved_offer),
     metadata: prod.metadata_json ? safeJsonParse(prod.metadata_json, {}) : {},
+    segments,
     plans,
+    isContracted,
+    contractStatus: userSub ? userSub.status : null,
+    subscriptionId: userSub ? userSub.id : null,
   };
 }
 
-function createProduct({ code, name, description, category = 'GERAL', icon = 'bot', metadata = {} }) {
+function getProductCatalogDetails(codeOrId, { userId = null } = {}) {
+  let prod = null;
+  if (typeof codeOrId === 'number' || /^\d+$/.test(codeOrId)) {
+    prod = db.prepare('SELECT * FROM products WHERE id = ?').get(Number(codeOrId));
+  } else {
+    prod = db.prepare('SELECT * FROM products WHERE UPPER(code) = UPPER(?)').get(String(codeOrId).trim());
+  }
+  if (!prod) return null;
+
+  const segments = getProductSegments(prod.id);
+  const plans = db.prepare('SELECT * FROM product_plans WHERE product_id = ? AND is_active = 1 ORDER BY price_cents ASC').all(prod.id).map(p => ({
+    ...p,
+    priceFormatted: (p.price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+    setupFeeFormatted: (p.setup_fee_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+    promoFairPriceFormatted: p.promo_fair_price_cents !== null ? (p.promo_fair_price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : null,
+    features: p.features_json ? safeJsonParse(p.features_json, []) : [],
+  }));
+
+  let userSub = null;
+  if (userId) {
+    userSub = db.prepare(`
+      SELECT * FROM customer_subscriptions
+      WHERE user_id = ? AND product_id = ?
+      ORDER BY id DESC LIMIT 1
+    `).get(userId, prod.id);
+  }
+
+  const isPaidValid = Boolean(userSub && userSub.paid_until && new Date(userSub.paid_until) >= new Date());
+  const isContracted = Boolean(userSub && (userSub.status === 'ACTIVE' || (userSub.status === 'CANCELLED' && isPaidValid)));
+  const meta = prod.metadata_json ? safeJsonParse(prod.metadata_json, {}) : {};
+  const canPurchase = Boolean(prod.is_active) &&
+    (prod.commercial_status === 'AVAILABLE') &&
+    Boolean(prod.has_approved_offer) &&
+    plans.length > 0;
+
+  return {
+    id: prod.id,
+    code: prod.code,
+    name: prod.name,
+    description: prod.description,
+    summary: prod.summary || prod.description,
+    targetAudience: prod.target_audience || null,
+    category: prod.category,
+    solutionType: prod.solution_type || 'AGENDA',
+    commercialStatus: prod.commercial_status || 'AVAILABLE',
+    hasApprovedOffer: Boolean(prod.has_approved_offer),
+    canPurchase,
+    plannedFeatures: meta.plannedFeatures || [],
+    isActive: Boolean(prod.is_active),
+    icon: prod.icon || 'bot',
+    metadata: meta,
+    segments,
+    plans,
+    isContracted,
+    subscription: userSub ? {
+      id: userSub.id,
+      status: userSub.status,
+      origin: userSub.origin,
+      gateway: userSub.gateway,
+      priceCents: userSub.price_cents,
+      priceFormatted: (userSub.price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+      paidUntil: userSub.paid_until,
+      contractedAt: userSub.contracted_at,
+    } : null,
+    moduleRoute: prod.code === 'JESSICA' ? '/cliente/painel.html?modulo=jessica' : null
+  };
+}
+
+function createProduct({
+  code,
+  name,
+  description,
+  summary,
+  targetAudience,
+  category = 'GERAL',
+  solutionType = 'AGENDA',
+  commercialStatus = 'AVAILABLE',
+  hasApprovedOffer = 1,
+  icon = 'bot',
+  metadata = {},
+  segments = []
+}) {
   if (!code || !name) {
     throw new Error('Código e nome do produto são obrigatórios.');
   }
@@ -93,18 +480,32 @@ function createProduct({ code, name, description, category = 'GERAL', icon = 'bo
   }
 
   const result = db.prepare(`
-    INSERT INTO products (code, name, description, category, icon, metadata_json)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO products (
+      code, name, description, summary, target_audience,
+      category, solution_type, commercial_status, has_approved_offer,
+      icon, metadata_json
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     cleanCode,
     cleanName,
     description ? String(description).trim() : null,
+    summary ? String(summary).trim() : (description ? String(description).trim() : null),
+    targetAudience ? String(targetAudience).trim() : null,
     String(category).trim().toUpperCase(),
+    String(solutionType || 'AGENDA').trim().toUpperCase(),
+    String(commercialStatus || 'AVAILABLE').trim().toUpperCase(),
+    hasApprovedOffer ? 1 : 0,
     icon || 'bot',
     JSON.stringify(metadata || {})
   );
 
-  return getProductById(Number(result.lastInsertRowid));
+  const prodId = Number(result.lastInsertRowid);
+  if (Array.isArray(segments) && segments.length > 0) {
+    setProductSegments(prodId, segments);
+  }
+
+  return getProductById(prodId);
 }
 
 function updateProduct(id, updates = {}) {
@@ -115,16 +516,27 @@ function updateProduct(id, updates = {}) {
 
   const name = updates.name !== undefined ? String(updates.name).trim() : existing.name;
   const description = updates.description !== undefined ? String(updates.description).trim() : existing.description;
+  const summary = updates.summary !== undefined ? String(updates.summary).trim() : existing.summary;
+  const targetAudience = updates.targetAudience !== undefined ? String(updates.targetAudience).trim() : existing.target_audience;
   const category = updates.category !== undefined ? String(updates.category).trim().toUpperCase() : existing.category;
+  const solutionType = updates.solutionType !== undefined ? String(updates.solutionType).trim().toUpperCase() : existing.solution_type;
+  const commercialStatus = updates.commercialStatus !== undefined ? String(updates.commercialStatus).trim().toUpperCase() : existing.commercial_status;
+  const hasApprovedOffer = updates.hasApprovedOffer !== undefined ? (updates.hasApprovedOffer ? 1 : 0) : existing.has_approved_offer;
   const icon = updates.icon !== undefined ? String(updates.icon).trim() : existing.icon;
   const isActive = updates.isActive !== undefined ? (updates.isActive ? 1 : 0) : existing.is_active;
   const metadata = updates.metadata !== undefined ? JSON.stringify(updates.metadata) : existing.metadata_json;
 
   db.prepare(`
     UPDATE products
-    SET name = ?, description = ?, category = ?, icon = ?, is_active = ?, metadata_json = ?, updated_at = CURRENT_TIMESTAMP
+    SET name = ?, description = ?, summary = ?, target_audience = ?,
+        category = ?, solution_type = ?, commercial_status = ?, has_approved_offer = ?,
+        icon = ?, is_active = ?, metadata_json = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(name, description, category, icon, isActive, metadata, id);
+  `).run(name, description, summary, targetAudience, category, solutionType, commercialStatus, hasApprovedOffer, icon, isActive, metadata, id);
+
+  if (Array.isArray(updates.segments)) {
+    setProductSegments(id, updates.segments);
+  }
 
   return getProductById(id);
 }
@@ -292,10 +704,18 @@ function hasProductAccess(userId, productCode) {
   const paidUntilDate = sub.paidUntil ? new Date(sub.paidUntil) : null;
   const isPaidPeriodValid = paidUntilDate ? paidUntilDate >= now : false;
 
-  // Active status
+  // Active status: must have valid paid period
   if (sub.status === 'ACTIVE') {
-    if (isPaidPeriodValid || !sub.paidUntil) {
+    if (paidUntilDate && isPaidPeriodValid) {
       return { hasAccess: true, status: 'ACTIVE', subscription: sub, reason: 'SUBSCRIPTION_ACTIVE' };
+    }
+    if (!sub.paidUntil) {
+      return {
+        hasAccess: false,
+        status: 'PAYMENT_UNCONFIRMED',
+        subscription: sub,
+        reason: 'Assinatura sem vigência ou aguardando confirmação de pagamento.',
+      };
     }
     return {
       hasAccess: false,
@@ -409,6 +829,13 @@ function createCustomerSubscription({
 
   const finalCycle = billingCycle || plan?.billing_cycle || 'MONTHLY';
 
+  let effectivePaidUntil = paidUntil || null;
+  if (!effectivePaidUntil && status === 'ACTIVE') {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    effectivePaidUntil = d.toISOString();
+  }
+
   const result = db.prepare(`
     INSERT INTO customer_subscriptions (
       user_id, product_id, plan_id, origin, gateway, gateway_subscription_id,
@@ -420,7 +847,7 @@ function createCustomerSubscription({
     userId, product.id, plan?.id || null, origin, gateway,
     gatewaySubscriptionId || null, gatewayCustomerId || null, gatewayPaymentId || null,
     status, finalPriceCents, finalSetupFeeCents, finalCycle, isFair ? 1 : 0,
-    Number(extraProfessionals || 0), paidUntil || null, paidUntil || null,
+    Number(extraProfessionals || 0), effectivePaidUntil, effectivePaidUntil,
     JSON.stringify(customSettings || {})
   );
 
@@ -728,6 +1155,15 @@ function formatSubscriptionRow(row) {
 }
 
 module.exports = {
+  listSegments,
+  getSegmentByCode,
+  getSegmentById,
+  createSegment,
+  updateSegment,
+  deleteSegment,
+  getProductSegments,
+  setProductSegments,
+  getProductCatalogDetails,
   listProducts,
   getProductByCode,
   getProductById,

@@ -34,6 +34,30 @@ try {
 
 const app = express();
 
+app.enable('trust proxy');
+
+// Force HTTPS and Security Headers in Production/Staging to prevent Chrome "Not Secure" warning
+app.use((req, res, next) => {
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
+  const proto = req.headers['x-forwarded-proto'];
+
+  if (isProduction && proto && proto.toLowerCase() === 'http') {
+    const host = req.headers.host || 'staging.raiaagentes.com.br';
+    return res.redirect(301, `https://${host}${req.url}`);
+  }
+
+  // Security Headers against "Not Secure" warnings & mixed content
+  if (isProduction) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Content-Security-Policy', "upgrade-insecure-requests; default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';");
+  }
+
+  next();
+});
+
 app.use(cors());
 app.use(express.json());
 
@@ -644,6 +668,52 @@ app.post('/api/admin/direct-sales/:id/cancel', requireAdmin, async (req, res) =>
 // ==========================================
 // CENTRAL DE PRODUTOS & MULTIPRODUTO ADMIN
 // ==========================================
+
+// 0. Market Segments Admin API
+app.get('/api/admin/segments', requireAdmin, (req, res) => {
+  try {
+    const segments = productService.listSegments({ activeOnly: false });
+    return res.json({ success: true, segments });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/admin/segments', requireAdmin, (req, res) => {
+  try {
+    const segment = productService.createSegment(req.body || {});
+    return res.status(201).json({ success: true, segment });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.put('/api/admin/segments/:id', requireAdmin, (req, res) => {
+  try {
+    const segment = productService.updateSegment(Number(req.params.id), req.body || {});
+    return res.json({ success: true, segment });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.delete('/api/admin/segments/:id', requireAdmin, (req, res) => {
+  try {
+    const result = productService.deleteSegment(Number(req.params.id));
+    return res.json({ success: true, result });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/admin/products/:id/segments', requireAdmin, (req, res) => {
+  try {
+    const segments = productService.setProductSegments(Number(req.params.id), req.body?.segments || []);
+    return res.json({ success: true, segments });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
 
 // 1. List all products and their plans (Catalog)
 app.get('/api/admin/products', requireAdmin, (req, res) => {

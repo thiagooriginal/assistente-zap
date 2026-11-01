@@ -1005,28 +1005,64 @@
               <label class="block text-xs font-bold text-zinc-300 mb-1">Nome Comercial</label>
               <input type="text" id="npName" required placeholder="Ex: Lucas Corretor IA" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-amber-400">
             </div>
-            <div>
-              <label class="block text-xs font-bold text-zinc-300 mb-1">Categoria</label>
-              <select id="npCategory" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-amber-400">
-                <option value="BELEZA">Beleza & Estética</option>
-                <option value="FINANCEIRO">Financeiro & MEI</option>
-                <option value="SAUDE">Saúde & Clínicas</option>
-                <option value="IMOBILIARIO">Imobiliário & Vendas</option>
-                <option value="JURIDICO">Jurídico & Compliance</option>
-                <option value="GERAL">Geral / Automações</option>
-              </select>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-bold text-zinc-300 mb-1">Tipo de Solução</label>
+                <select id="npSolutionType" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-amber-400">
+                  <option value="AGENDA">📅 Agenda & Marcações</option>
+                  <option value="CAIXA">💰 Caixa & Financeiro</option>
+                  <option value="MARKETING">🚀 Marketing & Vendas</option>
+                  <option value="ATENDIMENTO">💬 Atendimento & SAC</option>
+                  <option value="OUTROS">⚡ Outras Automações</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-zinc-300 mb-1">Status Comercial</label>
+                <select id="npCommercialStatus" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-amber-400">
+                  <option value="AVAILABLE">Disponível</option>
+                  <option value="IN_PREPARATION">Em Preparação</option>
+                  <option value="COMING_SOON">Em Breve</option>
+                  <option value="UNAVAILABLE">Indisponível</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-bold text-zinc-300 mb-1">Categoria Legada</label>
+                <select id="npCategory" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-amber-400">
+                  <option value="BELEZA">Beleza & Estética</option>
+                  <option value="FINANCEIRO">Financeiro & MEI</option>
+                  <option value="SAUDE">Saúde & Clínicas</option>
+                  <option value="IMOBILIARIO">Imobiliário & Vendas</option>
+                  <option value="JURIDICO">Jurídico & Compliance</option>
+                  <option value="GERAL">Geral / Automações</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-zinc-300 mb-1">Ícone</label>
+                <select id="npIcon" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-amber-400">
+                  <option value="bot">Robô (Padrão)</option>
+                  <option value="scissors">Tesoura (Salão)</option>
+                  <option value="wallet">Carteira (Financeiro)</option>
+                  <option value="stethoscope">Estetoscópio (Saúde)</option>
+                  <option value="building">Prédio (Imobiliário)</option>
+                  <option value="scale">Balança (Jurídico)</option>
+                  <option value="sparkles">Brilho (Especial)</option>
+                  <option value="rocket">Foguete (Growth)</option>
+                </select>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 p-2 bg-zinc-900/60 rounded-xl border border-zinc-800">
+              <input type="checkbox" id="npApprovedOffer" checked class="w-4 h-4 rounded text-amber-500 bg-zinc-800 border-zinc-700">
+              <label for="npApprovedOffer" class="text-xs text-zinc-300 cursor-pointer select-none">
+                <span class="font-bold text-white">Oferta Comercial Aprovada</span> (Habilita compra)
+              </label>
             </div>
             <div>
-              <label class="block text-xs font-bold text-zinc-300 mb-1">Ícone</label>
-              <select id="npIcon" class="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none focus:border-amber-400">
-                <option value="bot">Robô (Padrão)</option>
-                <option value="scissors">Tesoura (Salão)</option>
-                <option value="wallet">Carteira (Financeiro)</option>
-                <option value="stethoscope">Estetoscópio (Saúde)</option>
-                <option value="building">Prédio (Imobiliário)</option>
-                <option value="scale">Balança (Jurídico)</option>
-                <option value="sparkles">Brilho (Especial)</option>
-              </select>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Segmentos Oficiais Associados</label>
+              <div id="npSegmentsCheckboxes" class="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto p-2 bg-zinc-900/80 rounded-xl border border-zinc-800 text-xs text-zinc-400">
+                <span>Carregando segmentos...</span>
+              </div>
             </div>
             <div>
               <label class="block text-xs font-bold text-zinc-300 mb-1">Descrição</label>
@@ -1046,9 +1082,31 @@
               <p class="text-xs text-zinc-400">Planos, limites e condições comerciais de cada produto</p>
             </div>
           </div>
-          <div id="productsCatalogContainer" class="space-y-4 max-h-[520px] overflow-y-auto pr-1">
+          <div id="productsCatalogContainer" class="space-y-4 max-h-[560px] overflow-y-auto pr-1">
             <p class="text-xs text-zinc-500 py-4 text-center">Carregando catálogo de produtos...</p>
           </div>
+        </div>
+      </div>
+
+      <!-- GERENCIADOR DE SEGMENTOS DE MERCADO OFICIAIS -->
+      <div class="p-6 rounded-3xl bg-[#0c1322] border border-zinc-800 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-zinc-800 pb-3">
+          <div>
+            <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[10px] font-black uppercase tracking-wider mb-1">
+              <i data-lucide="tag" class="w-3 h-3"></i>
+              <span>Categorias Oficiais N:N</span>
+            </div>
+            <h3 class="text-base font-extrabold text-white">Segmentos do Portfólio (10 Categorias Oficiais)</h3>
+            <p class="text-xs text-zinc-400">Segmentos de mercado oficiais para agrupamento comercial e filtragem na Central de Soluções.</p>
+          </div>
+          <button onclick="openCreateSegmentModal()" class="px-3.5 py-2 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 font-bold text-xs border border-cyan-500/30 flex items-center gap-1.5 transition cursor-pointer self-start sm:self-auto">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>Novo Segmento</span>
+          </button>
+        </div>
+
+        <div id="segmentsListContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <p class="text-xs text-zinc-500 col-span-full py-4 text-center">Carregando segmentos...</p>
         </div>
       </div>
 
@@ -1101,6 +1159,63 @@
             </button>
           </div>
         </form>
+      </div>
+
+      <!-- MODAL CRIAR/EDITAR SEGMENTO -->
+      <div id="segmentModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-[#0f172a] border border-zinc-700 w-full max-w-md rounded-2xl p-6 shadow-2xl space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <h4 class="text-sm font-extrabold text-white" id="segmentModalTitle">Novo Segmento</h4>
+            <button type="button" onclick="closeSegmentModal()" class="text-zinc-400 hover:text-white text-xs cursor-pointer">✕ Fechar</button>
+          </div>
+          <form id="segmentForm" onsubmit="handleSaveSegment(event)" class="space-y-3">
+            <input type="hidden" id="segModalId">
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Código Único (slug)</label>
+              <input type="text" id="segModalCode" required placeholder="ex: consultoria_empresarial" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs font-mono outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Nome do Segmento</label>
+              <input type="text" id="segModalName" required placeholder="ex: Consultoria & Negócios" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Ícone Lucide</label>
+              <input type="text" id="segModalIcon" placeholder="briefcase" value="folder" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-zinc-300 mb-1">Descrição</label>
+              <textarea id="segModalDescription" rows="2" placeholder="Público-alvo e atuação do segmento..." class="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-xl text-white text-xs outline-none"></textarea>
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-2">
+              <button type="button" onclick="closeSegmentModal()" class="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold cursor-pointer">Cancelar</button>
+              <button type="submit" class="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-extrabold shadow cursor-pointer">Salvar Segmento</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- MODAL VINCULAR SEGMENTOS AO PRODUTO -->
+      <div id="productSegmentsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-[#0f172a] border border-zinc-700 w-full max-w-lg rounded-2xl p-6 shadow-2xl space-y-4">
+          <div class="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div>
+              <h4 class="text-sm font-extrabold text-white">Vincular Segmentos de Mercado</h4>
+              <p class="text-xs text-amber-400 font-mono mt-0.5" id="psModalProductName"></p>
+            </div>
+            <button type="button" onclick="closeProductSegmentsModal()" class="text-zinc-400 hover:text-white text-xs cursor-pointer">✕ Fechar</button>
+          </div>
+          <input type="hidden" id="psModalProductId">
+          <div class="space-y-2">
+            <p class="text-xs text-zinc-400">Selecione todos os segmentos de mercado aos quais este produto pertence (relação N:N):</p>
+            <div id="psModalCheckboxes" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto p-2 bg-zinc-900/60 rounded-xl border border-zinc-800">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800">
+            <button type="button" onclick="closeProductSegmentsModal()" class="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold cursor-pointer">Cancelar</button>
+            <button type="button" onclick="saveProductSegmentsAssignment()" class="px-4 py-2 rounded-xl bg-[#00F59B] hover:bg-[#00d688] text-black text-xs font-extrabold shadow cursor-pointer">Salvar Vinculação</button>
+          </div>
+        </div>
       </div>
 
       <!-- TABELA GESTÃO MULTICONTRATOS DE CLIENTES -->
@@ -1925,16 +2040,26 @@
     // CENTRAL DE PRODUTOS & MULTIPRODUTO RAIA
     // -------------------------------------------------------------
     let cachedAdminProducts = [];
+    let cachedAdminSegments = [];
+    let currentEditingProductId = null;
 
     async function loadProductsDashboard() {
       try {
-        const [metricsRes, prodRes] = await Promise.all([
+        const [metricsRes, prodRes, segRes] = await Promise.all([
           fetch('/api/admin/multiproduct/metrics'),
           fetch('/api/admin/products'),
+          fetch('/api/admin/segments'),
         ]);
 
         const metricsData = await metricsRes.json();
         const prodData = await prodRes.json();
+        const segData = await segRes.json();
+
+        if (segData.success && segData.segments) {
+          cachedAdminSegments = segData.segments;
+          renderAdminSegments(cachedAdminSegments);
+          renderNpSegmentsCheckboxes(cachedAdminSegments);
+        }
 
         if (metricsData.success && metricsData.metrics) {
           const m = metricsData.metrics;
@@ -1998,6 +2123,171 @@
       }
     }
 
+    function renderAdminSegments(segments) {
+      const container = document.getElementById('segmentsListContainer');
+      if (!container) return;
+      if (!segments || segments.length === 0) {
+        container.innerHTML = '<p class="text-xs text-zinc-500 col-span-full py-4 text-center">Nenhum segmento cadastrado.</p>';
+        return;
+      }
+      container.innerHTML = segments.map(seg => `
+        <div class="p-3 rounded-2xl bg-zinc-900 border border-zinc-800 flex flex-col justify-between hover:border-cyan-500/40 transition">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="w-7 h-7 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+                <i data-lucide="${seg.icon || 'folder'}" class="w-3.5 h-3.5"></i>
+              </span>
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="openEditSegmentModal(${seg.id})" class="p-1 text-zinc-400 hover:text-white cursor-pointer" title="Editar">
+                  <i data-lucide="edit-3" class="w-3 h-3"></i>
+                </button>
+                <button type="button" onclick="handleDeleteSegment(${seg.id}, '${escapeHtml(seg.name)}')" class="p-1 text-zinc-500 hover:text-rose-400 cursor-pointer" title="Excluir">
+                  <i data-lucide="trash-2" class="w-3 h-3"></i>
+                </button>
+              </div>
+            </div>
+            <h5 class="text-xs font-extrabold text-white mt-2">${escapeHtml(seg.name)}</h5>
+            <span class="text-[10px] font-mono text-zinc-500 block">${escapeHtml(seg.code)}</span>
+            <p class="text-[11px] text-zinc-400 mt-1 line-clamp-2">${escapeHtml(seg.description || '')}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderNpSegmentsCheckboxes(segments) {
+      const container = document.getElementById('npSegmentsCheckboxes');
+      if (!container) return;
+      if (!segments || segments.length === 0) {
+        container.innerHTML = '<span class="text-xs text-zinc-500">Nenhum segmento cadastrado.</span>';
+        return;
+      }
+      container.innerHTML = segments.map(seg => `
+        <label class="flex items-center gap-1.5 p-1 rounded hover:bg-zinc-800 text-zinc-300 cursor-pointer">
+          <input type="checkbox" name="npSegmentCodes" value="${seg.code}" class="w-3.5 h-3.5 rounded text-amber-500 bg-zinc-800 border-zinc-700">
+          <span class="truncate">${escapeHtml(seg.name)}</span>
+        </label>
+      `).join('');
+    }
+
+    function openCreateSegmentModal() {
+      document.getElementById('segmentModalTitle').innerText = 'Novo Segmento de Mercado';
+      document.getElementById('segModalId').value = '';
+      document.getElementById('segModalCode').value = '';
+      document.getElementById('segModalCode').readOnly = false;
+      document.getElementById('segModalName').value = '';
+      document.getElementById('segModalIcon').value = 'briefcase';
+      document.getElementById('segModalDescription').value = '';
+      document.getElementById('segmentModal').classList.remove('hidden');
+    }
+
+    function openEditSegmentModal(id) {
+      const seg = cachedAdminSegments.find(s => s.id === id);
+      if (!seg) return;
+      document.getElementById('segmentModalTitle').innerText = 'Editar Segmento';
+      document.getElementById('segModalId').value = seg.id;
+      document.getElementById('segModalCode').value = seg.code;
+      document.getElementById('segModalCode').readOnly = true;
+      document.getElementById('segModalName').value = seg.name;
+      document.getElementById('segModalIcon').value = seg.icon || 'folder';
+      document.getElementById('segModalDescription').value = seg.description || '';
+      document.getElementById('segmentModal').classList.remove('hidden');
+    }
+
+    function closeSegmentModal() {
+      document.getElementById('segmentModal').classList.add('hidden');
+    }
+
+    async function handleSaveSegment(e) {
+      e.preventDefault();
+      const id = document.getElementById('segModalId').value;
+      const code = document.getElementById('segModalCode').value.trim();
+      const name = document.getElementById('segModalName').value.trim();
+      const icon = document.getElementById('segModalIcon').value.trim();
+      const description = document.getElementById('segModalDescription').value.trim();
+
+      const isEdit = Boolean(id);
+      const url = isEdit ? `/api/admin/segments/${id}` : '/api/admin/segments';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, name, icon, description })
+        });
+        const json = await res.json();
+        if (json.success) {
+          closeSegmentModal();
+          loadProductsDashboard();
+        } else {
+          alert('Erro ao salvar segmento: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    }
+
+    async function handleDeleteSegment(id, name) {
+      if (!confirm(`Remover segmento "${name}"? Os vínculos deste segmento com produtos serão excluídos.`)) return;
+      try {
+        const res = await fetch(`/api/admin/segments/${id}`, { method: 'DELETE' });
+        const json = await res.json();
+        if (json.success) {
+          loadProductsDashboard();
+        } else {
+          alert('Erro ao excluir segmento: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro: ' + err.message);
+      }
+    }
+
+    function openProductSegmentsModal(productId, productName) {
+      currentEditingProductId = productId;
+      document.getElementById('psModalProductId').value = productId;
+      document.getElementById('psModalProductName').innerText = productName;
+
+      const prod = cachedAdminProducts.find(p => p.id === productId);
+      const activeCodes = (prod && prod.segments) ? prod.segments.map(s => s.code) : [];
+
+      const container = document.getElementById('psModalCheckboxes');
+      container.innerHTML = cachedAdminSegments.map(seg => `
+        <label class="flex items-center gap-2 p-2 rounded-lg bg-zinc-800/80 hover:bg-zinc-800 text-xs text-zinc-300 cursor-pointer">
+          <input type="checkbox" name="productSegmentChoice" value="${seg.code}" ${activeCodes.includes(seg.code) ? 'checked' : ''} class="w-4 h-4 rounded text-cyan-500 bg-zinc-900 border-zinc-700">
+          <span>${escapeHtml(seg.name)}</span>
+        </label>
+      `).join('');
+
+      document.getElementById('productSegmentsModal').classList.remove('hidden');
+    }
+
+    function closeProductSegmentsModal() {
+      document.getElementById('productSegmentsModal').classList.add('hidden');
+      currentEditingProductId = null;
+    }
+
+    async function saveProductSegmentsAssignment() {
+      if (!currentEditingProductId) return;
+      const checked = Array.from(document.querySelectorAll('input[name="productSegmentChoice"]:checked')).map(cb => cb.value);
+
+      try {
+        const res = await fetch(`/api/admin/products/${currentEditingProductId}/segments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ segments: checked })
+        });
+        const json = await res.json();
+        if (json.success) {
+          closeProductSegmentsModal();
+          loadProductsDashboard();
+        } else {
+          alert('Erro ao atualizar segmentos: ' + json.error);
+        }
+      } catch (err) {
+        alert('Erro ao atualizar segmentos: ' + err.message);
+      }
+    }
+
     function renderProductsCatalog(products) {
       const container = document.getElementById('productsCatalogContainer');
       container.innerHTML = '';
@@ -2024,24 +2314,52 @@
           </div>
         `).join('');
 
+        const segmentsBadges = (prod.segments && prod.segments.length > 0)
+          ? prod.segments.map(s => `<span class="px-2 py-0.5 rounded text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">${escapeHtml(s.name)}</span>`).join(' ')
+          : '<span class="text-[10px] text-zinc-500 italic">Nenhum segmento associado</span>';
+
+        const statusBadges = {
+          'AVAILABLE': '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">🟢 Disponível</span>',
+          'IN_PREPARATION': '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">🟡 Em Preparação</span>',
+          'COMING_SOON': '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">🔵 Em Breve</span>',
+          'UNAVAILABLE': '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-zinc-800 text-zinc-500">⚪ Indisponível</span>',
+        };
+
+        const solBadge = prod.solutionType ? `<span class="px-2 py-0.5 rounded text-[10px] bg-violet-500/10 text-violet-400 border border-violet-500/20 font-bold">${prod.solutionType}</span>` : '';
+        const offerBadge = prod.hasApprovedOffer
+          ? '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-300">✓ Oferta Aprovada</span>'
+          : '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400">⚠️ Preço Sob Análise</span>';
+
         item.innerHTML = `
-          <div class="flex items-start justify-between">
+          <div class="flex items-start justify-between flex-wrap gap-2">
             <div>
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-1.5 flex-wrap">
                 <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">${prod.code}</span>
-                <span class="px-2 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400">${prod.category}</span>
-                <span class="text-[10px] font-bold ${prod.is_active ? 'text-emerald-400' : 'text-zinc-500'}">● ${prod.is_active ? 'Ativo' : 'Desativado'}</span>
+                ${statusBadges[prod.commercialStatus] || ''}
+                ${solBadge}
+                ${offerBadge}
               </div>
               <h4 class="text-sm font-extrabold text-white mt-1.5 flex items-center gap-2">
                 <i data-lucide="${prod.icon || 'bot'}" class="w-4 h-4 text-[#00F59B]"></i>
                 <span>${prod.name}</span>
               </h4>
               <p class="text-xs text-zinc-400 mt-0.5">${prod.description || 'Sem descrição.'}</p>
+              
+              <div class="flex items-center gap-1.5 mt-2 flex-wrap">
+                <span class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Segmentos:</span>
+                ${segmentsBadges}
+              </div>
             </div>
-            <button onclick="openAddPlanModal(${prod.id}, '${escapeHtml(prod.name)}')" class="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30 flex items-center gap-1 transition cursor-pointer">
-              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-              <span>Novo Plano</span>
-            </button>
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="openProductSegmentsModal(${prod.id}, '${escapeHtml(prod.name)}')" class="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-xs font-bold border border-cyan-500/30 flex items-center gap-1 transition cursor-pointer">
+                <i data-lucide="tag" class="w-3.5 h-3.5"></i>
+                <span>Segmentos (${(prod.segments || []).length})</span>
+              </button>
+              <button type="button" onclick="openAddPlanModal(${prod.id}, '${escapeHtml(prod.name)}')" class="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30 flex items-center gap-1 transition cursor-pointer">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                <span>Novo Plano</span>
+              </button>
+            </div>
           </div>
 
           <div class="space-y-1.5 pt-2 border-t border-zinc-800/60">
@@ -2051,6 +2369,7 @@
         `;
         container.appendChild(item);
       });
+      lucide.createIcons();
     }
 
     function openAddPlanModal(productId, productName) {
@@ -2070,8 +2389,13 @@
       const code = document.getElementById('npCode').value.trim();
       const name = document.getElementById('npName').value.trim();
       const category = document.getElementById('npCategory').value;
+      const solutionType = document.getElementById('npSolutionType').value;
+      const commercialStatus = document.getElementById('npCommercialStatus').value;
+      const hasApprovedOffer = document.getElementById('npApprovedOffer').checked;
       const icon = document.getElementById('npIcon').value;
       const description = document.getElementById('npDescription').value.trim();
+
+      const checkedSegments = Array.from(document.querySelectorAll('input[name="npSegmentCodes"]:checked')).map(cb => cb.value);
 
       const btn = document.getElementById('btnCreateProduct');
       btn.disabled = true;
@@ -2080,7 +2404,17 @@
         const res = await fetch('/api/admin/products', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, name, category, icon, description }),
+          body: JSON.stringify({
+            code,
+            name,
+            category,
+            solutionType,
+            commercialStatus,
+            hasApprovedOffer,
+            icon,
+            description,
+            segments: checkedSegments
+          }),
         });
         const json = await res.json();
         if (json.success) {

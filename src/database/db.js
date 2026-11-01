@@ -358,13 +358,33 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_asaas_events_event_id ON asaas_webhook_events(event_id);
 
+  -- MULTIPRODUCT ARCHITECTURE: Market Segments (10 official categories)
+  CREATE TABLE IF NOT EXISTS product_segments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    icon TEXT DEFAULT 'layers',
+    display_order INTEGER DEFAULT 0,
+    is_active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_prod_segments_code ON product_segments(code);
+  CREATE INDEX IF NOT EXISTS idx_prod_segments_active ON product_segments(is_active);
+
   -- MULTIPRODUCT ARCHITECTURE: Products Catalog
   CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT UNIQUE NOT NULL,
     name TEXT NOT NULL,
     description TEXT,
+    summary TEXT,
+    target_audience TEXT,
     category TEXT NOT NULL DEFAULT 'GERAL',
+    solution_type TEXT NOT NULL DEFAULT 'AGENDA',
+    commercial_status TEXT NOT NULL DEFAULT 'AVAILABLE',
+    has_approved_offer INTEGER NOT NULL DEFAULT 1,
     is_active INTEGER NOT NULL DEFAULT 1,
     icon TEXT DEFAULT 'bot',
     metadata_json TEXT,
@@ -373,6 +393,16 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_products_code ON products(code);
   CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+
+  -- MULTIPRODUCT ARCHITECTURE: Product to Segment Association (N:N)
+  CREATE TABLE IF NOT EXISTS product_segment_relations (
+    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    segment_id INTEGER NOT NULL REFERENCES product_segments(id) ON DELETE CASCADE,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (product_id, segment_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_prod_seg_prod ON product_segment_relations(product_id);
+  CREATE INDEX IF NOT EXISTS idx_prod_seg_seg ON product_segment_relations(segment_id);
 
   -- MULTIPRODUCT ARCHITECTURE: Plans per Product
   CREATE TABLE IF NOT EXISTS product_plans (
@@ -502,6 +532,12 @@ ensureColumnExists('scheduled_payments', 'user_id', 'INTEGER NOT NULL DEFAULT 1'
 ensureColumnExists('reminder_logs', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumnExists('appointments', 'google_event_id', 'TEXT');
 
+ensureColumnExists('products', 'solution_type', "TEXT DEFAULT 'AGENDA'");
+ensureColumnExists('products', 'commercial_status', "TEXT DEFAULT 'AVAILABLE'");
+ensureColumnExists('products', 'has_approved_offer', "INTEGER DEFAULT 1");
+ensureColumnExists('products', 'summary', "TEXT");
+ensureColumnExists('products', 'target_audience', "TEXT");
+
 try {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -513,6 +549,8 @@ try {
     CREATE INDEX IF NOT EXISTS idx_incomes_user ON incomes(user_id);
     CREATE INDEX IF NOT EXISTS idx_payments_user ON scheduled_payments(user_id);
     CREATE INDEX IF NOT EXISTS idx_appointments_google_id ON appointments(google_event_id);
+    CREATE INDEX IF NOT EXISTS idx_products_solution_type ON products(solution_type);
+    CREATE INDEX IF NOT EXISTS idx_products_comm_status ON products(commercial_status);
   `);
 } catch (e) {}
 
@@ -558,15 +596,52 @@ try {
   console.error('[Database] Erro ao verificar/criar usuário master:', err.message);
 }
 
-// 4. Seed Default Products & Plans for Multiproduct Architecture
+// 4. Seed Default Segments, Products & Plans for Multiproduct Architecture
 try {
+  // 4.1 Seed 10 Official Market Segments (Categories)
+  const officialSegments = [
+    { code: 'saloes_beleza', name: 'Salões & Beleza', description: 'Soluções para salões de beleza, barbearias, estética e spas', icon: 'scissors', display_order: 1 },
+    { code: 'saude_clinicas', name: 'Saúde & Clínicas', description: 'Soluções para consultórios médicos, odontologia, fisioterapia e clínicas', icon: 'stethoscope', display_order: 2 },
+    { code: 'delivery_restaurantes', name: 'Delivery & Restaurantes', description: 'Atendimento, cardápio digital e gestão de pedidos para gastronomia', icon: 'utensils', display_order: 3 },
+    { code: 'advocacia_juridico', name: 'Advocacia & Jurídico', description: 'Triagem de clientes, agendamento de consultas e gestão jurídica', icon: 'scale', display_order: 4 },
+    { code: 'imobiliarias_corretores', name: 'Imobiliárias & Corretores', description: 'Qualificação de leads, agendamento de visitas e portfólio de imóveis', icon: 'building-2', display_order: 5 },
+    { code: 'oficinas_autocenters', name: 'Oficinas & Auto Centers', description: 'Orçamentos, revisões periódicas, agendamentos mecânicos e pós-venda', icon: 'wrench', display_order: 6 },
+    { code: 'academias_pilates', name: 'Academias & Pilates', description: 'Agendamento de aulas, renovação de matrículas e engajamento de alunos', icon: 'dumbbell', display_order: 7 },
+    { code: 'financeiro_mei', name: 'Financeiro & MEI', description: 'Conciliação, cobrança, emissão e lembretes financeiros inteligentes', icon: 'wallet', display_order: 8 },
+    { code: 'locacao_obras', name: 'Locação & Obras', description: 'Gestão de locação de equipamentos, contratos e cronograma de obras', icon: 'hard-hat', display_order: 9 },
+    { code: 'veiculos_seminovos', name: 'Veículos & Seminovos', description: 'Captação de compradores, simulação de propostas e estoque automotivo', icon: 'car', display_order: 10 },
+  ];
+
+  for (const seg of officialSegments) {
+    const existing = db.prepare('SELECT id FROM product_segments WHERE code = ?').get(seg.code);
+    if (!existing) {
+      db.prepare(`
+        INSERT INTO product_segments (code, name, description, icon, display_order)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(seg.code, seg.name, seg.description, seg.icon, seg.display_order);
+    } else {
+      db.prepare(`
+        UPDATE product_segments
+        SET name = ?, description = ?, icon = ?, display_order = ?
+        WHERE code = ?
+      `).run(seg.name, seg.description, seg.icon, seg.display_order, seg.code);
+    }
+  }
+
+  // 4.2 Seed & Update Products
   const seedProducts = [
     {
       code: 'JESSICA',
       name: 'Jéssica - Assistente Virtual para Salões e Barbearias',
       description: 'Agente de IA especializado em agendamentos, catálogo de serviços, confirmações automáticas e atendimento 24/7 via WhatsApp.',
+      summary: 'Secretária virtual de WhatsApp para agendamentos automáticos, gestão de equipe e confirmação de horários.',
+      target_audience: 'Salões de beleza, barbearias, manicures, clínicas de estética e spas',
       category: 'BELEZA',
+      solution_type: 'AGENDA',
+      commercial_status: 'AVAILABLE',
+      has_approved_offer: 1,
       icon: 'scissors',
+      segments: ['saloes_beleza'],
       metadata_json: JSON.stringify({ module: 'salon', whatsappCapable: true }),
       plans: [
         {
@@ -608,8 +683,14 @@ try {
       code: 'JARVIS_FINANCEIRO',
       name: 'Jarvis - Assistente Financeiro Inteligente',
       description: 'Agente de IA para controle de receitas, despesas, contas a pagar, lembretes de vencimento e relatórios via WhatsApp.',
+      summary: 'Assistente de gestão financeira via WhatsApp: receitas, despesas, contas a pagar e conciliação bancária.',
+      target_audience: 'Profissionais autônomos, MEIs, pequenas empresas, salões e consultórios',
       category: 'FINANCEIRO',
+      solution_type: 'CAIXA',
+      commercial_status: 'IN_PREPARATION',
+      has_approved_offer: 0,
       icon: 'wallet',
+      segments: ['financeiro_mei', 'saloes_beleza', 'saude_clinicas'],
       metadata_json: JSON.stringify({ module: 'finance', whatsappCapable: true }),
       plans: [
         {
@@ -640,8 +721,14 @@ try {
       code: 'ASSISTENTE_CLINICA',
       name: 'Dra. Camila - Atendente para Clínicas e Consultórios',
       description: 'Agente de IA especializado em triagem, agendamento de consultas médicas e odontológicas, orientações e retornos.',
+      summary: 'Atendente virtual inteligente para triagem, agendamento de consultas médicas e odontológicas.',
+      target_audience: 'Consultórios médicos, odontologia, clínicas de psicologia, fisioterapia e saúde',
       category: 'SAUDE',
+      solution_type: 'AGENDA',
+      commercial_status: 'IN_PREPARATION',
+      has_approved_offer: 0,
       icon: 'stethoscope',
+      segments: ['saude_clinicas'],
       metadata_json: JSON.stringify({ module: 'clinic', whatsappCapable: true }),
       plans: [
         {
@@ -667,6 +754,24 @@ try {
           features_json: JSON.stringify(['AGENDAMENTO_CONSULTAS', 'CONFIRMACOES_LEMBRETES', 'PRONTUARIO_INTEGRADO', 'MULTI_ESPECIALISTAS', 'TRIAGEM_INTELIGENTE'])
         }
       ]
+    },
+    {
+      code: 'GROWTH_ASSISTANT_VIP',
+      name: 'Growth Assistant VIP',
+      description: 'Ferramentas de Marketing e Growth com inteligência artificial para captação, sorteios, licenciamento e automação multicanal.',
+      summary: 'Suíte de marketing para crescimento acelerado: extensão Chrome, aplicativo Android, sorteador web e licenciamento.',
+      target_audience: 'Empresas de todos os segmentos que buscam captação acelerada de clientes e campanhas virais',
+      category: 'Ferramentas de Marketing',
+      solution_type: 'MARKETING',
+      commercial_status: 'IN_PREPARATION',
+      has_approved_offer: 0,
+      icon: 'zap',
+      segments: ['saloes_beleza', 'delivery_restaurantes', 'imobiliarias_corretores', 'veiculos_seminovos'],
+      metadata_json: JSON.stringify({
+        plannedFeatures: ['Extensão Chrome', 'Aplicativo Android', 'Sorteador Web', 'Licenciamento de IA'],
+        statusNote: 'Em preparação operacional'
+      }),
+      plans: []
     }
   ];
 
@@ -674,14 +779,43 @@ try {
     let pRow = db.prepare('SELECT id FROM products WHERE code = ?').get(prod.code);
     if (!pRow) {
       const res = db.prepare(`
-        INSERT INTO products (code, name, description, category, icon, metadata_json)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(prod.code, prod.name, prod.description, prod.category, prod.icon, prod.metadata_json);
+        INSERT INTO products (code, name, description, summary, target_audience, category, solution_type, commercial_status, has_approved_offer, icon, metadata_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        prod.code, prod.name, prod.description, prod.summary, prod.target_audience,
+        prod.category, prod.solution_type, prod.commercial_status, prod.has_approved_offer,
+        prod.icon, prod.metadata_json
+      );
       pRow = { id: Number(res.lastInsertRowid) };
       console.log(`[Database Seed] Produto criado: ${prod.code} (${prod.name})`);
+    } else {
+      db.prepare(`
+        UPDATE products
+        SET name = ?, description = ?, summary = ?, target_audience = ?,
+            category = ?, solution_type = ?, commercial_status = ?, has_approved_offer = ?,
+            icon = ?, metadata_json = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(
+        prod.name, prod.description, prod.summary, prod.target_audience,
+        prod.category, prod.solution_type, prod.commercial_status, prod.has_approved_offer,
+        prod.icon, prod.metadata_json, pRow.id
+      );
     }
 
-    if (pRow?.id && prod.plans) {
+    // Associate product with segments
+    if (pRow?.id && Array.isArray(prod.segments)) {
+      for (const segCode of prod.segments) {
+        const segRow = db.prepare('SELECT id FROM product_segments WHERE code = ?').get(segCode);
+        if (segRow) {
+          db.prepare(`
+            INSERT OR IGNORE INTO product_segment_relations (product_id, segment_id)
+            VALUES (?, ?)
+          `).run(pRow.id, segRow.id);
+        }
+      }
+    }
+
+    if (pRow?.id && prod.plans && prod.plans.length > 0) {
       for (const pl of prod.plans) {
         const existingPlan = db.prepare('SELECT id FROM product_plans WHERE product_id = ? AND code = ?').get(pRow.id, pl.code);
         if (!existingPlan) {
