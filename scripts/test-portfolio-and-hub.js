@@ -10,6 +10,7 @@ const db = require('../src/database/db');
 const productService = require('../src/services/productService');
 const clientAuth = require('../src/services/clientAuthService');
 
+process.env.NODE_ENV = 'test';
 process.env.APP_MODE = 'staging';
 process.env.HOMOLOGACAO = 'true';
 process.env.DISABLE_WHATSAPP = 'true';
@@ -245,6 +246,7 @@ async function runTests() {
         planCode: 'START',
         priceCents: 5900,
         origin: 'ASAAS',
+        gatewaySubscriptionId: 'sub_test_portfolio_cancel_1',
         status: 'ACTIVE',
         paidUntil: futureDate,
       });
@@ -254,13 +256,14 @@ async function runTests() {
         productCode: 'JARVIS_FINANCEIRO',
         priceCents: 9900,
         origin: 'ASAAS',
+        gatewaySubscriptionId: 'sub_test_portfolio_jarvis_2',
         status: 'ACTIVE',
         paidUntil: futureDate,
         adminId: 1,
       });
 
       // Cancela sub1 (Jéssica)
-      const cancelled = await productService.cancelSubscription(sub1.id, { reason: 'Cancelado pelo cliente' });
+      const cancelled = await productService.cancelSubscription(sub1.id, { reason: 'Cancelado pelo cliente', isTestRun: true });
       assert.strictEqual(cancelled.status, 'CANCELLED');
       assert.ok(cancelled.paidUntil, 'Sem fidelidade: preserva vigência até o fim do período pago');
 
@@ -269,6 +272,10 @@ async function runTests() {
 
       // Jarvis não sofre impacto
       assert.strictEqual(productService.hasProductAccess(userId, 'JARVIS_FINANCEIRO').hasAccess, true, 'Jarvis não deve ser afetado');
+
+      // Status global do usuário permanece ACTIVE devido a Jarvis ativo
+      const userAfterCancel = db.prepare('SELECT subscription_status FROM users WHERE id = ?').get(userId);
+      assert.strictEqual(userAfterCancel.subscription_status, 'ACTIVE', 'Status global deve refletir produtos ainda vigentes');
     });
 
     // 7. Pagamento Vencido / Inadimplente Bloqueia Acesso

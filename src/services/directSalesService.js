@@ -151,12 +151,12 @@ async function createDirectContract(input, adminId) {
 
       db.prepare(`
         INSERT INTO customer_subscriptions (
-          user_id, product_id, plan_id, origin, gateway, gateway_subscription_id,
+          user_id, contract_id, product_id, plan_id, origin, gateway, gateway_subscription_id,
           gateway_customer_id, gateway_payment_id, status, price_cents, setup_fee_cents,
           billing_cycle, promotional_fair, extra_professionals, contracted_at
-        ) VALUES (?, ?, ?, 'ASAAS', 'ASAAS', ?, ?, ?, 'PENDING', ?, ?, 'MONTHLY', ?, ?, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, 'ASAAS', 'ASAAS', ?, ?, ?, 'PENDING', ?, ?, 'MONTHLY', ?, ?, CURRENT_TIMESTAMP)
       `).run(
-        userId, jessica?.id || 1, plan?.id || null,
+        userId, contractId, jessica?.id || 1, plan?.id || null,
         asaasSub?.id || null, asaasCustomer?.id || null, firstPayment?.id || null,
         quoted.monthlyCents, quoted.setupCents, quoted.promotion === 'FAIR_2026' ? 1 : 0,
         quoted.extraProfessionals || 0

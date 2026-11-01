@@ -795,6 +795,7 @@ function createCustomerSubscription({
   billingCycle = 'MONTHLY',
   promotionalFair = false,
   extraProfessionals = 0,
+  contractId = null,
   gatewaySubscriptionId = null,
   gatewayCustomerId = null,
   gatewayPaymentId = null,
@@ -855,13 +856,13 @@ function createCustomerSubscription({
 
   const result = db.prepare(`
     INSERT INTO customer_subscriptions (
-      user_id, product_id, plan_id, origin, gateway, gateway_subscription_id,
+      user_id, contract_id, product_id, plan_id, origin, gateway, gateway_subscription_id,
       gateway_customer_id, gateway_payment_id, status, price_cents, setup_fee_cents,
       billing_cycle, promotional_fair, extra_professionals, contracted_at, paid_until,
       access_expires_at, custom_settings_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
   `).run(
-    userId, product.id, plan?.id || null, origin, gateway,
+    userId, contractId || null, product.id, plan?.id || null, origin, gateway,
     gatewaySubscriptionId || null, gatewayCustomerId || null, gatewayPaymentId || null,
     status, finalPriceCents, finalSetupFeeCents, finalCycle, isFair ? 1 : 0,
     Number(extraProfessionals || 0), effectivePaidUntil, effectivePaidUntil,
@@ -953,6 +954,12 @@ async function cancelSubscription(subscriptionId, options = {}) {
   let adminId = 0;
   let userId = null;
   let ip = null;
+  let adminSuspendOnly = false;
+  let isTestRun = false;
+  let skipGateway = false;
+  let isWebhookSync = false;
+  let mockGatewayFailure = null;
+  let mockGatewayResponse = null;
 
   if (typeof options === 'string') {
     reason = options;
@@ -961,6 +968,12 @@ async function cancelSubscription(subscriptionId, options = {}) {
     adminId = options.adminId || 0;
     userId = options.userId || null;
     ip = options.ip || null;
+    adminSuspendOnly = Boolean(options.adminSuspendOnly);
+    isTestRun = Boolean(options.isTestRun);
+    skipGateway = Boolean(options.skipGateway);
+    isWebhookSync = Boolean(options.isWebhookSync || options.fromWebhook || (reason && /^(webhook|cancelamento via webhook|sync webhook)/i.test(reason.trim())));
+    mockGatewayFailure = options.mockGatewayFailure || null;
+    mockGatewayResponse = options.mockGatewayResponse || null;
   }
 
   const current = db.prepare('SELECT * FROM customer_subscriptions WHERE id = ?').get(subscriptionId);
@@ -986,49 +999,163 @@ async function cancelSubscription(subscriptionId, options = {}) {
   }
 
   const origin = (current.origin || current.gateway || 'MANUAL').toUpperCase();
+  const gateway = (current.gateway || current.origin || 'MANUAL').toUpperCase();
   const oldStatus = current.status;
   const now = new Date().toISOString();
 
-  // 1. GATEWAY: ASAAS
-  if (origin === 'ASAAS' && !options.skipGateway) {
+  const isAsaas = gateway === 'ASAAS' || origin === 'ASAAS';
+  const isHotmart = gateway === 'HOTMART' || origin === 'HOTMART';
+
+  // 1. ADMINISTRATIVE ACCESS SUSPENSION (Independent of gateway cancellation)
+  if (adminSuspendOnly) {
+    db.prepare(`
+      UPDATE customer_subscriptions
+      SET status = 'SUSPENDED', updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(subscriptionId);
+
+    logSubscriptionAudit({
+      subscriptionId,
+      userId: current.user_id,
+      productId: current.product_id,
+      oldStatus,
+      newStatus: 'SUSPENDED',
+      action: 'ADMIN_ACCESS_SUSPENDED',
+      reason: reason || 'Suspensão administrativa de acesso',
+      details: {
+        adminId,
+        origin,
+        gateway,
+        externalBillingCanceled: false,
+        note: `Acesso suspenso localmente. A cobrança externa (${gateway}) NÃO foi cancelada automaticamente e permanece ativa.`,
+      },
+    });
+
+    return {
+      ...getUserSubscriptionById(subscriptionId),
+      status: 'SUSPENDED',
+      externalBillingCanceled: false,
+      message: `Acesso ao produto suspenso administrativamente com sucesso. Atenção: a cobrança externa recorrente (${gateway}) NÃO foi cancelada automaticamente.`,
+    };
+  }
+
+  // 2. GATEWAY: ASAAS (MANDATORY API CONFIRMATION & STRICT ISOLATION)
+  if (isAsaas && !skipGateway) {
     const asaasSubId = current.gateway_subscription_id ||
-      db.prepare('SELECT asaas_subscription_id FROM users WHERE id = ?').get(current.user_id)?.asaas_subscription_id;
+      (current.contract_id ? db.prepare('SELECT asaas_subscription_id FROM direct_sales_contracts WHERE id = ?').get(current.contract_id)?.asaas_subscription_id : null) ||
+      db.prepare('SELECT asaas_subscription_id FROM direct_sales_contracts WHERE user_id = ? AND asaas_subscription_id IS NOT NULL').get(current.user_id)?.asaas_subscription_id ||
+      db.prepare('SELECT asaas_subscription_id FROM users WHERE id = ? AND asaas_subscription_id IS NOT NULL').get(current.user_id)?.asaas_subscription_id;
 
-    // Synthetic test IDs (e.g. sub_jessica_test_1) bypass real HTTP call to avoid hitting remote sandbox during local unit runs
-    const isSyntheticTestId = asaasSubId && (asaasSubId.includes('test_') || asaasSubId.includes('dummy_'));
+    // A) Missing Asaas Subscription ID: Block cancellation and audit
+    if (!asaasSubId) {
+      logSubscriptionAudit({
+        subscriptionId,
+        userId: current.user_id,
+        productId: current.product_id,
+        oldStatus,
+        newStatus: oldStatus,
+        action: 'GATEWAY_CANCEL_FAILED',
+        reason: 'Assinatura Asaas não possui identificador externo (gateway_subscription_id) para confirmação de cancelamento na API.',
+        details: { adminId, userId, origin, gateway },
+      });
+      const err = new Error('Assinatura Asaas não possui identificador externo (gateway_subscription_id) para confirmação de cancelamento na API.');
+      err.statusCode = 400;
+      err.gateway = 'ASAAS';
+      throw err;
+    }
 
-    if (asaasSubId && asaasService.isConfigured() && !isSyntheticTestId) {
-      try {
-        const asaasRes = await asaasService.cancelSubscription(asaasSubId);
-        // Ensure gateway deletion confirmed
-        if (asaasRes && asaasRes.deleted === false) {
-          throw new Error('O gateway Asaas não confirmou o cancelamento da assinatura.');
-        }
-      } catch (gatewayErr) {
-        logSubscriptionAudit({
-          subscriptionId,
-          userId: current.user_id,
-          productId: current.product_id,
-          oldStatus,
-          newStatus: oldStatus,
-          action: 'GATEWAY_CANCEL_FAILED',
-          reason: `Falha na comunicação com gateway Asaas: ${gatewayErr.message}`,
-          details: { asaasSubId, error: gatewayErr.message, adminId, userId },
-        });
+    // B) Gateway Unconfigured: Block cancellation and audit
+    if (!asaasService.isConfigured()) {
+      logSubscriptionAudit({
+        subscriptionId,
+        userId: current.user_id,
+        productId: current.product_id,
+        oldStatus,
+        newStatus: oldStatus,
+        action: 'GATEWAY_CANCEL_FAILED',
+        reason: 'Gateway Asaas não configurado no ambiente para confirmação do cancelamento.',
+        details: { asaasSubId, adminId, userId },
+      });
+      const err = new Error('Gateway Asaas não está configurado no ambiente para confirmar o cancelamento da assinatura.');
+      err.statusCode = 502;
+      err.gateway = 'ASAAS';
+      throw err;
+    }
 
-        const error = new Error(`Falha ao cancelar cobrança recorrente no Asaas: ${gatewayErr.message}`);
-        error.statusCode = 502;
-        error.gateway = 'ASAAS';
-        throw error;
+    // C) Synthetic Test IDs: Strictly permitted only in isolated tests
+    const isSynthetic = asaasSubId && (asaasSubId.includes('test_') || asaasSubId.includes('dummy_') || asaasSubId.startsWith('sub_synth_'));
+    const isIsolatedTest = (process.env.NODE_ENV === 'test') || isTestRun;
+
+    if (isSynthetic && !isIsolatedTest) {
+      logSubscriptionAudit({
+        subscriptionId,
+        userId: current.user_id,
+        productId: current.product_id,
+        oldStatus,
+        newStatus: oldStatus,
+        action: 'GATEWAY_CANCEL_FAILED',
+        reason: 'Identificadores sintéticos de teste não são permitidos em ambiente operacional.',
+        details: { asaasSubId, adminId, userId },
+      });
+      const err = new Error('Identificadores de teste não são permitidos em ambiente operacional.');
+      err.statusCode = 400;
+      err.gateway = 'ASAAS';
+      throw err;
+    }
+
+    // D) Gateway API Execution & Verification
+    let asaasRes = null;
+    try {
+      if (mockGatewayFailure) {
+        throw new Error(typeof mockGatewayFailure === 'string' ? mockGatewayFailure : 'Erro simulado na API Asaas');
       }
+
+      if (isSynthetic && isIsolatedTest) {
+        asaasRes = mockGatewayResponse || { deleted: true, id: asaasSubId };
+      } else {
+        asaasRes = await asaasService.cancelSubscription(asaasSubId);
+      }
+    } catch (gatewayErr) {
+      logSubscriptionAudit({
+        subscriptionId,
+        userId: current.user_id,
+        productId: current.product_id,
+        oldStatus,
+        newStatus: oldStatus,
+        action: 'GATEWAY_CANCEL_FAILED',
+        reason: `Falha na comunicação com gateway Asaas: ${gatewayErr.message}`,
+        details: { asaasSubId, error: gatewayErr.message, adminId, userId },
+      });
+
+      const error = new Error(`Falha ao cancelar cobrança recorrente no Asaas: ${gatewayErr.message}`);
+      error.statusCode = 502;
+      error.gateway = 'ASAAS';
+      throw error;
+    }
+
+    // E) Gateway confirmation proof: must be deleted: true
+    if (!asaasRes || asaasRes.deleted !== true) {
+      logSubscriptionAudit({
+        subscriptionId,
+        userId: current.user_id,
+        productId: current.product_id,
+        oldStatus,
+        newStatus: oldStatus,
+        action: 'GATEWAY_CANCEL_FAILED',
+        reason: 'O gateway Asaas não confirmou o cancelamento da assinatura (deleted != true)',
+        details: { asaasSubId, asaasRes, adminId, userId },
+      });
+
+      const error = new Error('O gateway Asaas não confirmou o cancelamento da assinatura.');
+      error.statusCode = 502;
+      error.gateway = 'ASAAS';
+      throw error;
     }
   }
 
-  // 2. GATEWAY: HOTMART
-  if (origin === 'HOTMART') {
-    // If cancellation is requested directly by client on Hotmart product,
-    // instruct client with the official Hotmart self-service portal
-    // unless admin is manually forcing or webhook is syncing
+  // 3. GATEWAY: HOTMART (DISTINCT HANDLING FOR ACCESS SUSPENSION VS FINANCIAL CANCELLATION)
+  if (isHotmart) {
+    // A) Client requested: Orient about recurring billing and direct to official Hotmart portal
     if (!adminId && userId) {
       logSubscriptionAudit({
         subscriptionId,
@@ -1043,7 +1170,7 @@ async function cancelSubscription(subscriptionId, options = {}) {
 
       const err = new Error(
         'Assinaturas contratadas via Hotmart devem ser gerenciadas diretamente pelo portal do comprador Hotmart (https://consumer.hotmart.com/). ' +
-        'O cancelamento no portal Hotmart interrompe cobranças futuras no seu cartão e sincroniza automaticamente o acesso até o fim do período pago.'
+        'O cancelamento no portal Hotmart interrompe cobranças futuras no seu cartão e sincroniza automaticamente o encerramento do acesso.'
       );
       err.statusCode = 400;
       err.gateway = 'HOTMART';
@@ -1051,30 +1178,91 @@ async function cancelSubscription(subscriptionId, options = {}) {
       err.instructionsUrl = 'https://consumer.hotmart.com/';
       throw err;
     }
+
+    // B) Financial cancellation: Only allowed when confirmed via official webhook or authorized sync
+    if (!skipGateway && !isWebhookSync) {
+      logSubscriptionAudit({
+        subscriptionId,
+        userId: current.user_id,
+        productId: current.product_id,
+        oldStatus,
+        newStatus: oldStatus,
+        action: 'HOTMART_CANCEL_BLOCKED_UNCONFIRMED',
+        reason: 'Tentativa de cancelamento financeiro sem confirmação oficial de webhook Hotmart',
+        details: { adminId, userId },
+      });
+
+      const err = new Error(
+        'O cancelamento financeiro de assinaturas Hotmart só pode ser registrado após confirmação oficial da plataforma via webhook. Para suspender apenas o acesso do cliente neste ambiente, utilize a opção de suspensão administrativa.'
+      );
+      err.statusCode = 400;
+      err.gateway = 'HOTMART';
+      throw err;
+    }
   }
 
-  // 3. Mark CANCELLED in database only when gateway confirmed or manual/admin action
+  // 4. Mark CANCELLED strictly for this subscription
   db.prepare(`
     UPDATE customer_subscriptions
     SET status = 'CANCELLED', cancelled_at = ?, cancellation_reason = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(now, reason || 'Cancelamento solicitado (sem fidelidade)', subscriptionId);
 
-  // Sync users table if this is a primary subscription
+  // 5. CONTRACT ISOLATION: Update ONLY the matching contract in direct_sales_contracts
   try {
-    db.prepare(`
-      UPDATE users
-      SET subscription_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND subscription_status = 'ACTIVE'
-    `).run(current.user_id);
+    let targetContract = null;
+    if (current.contract_id) {
+      targetContract = db.prepare('SELECT id, payment_status FROM direct_sales_contracts WHERE id = ?').get(current.contract_id);
+    }
+    if (!targetContract && current.gateway_subscription_id) {
+      targetContract = db.prepare('SELECT id, payment_status FROM direct_sales_contracts WHERE asaas_subscription_id = ?').get(current.gateway_subscription_id);
+    }
 
-    db.prepare(`
-      UPDATE direct_sales_contracts
-      SET payment_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP
-      WHERE user_id = ? AND payment_status = 'CONFIRMED'
-    `).run(current.user_id);
+    if (targetContract && targetContract.payment_status !== 'CANCELED') {
+      db.prepare(`
+        UPDATE direct_sales_contracts
+        SET payment_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(targetContract.id);
+
+      try {
+        db.prepare(`
+          INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
+          VALUES (?, ?, 'CANCELED_NO_LOYALTY', ?)
+        `).run(targetContract.id, adminId || 0, `Cancelamento da assinatura #${subscriptionId}. Sem fidelidade.`);
+      } catch (evErr) {}
+    }
+  } catch (contractErr) {
+    console.warn('[Cancel Subscription] Aviso na sincronização de direct_sales_contracts:', contractErr.message);
+  }
+
+  // 6. GLOBAL USER STATUS: Keep ACTIVE if user has other active products
+  try {
+    const activeSubs = db.prepare(`
+      SELECT id, status, paid_until
+      FROM customer_subscriptions
+      WHERE user_id = ? AND id != ?
+    `).all(current.user_id, subscriptionId);
+
+    const hasOtherActiveProducts = activeSubs.some(s => {
+      if (s.status === 'ACTIVE') return true;
+      if ((s.status === 'CANCELLED' || s.status === 'OVERDUE') && s.paid_until) {
+        return new Date(s.paid_until) >= new Date();
+      }
+      return false;
+    });
+
+    if (!hasOtherActiveProducts) {
+      db.prepare(`
+        UPDATE users
+        SET subscription_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND subscription_status = 'ACTIVE'
+      `).run(current.user_id);
+    } else {
+      console.log(`[Cancel Subscription] Usuário #${current.user_id} possui outros produtos vigentes. Status global mantido como ACTIVE.`);
+    }
   } catch (syncErr) {
-    console.warn('[Cancel Subscription] Aviso na sincronização de status secundário:', syncErr.message);
+    console.warn('[Cancel Subscription] Aviso na sincronização de status global do usuário:', syncErr.message);
   }
 
   logSubscriptionAudit({
@@ -1083,15 +1271,19 @@ async function cancelSubscription(subscriptionId, options = {}) {
     productId: current.product_id,
     oldStatus,
     newStatus: 'CANCELLED',
-    action: 'CANCELLED',
+    action: (skipGateway || isWebhookSync) ? 'CANCELLED_GATEWAY_SYNC' : 'CANCELLED',
     reason: reason || 'Cancelamento solicitado (sem fidelidade)',
-    details: { adminId, userId, accessRetainedUntil: current.paid_until, origin },
+    details: { adminId, userId, accessRetainedUntil: current.paid_until, origin, gateway },
   });
 
   return {
     ...getUserSubscriptionById(subscriptionId),
     message: 'Assinatura cancelada com sucesso. O acesso ao produto continuará liberado até o final do período pago.',
   };
+}
+
+function suspendSubscriptionAccess(subscriptionId, { adminId = 0, reason = null } = {}) {
+  return cancelSubscription(subscriptionId, { adminId, reason, adminSuspendOnly: true });
 }
 
 function getUserSubscriptionById(id) {
@@ -1256,6 +1448,7 @@ function formatSubscriptionRow(row) {
   return {
     id: row.id,
     userId: row.user_id,
+    contractId: row.contract_id || null,
     productId: row.product_id,
     productCode: row.product_code,
     productName: row.product_name,
@@ -1315,6 +1508,7 @@ module.exports = {
   updateSubscriptionStatus,
   renewSubscription,
   cancelSubscription,
+  suspendSubscriptionAccess,
   getUserSubscriptionById,
   getMultiproductMetrics,
   listAllSubscriptions,

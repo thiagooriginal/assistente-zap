@@ -430,6 +430,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS customer_subscriptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id),
+    contract_id INTEGER,
     product_id INTEGER NOT NULL REFERENCES products(id),
     plan_id INTEGER REFERENCES product_plans(id),
     origin TEXT NOT NULL DEFAULT 'ASAAS',
@@ -588,6 +589,7 @@ ensureColumnExists('direct_sales_contracts', 'asaas_subscription_id', 'TEXT');
 ensureColumnExists('direct_sales_contracts', 'asaas_payment_id', 'TEXT');
 ensureColumnExists('direct_sales_contracts', 'asaas_invoice_url', 'TEXT');
 ensureColumnExists('direct_sales_contracts', 'pix_payload', 'TEXT');
+ensureColumnExists('customer_subscriptions', 'contract_id', 'INTEGER');
 
 ensureColumnExists('asaas_payments', 'subscription_id', 'TEXT');
 ensureColumnExists('asaas_payments', 'user_id', 'INTEGER');
@@ -862,7 +864,7 @@ try {
       SELECT u.id, u.plan_tier, u.subscription_status, u.paid_until, u.subscription_origin,
              u.extra_professionals, u.asaas_subscription_id, u.asaas_customer_id, u.asaas_payment_id,
              u.hotmart_subscriber_code, u.hotmart_transaction,
-             c.promotion, c.monthly_cents, c.setup_cents, c.payment_status
+             c.id AS contract_id, c.promotion, c.monthly_cents, c.setup_cents, c.payment_status
       FROM users u
       LEFT JOIN direct_sales_contracts c ON c.user_id = u.id
       WHERE u.role != 'ADMIN' AND (
@@ -898,13 +900,13 @@ try {
 
         db.prepare(`
           INSERT INTO customer_subscriptions (
-            user_id, product_id, plan_id, origin, gateway, gateway_subscription_id,
+            user_id, contract_id, product_id, plan_id, origin, gateway, gateway_subscription_id,
             gateway_customer_id, gateway_payment_id, status, price_cents, setup_fee_cents,
             billing_cycle, promotional_fair, extra_professionals, contracted_at, paid_until,
             access_expires_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'MONTHLY', ?, ?, CURRENT_TIMESTAMP, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'MONTHLY', ?, ?, CURRENT_TIMESTAMP, ?, ?)
         `).run(
-          u.id, jessica.id, plan?.id || null, origin, gateway,
+          u.id, u.contract_id || null, jessica.id, plan?.id || null, origin, gateway,
           subId, u.asaas_customer_id || null, u.asaas_payment_id || null,
           subStatus, priceCents, setupCents, isFair ? 1 : 0,
           u.extra_professionals || 0, u.paid_until || null, u.paid_until || null
