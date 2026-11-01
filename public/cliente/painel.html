@@ -1321,10 +1321,16 @@
           priceDisplay = `<span class="text-slate-400 italic">Preço sob consulta</span>`;
         }
 
+        const solutionTypeLabels = {
+          AGENDA: 'Agenda & Atendimento',
+          CAIXA: 'Caixa & Financeiro',
+          MARKETING: 'Marketing & Growth',
+        };
+
         const safeCode = escapeHtml(p.code);
         const safeName = escapeHtml(p.name);
         const safeSummary = escapeHtml(p.summary || p.description || '');
-        const safeType = escapeHtml(p.solutionType || 'SOLUÇÃO');
+        const safeType = escapeHtml(solutionTypeLabels[p.solutionType] || p.solutionType || 'SOLUÇÃO');
         const safeIcon = escapeHtml(p.icon || 'bot');
 
         card.innerHTML = `
@@ -1395,9 +1401,15 @@
         const p = data.product;
         const modal = document.getElementById('productDetailsModal');
 
+        const solutionTypeLabels = {
+          AGENDA: 'Agenda & Atendimento',
+          CAIXA: 'Caixa & Financeiro',
+          MARKETING: 'Marketing & Growth',
+        };
+
         document.getElementById('modalProductName').innerText = p.name || '';
         document.getElementById('modalProductSummary').innerText = p.summary || p.description || '';
-        document.getElementById('modalProductType').innerText = p.solutionType || 'SOLUÇÃO';
+        document.getElementById('modalProductType').innerText = solutionTypeLabels[p.solutionType] || p.solutionType || 'SOLUÇÃO';
         document.getElementById('modalProductSegments').innerText = (p.segments || []).map(s => s.name).join(', ') || 'Multisegmento';
         document.getElementById('modalProductAudience').innerText = p.targetAudience || 'Profissionais e empresas do setor';
 

@@ -558,6 +558,16 @@ runVersionedMigration('20261101_01_archive_unapproved_plans', 'Archive unapprove
   `).run();
 });
 
+// Versioned migration: Fix solution_type for Jarvis to CAIXA if set to AGENDA
+runVersionedMigration('20261101_02_fix_jarvis_solution_type', 'Fix solution_type for Jarvis to CAIXA if incorrectly set to AGENDA', () => {
+  db.prepare(`
+    UPDATE products
+    SET solution_type = 'CAIXA',
+        updated_at = CURRENT_TIMESTAMP
+    WHERE code = 'JARVIS_FINANCEIRO' AND solution_type != 'CAIXA'
+  `).run();
+});
+
 // User columns for Client Authentication & Hotmart Subscriptions
 ensureColumnExists('users', 'email', 'TEXT');
 ensureColumnExists('users', 'password_hash', 'TEXT');
