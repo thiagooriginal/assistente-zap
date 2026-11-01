@@ -280,7 +280,7 @@ async function runTests() {
     // Cancel Jéssica, with paid_until 20 days in the future
     const futurePaidUntil = new Date(Date.now() + 20 * 86400000).toISOString();
     db.prepare("UPDATE customer_subscriptions SET paid_until = ? WHERE id = ?").run(futurePaidUntil, jessicaSub.id);
-    productService.cancelSubscription(jessicaSub.id, { reason: 'Cliente solicitou encerramento sem fidelidade' });
+    await productService.cancelSubscription(jessicaSub.id, { reason: 'Cliente solicitou encerramento sem fidelidade' });
 
     // Status is CANCELLED, but because paid_until is in future, access remains valid
     const jessicaAccessCancelledWithGrace = productService.hasProductAccess(clientId, 'JESSICA');

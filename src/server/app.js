@@ -80,7 +80,34 @@ app.use((req, res, next) => {
 app.use(cors());
 app.use(express.json());
 
-// Staging HTTP Basic Auth Gate (Protection against unauthorized indexing & public probing)
+// Helper to extract cookies from request header
+function getCookie(req, name) {
+  const cookieHeader = req.headers.cookie;
+  if (!cookieHeader) return null;
+  const match = cookieHeader.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+// Cookie session helpers with HttpOnly, SameSite and dynamic Secure
+function setSessionCookie(res, name, value, req, maxAgeSeconds = 7 * 24 * 3600) {
+  const isHttps = req.secure || (req.headers['x-forwarded-proto'] || '').toLowerCase() === 'https';
+  let cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Lax`;
+  if (isHttps) {
+    cookie += '; Secure';
+  }
+  res.setHeader('Set-Cookie', cookie);
+}
+
+function clearSessionCookie(res, name, req) {
+  const isHttps = req.secure || (req.headers['x-forwarded-proto'] || '').toLowerCase() === 'https';
+  let cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; HttpOnly; SameSite=Lax`;
+  if (isHttps) {
+    cookie += '; Secure';
+  }
+  res.setHeader('Set-Cookie', cookie);
+}
+
+// Staging Gate Middleware: Protects staging environment without conflicting with Authorization: Bearer
 function stagingProtectionMiddleware(req, res, next) {
   const isStagingProtected = process.env.STAGING_PROTECTION_ENABLED === 'true' ||
                              process.env.STAGING_AUTH_ENABLED === 'true' ||
@@ -102,16 +129,67 @@ function stagingProtectionMiddleware(req, res, next) {
     return next();
   }
 
-  const expectedUser = process.env.STAGING_USER || 'raia-staging';
-  const expectedPassword = process.env.STAGING_PASSWORD || 'raia2026staging!';
+  const expectedUser = (process.env.STAGING_USER || 'raia-staging').trim();
+  const expectedPassword = (process.env.STAGING_PASSWORD || '').trim();
+
+  // Strict check: NEVER allow hardcoded default fallback passwords
+  if (!expectedPassword) {
+    console.error('[Staging Gate] ERRO: STAGING_PASSWORD não está configurada no ambiente.');
+    return res.status(500).send('Erro de configuração: Proteção de homologação ativada, mas STAGING_PASSWORD não está configurada no servidor.');
+  }
+
+  const stagingGateSecret = crypto.createHmac('sha256', expectedPassword).update(expectedUser).digest('hex');
+
+  // 1. Session Cookie Check (Prevents repeated browser prompts and avoids Authorization: Bearer conflict)
+  const gateCookie = getCookie(req, 'raia_staging_gate');
+  if (gateCookie === stagingGateSecret) {
+    return next();
+  }
+
+  // 2. Custom header check (for automation or scripts)
+  const stagingKey = req.headers['x-staging-key'] || req.headers['x-staging-token'];
+  if (stagingKey && stagingKey.trim() === expectedPassword) {
+    return next();
+  }
 
   const authHeader = req.headers.authorization;
+
+  // 3. HTTP Basic Auth Check
   if (authHeader && authHeader.startsWith('Basic ')) {
-    const credentials = Buffer.from(authHeader.slice(6), 'base64').toString('utf8');
-    const [user, pass] = credentials.split(':');
-    if (user === expectedUser && pass === expectedPassword) {
-      return next();
+    try {
+      const credentials = Buffer.from(authHeader.slice(6), 'base64').toString('utf8');
+      const [user, pass] = credentials.split(':');
+      if (user === expectedUser && pass === expectedPassword) {
+        // Set secure cookie so subsequent page navigations and API fetch calls do not re-prompt
+        setSessionCookie(res, 'raia_staging_gate', stagingGateSecret, req, 7 * 24 * 3600);
+        return next();
+      }
+    } catch (e) {
+      // Invalid base64, continue to rejection
     }
+  }
+
+  // 4. Authorization: Bearer Token Check (Resolve conflict between Basic and Bearer auth)
+  // If an API client or authenticated portal session sends a valid user token, allow through gate
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const bearerToken = authHeader.slice(7).trim();
+    try {
+      const isClientToken = clientAuth.verifyToken(bearerToken);
+      const isAdminToken = isClientToken ? null : db.prepare("SELECT id FROM users WHERE magic_token = ? AND role = 'ADMIN'").get(bearerToken);
+      if (isClientToken || isAdminToken) {
+        return next(); // Authenticated system user is granted passage through staging gate
+      }
+    } catch (tokenErr) {
+      // Invalid token, fall through to staging rejection
+    }
+  }
+
+  // 5. Response handling: JSON for API requests (avoids browser dialog hijacking), Basic Auth for HTML
+  if (req.path.startsWith('/api/')) {
+    return res.status(401).json({
+      success: false,
+      error: 'Acesso restrito ao ambiente de homologação RAIA AGENTES. Autenticação de staging necessária.'
+    });
   }
 
   res.setHeader('WWW-Authenticate', 'Basic realm="RAIA AGENTES Homologacao"');
@@ -204,33 +282,6 @@ app.get(['/admin', '/admin.html', '/dashboard', '/painel'], (req, res) => {
 app.get(['/', '/index.html', '/vitrine'], (req, res) => {
   res.sendFile(path.resolve(__dirname, '../../public/index.html'));
 });
-
-// Helper to extract cookies from request header
-function getCookie(req, name) {
-  const cookieHeader = req.headers.cookie;
-  if (!cookieHeader) return null;
-  const match = cookieHeader.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]*)'));
-  return match ? decodeURIComponent(match[1]) : null;
-}
-
-// Cookie session helpers with HttpOnly, SameSite and dynamic Secure
-function setSessionCookie(res, name, value, req, maxAgeSeconds = 7 * 24 * 3600) {
-  const isHttps = req.secure || (req.headers['x-forwarded-proto'] || '').toLowerCase() === 'https';
-  let cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Lax`;
-  if (isHttps) {
-    cookie += '; Secure';
-  }
-  res.setHeader('Set-Cookie', cookie);
-}
-
-function clearSessionCookie(res, name, req) {
-  const isHttps = req.secure || (req.headers['x-forwarded-proto'] || '').toLowerCase() === 'https';
-  let cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; HttpOnly; SameSite=Lax`;
-  if (isHttps) {
-    cookie += '; Secure';
-  }
-  res.setHeader('Set-Cookie', cookie);
-}
 
 // Multi-Tenant Authentication Middleware
 function authMiddleware(req, res, next) {
@@ -827,15 +878,15 @@ app.post('/api/admin/multiproduct/subscriptions', requireAdmin, (req, res) => {
 });
 
 // 9. Cancel Specific Product Subscription
-app.post('/api/admin/multiproduct/subscriptions/:id/cancel', requireAdmin, (req, res) => {
+app.post('/api/admin/multiproduct/subscriptions/:id/cancel', requireAdmin, async (req, res) => {
   try {
-    const sub = productService.cancelSubscription(Number(req.params.id), {
+    const sub = await productService.cancelSubscription(Number(req.params.id), {
       reason: req.body?.reason,
       adminId: req.user.id,
     });
     return res.json({ success: true, subscription: sub });
   } catch (err) {
-    return res.status(400).json({ success: false, error: err.message });
+    return res.status(err.statusCode || 400).json({ success: false, error: err.message });
   }
 });
 

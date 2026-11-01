@@ -428,7 +428,7 @@ router.get('/my-invoices', clientAuthMiddleware, (req, res) => {
   });
 });
 
-router.post('/subscriptions/:id/cancel', clientAuthMiddleware, (req, res) => {
+router.post('/subscriptions/:id/cancel', clientAuthMiddleware, async (req, res) => {
   const subId = Number(req.params.id);
   const sub = productService.getUserSubscriptionById(subId);
   if (!sub || sub.userId !== req.clientUser.id) {
@@ -436,12 +436,27 @@ router.post('/subscriptions/:id/cancel', clientAuthMiddleware, (req, res) => {
   }
 
   const { reason } = req.body || {};
-  const updated = productService.cancelSubscription(subId, null, reason || 'Solicitado pelo cliente via Central RAIA');
-  res.json({
-    success: true,
-    message: 'Assinatura cancelada com sucesso. O acesso ao produto continuará liberado até o final do período pago.',
-    subscription: updated
-  });
+  try {
+    const updated = await productService.cancelSubscription(subId, {
+      reason: reason || 'Solicitado pelo cliente via Central RAIA',
+      userId: req.clientUser.id,
+      ip: req.ip,
+    });
+    return res.json({
+      success: true,
+      message: updated.message || 'Assinatura cancelada com sucesso. O acesso ao produto continuará liberado até o final do período pago.',
+      subscription: updated,
+    });
+  } catch (err) {
+    console.error(`[Client Cancel Subscription] Falha ao cancelar sub #${subId}:`, err.message);
+    return res.status(err.statusCode || 400).json({
+      success: false,
+      error: err.message || 'Erro ao processar cancelamento no gateway financeiro.',
+      gateway: err.gateway || sub.gateway || sub.origin,
+      requiresAction: err.requiresAction || false,
+      instructionsUrl: err.instructionsUrl || null,
+    });
+  }
 });
 
 router.put('/profile/password', clientAuthMiddleware, async (req, res) => {

@@ -1839,6 +1839,15 @@
 
   <!-- SCRIPT ENGINE -->
   <script>
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
     // -------------------------------------------------------------
     // TOKEN & AUTHENTICATION
     // -------------------------------------------------------------
@@ -2304,8 +2313,8 @@
         const plansHtml = (prod.plans || []).map(pl => `
           <div class="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-between text-xs">
             <div>
-              <span class="font-extrabold text-white">${pl.name}</span>
-              <span class="text-zinc-500 text-[10px] font-mono ml-1">(${pl.code})</span>
+              <span class="font-extrabold text-white">${escapeHtml(pl.name)}</span>
+              <span class="text-zinc-500 text-[10px] font-mono ml-1">(${escapeHtml(pl.code)})</span>
               <div class="text-[11px] text-zinc-400">Regular: <strong class="text-white">${(pl.price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>${pl.promo_fair_price_cents ? ` • Feira: <strong class="text-[#00F59B]">${(pl.promo_fair_price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>` : ''}${pl.setup_fee_cents > 0 ? ` • Implantação: ${(pl.setup_fee_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ' • Implantação Grátis'}</div>
             </div>
             <div class="text-right">
@@ -2334,16 +2343,16 @@
           <div class="flex items-start justify-between flex-wrap gap-2">
             <div>
               <div class="flex items-center gap-1.5 flex-wrap">
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">${prod.code}</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">${escapeHtml(prod.code)}</span>
                 ${statusBadges[prod.commercialStatus] || ''}
                 ${solBadge}
                 ${offerBadge}
               </div>
               <h4 class="text-sm font-extrabold text-white mt-1.5 flex items-center gap-2">
-                <i data-lucide="${prod.icon || 'bot'}" class="w-4 h-4 text-[#00F59B]"></i>
-                <span>${prod.name}</span>
+                <i data-lucide="${escapeHtml(prod.icon || 'bot')}" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>${escapeHtml(prod.name)}</span>
               </h4>
-              <p class="text-xs text-zinc-400 mt-0.5">${prod.description || 'Sem descrição.'}</p>
+              <p class="text-xs text-zinc-400 mt-0.5">${escapeHtml(prod.description || 'Sem descrição.')}</p>
               
               <div class="flex items-center gap-1.5 mt-2 flex-wrap">
                 <span class="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Segmentos:</span>
@@ -2351,11 +2360,11 @@
               </div>
             </div>
             <div class="flex items-center gap-2">
-              <button type="button" onclick="openProductSegmentsModal(${prod.id}, '${escapeHtml(prod.name)}')" class="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-xs font-bold border border-cyan-500/30 flex items-center gap-1 transition cursor-pointer">
+              <button type="button" onclick="openProductSegmentsModal(${Number(prod.id)}, '${escapeHtml(prod.name).replace(/'/g, "\\'")}')" class="px-3 py-1.5 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 text-xs font-bold border border-cyan-500/30 flex items-center gap-1 transition cursor-pointer">
                 <i data-lucide="tag" class="w-3.5 h-3.5"></i>
                 <span>Segmentos (${(prod.segments || []).length})</span>
               </button>
-              <button type="button" onclick="openAddPlanModal(${prod.id}, '${escapeHtml(prod.name)}')" class="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30 flex items-center gap-1 transition cursor-pointer">
+              <button type="button" onclick="openAddPlanModal(${Number(prod.id)}, '${escapeHtml(prod.name).replace(/'/g, "\\'")}')" class="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-bold border border-amber-500/30 flex items-center gap-1 transition cursor-pointer">
                 <i data-lucide="plus" class="w-3.5 h-3.5"></i>
                 <span>Novo Plano</span>
               </button>

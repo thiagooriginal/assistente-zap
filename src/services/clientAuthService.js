@@ -546,6 +546,17 @@ function ensureDemoAccount() {
   return demoUser;
 }
 
+function verifyToken(token) {
+  if (!token) return null;
+  const user = db.prepare('SELECT * FROM users WHERE magic_token = ?').get(token);
+  if (!user) return null;
+  if (user.magic_token_expires_at) {
+    const expires = new Date(user.magic_token_expires_at);
+    if (expires < new Date()) return null;
+  }
+  return user;
+}
+
 module.exports = {
   hashPassword,
   verifyPassword,
@@ -557,4 +568,5 @@ module.exports = {
   ensureSalonForUser,
   getSanitizedUser,
   ensureDemoAccount,
+  verifyToken,
 };

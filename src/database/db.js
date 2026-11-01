@@ -489,6 +489,74 @@ function ensureColumnExists(tableName, columnName, columnDef) {
   }
 }
 
+// Versioned schema migrations & backup table
+db.exec(`
+  CREATE TABLE IF NOT EXISTS schema_migrations (
+    version TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    applied_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS product_plans_backup (
+    id INTEGER PRIMARY KEY,
+    product_id INTEGER,
+    code TEXT,
+    name TEXT,
+    description TEXT,
+    billing_cycle TEXT,
+    price_cents INTEGER,
+    setup_fee_cents INTEGER,
+    promo_fair_price_cents INTEGER,
+    max_professionals INTEGER,
+    features_json TEXT,
+    archived_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    archive_reason TEXT
+  );
+`);
+
+function runVersionedMigration(version, name, migrationFn) {
+  const row = db.prepare('SELECT version FROM schema_migrations WHERE version = ?').get(version);
+  if (row) return; // Already applied
+
+  try {
+    console.log(`[Database Migration] Executando migração ${version} (${name})...`);
+    migrationFn();
+    db.prepare('INSERT INTO schema_migrations (version, name) VALUES (?, ?)').run(version, name);
+    console.log(`[Database Migration] Migração ${version} concluída com sucesso.`);
+  } catch (err) {
+    console.error(`[Database Migration] Falha na migração ${version}:`, err.message);
+    throw err;
+  }
+}
+
+// One-time non-destructive migration to archive unapproved plans from initial seeds
+runVersionedMigration('20261101_01_archive_unapproved_plans', 'Archive unapproved plans for Jarvis and Dra. Camila without data loss', () => {
+  // 1. Backup any existing plans before removing from active catalog
+  db.exec(`
+    INSERT INTO product_plans_backup (
+      id, product_id, code, name, description, billing_cycle,
+      price_cents, setup_fee_cents, promo_fair_price_cents,
+      max_professionals, features_json, archive_reason
+    )
+    SELECT id, product_id, code, name, description, billing_cycle,
+           price_cents, setup_fee_cents, promo_fair_price_cents,
+           max_professionals, features_json, 'Migração para status IN_PREPARATION sem oferta comercial aprovada'
+    FROM product_plans
+    WHERE product_id IN (
+      SELECT id FROM products WHERE code IN ('JARVIS_FINANCEIRO', 'ASSISTENTE_CLINICA')
+    ) AND id NOT IN (SELECT id FROM product_plans_backup);
+  `);
+
+  // 2. Remove unapproved plans from active table ONLY if no active subscription depends on it
+  db.prepare(`
+    DELETE FROM product_plans
+    WHERE product_id IN (
+      SELECT id FROM products WHERE code IN ('JARVIS_FINANCEIRO', 'ASSISTENTE_CLINICA')
+    )
+    AND id NOT IN (SELECT DISTINCT plan_id FROM customer_subscriptions WHERE plan_id IS NOT NULL)
+  `).run();
+});
+
 // User columns for Client Authentication & Hotmart Subscriptions
 ensureColumnExists('users', 'email', 'TEXT');
 ensureColumnExists('users', 'password_hash', 'TEXT');
@@ -619,16 +687,11 @@ try {
         INSERT INTO product_segments (code, name, description, icon, display_order)
         VALUES (?, ?, ?, ?, ?)
       `).run(seg.code, seg.name, seg.description, seg.icon, seg.display_order);
-    } else {
-      db.prepare(`
-        UPDATE product_segments
-        SET name = ?, description = ?, icon = ?, display_order = ?
-        WHERE code = ?
-      `).run(seg.name, seg.description, seg.icon, seg.display_order, seg.code);
     }
+    // Existing segments are NOT overwritten on boot, preserving administrative changes
   }
 
-  // 4.2 Seed & Update Products
+  // 4.2 Seed Products & Default Plans (insert only if not exists, never overwrite admin modifications)
   const seedProducts = [
     {
       code: 'JESSICA',
@@ -750,72 +813,42 @@ try {
       );
       pRow = { id: Number(res.lastInsertRowid) };
       console.log(`[Database Seed] Produto criado: ${prod.code} (${prod.name})`);
-    } else {
-      db.prepare(`
-        UPDATE products
-        SET name = ?, description = ?, summary = ?, target_audience = ?,
-            category = ?, solution_type = ?, commercial_status = ?, has_approved_offer = ?,
-            icon = ?, metadata_json = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(
-        prod.name, prod.description, prod.summary, prod.target_audience,
-        prod.category, prod.solution_type, prod.commercial_status, prod.has_approved_offer,
-        prod.icon, prod.metadata_json, pRow.id
-      );
-    }
 
-    // Associate product with segments
-    if (pRow?.id && Array.isArray(prod.segments)) {
-      for (const segCode of prod.segments) {
-        const segRow = db.prepare('SELECT id FROM product_segments WHERE code = ?').get(segCode);
-        if (segRow) {
-          db.prepare(`
-            INSERT OR IGNORE INTO product_segment_relations (product_id, segment_id)
-            VALUES (?, ?)
-          `).run(pRow.id, segRow.id);
+      // Associate product with initial segments only on creation
+      if (pRow?.id && Array.isArray(prod.segments)) {
+        for (const segCode of prod.segments) {
+          const segRow = db.prepare('SELECT id FROM product_segments WHERE code = ?').get(segCode);
+          if (segRow) {
+            db.prepare(`
+              INSERT OR IGNORE INTO product_segment_relations (product_id, segment_id)
+              VALUES (?, ?)
+            `).run(pRow.id, segRow.id);
+          }
+        }
+      }
+
+      // Seed default plans only on initial product creation
+      if (pRow?.id && prod.plans && prod.plans.length > 0) {
+        for (const pl of prod.plans) {
+          const existingPlan = db.prepare('SELECT id FROM product_plans WHERE product_id = ? AND code = ?').get(pRow.id, pl.code);
+          if (!existingPlan) {
+            db.prepare(`
+              INSERT INTO product_plans (
+                product_id, code, name, description, billing_cycle,
+                price_cents, setup_fee_cents, promo_fair_price_cents,
+                max_professionals, features_json
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+              pRow.id, pl.code, pl.name, pl.description, pl.billing_cycle,
+              pl.price_cents, pl.setup_fee_cents, pl.promo_fair_price_cents,
+              pl.max_professionals || 1, pl.features_json
+            );
+            console.log(`[Database Seed] Plano criado: ${prod.code} -> ${pl.code} (${pl.name})`);
+          }
         }
       }
     }
-
-    if (pRow?.id && prod.plans && prod.plans.length > 0) {
-      for (const pl of prod.plans) {
-        const existingPlan = db.prepare('SELECT id FROM product_plans WHERE product_id = ? AND code = ?').get(pRow.id, pl.code);
-        if (!existingPlan) {
-          db.prepare(`
-            INSERT INTO product_plans (
-              product_id, code, name, description, billing_cycle,
-              price_cents, setup_fee_cents, promo_fair_price_cents,
-              max_professionals, features_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            pRow.id, pl.code, pl.name, pl.description, pl.billing_cycle,
-            pl.price_cents, pl.setup_fee_cents, pl.promo_fair_price_cents,
-            pl.max_professionals || 1, pl.features_json
-          );
-          console.log(`[Database Seed] Plano criado: ${prod.code} -> ${pl.code} (${pl.name})`);
-        }
-      }
-    }
-  }
-
-  // Cleanup unapproved plans from products in preparation (Jarvis Financeiro and Dra. Camila)
-  try {
-    db.prepare(`
-      UPDATE customer_subscriptions
-      SET plan_id = NULL
-      WHERE product_id IN (
-        SELECT id FROM products WHERE code IN ('JARVIS_FINANCEIRO', 'ASSISTENTE_CLINICA')
-      )
-    `).run();
-
-    db.prepare(`
-      DELETE FROM product_plans
-      WHERE product_id IN (
-        SELECT id FROM products WHERE code IN ('JARVIS_FINANCEIRO', 'ASSISTENTE_CLINICA')
-      )
-    `).run();
-  } catch (cleanErr) {
-    console.warn('[Database Seed] Aviso ao limpar planos não aprovados:', cleanErr.message);
+    // Existing products and their custom plans are left intact, preserving admin modifications
   }
 
   // 5. Backfill: Ensure existing users with contracts have customer_subscriptions for JESSICA

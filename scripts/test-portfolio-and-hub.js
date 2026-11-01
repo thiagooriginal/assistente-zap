@@ -210,7 +210,7 @@ async function runTests() {
       const accessJarvis = productService.hasProductAccess(userId, 'JARVIS_FINANCEIRO');
       assert.strictEqual(accessJarvis.hasAccess, false, 'Não deve ter acesso ao Jarvis');
 
-      // Agora assina Jarvis também
+      // Agora assina Jarvis também (com adminId para permitir produto em preparação)
       const subJarvis = productService.createCustomerSubscription({
         userId,
         productCode: 'JARVIS_FINANCEIRO',
@@ -219,6 +219,7 @@ async function runTests() {
         origin: 'ASAAS',
         status: 'ACTIVE',
         paidUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        adminId: 1,
       });
 
       assert.ok(subJarvis.id, 'Assinatura de Jarvis deve ser criada');
@@ -227,7 +228,7 @@ async function runTests() {
     });
 
     // 6. Cancelamento Sem Fidelidade (preserva acesso até paid_until e isola outros produtos)
-    test('6. Cancelamento sem fidelidade preserva acesso até paid_until e isola produtos', () => {
+    await testAsync('6. Cancelamento sem fidelidade preserva acesso até paid_until e isola produtos', async () => {
       const testEmail = `cancel_${Date.now()}@teste.com`;
       const { hash, salt } = clientAuth.hashPassword('senha123');
       const userRes = db.prepare(`
@@ -255,10 +256,11 @@ async function runTests() {
         origin: 'ASAAS',
         status: 'ACTIVE',
         paidUntil: futureDate,
+        adminId: 1,
       });
 
       // Cancela sub1 (Jéssica)
-      const cancelled = productService.cancelSubscription(sub1.id, { reason: 'Cancelado pelo cliente' });
+      const cancelled = await productService.cancelSubscription(sub1.id, { reason: 'Cancelado pelo cliente' });
       assert.strictEqual(cancelled.status, 'CANCELLED');
       assert.ok(cancelled.paidUntil, 'Sem fidelidade: preserva vigência até o fim do período pago');
 
