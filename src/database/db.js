@@ -691,31 +691,12 @@ try {
       has_approved_offer: 0,
       icon: 'wallet',
       segments: ['financeiro_mei', 'saloes_beleza', 'saude_clinicas'],
-      metadata_json: JSON.stringify({ module: 'finance', whatsappCapable: true }),
-      plans: [
-        {
-          code: 'START',
-          name: 'Jarvis Inicial',
-          description: 'Controle financeiro pessoal e MEI via WhatsApp',
-          billing_cycle: 'MONTHLY',
-          price_cents: 9900,
-          setup_fee_cents: 0,
-          promo_fair_price_cents: 7900,
-          max_professionals: 1,
-          features_json: JSON.stringify(['RECEITAS_DESPESAS', 'LEMBRETES_CONTAS', 'RELATORIOS_MENSAIS'])
-        },
-        {
-          code: 'PRO',
-          name: 'Jarvis Empresarial',
-          description: 'Gestão financeira avançada para PMEs com conciliação',
-          billing_cycle: 'MONTHLY',
-          price_cents: 19900,
-          setup_fee_cents: 0,
-          promo_fair_price_cents: 14900,
-          max_professionals: 5,
-          features_json: JSON.stringify(['RECEITAS_DESPESAS', 'LEMBRETES_CONTAS', 'RELATORIOS_AVANCADOS', 'CONCILIACAO_EXTRATOS', 'MULTI_USUARIOS'])
-        }
-      ]
+      metadata_json: JSON.stringify({
+        module: 'finance',
+        whatsappCapable: true,
+        statusNote: 'Em preparação operacional — condições comerciais sob definição'
+      }),
+      plans: []
     },
     {
       code: 'ASSISTENTE_CLINICA',
@@ -729,31 +710,12 @@ try {
       has_approved_offer: 0,
       icon: 'stethoscope',
       segments: ['saude_clinicas'],
-      metadata_json: JSON.stringify({ module: 'clinic', whatsappCapable: true }),
-      plans: [
-        {
-          code: 'START',
-          name: 'Dra. Camila Clínicas Básica',
-          description: 'Agendamento e triagem para 1 consultório',
-          billing_cycle: 'MONTHLY',
-          price_cents: 11900,
-          setup_fee_cents: 35000,
-          promo_fair_price_cents: 9900,
-          max_professionals: 1,
-          features_json: JSON.stringify(['AGENDAMENTO_CONSULTAS', 'CONFIRMACOES_LEMBRETES', 'PRONTUARIO_INTEGRADO'])
-        },
-        {
-          code: 'PRO',
-          name: 'Dra. Camila Clínicas Avançada',
-          description: 'Triagem personalizada, múltiplos especialistas e retornos',
-          billing_cycle: 'MONTHLY',
-          price_cents: 24900,
-          setup_fee_cents: 35000,
-          promo_fair_price_cents: 18900,
-          max_professionals: 5,
-          features_json: JSON.stringify(['AGENDAMENTO_CONSULTAS', 'CONFIRMACOES_LEMBRETES', 'PRONTUARIO_INTEGRADO', 'MULTI_ESPECIALISTAS', 'TRIAGEM_INTELIGENTE'])
-        }
-      ]
+      metadata_json: JSON.stringify({
+        module: 'clinic',
+        whatsappCapable: true,
+        statusNote: 'Em preparação operacional — condições comerciais sob definição'
+      }),
+      plans: []
     },
     {
       code: 'GROWTH_ASSISTANT_VIP',
@@ -834,6 +796,26 @@ try {
         }
       }
     }
+  }
+
+  // Cleanup unapproved plans from products in preparation (Jarvis Financeiro and Dra. Camila)
+  try {
+    db.prepare(`
+      UPDATE customer_subscriptions
+      SET plan_id = NULL
+      WHERE product_id IN (
+        SELECT id FROM products WHERE code IN ('JARVIS_FINANCEIRO', 'ASSISTENTE_CLINICA')
+      )
+    `).run();
+
+    db.prepare(`
+      DELETE FROM product_plans
+      WHERE product_id IN (
+        SELECT id FROM products WHERE code IN ('JARVIS_FINANCEIRO', 'ASSISTENTE_CLINICA')
+      )
+    `).run();
+  } catch (cleanErr) {
+    console.warn('[Database Seed] Aviso ao limpar planos não aprovados:', cleanErr.message);
   }
 
   // 5. Backfill: Ensure existing users with contracts have customer_subscriptions for JESSICA

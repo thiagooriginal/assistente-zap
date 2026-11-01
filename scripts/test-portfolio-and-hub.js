@@ -140,7 +140,26 @@ async function runTests() {
       assert.strictEqual(growth.commercialStatus, 'IN_PREPARATION');
       assert.strictEqual(growth.hasApprovedOffer, false);
       assert.strictEqual(growth.canPurchase, false, 'Growth VIP NÃO pode permitir compra enquanto em preparação');
+      assert.strictEqual(growth.plans.length, 0, 'Growth VIP não deve possuir planos cadastrados');
       assert.ok(Array.isArray(growth.plannedFeatures) && growth.plannedFeatures.length >= 4);
+
+      // Jarvis Financeiro (Em Preparação sem preços não aprovados)
+      const resJarvis = await apiFetch('/api/cliente/products/JARVIS_FINANCEIRO/details');
+      assert.strictEqual(resJarvis.status, 200);
+      const jarvis = (await resJarvis.json()).product;
+      assert.strictEqual(jarvis.commercialStatus, 'IN_PREPARATION');
+      assert.strictEqual(jarvis.hasApprovedOffer, false);
+      assert.strictEqual(jarvis.canPurchase, false, 'Jarvis não deve permitir compra enquanto em preparação');
+      assert.strictEqual(jarvis.plans.length, 0, 'Jarvis não deve ter planos com preços não aprovados');
+
+      // Dra. Camila (Em Preparação sem preços não aprovados)
+      const resCamila = await apiFetch('/api/cliente/products/ASSISTENTE_CLINICA/details');
+      assert.strictEqual(resCamila.status, 200);
+      const camila = (await resCamila.json()).product;
+      assert.strictEqual(camila.commercialStatus, 'IN_PREPARATION');
+      assert.strictEqual(camila.hasApprovedOffer, false);
+      assert.strictEqual(camila.canPurchase, false, 'Dra. Camila não deve permitir compra enquanto em preparação');
+      assert.strictEqual(camila.plans.length, 0, 'Dra. Camila não deve ter planos com preços não aprovados');
 
       // Jéssica (Disponível com oferta aprovada)
       const resJessica = await apiFetch('/api/cliente/products/JESSICA/details');
@@ -413,12 +432,40 @@ async function runTests() {
       assert.strictEqual(invJson.invoices[0].status, 'CONFIRMED');
     });
 
-    // 11. Headers de Segurança e Redirecionamento HTTPS
-    await testAsync('11. Headers de Segurança (nosniff, upgrade-insecure-requests) e Proxy Trust', async () => {
+    // 11. Headers de Segurança, Redirecionamento HTTPS e Política HSTS
+    await testAsync('11. Headers de Segurança, Redirecionamento HTTPS 301, HSTS e Proxy Trust', async () => {
+      // 11.1 Proxy Trust configurado para 1 salto (apenas Traefik)
+      assert.strictEqual(app.get('trust proxy'), 1, 'Trust proxy deve confiar apenas no proxy reverso imediato (1)');
+
+      // 11.2 Cabeçalhos de segurança básicos presentes
       const res = await apiFetch('/api/health/ready');
       assert.strictEqual(res.headers.get('x-content-type-options'), 'nosniff');
       assert.strictEqual(res.headers.get('x-frame-options'), 'SAMEORIGIN');
+      assert.strictEqual(res.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
       assert.ok(res.headers.get('content-security-policy')?.includes('upgrade-insecure-requests'));
+
+      // 11.3 HSTS em homologação NÃO deve conter includeSubDomains ou preload
+      const hstsStaging = res.headers.get('strict-transport-security');
+      if (hstsStaging) {
+        assert.strictEqual(hstsStaging.includes('includeSubDomains'), false, 'Staging HSTS NÃO pode ter includeSubDomains');
+        assert.strictEqual(hstsStaging.includes('preload'), false, 'Staging HSTS NÃO pode ter preload');
+      }
+
+      // 11.4 Cenário de Redirecionamento HTTP -> HTTPS 301
+      const resHttp = await fetch(`${baseUrl}/cliente/login`, {
+        method: 'GET',
+        headers: {
+          'x-forwarded-proto': 'http',
+          'x-forwarded-host': 'staging.raiaagentes.com.br'
+        },
+        redirect: 'manual'
+      });
+      assert.strictEqual(resHttp.status, 301, 'Requisição HTTP em staging deve redirecionar com 301');
+      assert.strictEqual(
+        resHttp.headers.get('location'),
+        'https://staging.raiaagentes.com.br/cliente/login',
+        'Redirecionamento deve apontar para HTTPS com domínio staging correto'
+      );
     });
 
     // 12. CRUD de Segmentos Administrativos

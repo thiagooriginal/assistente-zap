@@ -34,24 +34,43 @@ try {
 
 const app = express();
 
-app.enable('trust proxy');
+// Trust only the immediate reverse proxy (Traefik in Docker/Easypanel), 1 hop.
+// Prevents trusting spoofed X-Forwarded-* headers from untrusted external clients.
+app.set('trust proxy', 1);
 
-// Force HTTPS and Security Headers in Production/Staging to prevent Chrome "Not Secure" warning
+// Application-level HTTPS redirect and security headers
+// NOTE: TLS certificate provisioning is managed by Traefik / Let's Encrypt at the ingress proxy layer.
+// Express middleware does NOT issue or fix TLS certificates; it handles HTTP->HTTPS redirection and response security headers.
 app.use((req, res, next) => {
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
-  const proto = req.headers['x-forwarded-proto'];
+  const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
+  const isProduction = process.env.NODE_ENV === 'production' && !isStaging;
+  const isStagingOrProd = isProduction || isStaging;
 
-  if (isProduction && proto && proto.toLowerCase() === 'http') {
-    const host = req.headers.host || 'staging.raiaagentes.com.br';
-    return res.redirect(301, `https://${host}${req.url}`);
+  const proto = req.get('x-forwarded-proto');
+
+  // Enforce HTTPS redirection in staging / production if request arrived over plain HTTP
+  if (isStagingOrProd && proto && proto.toLowerCase() === 'http') {
+    const host = req.get('x-forwarded-host') || req.get('host') || 'staging.raiaagentes.com.br';
+    return res.redirect(301, `https://${host}${req.originalUrl || req.url}`);
   }
 
-  // Security Headers against "Not Secure" warnings & mixed content
+  // HSTS Policy:
+  // - Homologation/Staging: Do NOT send includeSubDomains or preload.
+  //   HSTS is only enabled in staging if TLS certificate validation has been confirmed (via ENABLE_HSTS_STAGING),
+  //   using a conservative max-age without subdomains or preload to prevent certificate locking issues.
+  // - Production: Send standard max-age=31536000 once certificate is validated.
   if (isProduction) {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000');
+  } else if (isStaging && process.env.ENABLE_HSTS_STAGING === 'true') {
+    res.setHeader('Strict-Transport-Security', 'max-age=86400');
+  }
+
+  // Response defense-in-depth headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
+  if (isStagingOrProd) {
     res.setHeader('Content-Security-Policy', "upgrade-insecure-requests; default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';");
   }
 
