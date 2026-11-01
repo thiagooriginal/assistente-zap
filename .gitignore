@@ -4,7 +4,8 @@ auth_info_baileys/
 data/
 google_credentials.json
 google_token.json
-qrcode.png
+/qrcode.png
+!public/qrcode.png
 *.log
 cloudflared.exe
 scratch/

@@ -117,13 +117,14 @@ function stagingProtectionMiddleware(req, res, next) {
     return next();
   }
 
-  // Bypass health checks, diagnostics and webhooks
+  // Bypass health checks, diagnostics, webhooks and static asset /qrcode.png
   const bypassPaths = [
     '/api/health',
     '/api/health/ready',
     '/api/webhooks/asaas',
     '/api/webhooks/hotmart',
-    '/api/analytics/event'
+    '/api/analytics/event',
+    '/qrcode.png'
   ];
   if (bypassPaths.includes(req.path) || req.path.startsWith('/api/webhooks/')) {
     return next();
@@ -198,6 +199,20 @@ function stagingProtectionMiddleware(req, res, next) {
 
 app.use(stagingProtectionMiddleware);
 app.use(express.static(path.resolve(__dirname, '../../public')));
+
+// QR code route: serve active WhatsApp pairing QR code if present at root, or fallback to public image
+app.get('/qrcode.png', (req, res) => {
+  const fs = require('fs');
+  const rootQr = path.resolve(__dirname, '../../qrcode.png');
+  if (fs.existsSync(rootQr)) {
+    return res.sendFile(rootQr);
+  }
+  const publicQr = path.resolve(__dirname, '../../public/qrcode.png');
+  if (fs.existsSync(publicQr)) {
+    return res.sendFile(publicQr);
+  }
+  return res.redirect('https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=RAIA_HOMOLOGACAO_SIMULATOR');
+});
 
 // Mount Client Portal APIs
 app.use('/api/cliente', clientRoutes);

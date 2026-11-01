@@ -990,15 +990,25 @@
     // 0. MEUS PRODUTOS HUB LOADER
     // ==========================================
     async function loadMyProducts() {
+      const grid = document.getElementById('myProductsGrid');
+      const spotGrid = document.getElementById('hubSpotlightGrid');
       try {
         const [subRes, catRes] = await Promise.all([
           fetch('/api/cliente/my-products'),
           fetch('/api/cliente/products-catalog'),
         ]);
+
+        if (!subRes.ok || !catRes.ok) {
+          throw new Error('Falha na resposta dos serviços de produtos.');
+        }
+
         const subData = await subRes.json();
         const catData = await catRes.json();
 
-        const grid = document.getElementById('myProductsGrid');
+        if (!subData.success || !catData.success) {
+          throw new Error(subData.error || catData.error || 'Erro ao carregar dados do catálogo.');
+        }
+
         grid.innerHTML = '';
 
         const subs = subData.subscriptions || [];
@@ -1128,6 +1138,26 @@
         lucide.createIcons();
       } catch (err) {
         console.error('Erro ao carregar Meus Produtos:', err);
+        if (grid) {
+          grid.innerHTML = `
+            <div class="col-span-full p-8 rounded-2xl bg-[#11131a] border border-rose-500/20 text-center space-y-3">
+              <i data-lucide="alert-circle" class="w-8 h-8 text-rose-400 mx-auto"></i>
+              <div class="text-sm font-bold text-white">Não foi possível carregar seus produtos</div>
+              <p class="text-xs text-slate-400 max-w-sm mx-auto">Ocorreu uma instabilidade na consulta às suas assinaturas ativas.</p>
+              <button onclick="loadMyProducts()" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-all">
+                Tentar Novamente
+              </button>
+            </div>
+          `;
+        }
+        if (spotGrid) {
+          spotGrid.innerHTML = `
+            <div class="col-span-full p-4 text-center text-rose-400 text-xs bg-[#11131a] rounded-xl border border-rose-500/20">
+              Falha ao carregar catálogo em destaque. <button onclick="loadMyProducts()" class="underline font-bold ml-1">Tentar novamente</button>
+            </div>
+          `;
+        }
+        lucide.createIcons();
       }
     }
 
@@ -1135,13 +1165,24 @@
     // 1. EXPLORAR SOLUÇÕES (COMMERCIAL CATALOG)
     // ==========================================
     async function loadExploreSolutions() {
+      const grid = document.getElementById('catalogProductsGrid');
+      const segBar = document.getElementById('segmentFiltersBar');
       try {
         const [catRes, segRes] = await Promise.all([
           fetch('/api/cliente/products-catalog'),
           fetch('/api/cliente/segments'),
         ]);
+
+        if (!catRes.ok || !segRes.ok) {
+          throw new Error('Falha na comunicação com o catálogo comercial.');
+        }
+
         const catData = await catRes.json();
         const segData = await segRes.json();
+
+        if (!catData.success || !segData.success) {
+          throw new Error(catData.error || segData.error || 'Erro ao carregar dados dos produtos.');
+        }
 
         catalogState.products = catData.products || [];
         catalogState.segments = segData.segments || [];
@@ -1150,6 +1191,22 @@
         renderCatalogProducts();
       } catch (err) {
         console.error('Erro ao carregar catálogo comercial:', err);
+        if (grid) {
+          grid.innerHTML = `
+            <div class="col-span-full p-12 rounded-2xl bg-[#11131a] border border-rose-500/20 text-center space-y-3">
+              <i data-lucide="alert-circle" class="w-8 h-8 text-rose-400 mx-auto"></i>
+              <div class="text-sm font-bold text-white">Não foi possível carregar o catálogo de soluções</div>
+              <p class="text-xs text-slate-400 max-w-sm mx-auto">Houve uma instabilidade na consulta às soluções disponíveis.</p>
+              <button onclick="loadExploreSolutions()" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-all">
+                Tentar Novamente
+              </button>
+            </div>
+          `;
+        }
+        if (segBar && (!catalogState.segments || catalogState.segments.length === 0)) {
+          segBar.innerHTML = `<span class="text-xs text-slate-500 italic">Segmentos temporariamente indisponíveis.</span>`;
+        }
+        lucide.createIcons();
       }
     }
 
@@ -1418,12 +1475,6 @@
             </button>
           `;
         }
-          actionContainer.innerHTML = `
-            <button disabled class="px-5 py-2.5 rounded-xl bg-white/5 text-slate-500 font-bold text-xs cursor-not-allowed">
-              Aguardando Lançamento
-            </button>
-          `;
-        }
 
         modal.classList.remove('hidden');
         lucide.createIcons();
@@ -1512,6 +1563,16 @@
         lucide.createIcons();
       } catch (err) {
         console.error('Erro ao carregar assinaturas:', err);
+        const container = document.getElementById('subscriptionsTableContainer');
+        if (container) {
+          container.innerHTML = `
+            <div class="p-8 text-center text-rose-400 text-xs bg-[#11131a] rounded-xl border border-rose-500/20 space-y-2">
+              <p>Falha ao consultar assinaturas contratuais.</p>
+              <button onclick="loadMySubscriptions()" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold">Tentar novamente</button>
+            </div>
+          `;
+        }
+        lucide.createIcons();
       }
     }
 
@@ -1587,6 +1648,16 @@
         lucide.createIcons();
       } catch (err) {
         console.error('Erro ao carregar faturas:', err);
+        const container = document.getElementById('invoicesListContainer');
+        if (container) {
+          container.innerHTML = `
+            <div class="p-8 text-center text-rose-400 text-xs bg-[#07080c] rounded-xl border border-rose-500/20 space-y-2">
+              <p>Falha ao consultar histórico de faturas.</p>
+              <button onclick="loadMyInvoices()" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold">Tentar novamente</button>
+            </div>
+          `;
+        }
+        lucide.createIcons();
       }
     }
 
@@ -1663,7 +1734,13 @@
           switchTab('my-products');
         }
       } catch (err) {
-        window.location.href = '/cliente/login';
+        console.error('Erro ao carregar perfil:', err);
+        const footerName = document.getElementById('footerUserName');
+        if (footerName && footerName.innerText === 'Carregando...') {
+          footerName.innerText = 'Cliente Conectado';
+        }
+        showToast('Instabilidade ao carregar dados do perfil.', 'error');
+        switchTab('my-products');
       }
     }
 
@@ -2087,7 +2164,11 @@
     });
 
     // Run on startup
-    loadProfile();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadProfile);
+    } else {
+      loadProfile();
+    }
   </script>
 </body>
 </html>
