@@ -168,10 +168,10 @@
 
           <button data-tab="dashboard-pro" class="nav-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all">
             <div class="flex items-center gap-2">
-              <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-[#F59E0B]"></i>
-              <span>Dashboard Pro</span>
+              <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+              <span>Dashboard Gerencial & Financeiro</span>
             </div>
-            <span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30">PRO</span>
+            <span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded bg-[#00F59B]/20 text-[#00F59B] border border-[#00F59B]/30">PRO</span>
           </button>
 
           <button data-tab="campaigns-pro" class="nav-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all">
@@ -719,38 +719,518 @@
       </section>
 
       <!-- ============================================== -->
-      <!-- TAB 6: DASHBOARD PRO (EXCLUSIVE PRO)           -->
+      <!-- ============================================== -->
+      <!-- TAB 6: DASHBOARD GERENCIAL & FINANCEIRO 2.0    -->
       <!-- ============================================== -->
       <section id="tab-dashboard-pro" class="tab-content hidden space-y-6">
-        <!-- Upgrade Banner if not PRO -->
+        <!-- Upgrade Banner if not allowed (e.g. JESSICA_START) -->
         <div id="proDashboardLocked" class="hidden p-8 rounded-2xl bg-gradient-to-br from-amber-950/40 via-[#11131a] to-[#11131a] border border-amber-500/30 text-center space-y-4">
           <div class="w-12 h-12 rounded-full bg-[#F59E0B]/10 text-[#F59E0B] flex items-center justify-center mx-auto">
             <i data-lucide="lock" class="w-6 h-6"></i>
           </div>
-          <h3 class="text-base font-extrabold text-white">Recurso Exclusivo do Plano Jéssica Pró</h3>
-          <p class="text-xs text-slate-400 max-w-md mx-auto">O Dashboard Gerencial com métricas de faturamento, ticket médio e ticket por profissional é reservado aos assinantes do Plano Pró.</p>
-          <a href="https://wa.me/5511951364159?text=Ol%C3%A1%2C+gostaria+de+fazer+upgrade+para+o+Plano+J%C3%A9ssica+Pr%C3%B3" target="_blank" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#F59E0B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all">
-            <span>Fazer Upgrade para o Pró</span>
+          <h3 class="text-base font-extrabold text-white">Dashboard Gerencial & Financeiro</h3>
+          <p class="text-xs text-slate-400 max-w-md mx-auto">Indicadores financeiros em tempo real, curva de receitas, ticket médio e contas a pagar são recursos disponíveis a partir do Plano Jéssica Intermediário e Pró.</p>
+          <a href="https://wa.me/5511951364159?text=Ol%C3%A1%2C+gostaria+de+fazer+upgrade+para+o+Dashboard+Financeiro" target="_blank" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all">
+            <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
+            <span>Fazer Upgrade do Plano</span>
           </a>
         </div>
 
         <div id="proDashboardContent" class="space-y-6">
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10">
-              <span class="text-xs text-slate-400">Total de Agendamentos</span>
-              <div id="metricTotalAppts" class="text-2xl font-bold text-white mt-1">0</div>
+          <!-- Top Controls Bar: Filters & Actions -->
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 p-4 rounded-2xl bg-[#11131a] border border-white/10">
+            <!-- Period Filters -->
+            <div class="flex flex-wrap items-center gap-1.5" id="proPeriodBtnGroup">
+              <span class="text-xs font-semibold text-slate-400 mr-1 flex items-center gap-1.5">
+                <i data-lucide="calendar" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+                <span>Período:</span>
+              </span>
+              <button type="button" data-period="today" class="period-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 transition-all">Hoje</button>
+              <button type="button" data-period="7d" class="period-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 transition-all">7 Dias</button>
+              <button type="button" data-period="this_month" class="period-filter-btn active px-3 py-1.5 rounded-xl text-xs font-bold bg-[#00F59B]/15 text-[#00F59B] border border-[#00F59B]/30 transition-all">Este Mês</button>
+              <button type="button" data-period="last_month" class="period-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 transition-all">Mês Anterior</button>
+              <button type="button" data-period="custom" class="period-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 transition-all">Personalizado</button>
             </div>
-            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10">
-              <span class="text-xs text-slate-400">Volume Total Estimado</span>
-              <div id="metricRevenue" class="text-2xl font-bold text-[#00F59B] mt-1">R$ 0,00</div>
+
+            <!-- Custom Date Inputs (collapsible) -->
+            <div id="customDateRangeBox" class="hidden flex flex-wrap items-center gap-2">
+              <input type="date" id="dashCustomStart" class="px-2.5 py-1.5 rounded-xl bg-[#07080c] border border-white/10 text-white text-xs">
+              <span class="text-xs text-slate-500">até</span>
+              <input type="date" id="dashCustomEnd" class="px-2.5 py-1.5 rounded-xl bg-[#07080c] border border-white/10 text-white text-xs">
+              <button type="button" id="btnApplyCustomDates" class="px-3 py-1.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all">Filtrar</button>
             </div>
-            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10">
-              <span class="text-xs text-slate-400">Ticket Médio por Cliente</span>
-              <div id="metricAvgTicket" class="text-2xl font-bold text-white mt-1">R$ 0,00</div>
+
+            <!-- Badges & Action Buttons -->
+            <div class="flex items-center gap-2.5">
+              <div id="proDemoBadge" class="hidden items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-bold">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                <span>Dados Demonstrativos • Homologação</span>
+              </div>
+              <button type="button" id="btnOpenNewTxModal" class="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-white flex items-center gap-1.5 transition-all">
+                <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+                <span>+ Movimentação</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 8 Core KPI Cards Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- 1. Faturamento Realizado -->
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 relative overflow-hidden group hover:border-[#00F59B]/30 transition-all">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-400">Faturamento Realizado</span>
+                <div class="w-8 h-8 rounded-xl bg-[#00F59B]/10 text-[#00F59B] flex items-center justify-center">
+                  <i data-lucide="wallet" class="w-4 h-4"></i>
+                </div>
+              </div>
+              <div id="kpiRealizedRevenue" class="text-2xl font-black text-[#00F59B] mt-2">R$ 0,00</div>
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[11px]">
+                <span class="text-slate-500">Receitas pagas em caixa</span>
+                <span id="kpiVarRealized" class="font-bold text-slate-400">--</span>
+              </div>
+            </div>
+
+            <!-- 2. Faturamento Estimado -->
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 relative overflow-hidden group hover:border-violet-500/30 transition-all">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-400">Faturamento Estimado</span>
+                <div class="w-8 h-8 rounded-xl bg-violet-500/10 text-violet-400 flex items-center justify-center">
+                  <i data-lucide="trending-up" class="w-4 h-4"></i>
+                </div>
+              </div>
+              <div id="kpiEstimatedRevenue" class="text-2xl font-black text-violet-300 mt-2">R$ 0,00</div>
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[11px]">
+                <span class="text-slate-500">Agendamentos pendentes</span>
+                <span class="text-slate-400">Previsão</span>
+              </div>
+            </div>
+
+            <!-- 3. Despesas Registradas -->
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 relative overflow-hidden group hover:border-rose-500/30 transition-all">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-400">Despesas Registradas</span>
+                <div class="w-8 h-8 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center">
+                  <i data-lucide="credit-card" class="w-4 h-4"></i>
+                </div>
+              </div>
+              <div id="kpiExpensesTotal" class="text-2xl font-black text-rose-400 mt-2">R$ 0,00</div>
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[11px]">
+                <span class="text-slate-500">Custos operacionais pagos</span>
+                <span id="kpiVarExpenses" class="font-bold text-slate-400">--</span>
+              </div>
+            </div>
+
+            <!-- 4. Resultado Financeiro -->
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 relative overflow-hidden group hover:border-emerald-500/30 transition-all">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-400">Resultado do Período</span>
+                <div id="kpiResultIconWrap" class="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                  <i data-lucide="scale" class="w-4 h-4"></i>
+                </div>
+              </div>
+              <div id="kpiFinancialResult" class="text-2xl font-black text-emerald-400 mt-2">R$ 0,00</div>
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[11px]">
+                <span class="text-slate-500">Receitas (-) Despesas</span>
+                <span class="text-[10px] text-slate-500">Não contábil</span>
+              </div>
+            </div>
+
+            <!-- 5. Total de Agendamentos -->
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 relative overflow-hidden group hover:border-blue-500/30 transition-all">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-400">Total de Agendamentos</span>
+                <div class="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                  <i data-lucide="calendar" class="w-4 h-4"></i>
+                </div>
+              </div>
+              <div id="kpiTotalAppts" class="text-2xl font-black text-white mt-2">0</div>
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[11px]">
+                <span class="text-slate-500">Volume na agenda</span>
+                <span id="kpiVarAppts" class="font-bold text-slate-400">--</span>
+              </div>
+            </div>
+
+            <!-- 6. Atendimentos Realizados -->
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 relative overflow-hidden group hover:border-cyan-500/30 transition-all">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-400">Atendimentos Concluídos</span>
+                <div class="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+                  <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                </div>
+              </div>
+              <div id="kpiCompletedAppts" class="text-2xl font-black text-cyan-300 mt-2">0</div>
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[11px]">
+                <span class="text-slate-500">Clientes atendidos</span>
+                <span id="kpiVarCompleted" class="font-bold text-slate-400">--</span>
+              </div>
+            </div>
+
+            <!-- 7. Ticket Médio -->
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 relative overflow-hidden group hover:border-amber-500/30 transition-all">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-400">Ticket Médio</span>
+                <div class="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                  <i data-lucide="tag" class="w-4 h-4"></i>
+                </div>
+              </div>
+              <div id="kpiAverageTicket" class="text-2xl font-black text-amber-300 mt-2">R$ 0,00</div>
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[11px]">
+                <span class="text-slate-500" id="kpiTicketSubtext">Por atendimento</span>
+                <span class="text-[10px] text-slate-400">Médio</span>
+              </div>
+            </div>
+
+            <!-- 8. Agendamentos Cancelados -->
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 relative overflow-hidden group hover:border-orange-500/30 transition-all">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-semibold text-slate-400">Cancelados / Ausências</span>
+                <div class="w-8 h-8 rounded-xl bg-orange-500/10 text-orange-400 flex items-center justify-center">
+                  <i data-lucide="calendar-x" class="w-4 h-4"></i>
+                </div>
+              </div>
+              <div id="kpiCancelledAppts" class="text-2xl font-black text-orange-400 mt-2">0</div>
+              <div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[11px]">
+                <span class="text-slate-500">Cancelamentos</span>
+                <span class="text-[10px] text-slate-400">Período</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Financial Chart (Receitas, Despesas, Resultado) -->
+          <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <i data-lucide="activity" class="w-4 h-4 text-[#00F59B]"></i>
+                  <span>Evolução Temporal • Receitas vs Despesas</span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">Acompanhamento diário das entradas, saídas e resultado líquido.</p>
+              </div>
+              <div class="flex items-center gap-4 text-xs">
+                <div class="flex items-center gap-1.5 text-slate-300">
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#00F59B]"></span>
+                  <span>Receitas</span>
+                </div>
+                <div class="flex items-center gap-1.5 text-slate-300">
+                  <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                  <span>Despesas</span>
+                </div>
+                <div class="flex items-center gap-1.5 text-slate-300">
+                  <span class="w-2.5 h-2.5 rounded-full bg-violet-400"></span>
+                  <span>Resultado</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Chart Canvas / SVG Container -->
+            <div id="financialChartContainer" class="w-full h-64 relative bg-[#07080c]/60 rounded-xl border border-white/5 p-3 flex items-center justify-center overflow-hidden">
+              <div class="text-xs text-slate-500">Carregando gráfico...</div>
+            </div>
+          </div>
+
+          <!-- 2-Column Grid: Serviços Mais Procurados & Horários de Pico -->
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <!-- Serviços Mais Procurados -->
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 space-y-3">
+              <div class="flex items-center justify-between border-b border-white/5 pb-3">
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <i data-lucide="scissors" class="w-4 h-4 text-violet-400"></i>
+                  <span>Serviços Mais Procurados</span>
+                </h4>
+                <span class="text-[11px] text-slate-500">Por volume e receita</span>
+              </div>
+              <div id="topServicesList" class="space-y-2.5">
+                <div class="text-xs text-slate-500 py-4 text-center">Nenhum serviço registrado no período.</div>
+              </div>
+            </div>
+
+            <!-- Horários de Maior Movimento -->
+            <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 space-y-3">
+              <div class="flex items-center justify-between border-b border-white/5 pb-3">
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <i data-lucide="clock" class="w-4 h-4 text-amber-400"></i>
+                  <span>Horários de Maior Movimento</span>
+                </h4>
+                <span class="text-[11px] text-slate-500">Distribuição na agenda</span>
+              </div>
+              <div id="peakHoursContainer" class="space-y-2">
+                <div class="text-xs text-slate-500 py-4 text-center">Sem dados de horários no período.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Desempenho por Profissional -->
+          <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 space-y-3">
+            <div class="flex items-center justify-between border-b border-white/5 pb-3">
+              <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <i data-lucide="users" class="w-4 h-4 text-[#00F59B]"></i>
+                  <span>Desempenho da Equipe & Profissionais</span>
+                </h4>
+                <p class="text-xs text-slate-400 mt-0.5">Atendimentos concluídos, faturamento atribuído e participação no resultado.</p>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr class="border-b border-white/5 text-slate-400">
+                    <th class="py-2.5 px-3 font-semibold">Profissional</th>
+                    <th class="py-2.5 px-3 font-semibold">Especialidade</th>
+                    <th class="py-2.5 px-3 font-semibold text-center">Atendimentos</th>
+                    <th class="py-2.5 px-3 font-semibold text-right">Receita Atribuída</th>
+                    <th class="py-2.5 px-3 font-semibold text-right">Ticket Médio</th>
+                    <th class="py-2.5 px-3 font-semibold text-right">Participação</th>
+                  </tr>
+                </thead>
+                <tbody id="staffPerformanceTableBody" class="divide-y divide-white/5 text-slate-300">
+                  <tr>
+                    <td colspan="6" class="py-4 text-center text-slate-500">Nenhum profissional com dados no período.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ============================================== -->
+          <!-- CONTAS A PAGAR (EXCLUSIVO PRÓ)                 -->
+          <!-- ============================================== -->
+          <div id="sectionContasPagar" class="p-5 rounded-2xl bg-[#11131a] border border-white/10 space-y-4">
+            <!-- Locked State for Jéssica Intermediate -->
+            <div id="billsLockedBanner" class="hidden p-6 rounded-xl bg-gradient-to-r from-amber-950/30 via-[#07080c] to-[#07080c] border border-amber-500/20 text-center space-y-3">
+              <div class="w-10 h-10 rounded-full bg-[#F59E0B]/10 text-[#F59E0B] flex items-center justify-center mx-auto">
+                <i data-lucide="lock" class="w-5 h-5"></i>
+              </div>
+              <h4 class="text-sm font-bold text-white">Módulo de Contas a Pagar • Exclusivo do Plano Jéssica Pró</h4>
+              <p class="text-xs text-slate-400 max-w-lg mx-auto">Gerencie vencimentos de boletos, aluguel, fornecedores e receba alertas automáticos de contas a pagar no WhatsApp fazendo upgrade para o Plano Pró.</p>
+              <a href="https://wa.me/5511951364159?text=Ol%C3%A1%2C+quero+liberar+o+Contas+a+Pagar+no+Plano+Pr%C3%B3" target="_blank" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#F59E0B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all">
+                <span>Liberar Contas a Pagar</span>
+              </a>
+            </div>
+
+            <!-- Unlocked State for Jéssica Pro -->
+            <div id="billsUnlockedContent" class="space-y-4">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+                <div>
+                  <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <i data-lucide="receipt" class="w-4 h-4 text-[#F59E0B]"></i>
+                    <span>Contas a Pagar & Obrigações do Salão</span>
+                  </h4>
+                  <p class="text-xs text-slate-400 mt-0.5">Controle de boletos, fornecedores, tributos e custos fixos.</p>
+                </div>
+                <button type="button" id="btnOpenNewBillModal" class="px-3.5 py-1.5 rounded-xl bg-[#F59E0B] text-[#07080c] font-bold text-xs hover:brightness-110 flex items-center gap-1.5 transition-all">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  <span>Nova Conta a Pagar</span>
+                </button>
+              </div>
+
+              <!-- Bills KPI Subcards -->
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="p-3.5 rounded-xl bg-[#07080c] border border-white/5">
+                  <span class="text-[11px] text-slate-400">Total Pendente</span>
+                  <div id="billsPendingTotal" class="text-base font-bold text-amber-400 mt-0.5">R$ 0,00</div>
+                  <span id="billsPendingCount" class="text-[10px] text-slate-500">0 contas</span>
+                </div>
+                <div class="p-3.5 rounded-xl bg-[#07080c] border border-white/5">
+                  <span class="text-[11px] text-slate-400">Vencidas</span>
+                  <div id="billsOverdueCount" class="text-base font-bold text-rose-400 mt-0.5">0</div>
+                  <span class="text-[10px] text-rose-500/80">Requer atenção</span>
+                </div>
+                <div class="p-3.5 rounded-xl bg-[#07080c] border border-white/5">
+                  <span class="text-[11px] text-slate-400">Próximos Vencimentos</span>
+                  <div id="billsUpcomingCount" class="text-base font-bold text-blue-400 mt-0.5">0</div>
+                  <span class="text-[10px] text-slate-500">A vencer</span>
+                </div>
+                <div class="p-3.5 rounded-xl bg-[#07080c] border border-white/5">
+                  <span class="text-[11px] text-slate-400">Quitadas</span>
+                  <div id="billsPaidTotal" class="text-base font-bold text-emerald-400 mt-0.5">R$ 0,00</div>
+                  <span id="billsPaidCount" class="text-[10px] text-slate-500">0 pagas</span>
+                </div>
+              </div>
+
+              <!-- Bills List Table -->
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead>
+                    <tr class="border-b border-white/5 text-slate-400">
+                      <th class="py-2.5 px-3 font-semibold">Conta / Fornecedor</th>
+                      <th class="py-2.5 px-3 font-semibold">Vencimento</th>
+                      <th class="py-2.5 px-3 font-semibold">Categoria</th>
+                      <th class="py-2.5 px-3 font-semibold">Status</th>
+                      <th class="py-2.5 px-3 font-semibold text-right">Valor</th>
+                      <th class="py-2.5 px-3 font-semibold text-center">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody id="billsTableBody" class="divide-y divide-white/5 text-slate-300">
+                    <tr>
+                      <td colspan="6" class="py-4 text-center text-slate-500">Nenhuma conta agendada cadastrada.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- ============================================== -->
+          <!-- EXTRATO DE MOVIMENTAÇÕES FINANCEIRAS           -->
+          <!-- ============================================== -->
+          <div class="p-5 rounded-2xl bg-[#11131a] border border-white/10 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+              <div>
+                <h4 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <i data-lucide="arrow-left-right" class="w-4 h-4 text-cyan-400"></i>
+                  <span>Movimentações Financeiras • Extrato de Caixa</span>
+                </h4>
+                <p class="text-xs text-slate-400 mt-0.5">Lançamentos de receitas e despesas operacionais do estabelecimento.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <input type="text" id="txFilterSearch" placeholder="Buscar lançamentos..." class="px-3 py-1.5 rounded-xl bg-[#07080c] border border-white/10 text-white text-xs placeholder:text-slate-500">
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr class="border-b border-white/5 text-slate-400">
+                    <th class="py-2.5 px-3 font-semibold">Data</th>
+                    <th class="py-2.5 px-3 font-semibold">Tipo</th>
+                    <th class="py-2.5 px-3 font-semibold">Descrição</th>
+                    <th class="py-2.5 px-3 font-semibold">Categoria</th>
+                    <th class="py-2.5 px-3 font-semibold">Origem</th>
+                    <th class="py-2.5 px-3 font-semibold text-right">Valor</th>
+                  </tr>
+                </thead>
+                <tbody id="transactionsTableBody" class="divide-y divide-white/5 text-slate-300">
+                  <tr>
+                    <td colspan="6" class="py-4 text-center text-slate-500">Nenhuma movimentação registrada no período.</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
       </section>
+
+      <!-- ============================================== -->
+      <!-- MODAL: NOVA CONTA A PAGAR                      -->
+      <!-- ============================================== -->
+      <div id="modalNewBill" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs">
+          <div class="flex items-center justify-between border-b border-white/10 pb-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="receipt" class="w-4 h-4 text-[#F59E0B]"></i>
+              <span>Cadastrar Nova Conta a Pagar</span>
+            </h3>
+            <button type="button" id="btnCloseNewBillModal" class="text-slate-400 hover:text-white">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+          <form id="formNewBill" class="space-y-3.5">
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Título / Fornecedor *</label>
+              <input type="text" id="billTitle" placeholder="Ex: Fornecedor de Produtos, Aluguel, Luz" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-400 font-semibold mb-1">Valor Total (R$) *</label>
+                <input type="number" step="0.01" min="0.01" id="billAmount" placeholder="0,00" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white font-bold">
+              </div>
+              <div>
+                <label class="block text-slate-400 font-semibold mb-1">Data de Vencimento *</label>
+                <input type="date" id="billDueDate" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-400 font-semibold mb-1">Categoria</label>
+                <select id="billCategory" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+                  <option value="Contas">Contas Básicas</option>
+                  <option value="Fornecedores">Fornecedores / Produtos</option>
+                  <option value="Aluguel">Aluguel / Imóvel</option>
+                  <option value="Tributos">Tributos / Impostos</option>
+                  <option value="Equipe">Comissão / Folha</option>
+                  <option value="Outros">Outros</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-slate-400 font-semibold mb-1">Parcelas</label>
+                <input type="number" min="1" max="60" id="billInstallments" value="1" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+              </div>
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+              <button type="button" id="btnCancelNewBill" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold">Cancelar</button>
+              <button type="submit" id="btnSaveNewBill" class="px-4 py-2 rounded-xl bg-[#F59E0B] text-[#07080c] font-bold hover:brightness-110">Salvar Conta</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- ============================================== -->
+      <!-- MODAL: NOVA MOVIMENTAÇÃO DE CAIXA             -->
+      <!-- ============================================== -->
+      <div id="modalNewTransaction" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+        <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs">
+          <div class="flex items-center justify-between border-b border-white/10 pb-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="plus-circle" class="w-4 h-4 text-[#00F59B]"></i>
+              <span>Lançar Movimentação de Caixa</span>
+            </h3>
+            <button type="button" id="btnCloseNewTxModal" class="text-slate-400 hover:text-white">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+          <form id="formNewTransaction" class="space-y-3.5">
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Tipo de Lançamento *</label>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-white/10 bg-[#07080c] cursor-pointer hover:border-[#00F59B]/50 transition-all text-emerald-400 font-bold">
+                  <input type="radio" name="txType" value="INCOME" checked class="accent-[#00F59B]">
+                  <span>Receita / Entrada</span>
+                </label>
+                <label class="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-white/10 bg-[#07080c] cursor-pointer hover:border-rose-500/50 transition-all text-rose-400 font-bold">
+                  <input type="radio" name="txType" value="EXPENSE" class="accent-rose-500">
+                  <span>Despesa / Saída</span>
+                </label>
+              </div>
+            </div>
+            <div>
+              <label class="block text-slate-400 font-semibold mb-1">Descrição / Cliente / Fornecedor *</label>
+              <input type="text" id="txDescription" placeholder="Ex: Procedimento Extra, Compra de Café" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-400 font-semibold mb-1">Valor (R$) *</label>
+                <input type="number" step="0.01" min="0.01" id="txAmount" placeholder="0,00" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white font-bold">
+              </div>
+              <div>
+                <label class="block text-slate-400 font-semibold mb-1">Forma de Pagamento</label>
+                <select id="txPaymentMethod" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+                  <option value="Pix">Pix</option>
+                  <option value="Cartão de Crédito">Cartão de Crédito</option>
+                  <option value="Cartão de Débito">Cartão de Débito</option>
+                  <option value="Dinheiro">Dinheiro</option>
+                  <option value="Boleto">Boleto</option>
+                  <option value="Outro">Outro</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-slate-400 font-semibold mb-1">Categoria</label>
+                <input type="text" id="txCategory" placeholder="Ex: Cortes, Insumos, Manutenção" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+              </div>
+              <div>
+                <label class="block text-slate-400 font-semibold mb-1">Data</label>
+                <input type="date" id="txDate" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+              </div>
+            </div>
+            <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+              <button type="button" id="btnCancelNewTx" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold">Cancelar</button>
+              <button type="submit" id="btnSaveNewTx" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110">Salvar Lançamento</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <!-- ============================================== -->
       <!-- TAB 7: CAMPANHAS PRO (EXCLUSIVE PRO + LGPD)    -->
@@ -910,7 +1390,7 @@
       'services': { title: 'Módulo Jéssica • Serviços & Preços', subtitle: 'Procedimentos conhecidos e informados pela Jéssica' },
       'staff': { title: 'Módulo Jéssica • Equipe & Profissionais', subtitle: 'Profissionais habilitados para agendamento automático' },
       'appointments': { title: 'Módulo Jéssica • Agenda de Atendimentos', subtitle: 'Histórico e novos agendamentos confirmados' },
-      'dashboard-pro': { title: 'Módulo Jéssica • Dashboard Gerencial', subtitle: 'Indicadores financeiros e lucratividade em tempo real' },
+      'dashboard-pro': { title: 'Módulo Jéssica • Dashboard Gerencial & Financeiro', subtitle: 'Acompanhe o desempenho do seu salão em um só lugar.' },
       'campaigns-pro': { title: 'Módulo Jéssica • Campanhas Promocionais', subtitle: 'Disparo de novidades com consentimento e opt-out' },
     };
 
@@ -2057,18 +2537,465 @@
       }
     }
 
-    // Pro Dashboard
-    async function loadProDashboard() {
-      try {
-        const res = await fetch('/api/cliente/pro/dashboard');
-        if (res.status === 403) return;
-        const data = await res.json();
-        if (data.metrics) {
-          document.getElementById('metricTotalAppts').innerText = data.metrics.totalAppointments || 0;
-          document.getElementById('metricRevenue').innerText = `R$ ${(data.metrics.totalRevenue || 0).toFixed(2).replace('.', ',')}`;
-          document.getElementById('metricAvgTicket').innerText = `R$ ${(data.metrics.averageTicket || 0).toFixed(2).replace('.', ',')}`;
+    // ==========================================
+    // DASHBOARD GERENCIAL & FINANCEIRO 2.0
+    // ==========================================
+    let proDashboardState = {
+      period: 'this_month',
+      startDate: null,
+      endDate: null,
+      data: null,
+    };
+
+    function formatBRL(val) {
+      if (val === null || val === undefined || isNaN(val)) return 'R$ 0,00';
+      return Number(val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function renderVariationBadge(elemId, varObj) {
+      const el = document.getElementById(elemId);
+      if (!el) return;
+      if (varObj && varObj.hasHistory && varObj.formatted) {
+        const isUp = varObj.direction === 'up';
+        const colorClass = isUp ? 'text-emerald-400' : 'text-rose-400';
+        const arrow = isUp ? '↑' : '↓';
+        el.innerHTML = `<span class="${colorClass}">${arrow} ${varObj.formatted}</span>`;
+      } else {
+        el.innerHTML = `<span class="text-slate-500 font-normal">--</span>`;
+      }
+    }
+
+    // Render interactive SVG Chart for Revenues vs Expenses vs Result
+    function renderFinancialChart(timeline = []) {
+      const container = document.getElementById('financialChartContainer');
+      if (!container) return;
+
+      if (!timeline || timeline.length === 0) {
+        container.innerHTML = '<div class="text-xs text-slate-500">Sem dados financeiros suficientes para o período.</div>';
+        return;
+      }
+
+      const w = container.clientWidth || 800;
+      const h = container.clientHeight || 240;
+      const padLeft = 60;
+      const padRight = 20;
+      const padTop = 20;
+      const padBottom = 35;
+      const chartW = Math.max(100, w - padLeft - padRight);
+      const chartH = Math.max(60, h - padTop - padBottom);
+
+      // Find max and min values
+      let maxVal = 100;
+      let minVal = 0;
+      timeline.forEach(pt => {
+        if (pt.receitas > maxVal) maxVal = pt.receitas;
+        if (pt.despesas > maxVal) maxVal = pt.despesas;
+        if (pt.resultado > maxVal) maxVal = pt.resultado;
+        if (pt.resultado < minVal) minVal = pt.resultado;
+      });
+
+      maxVal = Math.ceil(maxVal * 1.15);
+      if (minVal < 0) minVal = Math.floor(minVal * 1.15);
+
+      const valRange = maxVal - minVal || 1;
+      const getY = (val) => padTop + chartH - ((val - minVal) / valRange) * chartH;
+      const zeroY = getY(0);
+
+      // X scale
+      const stepX = timeline.length > 1 ? chartW / (timeline.length - 1) : chartW / 2;
+      const getX = (idx) => padLeft + (timeline.length > 1 ? idx * stepX : chartW / 2);
+
+      // Build paths
+      let recPoints = [];
+      let despPoints = [];
+      let resPoints = [];
+
+      timeline.forEach((pt, idx) => {
+        const x = getX(idx);
+        recPoints.push(`${x},${getY(pt.receitas)}`);
+        despPoints.push(`${x},${getY(pt.despesas)}`);
+        resPoints.push(`${x},${getY(pt.resultado)}`);
+      });
+
+      const recPathD = `M ` + recPoints.join(' L ');
+      const despPathD = `M ` + despPoints.join(' L ');
+      const resPathD = `M ` + resPoints.join(' L ');
+
+      // Horizontal grid lines
+      const gridCount = 4;
+      let gridLinesSvg = '';
+      for (let i = 0; i <= gridCount; i++) {
+        const val = minVal + (valRange / gridCount) * i;
+        const y = getY(val);
+        gridLinesSvg += `
+          <line x1="${padLeft}" y1="${y}" x2="${padLeft + chartW}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3,3" />
+          <text x="${padLeft - 8}" y="${y + 4}" fill="#64748b" font-size="10" text-anchor="end">${Math.round(val)}</text>
+        `;
+      }
+
+      // X Axis Labels (sample if too many points)
+      const labelInterval = timeline.length > 16 ? Math.ceil(timeline.length / 8) : (timeline.length > 8 ? 2 : 1);
+      let xLabelsSvg = '';
+      timeline.forEach((pt, idx) => {
+        if (idx % labelInterval === 0 || idx === timeline.length - 1) {
+          const x = getX(idx);
+          xLabelsSvg += `
+            <text x="${x}" y="${padTop + chartH + 20}" fill="#94a3b8" font-size="10" text-anchor="middle">${pt.label}</text>
+          `;
         }
-      } catch (e) {}
+      });
+
+      // Data point dots & tooltips
+      let dotsSvg = '';
+      timeline.forEach((pt, idx) => {
+        const x = getX(idx);
+        const yRec = getY(pt.receitas);
+        const yDesp = getY(pt.despesas);
+        const yRes = getY(pt.resultado);
+
+        dotsSvg += `
+          <g class="chart-point-group cursor-pointer">
+            <title>${pt.label} | Receitas: R$ ${pt.receitas.toFixed(2)} | Despesas: R$ ${pt.despesas.toFixed(2)} | Resultado: R$ ${pt.resultado.toFixed(2)}</title>
+            <circle cx="${x}" cy="${yRec}" r="3" fill="#00F59B" stroke="#07080c" stroke-width="1.5" />
+            <circle cx="${x}" cy="${yDesp}" r="3" fill="#EF4444" stroke="#07080c" stroke-width="1.5" />
+            <circle cx="${x}" cy="${yRes}" r="3" fill="#8B5CF6" stroke="#07080c" stroke-width="1.5" />
+          </g>
+        `;
+      });
+
+      container.innerHTML = `
+        <svg viewBox="0 0 ${w} ${h}" class="w-full h-full overflow-visible" preserveAspectRatio="none">
+          <!-- Zero Line -->
+          ${minVal < 0 ? `<line x1="${padLeft}" y1="${zeroY}" x2="${padLeft + chartW}" y2="${zeroY}" stroke="rgba(255,255,255,0.2)" stroke-width="1" />` : ''}
+          <!-- Grid -->
+          ${gridLinesSvg}
+          <!-- Axes Labels -->
+          ${xLabelsSvg}
+          <!-- Trend Lines -->
+          <path d="${recPathD}" fill="none" stroke="#00F59B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="${despPathD}" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="${resPathD}" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-dasharray="4,4" stroke-linecap="round" stroke-linejoin="round" />
+          <!-- Dots -->
+          ${dotsSvg}
+        </svg>
+      `;
+    }
+
+    // Render Serviços Mais Procurados
+    function renderTopServices(services = []) {
+      const list = document.getElementById('topServicesList');
+      if (!list) return;
+
+      if (!services || services.length === 0) {
+        list.innerHTML = '<div class="text-xs text-slate-500 py-4 text-center">Nenhum serviço registrado no período.</div>';
+        return;
+      }
+
+      let html = '';
+      services.slice(0, 5).forEach((s, idx) => {
+        html += `
+          <div class="flex items-center justify-between p-2.5 rounded-xl bg-[#07080c] border border-white/5 hover:border-white/10 transition-all text-xs">
+            <div class="flex items-center gap-2.5">
+              <span class="w-5 h-5 rounded-lg bg-white/5 text-slate-400 font-bold flex items-center justify-center text-[10px]">#${idx + 1}</span>
+              <div>
+                <span class="font-bold text-white block">${s.name}</span>
+                <span class="text-[11px] text-slate-400">${s.count} atendimento${s.count === 1 ? '' : 's'}</span>
+              </div>
+            </div>
+            <div class="text-right">
+              <span class="font-bold text-[#00F59B] block">${formatBRL(s.revenue)}</span>
+              <span class="text-[10px] text-slate-500">preço médio: ${formatBRL(s.price)}</span>
+            </div>
+          </div>
+        `;
+      });
+      list.innerHTML = html;
+    }
+
+    // Render Horários de Maior Movimento
+    function renderPeakHours(peakHours = []) {
+      const container = document.getElementById('peakHoursContainer');
+      if (!container) return;
+
+      if (!peakHours || peakHours.length === 0) {
+        container.innerHTML = '<div class="text-xs text-slate-500 py-4 text-center">Sem dados de horários no período.</div>';
+        return;
+      }
+
+      const maxCount = Math.max(1, ...peakHours.map(p => p.count));
+      let html = '<div class="space-y-1.5">';
+
+      peakHours.forEach(p => {
+        const pct = Math.round((p.count / maxCount) * 100);
+        html += `
+          <div class="flex items-center gap-3 text-xs">
+            <span class="w-12 text-slate-400 font-mono text-[11px]">${p.hour}</span>
+            <div class="flex-1 h-3 rounded-full bg-white/5 overflow-hidden">
+              <div class="h-full rounded-full bg-gradient-to-r from-amber-500 to-[#00F59B] transition-all" style="width: ${pct}%"></div>
+            </div>
+            <span class="w-8 text-right font-bold text-slate-300 text-[11px]">${p.count}</span>
+          </div>
+        `;
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    // Render Desempenho por Profissional
+    function renderStaffPerformance(staff = []) {
+      const tbody = document.getElementById('staffPerformanceTableBody');
+      if (!tbody) return;
+
+      if (!staff || staff.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-slate-500">Nenhum profissional com dados no período.</td></tr>';
+        return;
+      }
+
+      let html = '';
+      staff.forEach(st => {
+        html += `
+          <tr class="hover:bg-white/[0.02] transition-colors">
+            <td class="py-3 px-3 font-bold text-white">${st.name}</td>
+            <td class="py-3 px-3 text-slate-400">${st.specialty || 'Profissional'}</td>
+            <td class="py-3 px-3 text-center font-bold text-slate-200">${st.appointments}</td>
+            <td class="py-3 px-3 text-right font-bold text-[#00F59B]">${formatBRL(st.revenue)}</td>
+            <td class="py-3 px-3 text-right text-slate-300">${formatBRL(st.avgTicket)}</td>
+            <td class="py-3 px-3 text-right">
+              <span class="px-2 py-0.5 rounded-full bg-white/5 text-slate-300 font-bold text-[10px]">${(st.sharePercent || 0).toFixed(1).replace('.', ',')}%</span>
+            </td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    // Render Contas a Pagar
+    function renderBills(bills = {}, isPro = true) {
+      const banner = document.getElementById('billsLockedBanner');
+      const content = document.getElementById('billsUnlockedContent');
+
+      if (!isPro) {
+        if (banner) banner.classList.remove('hidden');
+        if (content) content.classList.add('hidden');
+        return;
+      }
+
+      if (banner) banner.classList.add('hidden');
+      if (content) content.classList.remove('hidden');
+
+      // KPIs
+      document.getElementById('billsPendingTotal').innerText = formatBRL(bills.pendingTotal || 0);
+      document.getElementById('billsPendingCount').innerText = `${bills.pendingCount || 0} pendente${bills.pendingCount === 1 ? '' : 's'}`;
+      document.getElementById('billsOverdueCount').innerText = bills.overdueCount || 0;
+      document.getElementById('billsUpcomingCount').innerText = (bills.upcomingBills || []).length;
+      document.getElementById('billsPaidTotal').innerText = formatBRL(bills.paidTotal || 0);
+      document.getElementById('billsPaidCount').innerText = `${bills.paidCount || 0} quitada${bills.paidCount === 1 ? '' : 's'}`;
+
+      const tbody = document.getElementById('billsTableBody');
+      const allBills = [...(bills.overdueBills || []), ...(bills.upcomingBills || []), ...(bills.paidBills || [])];
+
+      if (allBills.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-slate-500">Nenhuma conta agendada cadastrada.</td></tr>';
+        return;
+      }
+
+      let html = '';
+      allBills.forEach(b => {
+        const isPaid = b.status === 'PAID';
+        const isOverdue = !isPaid && b.due_date < new Date().toISOString().slice(0, 10);
+
+        const statusBadge = isPaid
+          ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">QUITADA</span>'
+          : isOverdue
+          ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">VENCIDA</span>'
+          : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">PENDENTE</span>';
+
+        const actions = isPaid
+          ? `<button type="button" onclick="deleteBillItem(${b.id})" class="text-slate-500 hover:text-rose-400 p-1" title="Excluir histórico"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>`
+          : `
+            <div class="flex items-center justify-center gap-1.5">
+              <button type="button" onclick="markBillPaid(${b.id})" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 font-bold text-[10px] flex items-center gap-1 transition-all" title="Marcar como Paga">
+                <i data-lucide="check" class="w-3 h-3"></i>
+                <span>Pagar</span>
+              </button>
+              <button type="button" onclick="deleteBillItem(${b.id})" class="text-slate-500 hover:text-rose-400 p-1" title="Excluir"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+            </div>
+          `;
+
+        const [y, m, d] = (b.due_date || '').split('-');
+        const dateFormatted = d && m && y ? `${d}/${m}/${y}` : b.due_date;
+
+        html += `
+          <tr class="hover:bg-white/[0.02] transition-colors">
+            <td class="py-3 px-3 font-bold text-white">${b.title}</td>
+            <td class="py-3 px-3 text-slate-300 font-mono text-[11px]">${dateFormatted}</td>
+            <td class="py-3 px-3 text-slate-400">${b.category || 'Contas'}</td>
+            <td class="py-3 px-3">${statusBadge}</td>
+            <td class="py-3 px-3 text-right font-bold text-white">${formatBRL(b.amount)}</td>
+            <td class="py-3 px-3 text-center">${actions}</td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    // Render Movimentações Financeiras
+    function renderTransactions(transactions = []) {
+      const tbody = document.getElementById('transactionsTableBody');
+      if (!tbody) return;
+
+      if (!transactions || transactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-slate-500">Nenhuma movimentação registrada no período.</td></tr>';
+        return;
+      }
+
+      let html = '';
+      transactions.forEach(t => {
+        const isIncome = t.type === 'INCOME';
+        const typeBadge = isIncome
+          ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30">RECEITA</span>'
+          : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">DESPESA</span>';
+
+        const amountColor = isIncome ? 'text-[#00F59B]' : 'text-rose-400';
+        const prefix = isIncome ? '+' : '-';
+
+        // Format date string DD/MM/YYYY HH:MM
+        let dtFormatted = t.date;
+        try {
+          const d = new Date(t.date);
+          if (!isNaN(d.getTime())) {
+            dtFormatted = d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+          }
+        } catch (e) {}
+
+        html += `
+          <tr class="hover:bg-white/[0.02] transition-colors" data-desc="${(t.description || '').toLowerCase()}">
+            <td class="py-3 px-3 text-slate-400 font-mono text-[11px]">${dtFormatted}</td>
+            <td class="py-3 px-3">${typeBadge}</td>
+            <td class="py-3 px-3 font-bold text-white">${t.description}</td>
+            <td class="py-3 px-3 text-slate-400">${t.category || '--'}</td>
+            <td class="py-3 px-3 text-slate-400 text-[11px]">${t.origin || '--'}</td>
+            <td class="py-3 px-3 text-right font-black ${amountColor}">${prefix} ${formatBRL(Math.abs(t.amount))}</td>
+          </tr>
+        `;
+      });
+      tbody.innerHTML = html;
+    }
+
+    // Main Load Function for Dashboard Gerencial & Financeiro 2.0
+    async function loadProDashboard(period = null, customStart = null, customEnd = null) {
+      if (period) proDashboardState.period = period;
+      if (customStart) proDashboardState.startDate = customStart;
+      if (customEnd) proDashboardState.endDate = customEnd;
+
+      const p = proDashboardState.period || 'this_month';
+      let url = `/api/cliente/pro/dashboard?period=${encodeURIComponent(p)}`;
+      if (p === 'custom' && proDashboardState.startDate && proDashboardState.endDate) {
+        url += `&startDate=${encodeURIComponent(proDashboardState.startDate)}&endDate=${encodeURIComponent(proDashboardState.endDate)}`;
+      }
+
+      try {
+        const res = await fetch(url);
+
+        if (res.status === 403) {
+          const errData = await res.json().catch(() => ({}));
+          document.getElementById('proDashboardLocked').classList.remove('hidden');
+          document.getElementById('proDashboardContent').classList.add('hidden');
+          return;
+        }
+
+        if (!res.ok) {
+          showToast('Erro ao carregar indicadores gerenciais.', 'error');
+          return;
+        }
+
+        const data = await res.json();
+        proDashboardState.data = data;
+
+        document.getElementById('proDashboardLocked').classList.add('hidden');
+        document.getElementById('proDashboardContent').classList.remove('hidden');
+
+        // Demo Badge
+        const demoBadge = document.getElementById('proDemoBadge');
+        if (data.isDemo) {
+          demoBadge.classList.remove('hidden');
+          demoBadge.classList.add('flex');
+        } else {
+          demoBadge.classList.add('hidden');
+          demoBadge.classList.remove('flex');
+        }
+
+        // 8 Core KPI Cards
+        const m = data.metrics || {};
+        document.getElementById('kpiRealizedRevenue').innerText = formatBRL(m.realizedRevenue);
+        document.getElementById('kpiEstimatedRevenue').innerText = formatBRL(m.estimatedRevenue);
+        document.getElementById('kpiExpensesTotal').innerText = formatBRL(m.expensesTotal);
+
+        const resEl = document.getElementById('kpiFinancialResult');
+        resEl.innerText = formatBRL(m.financialResult);
+        if ((m.financialResult || 0) < 0) {
+          resEl.className = 'text-2xl font-black text-rose-400 mt-2';
+        } else {
+          resEl.className = 'text-2xl font-black text-emerald-400 mt-2';
+        }
+
+        document.getElementById('kpiTotalAppts').innerText = m.totalAppointments || 0;
+        document.getElementById('kpiCompletedAppts').innerText = m.completedAppointments || 0;
+        document.getElementById('kpiAverageTicket').innerText = m.hasSufficientData ? formatBRL(m.averageTicket) : 'Dados insuficientes';
+        document.getElementById('kpiCancelledAppts').innerText = m.cancelledAppointments || 0;
+
+        // Variations
+        const v = data.variations || {};
+        renderVariationBadge('kpiVarRealized', v.realizedRevenue);
+        renderVariationBadge('kpiVarExpenses', v.expensesTotal);
+        renderVariationBadge('kpiVarAppts', v.totalAppointments);
+        renderVariationBadge('kpiVarCompleted', v.completedAppointments);
+
+        // Sections
+        renderFinancialChart(data.timeline || []);
+        renderTopServices(data.services || []);
+        renderPeakHours(data.peakHours || []);
+        renderStaffPerformance(data.staff || []);
+        renderBills(data.bills || {}, data.isPro);
+        renderTransactions(data.transactions || []);
+
+        lucide.createIcons();
+      } catch (e) {
+        console.error('[Dashboard Load Error]:', e);
+        showToast('Erro de comunicação ao carregar dashboard.', 'error');
+      }
+    }
+
+    // Bill Actions
+    async function markBillPaid(billId) {
+      try {
+        const res = await fetch(`/api/cliente/pro/bills/${billId}/pay`, { method: 'PATCH' });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message || 'Conta marcada como paga!');
+          loadProDashboard();
+        } else {
+          showToast(data.error || 'Erro ao atualizar conta.', 'error');
+        }
+      } catch (e) {
+        showToast('Erro ao conectar ao servidor.', 'error');
+      }
+    }
+
+    async function deleteBillItem(billId) {
+      if (!confirm('Deseja realmente excluir esta conta agendada?')) return;
+      try {
+        const res = await fetch(`/api/cliente/pro/bills/${billId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message || 'Conta excluída!');
+          loadProDashboard();
+        } else {
+          showToast(data.error || 'Erro ao excluir conta.', 'error');
+        }
+      } catch (e) {
+        showToast('Erro ao excluir conta.', 'error');
+      }
     }
 
     // Pro Campaigns
@@ -2137,6 +3064,130 @@
       } catch (e) {
         showToast('Erro de conexão.', 'error');
       }
+    });
+
+    // Period Buttons
+    document.querySelectorAll('.period-filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.period-filter-btn').forEach(b => {
+          b.className = 'period-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 transition-all';
+        });
+        btn.className = 'period-filter-btn active px-3 py-1.5 rounded-xl text-xs font-bold bg-[#00F59B]/15 text-[#00F59B] border border-[#00F59B]/30 transition-all';
+
+        const p = btn.dataset.period;
+        const box = document.getElementById('customDateRangeBox');
+        if (p === 'custom') {
+          box.classList.remove('hidden');
+        } else {
+          box.classList.add('hidden');
+          loadProDashboard(p);
+        }
+      });
+    });
+
+    document.getElementById('btnApplyCustomDates')?.addEventListener('click', () => {
+      const s = document.getElementById('dashCustomStart').value;
+      const e = document.getElementById('dashCustomEnd').value;
+      if (!s || !e) {
+        showToast('Selecione as datas de início e fim.', 'error');
+        return;
+      }
+      loadProDashboard('custom', s, e);
+    });
+
+    // New Bill Modal
+    document.getElementById('btnOpenNewBillModal')?.addEventListener('click', () => {
+      document.getElementById('modalNewBill').classList.remove('hidden');
+      document.getElementById('modalNewBill').classList.add('flex');
+    });
+    const closeNewBillModal = () => {
+      document.getElementById('modalNewBill').classList.add('hidden');
+      document.getElementById('modalNewBill').classList.remove('flex');
+    };
+    document.getElementById('btnCloseNewBillModal')?.addEventListener('click', closeNewBillModal);
+    document.getElementById('btnCancelNewBill')?.addEventListener('click', closeNewBillModal);
+
+    document.getElementById('formNewBill')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = document.getElementById('billTitle').value;
+      const amount = document.getElementById('billAmount').value;
+      const dueDate = document.getElementById('billDueDate').value;
+      const category = document.getElementById('billCategory').value;
+      const installments = document.getElementById('billInstallments').value;
+
+      try {
+        const res = await fetch('/api/cliente/pro/bills', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, amount, dueDate, category, installments }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message || 'Conta cadastrada com sucesso!');
+          document.getElementById('formNewBill').reset();
+          closeNewBillModal();
+          loadProDashboard();
+        } else {
+          showToast(data.error || 'Erro ao cadastrar conta.', 'error');
+        }
+      } catch (e) {
+        showToast('Erro de comunicação.', 'error');
+      }
+    });
+
+    // New Transaction Modal
+    document.getElementById('btnOpenNewTxModal')?.addEventListener('click', () => {
+      document.getElementById('modalNewTransaction').classList.remove('hidden');
+      document.getElementById('modalNewTransaction').classList.add('flex');
+    });
+    const closeNewTxModal = () => {
+      document.getElementById('modalNewTransaction').classList.add('hidden');
+      document.getElementById('modalNewTransaction').classList.remove('flex');
+    };
+    document.getElementById('btnCloseNewTxModal')?.addEventListener('click', closeNewTxModal);
+    document.getElementById('btnCancelNewTx')?.addEventListener('click', closeNewTxModal);
+
+    document.getElementById('formNewTransaction')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const type = document.querySelector('input[name="txType"]:checked')?.value || 'INCOME';
+      const description = document.getElementById('txDescription').value;
+      const amount = document.getElementById('txAmount').value;
+      const paymentMethod = document.getElementById('txPaymentMethod').value;
+      const category = document.getElementById('txCategory').value;
+      const date = document.getElementById('txDate').value;
+
+      try {
+        const res = await fetch('/api/cliente/pro/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type, description, amount, paymentMethod, category, date }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message || 'Movimentação registrada com sucesso!');
+          document.getElementById('formNewTransaction').reset();
+          closeNewTxModal();
+          loadProDashboard();
+        } else {
+          showToast(data.error || 'Erro ao registrar movimentação.', 'error');
+        }
+      } catch (e) {
+        showToast('Erro de comunicação.', 'error');
+      }
+    });
+
+    // Transaction Search Filter
+    document.getElementById('txFilterSearch')?.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      const rows = document.querySelectorAll('#transactionsTableBody tr');
+      rows.forEach(r => {
+        const desc = r.getAttribute('data-desc') || '';
+        if (!q || desc.includes(q)) {
+          r.classList.remove('hidden');
+        } else {
+          r.classList.add('hidden');
+        }
+      });
     });
 
     // Test WhatsApp

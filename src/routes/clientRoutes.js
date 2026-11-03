@@ -5,6 +5,7 @@ const db = require('../database/db');
 const clientAuth = require('../services/clientAuthService');
 const config = require('../config');
 const productService = require('../services/productService');
+const salonDashboardService = require('../services/salonDashboardService');
 const { getPlan } = require('../services/planCatalog');
 const whatsappClient = require('../whatsapp/client');
 const {
@@ -714,78 +715,151 @@ router.delete('/appointments/:id', clientAuthMiddleware, requireProductAccess('J
   res.json({ success: true, message: 'Agendamento cancelado com sucesso.' });
 });
 
-// ==========================================
-// PRO PLAN EXCLUSIVE: MANAGERIAL DASHBOARD
-// ==========================================
+// =======================================================
+// DASHBOARD GERENCIAL & FINANCEIRO 2.0 (MÓDULO JÉSSICA)
+// =======================================================
 
-router.get('/pro/dashboard', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
-  const canAccessDashboard = ['JESSICA_INTERMEDIATE', 'JESSICA_PRO'].includes(req.clientUser.plan_tier) || req.isDemo;
+router.get('/pro/dashboard', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+  try {
+    const tier = salonDashboardService.getEffectiveJessicaTier(req.clientUser.id, req.clientUser);
+    const canAccessDashboard = ['JESSICA_INTERMEDIATE', 'JESSICA_PRO'].includes(tier) || req.isDemo;
 
-  if (!canAccessDashboard) {
-    return res.status(403).json({
+    if (!canAccessDashboard) {
+      return res.status(403).json({
+        success: false,
+        upgradeRequired: true,
+        currentPlan: tier,
+        message: 'Dashboard Gerencial disponível nos planos Intermediário e Pró.',
+        upgradeUrl: `${config.baseUrl}/planos`,
+      });
+    }
+
+    const { period, startDate, endDate } = req.query;
+    const data = await salonDashboardService.getSalonDashboard(req.clientUser.id, {
+      period,
+      startDate,
+      endDate,
+      isDemo: req.isDemo,
+    });
+
+    data.userTier = tier;
+    data.isPro = tier === 'JESSICA_PRO' || req.isDemo;
+
+    return res.json(data);
+  } catch (err) {
+    console.error('[Dashboard 2.0 Error]:', err);
+    return res.status(500).json({
       success: false,
-      upgradeRequired: true,
-      currentPlan: req.clientUser.plan_tier,
-      message: 'Dashboard Gerencial disponível nos planos Intermediário e Pró.',
-      upgradeUrl: `${config.baseUrl}/planos`,
+      error: 'Erro ao carregar dados do dashboard gerencial.',
     });
   }
+});
 
-  const userId = req.clientUser.id;
+// Bills to Pay (Contas a Pagar) - Exclusive to JESSICA_PRO
+router.get('/pro/bills', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+  try {
+    const tier = salonDashboardService.getEffectiveJessicaTier(req.clientUser.id, req.clientUser);
+    const isPro = tier === 'JESSICA_PRO' || req.isDemo;
 
-  // Real or mock metrics for demo
-  if (req.isDemo) {
-    return res.json({
-      success: true,
-      isDemo: true,
-      metrics: {
-        faturamentoMes: 9850.0,
-        faturamentoCrescimento: '+18.4%',
-        atendimentosMes: 148,
-        ticketMedio: 66.55,
-        taxaRetencao: '78.2%',
-        lucroEstimado: 6420.0,
-        receitaPorProfissional: [
-          { nome: 'Jéssica Ramos', valor: 4250.0, atendimentos: 58 },
-          { nome: 'Camila Santos', valor: 3480.0, atendimentos: 42 },
-          { nome: 'Rafael Costa', valor: 2120.0, atendimentos: 48 },
-        ],
-        receitaPorCategoria: [
-          { categoria: 'Cortes', valor: 4620.0, percent: 47 },
-          { categoria: 'Coloração & Mechas', valor: 3150.0, percent: 32 },
-          { categoria: 'Estética & Unhas', valor: 2080.0, percent: 21 },
-        ],
-      },
-    });
+    if (!isPro) {
+      return res.status(403).json({
+        success: false,
+        upgradeRequired: true,
+        proExclusive: true,
+        message: 'O módulo de Contas a Pagar é exclusivo do Plano Jéssica Pró.',
+      });
+    }
+
+    const dashboard = await salonDashboardService.getSalonDashboard(req.clientUser.id, { isDemo: req.isDemo });
+    return res.json({ success: true, bills: dashboard.bills });
+  } catch (err) {
+    console.error('[Bills Error]:', err);
+    return res.status(500).json({ success: false, error: 'Erro ao carregar contas a pagar.' });
   }
+});
 
-  // Real metrics calculated from user's appointments and services
-  const appointmentsCount = db.prepare(`
-    SELECT COUNT(*) as c FROM appointments
-    WHERE user_id = ? AND start_datetime >= date('now', 'start of month')
-  `).get(userId)?.c || 0;
+router.post('/pro/bills', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  try {
+    const tier = salonDashboardService.getEffectiveJessicaTier(req.clientUser.id, req.clientUser);
+    const isPro = tier === 'JESSICA_PRO' || req.isDemo;
 
-  const services = db.prepare('SELECT price FROM client_services WHERE user_id = ?').all(userId);
-  const avgPrice = services.length > 0
-    ? services.reduce((acc, s) => acc + (s.price || 0), 0) / services.length
-    : 70.0;
+    if (!isPro) {
+      return res.status(403).json({
+        success: false,
+        upgradeRequired: true,
+        proExclusive: true,
+        message: 'O módulo de Contas a Pagar é exclusivo do Plano Jéssica Pró.',
+      });
+    }
 
-  const faturamentoEstimado = appointmentsCount * avgPrice;
+    const bills = salonDashboardService.createBill(req.clientUser.id, req.body || {});
+    return res.status(201).json({ success: true, bills, message: 'Conta agendada registrada com sucesso!' });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message || 'Erro ao registrar conta.' });
+  }
+});
 
-  res.json({
-    success: true,
-    isDemo: false,
-    metrics: {
-      faturamentoMes: faturamentoEstimado,
-      faturamentoCrescimento: '+12.0%',
-      atendimentosMes: appointmentsCount,
-      ticketMedio: avgPrice,
-      taxaRetencao: '72.0%',
-      lucroEstimado: faturamentoEstimado * 0.65,
-      receitaPorProfissional: [],
-      receitaPorCategoria: [],
-    },
-  });
+router.patch('/pro/bills/:id/pay', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  try {
+    const tier = salonDashboardService.getEffectiveJessicaTier(req.clientUser.id, req.clientUser);
+    const isPro = tier === 'JESSICA_PRO' || req.isDemo;
+
+    if (!isPro) {
+      return res.status(403).json({
+        success: false,
+        upgradeRequired: true,
+        proExclusive: true,
+        message: 'O módulo de Contas a Pagar é exclusivo do Plano Jéssica Pró.',
+      });
+    }
+
+    const result = salonDashboardService.markBillAsPaid(req.clientUser.id, req.params.id);
+    return res.json({ success: true, ...result, message: 'Conta marcada como paga e despesa registrada no caixa!' });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message || 'Erro ao atualizar conta.' });
+  }
+});
+
+router.delete('/pro/bills/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  try {
+    const tier = salonDashboardService.getEffectiveJessicaTier(req.clientUser.id, req.clientUser);
+    const isPro = tier === 'JESSICA_PRO' || req.isDemo;
+
+    if (!isPro) {
+      return res.status(403).json({
+        success: false,
+        upgradeRequired: true,
+        proExclusive: true,
+        message: 'O módulo de Contas a Pagar é exclusivo do Plano Jéssica Pró.',
+      });
+    }
+
+    salonDashboardService.deleteBill(req.clientUser.id, req.params.id);
+    return res.json({ success: true, message: 'Conta excluída com sucesso.' });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message || 'Erro ao excluir conta.' });
+  }
+});
+
+// Manual transaction registration (Income or Expense)
+router.post('/pro/transactions', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  try {
+    const tier = salonDashboardService.getEffectiveJessicaTier(req.clientUser.id, req.clientUser);
+    const canAccess = ['JESSICA_INTERMEDIATE', 'JESSICA_PRO'].includes(tier) || req.isDemo;
+
+    if (!canAccess) {
+      return res.status(403).json({
+        success: false,
+        upgradeRequired: true,
+        message: 'Movimentações de caixa disponíveis nos planos Intermediário e Pró.',
+      });
+    }
+
+    const tx = salonDashboardService.recordTransaction(req.clientUser.id, req.body || {});
+    return res.status(201).json({ success: true, transaction: tx, message: 'Movimentação registrada com sucesso!' });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message || 'Erro ao registrar movimentação.' });
+  }
 });
 
 // ==========================================

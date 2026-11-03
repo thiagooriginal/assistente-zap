@@ -618,6 +618,19 @@ ensureColumnExists('products', 'has_approved_offer', "INTEGER DEFAULT 1");
 ensureColumnExists('products', 'summary', "TEXT");
 ensureColumnExists('products', 'target_audience', "TEXT");
 
+// Dashboard Gerencial & Financeiro 2.0 enhancements
+ensureColumnExists('appointments', 'service_id', 'INTEGER');
+ensureColumnExists('appointments', 'staff_id', 'INTEGER');
+ensureColumnExists('appointments', 'price', 'REAL');
+ensureColumnExists('appointments', 'client_name', 'TEXT');
+ensureColumnExists('appointments', 'client_phone', 'TEXT');
+
+ensureColumnExists('incomes', 'service_id', 'INTEGER');
+ensureColumnExists('incomes', 'staff_id', 'INTEGER');
+ensureColumnExists('incomes', 'appointment_id', 'INTEGER');
+
+ensureColumnExists('scheduled_payments', 'paid_at', 'TEXT');
+
 try {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -631,6 +644,10 @@ try {
     CREATE INDEX IF NOT EXISTS idx_appointments_google_id ON appointments(google_event_id);
     CREATE INDEX IF NOT EXISTS idx_products_solution_type ON products(solution_type);
     CREATE INDEX IF NOT EXISTS idx_products_comm_status ON products(commercial_status);
+    CREATE INDEX IF NOT EXISTS idx_incomes_user_date ON incomes(user_id, date);
+    CREATE INDEX IF NOT EXISTS idx_expenses_user_date ON expenses(user_id, date);
+    CREATE INDEX IF NOT EXISTS idx_scheduled_payments_user_due ON scheduled_payments(user_id, due_date, status);
+    CREATE INDEX IF NOT EXISTS idx_appointments_user_status_date ON appointments(user_id, status, start_datetime);
   `);
 } catch (e) {}
 
