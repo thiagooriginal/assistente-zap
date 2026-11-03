@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const config = require('../config');
 const db = require('../database/db');
+const { AUDIT_EVENTS, logSecurityEvent } = require('./securityAuditService');
 
 function getHeaders() {
   return {
@@ -478,6 +479,18 @@ async function handleWebhookEvent(eventData) {
       user = db.prepare('SELECT * FROM users WHERE id = ?').get(contract.user_id);
     }
   }
+  if (!user && subId) {
+    const custSub = db.prepare('SELECT user_id FROM customer_subscriptions WHERE gateway_subscription_id = ?').get(subId);
+    if (custSub) {
+      user = db.prepare('SELECT * FROM users WHERE id = ?').get(custSub.user_id);
+    }
+  }
+  if (!user && payment?.id) {
+    const custSub = db.prepare('SELECT user_id FROM customer_subscriptions WHERE gateway_payment_id = ?').get(payment.id);
+    if (custSub) {
+      user = db.prepare('SELECT * FROM users WHERE id = ?').get(custSub.user_id);
+    }
+  }
 
   // Check Hotmart isolation: Do NOT let Asaas events alter Hotmart customers
   if (user && user.subscription_origin === 'HOTMART') {
@@ -541,135 +554,319 @@ async function handleWebhookEvent(eventData) {
         `).run(paidUntilDate, payment?.id || null, user.id);
       }
 
-      // Update contract
-      db.prepare(`
-        UPDATE direct_sales_contracts
-        SET payment_status = 'PAID',
-            asaas_payment_id = COALESCE(?, asaas_payment_id),
-            updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = ?
-      `).run(payment?.id || null, user.id);
+      // -------------------------------------------------------------
+      // EXACT MULTIPRODUCT & CONTRACT TARGETING (PROTEÇÃO 19)
+      // Never use broad user_id = ? that would overwrite other independent contracts
+      // -------------------------------------------------------------
+      let targetSub = null;
+      if (subId) {
+        targetSub = db.prepare('SELECT * FROM customer_subscriptions WHERE gateway_subscription_id = ?').get(subId);
+      }
+      if (!targetSub && payment?.id) {
+        targetSub = db.prepare('SELECT * FROM customer_subscriptions WHERE gateway_payment_id = ?').get(payment.id);
+      }
+      if (!targetSub && user?.id) {
+        const userSubs = db.prepare("SELECT * FROM customer_subscriptions WHERE user_id = ? AND origin = 'ASAAS'").all(user.id);
+        if (userSubs.length === 1) targetSub = userSubs[0];
+      }
 
-      const contract = db.prepare('SELECT id FROM direct_sales_contracts WHERE user_id = ?').get(user.id);
-      if (contract) {
+      let targetContract = null;
+      if (subId) {
+        targetContract = db.prepare('SELECT * FROM direct_sales_contracts WHERE asaas_subscription_id = ?').get(subId);
+      }
+      if (!targetContract && payment?.id) {
+        targetContract = db.prepare('SELECT * FROM direct_sales_contracts WHERE asaas_payment_id = ?').get(payment.id);
+      }
+      if (!targetContract && targetSub?.contract_id) {
+        targetContract = db.prepare('SELECT * FROM direct_sales_contracts WHERE id = ?').get(targetSub.contract_id);
+      }
+      if (!targetContract && user?.id) {
+        const userContracts = db.prepare('SELECT * FROM direct_sales_contracts WHERE user_id = ?').all(user.id);
+        if (userContracts.length === 1) targetContract = userContracts[0];
+      }
+
+      // Update specific target contract
+      if (targetContract) {
+        db.prepare(`
+          UPDATE direct_sales_contracts
+          SET payment_status = 'PAID',
+              asaas_payment_id = COALESCE(?, asaas_payment_id),
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(payment?.id || null, targetContract.id);
+
         try {
           db.prepare(`
             INSERT OR REPLACE INTO direct_sales_payments (contract_id, reference, paid_until, confirmed_by)
             VALUES (?, ?, ?, 0)
-          `).run(contract.id, payment?.id || `PAY_${Date.now()}`, paidUntilDate);
+          `).run(targetContract.id, payment?.id || `PAY_${Date.now()}`, paidUntilDate);
 
           db.prepare(`
             INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
             VALUES (?, 0, 'PAYMENT_CONFIRMED_ASAAS', ?)
-          `).run(contract.id, `Pagamento Asaas confirmado: R$ ${payment?.value || 0}`);
+          `).run(targetContract.id, `Pagamento Asaas confirmado: R$ ${payment?.value || 0}`);
         } catch (e) {
           console.warn('[Asaas Webhook] Erro ao gravar evento direto:', e.message);
         }
       }
 
-      // Sync customer_subscriptions for multiproduct
+      // Sync specific customer_subscription for multiproduct
       try {
         const subStatus = user.password_hash ? 'ACTIVE' : 'PENDING';
-        db.prepare(`
-          UPDATE customer_subscriptions
-          SET status = ?, paid_until = ?, access_expires_at = ?,
-              gateway_payment_id = COALESCE(?, gateway_payment_id),
-              updated_at = CURRENT_TIMESTAMP
-          WHERE (gateway_subscription_id = ? OR gateway_payment_id = ? OR (user_id = ? AND origin = 'ASAAS'))
-        `).run(subStatus, paidUntilDate, paidUntilDate, payment?.id || null, subId || null, payment?.id || null, user.id);
+        if (targetSub) {
+          db.prepare(`
+            UPDATE customer_subscriptions
+            SET status = ?, paid_until = ?, access_expires_at = ?,
+                gateway_payment_id = COALESCE(?, gateway_payment_id),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(subStatus, paidUntilDate, paidUntilDate, payment?.id || null, targetSub.id);
+        } else if (subId || payment?.id) {
+          db.prepare(`
+            UPDATE customer_subscriptions
+            SET status = ?, paid_until = ?, access_expires_at = ?,
+                gateway_payment_id = COALESCE(?, gateway_payment_id),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE (gateway_subscription_id = ? OR gateway_payment_id = ?)
+          `).run(subStatus, paidUntilDate, paidUntilDate, payment?.id || null, subId || null, payment?.id || null);
+        }
       } catch (e) {}
+
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.WEBHOOK_PROCESSED,
+        userId: user.id,
+        details: { event, paymentId: payment?.id, subId, status: 'PAID' },
+      });
     } else if (event === 'PAYMENT_OVERDUE') {
-      db.prepare(`
-        UPDATE users SET subscription_status = 'OVERDUE', updated_at = CURRENT_TIMESTAMP WHERE id = ?
-      `).run(user.id);
-      db.prepare(`
-        UPDATE direct_sales_contracts SET payment_status = 'OVERDUE', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?
-      `).run(user.id);
+      let targetSub = null;
+      if (subId) {
+        targetSub = db.prepare('SELECT * FROM customer_subscriptions WHERE gateway_subscription_id = ?').get(subId);
+      }
+      if (!targetSub && payment?.id) {
+        targetSub = db.prepare('SELECT * FROM customer_subscriptions WHERE gateway_payment_id = ?').get(payment.id);
+      }
+      if (!targetSub && user?.id) {
+        const userSubs = db.prepare("SELECT * FROM customer_subscriptions WHERE user_id = ? AND origin = 'ASAAS'").all(user.id);
+        if (userSubs.length === 1) targetSub = userSubs[0];
+      }
 
-      try {
-        db.prepare(`
-          UPDATE customer_subscriptions
-          SET status = 'OVERDUE', updated_at = CURRENT_TIMESTAMP
-          WHERE (gateway_subscription_id = ? OR gateway_payment_id = ? OR (user_id = ? AND origin = 'ASAAS'))
-        `).run(subId || null, payment?.id || null, user.id);
-      } catch (e) {}
+      let targetContract = null;
+      if (subId) {
+        targetContract = db.prepare('SELECT * FROM direct_sales_contracts WHERE asaas_subscription_id = ?').get(subId);
+      }
+      if (!targetContract && payment?.id) {
+        targetContract = db.prepare('SELECT * FROM direct_sales_contracts WHERE asaas_payment_id = ?').get(payment.id);
+      }
+      if (!targetContract && targetSub?.contract_id) {
+        targetContract = db.prepare('SELECT * FROM direct_sales_contracts WHERE id = ?').get(targetSub.contract_id);
+      }
+      if (!targetContract && user?.id) {
+        const userContracts = db.prepare('SELECT * FROM direct_sales_contracts WHERE user_id = ?').all(user.id);
+        if (userContracts.length === 1) targetContract = userContracts[0];
+      }
 
-      const contract = db.prepare('SELECT id FROM direct_sales_contracts WHERE user_id = ?').get(user.id);
-      if (contract) {
+      if (targetContract) {
+        db.prepare(`UPDATE direct_sales_contracts SET payment_status = 'OVERDUE', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(targetContract.id);
         db.prepare(`
           INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
           VALUES (?, 0, 'PAYMENT_OVERDUE_ASAAS', ?)
-        `).run(contract.id, `Cobrança ID ${payment?.id} em atraso.`);
+        `).run(targetContract.id, `Cobrança ID ${payment?.id} em atraso.`);
       }
-    } else if (event === 'PAYMENT_REFUNDED' || event === 'PAYMENT_CHARGEBACK') {
-      db.prepare(`
-        UPDATE users
-        SET subscription_status = 'REFUNDED',
-        magic_token = NULL,
-        magic_token_expires_at = NULL,
-        reset_token = NULL,
-        reset_expires_at = NULL,
-        updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(user.id);
-      db.prepare(`
-        UPDATE direct_sales_contracts SET payment_status = 'REFUNDED', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?
-      `).run(user.id);
 
-      try {
+      if (targetSub) {
+        db.prepare(`UPDATE customer_subscriptions SET status = 'OVERDUE', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(targetSub.id);
+      } else if (subId || payment?.id) {
         db.prepare(`
           UPDATE customer_subscriptions
-          SET status = 'REFUNDED', updated_at = CURRENT_TIMESTAMP
-          WHERE (gateway_subscription_id = ? OR gateway_payment_id = ? OR (user_id = ? AND origin = 'ASAAS'))
-        `).run(subId || null, payment?.id || null, user.id);
-      } catch (e) {}
+          SET status = 'OVERDUE', updated_at = CURRENT_TIMESTAMP
+          WHERE (gateway_subscription_id = ? OR gateway_payment_id = ?)
+        `).run(subId || null, payment?.id || null);
+      }
 
-      const contract = db.prepare('SELECT id FROM direct_sales_contracts WHERE user_id = ?').get(user.id);
-      if (contract) {
+      // Check if user has other active products before downgrading global status
+      const hasOtherActive = db.prepare(`
+        SELECT id FROM customer_subscriptions
+        WHERE user_id = ? AND status = 'ACTIVE' AND datetime(paid_until) >= datetime('now')
+          AND id != COALESCE(?, -1)
+        LIMIT 1
+      `).get(user.id, targetSub?.id || -1);
+
+      if (!hasOtherActive) {
+        db.prepare(`UPDATE users SET subscription_status = 'OVERDUE', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(user.id);
+      } else {
+        console.log(`[Asaas Webhook] Usuário #${user.id} possui outros produtos ativos. Status global mantido.`);
+      }
+
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.WEBHOOK_PROCESSED,
+        userId: user.id,
+        details: { event, paymentId: payment?.id, subId, status: 'OVERDUE' },
+      });
+    } else if (event === 'PAYMENT_REFUNDED' || event === 'PAYMENT_CHARGEBACK') {
+      let targetSub = null;
+      if (subId) {
+        targetSub = db.prepare('SELECT * FROM customer_subscriptions WHERE gateway_subscription_id = ?').get(subId);
+      }
+      if (!targetSub && payment?.id) {
+        targetSub = db.prepare('SELECT * FROM customer_subscriptions WHERE gateway_payment_id = ?').get(payment.id);
+      }
+      if (!targetSub && user?.id) {
+        const userSubs = db.prepare("SELECT * FROM customer_subscriptions WHERE user_id = ? AND origin = 'ASAAS'").all(user.id);
+        if (userSubs.length === 1) targetSub = userSubs[0];
+      }
+
+      let targetContract = null;
+      if (subId) {
+        targetContract = db.prepare('SELECT * FROM direct_sales_contracts WHERE asaas_subscription_id = ?').get(subId);
+      }
+      if (!targetContract && payment?.id) {
+        targetContract = db.prepare('SELECT * FROM direct_sales_contracts WHERE asaas_payment_id = ?').get(payment.id);
+      }
+      if (!targetContract && targetSub?.contract_id) {
+        targetContract = db.prepare('SELECT * FROM direct_sales_contracts WHERE id = ?').get(targetSub.contract_id);
+      }
+      if (!targetContract && user?.id) {
+        const userContracts = db.prepare('SELECT * FROM direct_sales_contracts WHERE user_id = ?').all(user.id);
+        if (userContracts.length === 1) targetContract = userContracts[0];
+      }
+
+      if (targetContract) {
+        db.prepare(`UPDATE direct_sales_contracts SET payment_status = 'REFUNDED', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(targetContract.id);
         db.prepare(`
           INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
           VALUES (?, 0, 'PAYMENT_REFUNDED_ASAAS', ?)
-        `).run(contract.id, `Estorno / chargeback recebido no Asaas.`);
+        `).run(targetContract.id, `Estorno / chargeback recebido no Asaas.`);
       }
-    } else if (event === 'PAYMENT_RESTORED') {
-      db.prepare(`
-        UPDATE users SET subscription_status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP WHERE id = ?
-      `).run(user.id);
-      db.prepare(`
-        UPDATE direct_sales_contracts SET payment_status = 'PAID', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?
-      `).run(user.id);
 
-      try {
+      if (targetSub) {
+        db.prepare(`UPDATE customer_subscriptions SET status = 'REFUNDED', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(targetSub.id);
+      } else if (subId || payment?.id) {
         db.prepare(`
           UPDATE customer_subscriptions
-          SET status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP
-          WHERE (gateway_subscription_id = ? OR (user_id = ? AND origin = 'ASAAS'))
-        `).run(subId || null, user.id);
-      } catch (e) {}
+          SET status = 'REFUNDED', updated_at = CURRENT_TIMESTAMP
+          WHERE (gateway_subscription_id = ? OR gateway_payment_id = ?)
+        `).run(subId || null, payment?.id || null);
+      }
+
+      const hasOtherActive = db.prepare(`
+        SELECT id FROM customer_subscriptions
+        WHERE user_id = ? AND status = 'ACTIVE' AND datetime(paid_until) >= datetime('now')
+          AND id != COALESCE(?, -1)
+        LIMIT 1
+      `).get(user.id, targetSub?.id || -1);
+
+      if (!hasOtherActive) {
+        db.prepare(`
+          UPDATE users
+          SET subscription_status = 'REFUNDED',
+              magic_token = NULL,
+              magic_token_expires_at = NULL,
+              reset_token = NULL,
+              reset_expires_at = NULL,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(user.id);
+      } else {
+        console.log(`[Asaas Webhook] Usuário #${user.id} possui outros produtos ativos. Status global mantido após estorno de produto.`);
+      }
+
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.WEBHOOK_PROCESSED,
+        userId: user.id,
+        details: { event, paymentId: payment?.id, subId, status: 'REFUNDED' },
+      });
+    } else if (event === 'PAYMENT_RESTORED') {
+      let targetSub = null;
+      if (subId) {
+        targetSub = db.prepare('SELECT * FROM customer_subscriptions WHERE gateway_subscription_id = ?').get(subId);
+      }
+      if (!targetSub && payment?.id) {
+        targetSub = db.prepare('SELECT * FROM customer_subscriptions WHERE gateway_payment_id = ?').get(payment.id);
+      }
+
+      let targetContract = null;
+      if (subId) {
+        targetContract = db.prepare('SELECT * FROM direct_sales_contracts WHERE asaas_subscription_id = ?').get(subId);
+      }
+      if (!targetContract && payment?.id) {
+        targetContract = db.prepare('SELECT * FROM direct_sales_contracts WHERE asaas_payment_id = ?').get(payment.id);
+      }
+
+      if (targetContract) {
+        db.prepare(`UPDATE direct_sales_contracts SET payment_status = 'PAID', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(targetContract.id);
+      }
+      if (targetSub) {
+        db.prepare(`UPDATE customer_subscriptions SET status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(targetSub.id);
+      }
+
+      db.prepare(`UPDATE users SET subscription_status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(user.id);
     } else if (event === 'SUBSCRIPTION_DELETED' || event === 'SUBSCRIPTION_INACTIVATED') {
       // Cancellation without penalty (sem fidelidade) -> keeps access until paid_until expires
-      db.prepare(`
-        UPDATE users SET subscription_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP WHERE id = ?
-      `).run(user.id);
-      db.prepare(`
-        UPDATE direct_sales_contracts SET payment_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?
-      `).run(user.id);
+      let targetSub = null;
+      if (subId) {
+        targetSub = db.prepare('SELECT * FROM customer_subscriptions WHERE gateway_subscription_id = ?').get(subId);
+      }
+      if (!targetSub && payment?.id) {
+        targetSub = db.prepare('SELECT * FROM customer_subscriptions WHERE gateway_payment_id = ?').get(payment.id);
+      }
+      if (!targetSub && user?.id) {
+        const userSubs = db.prepare("SELECT * FROM customer_subscriptions WHERE user_id = ? AND origin = 'ASAAS'").all(user.id);
+        if (userSubs.length === 1) targetSub = userSubs[0];
+      }
 
-      try {
-        db.prepare(`
-          UPDATE customer_subscriptions
-          SET status = 'CANCELLED', cancelled_at = CURRENT_TIMESTAMP, cancellation_reason = 'Assinatura cancelada no Asaas', updated_at = CURRENT_TIMESTAMP
-          WHERE (gateway_subscription_id = ? OR (user_id = ? AND origin = 'ASAAS'))
-        `).run(subId || null, user.id);
-      } catch (e) {}
+      let targetContract = null;
+      if (subId) {
+        targetContract = db.prepare('SELECT * FROM direct_sales_contracts WHERE asaas_subscription_id = ?').get(subId);
+      }
+      if (!targetContract && targetSub?.contract_id) {
+        targetContract = db.prepare('SELECT * FROM direct_sales_contracts WHERE id = ?').get(targetSub.contract_id);
+      }
+      if (!targetContract && user?.id) {
+        const userContracts = db.prepare('SELECT * FROM direct_sales_contracts WHERE user_id = ?').all(user.id);
+        if (userContracts.length === 1) targetContract = userContracts[0];
+      }
 
-      const contract = db.prepare('SELECT id FROM direct_sales_contracts WHERE user_id = ?').get(user.id);
-      if (contract) {
+      if (targetContract) {
+        db.prepare(`UPDATE direct_sales_contracts SET payment_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(targetContract.id);
         db.prepare(`
           INSERT INTO direct_sales_events (contract_id, admin_id, event_type, notes)
           VALUES (?, 0, 'SUBSCRIPTION_CANCELED_ASAAS', ?)
-        `).run(contract.id, 'Assinatura cancelada no Asaas. Acesso mantido até o término do período pago.');
+        `).run(targetContract.id, 'Assinatura cancelada no Asaas. Acesso mantido até o término do período pago.');
       }
+
+      if (targetSub) {
+        db.prepare(`
+          UPDATE customer_subscriptions
+          SET status = 'CANCELLED', cancelled_at = CURRENT_TIMESTAMP, cancellation_reason = 'Assinatura cancelada no Asaas', updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(targetSub.id);
+      } else if (subId) {
+        db.prepare(`
+          UPDATE customer_subscriptions
+          SET status = 'CANCELLED', cancelled_at = CURRENT_TIMESTAMP, cancellation_reason = 'Assinatura cancelada no Asaas', updated_at = CURRENT_TIMESTAMP
+          WHERE gateway_subscription_id = ?
+        `).run(subId);
+      }
+
+      // Check if user has other active products
+      const hasOtherActive = db.prepare(`
+        SELECT id FROM customer_subscriptions
+        WHERE user_id = ? AND status = 'ACTIVE' AND datetime(paid_until) >= datetime('now')
+          AND id != COALESCE(?, -1)
+        LIMIT 1
+      `).get(user.id, targetSub?.id || -1);
+
+      if (!hasOtherActive) {
+        db.prepare(`UPDATE users SET subscription_status = 'CANCELED', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(user.id);
+      } else {
+        console.log(`[Asaas Webhook] Usuário #${user.id} possui outros produtos ativos. Status global mantido após cancelamento de assinatura.`);
+      }
+
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.CONTRACT_CANCELLED,
+        userId: user.id,
+        details: { event, subId, status: 'CANCELED' },
+      });
     }
   }
 

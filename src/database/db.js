@@ -129,6 +129,22 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_invite_code ON invite_codes(code);
 
+  -- SECURITY & AUDIT TRAIL LOGGING (PROTEÇÃO 08 & 26)
+  CREATE TABLE IF NOT EXISTS security_audit_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    user_id INTEGER,
+    ip_address TEXT,
+    user_agent TEXT,
+    resource TEXT,
+    status TEXT NOT NULL,
+    details_json TEXT,
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+  );
+  CREATE INDEX IF NOT EXISTS idx_sec_audit_event ON security_audit_logs(event_type);
+  CREATE INDEX IF NOT EXISTS idx_sec_audit_user ON security_audit_logs(user_id);
+  CREATE INDEX IF NOT EXISTS idx_sec_audit_created ON security_audit_logs(created_at);
+
   CREATE TABLE IF NOT EXISTS processed_messages (
     id TEXT PRIMARY KEY,
     sender_jid TEXT,
@@ -568,6 +584,35 @@ runVersionedMigration('20261101_02_fix_jarvis_solution_type', 'Fix solution_type
   `).run();
 });
 
+// Versioned migration: Security Hardening & Session Expiration (Proteção 08 & 17)
+runVersionedMigration('20261103_01_security_hardening_27_protections', 'Eliminate permanent magic tokens and initialize security audit trail', () => {
+  // Eliminate permanent magic tokens: set expiration to +7 days for any existing user with NULL
+  db.prepare(`
+    UPDATE users
+    SET magic_token_expires_at = datetime('now', '+7 days'),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE magic_token IS NOT NULL AND magic_token_expires_at IS NULL
+  `).run();
+
+  // Ensure security_audit_logs table exists
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS security_audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event_type TEXT NOT NULL,
+      user_id INTEGER,
+      ip_address TEXT,
+      user_agent TEXT,
+      resource TEXT,
+      status TEXT NOT NULL,
+      details_json TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_sec_audit_event ON security_audit_logs(event_type);
+    CREATE INDEX IF NOT EXISTS idx_sec_audit_user ON security_audit_logs(user_id);
+    CREATE INDEX IF NOT EXISTS idx_sec_audit_created ON security_audit_logs(created_at);
+  `);
+});
+
 // User columns for Client Authentication & Hotmart Subscriptions
 ensureColumnExists('users', 'email', 'TEXT');
 ensureColumnExists('users', 'password_hash', 'TEXT');
@@ -945,5 +990,47 @@ try {
   console.warn('[Database Seed] Aviso ao semear produtos ou migrar assinaturas:', seedErr.message);
 }
 
+/**
+ * SQLite Integrity & Security Validation (Proteção 03)
+ */
+db.checkDatabaseIntegrity = function () {
+  try {
+    const result = db.prepare('PRAGMA integrity_check').all();
+    const isOk = result.length === 1 && result[0].integrity_check === 'ok';
+    return {
+      ok: isOk,
+      result: result.map(r => r.integrity_check).join('; '),
+      timestamp: new Date().toISOString()
+    };
+  } catch (err) {
+    return { ok: false, error: err.message, timestamp: new Date().toISOString() };
+  }
+};
+
+/**
+ * SQLite Atomic Zero-Downtime Safe Backup (Proteção 03)
+ */
+db.backupDatabase = function (targetPath = null) {
+  if (!targetPath) {
+    const backupDir = path.resolve(path.dirname(config.dbPath), 'backups');
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    targetPath = path.join(backupDir, `assistant-backup-${timestamp}.db`);
+  }
+
+  try {
+    db.exec(`VACUUM INTO '${targetPath.replace(/'/g, "''")}'`);
+    return {
+      success: true,
+      backupPath: targetPath,
+      sizeBytes: fs.existsSync(targetPath) ? fs.statSync(targetPath).size : 0,
+      timestamp: new Date().toISOString()
+    };
+  } catch (err) {
+    throw new Error(`Falha ao executar backup SQLite: ${err.message}`);
+  }
+};
 
 module.exports = db;

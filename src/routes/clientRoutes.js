@@ -13,7 +13,9 @@ const {
   activationLimiter,
   passwordResetRequestLimiter,
   passwordResetSubmitLimiter,
+  whatsappTestLimiter,
 } = require('../middlewares/rateLimiter');
+const { AUDIT_EVENTS, logSecurityEvent } = require('../services/securityAuditService');
 
 // Helper to extract cookies from request header
 function getCookie(req, name) {
@@ -473,18 +475,42 @@ router.put('/profile/password', clientAuthMiddleware, async (req, res) => {
     }
     const valid = clientAuth.verifyPassword(currentPassword, user.password_hash, user.password_salt);
     if (!valid) {
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.LOGIN_FAILED,
+        userId: req.clientUser.id,
+        req,
+        status: 'FAILED',
+        details: { action: 'change_password_invalid_current' },
+      });
       return res.status(401).json({ success: false, error: 'Senha atual incorreta.' });
     }
   }
 
   const { hash, salt } = clientAuth.hashPassword(newPassword);
+  // Proteção 01: Rotate session token upon password change
+  const newSessionToken = clientAuth.generateSecureToken ? clientAuth.generateSecureToken(24) : require('crypto').randomBytes(24).toString('hex');
+  const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
   db.prepare(`
     UPDATE users
-    SET password_hash = ?, password_salt = ?, updated_at = CURRENT_TIMESTAMP
+    SET password_hash = ?,
+        password_salt = ?,
+        magic_token = ?,
+        magic_token_expires_at = ?,
+        updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(hash, salt, req.clientUser.id);
+  `).run(hash, salt, newSessionToken, sessionExpiresAt, req.clientUser.id);
 
-  res.json({ success: true, message: 'Senha alterada com sucesso.' });
+  setSessionCookie(res, 'client_auth_token', newSessionToken, 30 * 24 * 3600, req);
+
+  logSecurityEvent({
+    eventType: AUDIT_EVENTS.PASSWORD_CHANGE,
+    userId: req.clientUser.id,
+    req,
+    status: 'SUCCESS',
+  });
+
+  res.json({ success: true, message: 'Senha alterada com sucesso.', token: newSessionToken });
 });
 
 router.get('/products/:code/access', clientAuthMiddleware, (req, res) => {
@@ -943,8 +969,8 @@ router.post('/pro/campaigns', clientAuthMiddleware, requireProductAccess('JESSIC
 // WHATSAPP DISPATCH & DEMO SECURITY GUARDS
 // ==========================================
 
-// Test WhatsApp Message (Strictly blocked on Demo Account & Homologation)
-router.post('/test-whatsapp', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+// Test WhatsApp Message (Strictly blocked on Demo Account & Homologation) (Proteção 12)
+router.post('/test-whatsapp', whatsappTestLimiter, clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
   if (req.isDemo || req.clientUser.is_demo) {
     return res.status(403).json({
       success: false,

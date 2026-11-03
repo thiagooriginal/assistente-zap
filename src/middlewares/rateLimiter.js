@@ -1,11 +1,15 @@
 /**
  * Zero-dependency In-Memory Sliding-Window Rate Limiter
  * 
- * Provides rate limiting protection for sensitive endpoints:
- * - Admin Login
+ * Provides rate limiting protection for sensitive endpoints (Proteção 12):
+ * - Admin Login & Admin Actions
  * - Client Login
  * - Account Activation
- * - Password Reset
+ * - Password Reset (Request & Submit)
+ * - Lead Test Requests & TTS Streaming
+ * - Analytics & WhatsApp Test Dispatches
+ * 
+ * Uses strictly validated client IP via trusted reverse proxy (req.ip).
  */
 
 function createRateLimiter({
@@ -13,8 +17,9 @@ function createRateLimiter({
   maxAttempts = 5,
   message = 'Muitas tentativas a partir deste endereço. Tente novamente mais tarde.',
   keyGenerator = (req) => {
-    const forwarded = req.headers['x-forwarded-for'];
-    const ip = forwarded ? forwarded.split(',')[0].trim() : (req.ip || req.socket?.remoteAddress || '127.0.0.1');
+    // Proteção 12: Utilize strictly validated client IP from trusted reverse proxy
+    // Never trust spoofable raw x-forwarded-for header directly
+    const ip = req.ip || req.socket?.remoteAddress || '127.0.0.1';
     return `${ip}:${req.baseUrl || ''}${req.path || ''}`;
   },
 }) {
@@ -55,6 +60,17 @@ function createRateLimiter({
     if (record.count > maxAttempts) {
       const retryAfterSec = Math.max(1, Math.ceil((record.resetTime - now) / 1000));
       res.setHeader('Retry-After', retryAfterSec);
+
+      try {
+        const { logSecurityEvent, AUDIT_EVENTS } = require('../services/securityAuditService');
+        logSecurityEvent({
+          eventType: AUDIT_EVENTS.RATE_LIMIT_BLOCKED,
+          req,
+          status: 'BLOCKED',
+          details: { endpoint: req.originalUrl || req.path, count: record.count, maxAttempts, retryAfterSec },
+        });
+      } catch (_) {}
+
       return res.status(429).json({
         success: false,
         error: message,
@@ -103,6 +119,36 @@ const passwordResetSubmitLimiter = createRateLimiter({
   message: 'Limite de tentativas de redefinição de senha excedido. Tente novamente em 15 minutos.',
 });
 
+const leadTestLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  maxAttempts: 10,
+  message: 'Limite de solicitações de teste excedido. Tente novamente mais tarde.',
+});
+
+const ttsLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 25,
+  message: 'Limite de streaming de áudio neural excedido. Aguarde alguns minutos.',
+});
+
+const analyticsLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxAttempts: 60,
+  message: 'Limite de telemetria excedido.',
+});
+
+const adminActionLimiter = createRateLimiter({
+  windowMs: 5 * 60 * 1000,
+  maxAttempts: 40,
+  message: 'Limite de operações administrativas excedido. Aguarde alguns minutos.',
+});
+
+const whatsappTestLimiter = createRateLimiter({
+  windowMs: 10 * 60 * 1000,
+  maxAttempts: 5,
+  message: 'Limite de disparos de teste de WhatsApp excedido.',
+});
+
 module.exports = {
   createRateLimiter,
   adminLoginLimiter,
@@ -110,4 +156,9 @@ module.exports = {
   activationLimiter,
   passwordResetRequestLimiter,
   passwordResetSubmitLimiter,
+  leadTestLimiter,
+  ttsLimiter,
+  analyticsLimiter,
+  adminActionLimiter,
+  whatsappTestLimiter,
 };

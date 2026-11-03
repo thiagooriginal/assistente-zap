@@ -1,5 +1,6 @@
 const db = require('../database/db');
 const crypto = require('crypto');
+const { AUDIT_EVENTS, logSecurityEvent } = require('./securityAuditService');
 
 /**
  * Clean phone number to digits only
@@ -97,49 +98,81 @@ function updateUser(id, fields = {}) {
 }
 
 /**
- * Generate a 1-click passwordless Magic Link for the dashboard
+ * Generate a 1-click passwordless Magic Link with mandatory expiration (Proteção 17)
  */
-function generateMagicToken(userId, baseUrl = '') {
-  const existing = db.prepare('SELECT magic_token FROM users WHERE id = ?').get(userId);
-  let token = existing?.magic_token;
+function generateMagicToken(userId, baseUrl = '', expirationMinutes = 30) {
+  // Generate high-entropy single-session random token
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + expirationMinutes * 60 * 1000).toISOString();
 
-  if (!token) {
-    token = crypto.randomBytes(24).toString('hex');
-  }
-
-  // Set magic_token_expires_at to NULL for permanent lifetime
   db.prepare(`
     UPDATE users 
-    SET magic_token = ?, magic_token_expires_at = NULL 
+    SET magic_token = ?, magic_token_expires_at = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(token, userId);
+  `).run(token, expiresAt, userId);
+
+  logSecurityEvent({
+    eventType: AUDIT_EVENTS.MAGIC_TOKEN_GENERATED,
+    userId,
+    details: { expirationMinutes, expiresAt },
+  });
 
   const cleanBase = baseUrl ? baseUrl.replace(/\/+$/, '') : '';
   const loginUrl = `${cleanBase}/auth/magic?token=${token}`;
 
   return {
     token,
-    expiresAt: null,
+    expiresAt,
     url: loginUrl,
   };
 }
 
 /**
- * Validate magic token and return user
+ * Validate magic token and return user with strict expiration check (Proteção 01 & 17)
  */
 function getUserByMagicToken(token) {
-  if (!token) return null;
-  const user = db.prepare('SELECT * FROM users WHERE magic_token = ?').get(token);
+  if (!token || typeof token !== 'string') return null;
+  const user = db.prepare('SELECT * FROM users WHERE magic_token = ?').get(token.trim());
   if (!user) return null;
 
   if (user.magic_token_expires_at) {
     const expires = new Date(user.magic_token_expires_at);
     if (expires < new Date()) {
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.MAGIC_TOKEN_EXPIRED,
+        userId: user.id,
+        details: { expiredAt: user.magic_token_expires_at },
+      });
       return null; // Expired
     }
+  } else {
+    // Legacy un-migrated permanent token: reject in hardened mode
+    return null;
   }
 
   return user;
+}
+
+/**
+ * Revoke all active sessions and tokens for a user (Proteção 01)
+ */
+function revokeUserTokens(userId) {
+  if (!userId) return;
+  db.prepare(`
+    UPDATE users
+    SET magic_token = NULL,
+        magic_token_expires_at = NULL,
+        reset_token = NULL,
+        reset_expires_at = NULL,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(userId);
+
+  logSecurityEvent({
+    eventType: AUDIT_EVENTS.SESSION_REVOKED,
+    userId,
+    details: { reason: 'explicit_revocation' },
+  });
 }
 
 /**
@@ -463,4 +496,5 @@ module.exports = {
   deleteUser,
   findUserByFlexiblePhone,
   extendUserTrial,
+  revokeUserTokens,
 };

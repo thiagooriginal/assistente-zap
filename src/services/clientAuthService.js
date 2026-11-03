@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const db = require('../database/db');
 const config = require('../config');
+const { AUDIT_EVENTS, logSecurityEvent } = require('./securityAuditService');
 
 // Helper to hash password with salt using scrypt
 function hashPassword(password, salt = null) {
@@ -106,6 +107,12 @@ function activateAccount(token, password) {
   const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   db.prepare(`UPDATE users SET magic_token = ?, magic_token_expires_at = ? WHERE id = ?`).run(sessionToken, sessionExpiresAt, user.id);
 
+  logSecurityEvent({
+    eventType: AUDIT_EVENTS.ACTIVATION_SUCCESS,
+    userId: user.id,
+    status: 'SUCCESS',
+  });
+
   return {
     valid: true,
     success: true,
@@ -129,6 +136,11 @@ function login(email, password) {
   `).get(cleanEmail);
 
   if (!user) {
+    logSecurityEvent({
+      eventType: AUDIT_EVENTS.LOGIN_FAILED,
+      status: 'FAILED',
+      details: { email: cleanEmail, reason: 'user_not_found' },
+    });
     return { success: false, error: 'E-mail ou senha incorretos.', code: 'INVALID_CREDENTIALS' };
   }
 
@@ -176,6 +188,12 @@ function login(email, password) {
 
   const isMatch = verifyPassword(password, user.password_hash, user.password_salt);
   if (!isMatch) {
+    logSecurityEvent({
+      eventType: AUDIT_EVENTS.LOGIN_FAILED,
+      userId: user.id,
+      status: 'FAILED',
+      details: { email: cleanEmail, reason: 'password_mismatch' },
+    });
     return { success: false, error: 'E-mail ou senha incorretos.', code: 'INVALID_CREDENTIALS' };
   }
 
@@ -208,6 +226,12 @@ function login(email, password) {
 
   // Ensure salon entry exists
   ensureSalonForUser(user.id, user.name);
+
+  logSecurityEvent({
+    eventType: AUDIT_EVENTS.LOGIN_SUCCESS,
+    userId: user.id,
+    status: 'SUCCESS',
+  });
 
   return {
     success: true,
@@ -312,6 +336,12 @@ function resetPassword(token, newPassword) {
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(hash, salt, user.id);
+
+  logSecurityEvent({
+    eventType: AUDIT_EVENTS.PASSWORD_RESET_SUCCESS,
+    userId: user.id,
+    status: 'SUCCESS',
+  });
 
   return {
     success: true,
@@ -560,6 +590,7 @@ function verifyToken(token) {
 module.exports = {
   hashPassword,
   verifyPassword,
+  generateSecureToken,
   validateActivationToken,
   activateAccount,
   login,

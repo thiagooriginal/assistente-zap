@@ -17,8 +17,8 @@ async function runAsaasMultichannelTests() {
   console.log('💳  SUITE DE TESTES MULTICANAL: ASSINATURAS ASAAS & HOTMART');
   console.log('============================================================\n');
 
-  // Configure test webhook secret if empty
-  const TEST_WEBHOOK_SECRET = 'test_asaas_secret_token_raia_2026';
+  // Configure test webhook secret dynamically
+  const TEST_WEBHOOK_SECRET = config.asaasWebhookSecret || ('test_sec_' + crypto.randomBytes(16).toString('hex'));
   config.asaasWebhookSecret = TEST_WEBHOOK_SECRET;
 
   const server = http.createServer(app);

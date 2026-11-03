@@ -23,7 +23,24 @@ const clientAuth = require('../services/clientAuthService');
 const directSales = require('../services/directSalesService');
 const productService = require('../services/productService');
 const { PLANS } = require('../services/planCatalog');
-const { adminLoginLimiter } = require('../middlewares/rateLimiter');
+const {
+  adminLoginLimiter,
+  leadTestLimiter,
+  ttsLimiter,
+  analyticsLimiter,
+  adminActionLimiter,
+  whatsappTestLimiter,
+} = require('../middlewares/rateLimiter');
+const { AUDIT_EVENTS, logSecurityEvent, getRecentSecurityLogs } = require('../services/securityAuditService');
+
+// Execute Startup Environment & Configuration Validation (Proteção 11)
+try {
+  if (typeof config.validateEnvironment === 'function') {
+    config.validateEnvironment();
+  }
+} catch (envErr) {
+  console.error('[Config Error]', envErr.message);
+}
 
 // Initialize isolated demo account for Hotmart compliance
 try {
@@ -38,9 +55,19 @@ const app = express();
 // Prevents trusting spoofed X-Forwarded-* headers from untrusted external clients.
 app.set('trust proxy', 1);
 
-// Application-level HTTPS redirect and security headers
+// Validate host header to prevent Host Header Injection / Open Redirect attacks (Proteção 04)
+function getValidatedRedirectHost(req, fallbackHost) {
+  const rawHost = (req.get('x-forwarded-host') || req.get('host') || '').trim().toLowerCase();
+  if (!rawHost) return fallbackHost;
+  const isAllowed = rawHost === 'raiaagentes.com.br' ||
+                    rawHost.endsWith('.raiaagentes.com.br') ||
+                    rawHost.startsWith('localhost') ||
+                    rawHost.startsWith('127.0.0.1');
+  return isAllowed ? rawHost : fallbackHost;
+}
+
+// Application-level HTTPS redirect and security headers (Proteção 04 & 14)
 // NOTE: TLS certificate provisioning is managed by Traefik / Let's Encrypt at the ingress proxy layer.
-// Express middleware does NOT issue or fix TLS certificates; it handles HTTP->HTTPS redirection and response security headers.
 app.use((req, res, next) => {
   const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
   const isProduction = process.env.NODE_ENV === 'production' && !isStaging;
@@ -50,7 +77,8 @@ app.use((req, res, next) => {
 
   // Enforce HTTPS redirection in staging / production if request arrived over plain HTTP
   if (isStagingOrProd && proto && proto.toLowerCase() === 'http') {
-    const host = req.get('x-forwarded-host') || req.get('host') || 'staging.raiaagentes.com.br';
+    const defaultHost = isStaging ? 'staging.raiaagentes.com.br' : 'raiaagentes.com.br';
+    const host = getValidatedRedirectHost(req, defaultHost);
     return res.redirect(301, `https://${host}${req.originalUrl || req.url}`);
   }
 
@@ -65,20 +93,133 @@ app.use((req, res, next) => {
     res.setHeader('Strict-Transport-Security', 'max-age=86400');
   }
 
-  // Response defense-in-depth headers
+  // Response defense-in-depth headers (Proteção 14)
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.setHeader('X-XSS-Protection', '0');
 
   if (isStagingOrProd) {
-    res.setHeader('Content-Security-Policy', "upgrade-insecure-requests; default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';");
+    res.setHeader('Content-Security-Policy', "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'; base-uri 'self'; upgrade-insecure-requests;");
   }
 
   next();
 });
 
-app.use(cors());
+// Restricted CORS configuration (Proteção 13)
+const allowedOrigins = [
+  'https://raiaagentes.com.br',
+  'https://staging.raiaagentes.com.br',
+  'http://localhost:3333',
+  'http://127.0.0.1:3333',
+];
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true); // Allow server-to-server or non-browser tools
+    const isAllowed = allowedOrigins.includes(origin) ||
+                      origin.endsWith('.raiaagentes.com.br') ||
+                      origin.includes('localhost') ||
+                      origin.includes('127.0.0.1');
+    if (isAllowed) {
+      return callback(null, true);
+    }
+    // Disallow without throwing internal server error (browser will enforce origin block)
+    return callback(null, false);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Auth-Token', 'X-Staging-Key', 'X-Staging-Token', 'X-Admin-Key', 'X-Admin-Pin', 'X-CSRF-Token'],
+  credentials: true,
+}));
+
 app.use(express.json());
+
+// Anti-CSRF Protection Middleware on State-Changing Requests (Proteção 16)
+app.use((req, res, next) => {
+  const mutatingMethods = ['POST', 'PUT', 'DELETE', 'PATCH'];
+  if (!mutatingMethods.includes(req.method)) return next();
+
+  // Webhooks and anonymous public endpoints are exempted from browser CSRF checks
+  const exemptPrefixes = ['/api/webhooks', '/api/analytics/event', '/api/leads/request-test', '/api/test-agent'];
+  if (exemptPrefixes.some(p => req.path.startsWith(p))) {
+    return next();
+  }
+
+  // If request uses custom Authorization header or API keys, CSRF does not apply
+  const hasCustomAuthHeader = Boolean(
+    req.headers.authorization ||
+    req.headers['x-auth-token'] ||
+    req.headers['x-admin-key'] ||
+    req.headers['x-staging-key'] ||
+    req.headers['x-staging-token']
+  );
+  if (hasCustomAuthHeader) {
+    return next();
+  }
+
+  // If request relies purely on cookies for authentication, verify Origin / Referer
+  const cookieHeader = req.headers.cookie || '';
+  const hasAuthCookie = cookieHeader.includes('auth_token') || cookieHeader.includes('client_auth_token');
+  if (hasAuthCookie) {
+    const origin = req.headers.origin || req.headers.referer;
+    if (origin) {
+      try {
+        const parsed = new URL(origin).hostname.toLowerCase();
+        const isAllowed = parsed === 'raiaagentes.com.br' ||
+                          parsed.endsWith('.raiaagentes.com.br') ||
+                          parsed === 'localhost' ||
+                          parsed === '127.0.0.1';
+        if (!isAllowed) {
+          logSecurityEvent({
+            eventType: AUDIT_EVENTS.CSRF_VIOLATION_BLOCKED,
+            req,
+            status: 'BLOCKED',
+            details: { origin, path: req.path },
+          });
+          return res.status(403).json({ success: false, error: 'Acesso bloqueado: validação de origem CSRF falhou.' });
+        }
+      } catch (_) {
+        return res.status(403).json({ success: false, error: 'Origem da requisição inválida.' });
+      }
+    }
+  }
+
+  next();
+});
+
+// Cache-Control protection for private client and administrative data (Proteção 14)
+app.use(['/api/cliente', '/api/admin', '/api/asaas', '/api/me'], (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
+// Defensive block against exposing internal databases, secrets, backups, logs, and dotfiles (Proteção 23)
+app.use((req, res, next) => {
+  const urlPath = decodeURIComponent(req.path || '').toLowerCase();
+  const forbiddenPatterns = [
+    /\/\./,                             // Any hidden dotfile (e.g. .env, .git)
+    /\.(db|sqlite|sqlite3|db-wal|db-shm|db-journal)$/i, // Databases
+    /\.(key|pem|cert|crt|p12|pfx)$/i,    // Certificates & Keys
+    /\.(bak|dump|sql|backup|tar|gz)$/i, // Backups & Dumps
+    /\.(log|env|env.*)$/i,              // Logs and environment files
+    /\/package\.json$/i,                // Package manifests
+    /\/google_.*\.json$/i,              // Google credentials
+  ];
+  for (const pattern of forbiddenPatterns) {
+    if (pattern.test(urlPath)) {
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.SUSPICIOUS_FILE_ACCESS_BLOCKED,
+        req,
+        status: 'BLOCKED',
+        details: { requestedPath: req.path },
+      });
+      return res.status(404).send('Not Found');
+    }
+  }
+  next();
+});
 
 // Helper to extract cookies from request header
 function getCookie(req, name) {
@@ -440,14 +581,10 @@ app.get('/api/health', async (req, res) => {
     timestamp: new Date().toISOString(),
     gemini: {
       configured: Boolean(config.geminiApiKey),
-      keyLength: config.geminiApiKey ? config.geminiApiKey.length : 0,
-      keyPrefix: config.geminiApiKey ? config.geminiApiKey.substring(0, 6) + '...' : null,
       working: geminiWorking,
-      details: geminiDetails,
     },
     whatsapp: {
       connected: isConnected,
-      phone: waUser?.id ? waUser.id.split(':')[0] : null,
     },
     personalAssistant: {
       paused: Boolean(config.pausePersonalAssistant),
@@ -457,7 +594,6 @@ app.get('/api/health', async (req, res) => {
     },
     calendar: {
       connected: calendarService.isCalendarConnected(),
-      calendarId: config.googleCalendarId,
     },
   });
 });
@@ -661,9 +797,9 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
 });
 
 // ==========================================
-// MARKETING & ANALYTICS INGESTION ENDPOINTS
+// MARKETING & ANALYTICS INGESTION ENDPOINTS (PROTEÇÃO 12)
 // ==========================================
-app.post('/api/analytics/event', (req, res) => {
+app.post('/api/analytics/event', analyticsLimiter, (req, res) => {
   try {
     const {
       eventName, visitorId, utmSource, utmMedium, utmCampaign,
@@ -1193,11 +1329,11 @@ async function handleLeadTestRequest(req, res) {
   }
 }
 
-app.post('/api/test-agent', handleLeadTestRequest);
-app.post('/api/leads/request-test', handleLeadTestRequest);
+app.post('/api/test-agent', leadTestLimiter, handleLeadTestRequest);
+app.post('/api/leads/request-test', leadTestLimiter, handleLeadTestRequest);
 
 // ==========================================
-// 1-CLICK PASSWORDLESS MAGIC LINK ENDPOINT
+// 1-CLICK PASSWORDLESS MAGIC LINK ENDPOINT (PROTEÇÃO 17)
 // ==========================================
 app.get('/auth/magic', (req, res) => {
   const { token } = req.query;
@@ -1230,16 +1366,35 @@ app.get('/auth/magic', (req, res) => {
     `);
   }
 
+  // Proteção 01 & 17: Rotate single-use magic token into a fresh session token
+  const newSessionToken = crypto.randomBytes(32).toString('hex');
+  const sessionExpiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
+  db.prepare(`
+    UPDATE users 
+    SET magic_token = ?, magic_token_expires_at = ?, last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(newSessionToken, sessionExpiresAt, user.id);
+
   // Set secure auth cookie with HttpOnly & SameSite=Lax (7 days)
-  setSessionCookie(res, 'auth_token', token, req, 7 * 24 * 3600);
-  return res.redirect(`/admin?token=${token}`);
+  setSessionCookie(res, 'auth_token', newSessionToken, req, 7 * 24 * 3600);
+
+  logSecurityEvent({
+    eventType: AUDIT_EVENTS.MAGIC_TOKEN_USED,
+    userId: user.id,
+    req,
+    status: 'SUCCESS',
+    details: { destination: '/admin' }
+  });
+
+  // Redirect to admin panel WITHOUT leaking token into query string
+  return res.redirect('/admin');
 });
 
 // ==========================================
-// DIRECT ADMIN LOGIN VIA API (PASSWORD / PIN)
+// DIRECT ADMIN LOGIN VIA API (PASSWORD / PIN / MFA) (PROTEÇÃO 01 & 09)
 // ==========================================
 app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
-  const { password } = req.body || {};
+  const { password, mfaCode } = req.body || {};
   const input = typeof password === 'string' ? password.trim() : '';
 
   if (!input) {
@@ -1265,10 +1420,47 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
   }
 
   if (!isValid) {
+    logSecurityEvent({
+      eventType: AUDIT_EVENTS.ADMIN_LOGIN_FAILED,
+      req,
+      status: 'FAILED',
+      details: { reason: 'invalid_credentials' },
+    });
     return res.status(401).json({
       success: false,
       error: 'Senha ou PIN de administrador incorreto.'
     });
+  }
+
+  // Admin MFA Verification (Proteção 01)
+  const isMfaActive = config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true';
+  if (isMfaActive) {
+    if (!mfaCode) {
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.ADMIN_MFA_CHALLENGE,
+        req,
+        status: 'CHALLENGE_REQUIRED',
+      });
+      return res.status(200).json({
+        success: false,
+        mfaRequired: true,
+        message: 'Autenticação multifator (MFA) obrigatória para administradores. Informe o código MFA.',
+      });
+    }
+
+    const expectedMfa = (config.adminPin || process.env.ADMIN_MFA_PIN || '').trim();
+    if (!expectedMfa || !timingSafeMatch(String(mfaCode).trim(), expectedMfa)) {
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.ADMIN_MFA_FAILED,
+        req,
+        status: 'FAILED',
+        details: { reason: 'invalid_mfa_code' },
+      });
+      return res.status(401).json({
+        success: false,
+        error: 'Código MFA incorreto ou inválido.',
+      });
+    }
   }
 
   // Find or ensure master admin user
@@ -1283,12 +1475,20 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
     db.prepare("UPDATE users SET role = 'ADMIN', plan = 'PRO' WHERE id = ?").run(admin.id);
   }
 
-  // Generate 7-day session token
+  // Generate 7-day session token (Proteção 01 - Session Rotation)
   const token = crypto.randomBytes(32).toString('hex');
   db.prepare("UPDATE users SET magic_token = ?, magic_token_expires_at = datetime('now', '+7 days') WHERE id = ?").run(token, admin.id);
 
   // Set secure HttpOnly cookie
   setSessionCookie(res, 'auth_token', token, req, 7 * 24 * 3600);
+
+  logSecurityEvent({
+    eventType: AUDIT_EVENTS.ADMIN_LOGIN_SUCCESS,
+    userId: admin.id,
+    req,
+    status: 'SUCCESS',
+    details: { mfaVerified: Boolean(isMfaActive) },
+  });
 
   return res.json({
     success: true,
@@ -1508,9 +1708,9 @@ app.post('/api/admin/marketing/generate-script', requireAdmin, async (req, res) 
 });
 
 // ==========================================
-// HIGH DEFINITION NEURAL TTS AUDIO STREAMING
+// HIGH DEFINITION NEURAL TTS AUDIO STREAMING (PROTEÇÃO 12)
 // ==========================================
-app.get('/api/tts', async (req, res) => {
+app.get('/api/tts', ttsLimiter, async (req, res) => {
   try {
     const text = (req.query.text || '').substring(0, 500).replace(/[*_~`#]/g, '').trim();
     if (!text) return res.status(400).send('Texto não fornecido');
@@ -2327,6 +2527,82 @@ app.delete('/api/appointments/:id', authMiddleware, (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// ==========================================
+// SECURITY AUDIT & SYSTEM INTEGRITY ENDPOINTS (PROTEÇÃO 03 & 08)
+// ==========================================
+app.get('/api/admin/security/audit-logs', requireAdmin, (req, res) => {
+  try {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
+    const eventType = req.query.eventType || null;
+    const userId = req.query.userId ? parseInt(req.query.userId, 10) : null;
+    const logs = getRecentSecurityLogs({ limit, eventType, userId });
+    res.json({ success: true, count: logs.length, logs });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Erro ao buscar logs de auditoria: ' + err.message });
+  }
+});
+
+app.get('/api/admin/system/integrity-check', requireAdmin, (req, res) => {
+  try {
+    const integrity = typeof db.checkDatabaseIntegrity === 'function'
+      ? db.checkDatabaseIntegrity()
+      : { ok: true, message: 'checkDatabaseIntegrity não disponível' };
+    logSecurityEvent({
+      eventType: AUDIT_EVENTS.DB_INTEGRITY_CHECK,
+      userId: req.user?.id,
+      req,
+      status: integrity.ok ? 'SUCCESS' : 'FAILED',
+      details: integrity,
+    });
+    res.json({ success: integrity.ok, ...integrity });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/api/admin/system/backup', requireAdmin, (req, res) => {
+  try {
+    if (typeof db.backupDatabase !== 'function') {
+      return res.status(500).json({ success: false, error: 'Função de backup não disponível no adaptador SQLite.' });
+    }
+    const result = db.backupDatabase();
+    logSecurityEvent({
+      eventType: AUDIT_EVENTS.DB_BACKUP_CREATED,
+      userId: req.user?.id,
+      req,
+      status: 'SUCCESS',
+      details: { backupPath: result.backupPath, sizeBytes: result.sizeBytes },
+    });
+    res.json({ success: true, message: 'Backup SQLite executado com sucesso.', ...result });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// CENTRALIZED ERROR HANDLING MIDDLEWARE (PROTEÇÃO 20)
+// Prevents leaking stack traces, environment variables or internal details
+// ==========================================
+app.use((err, req, res, next) => {
+  if (err.message && err.message.includes('CORS')) {
+    return res.status(403).json({
+      success: false,
+      error: 'Origem não autorizada pela política CORS.',
+      code: 'CORS_FORBIDDEN',
+    });
+  }
+  console.error('[Unhandled Server Error]', err.stack || err.message || err);
+  const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
+  const isProdOrStaging = process.env.NODE_ENV === 'production' || isStaging;
+  const status = err.status || err.statusCode || 500;
+  
+  return res.status(status).json({
+    success: false,
+    error: isProdOrStaging ? 'Ocorreu um erro interno no servidor.' : (err.message || 'Erro interno no servidor.'),
+    code: 'INTERNAL_SERVER_ERROR',
+  });
 });
 
 function startServer(port = 3333) {

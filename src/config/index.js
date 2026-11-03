@@ -28,6 +28,7 @@ const config = {
   adminPassword: (process.env.ADMIN_PASSWORD || '').trim(),
   adminPin: (process.env.ADMIN_PIN || '').trim(),
   adminApiKey: (process.env.ADMIN_API_KEY || '').trim(),
+  adminMfaEnabled: process.env.ADMIN_MFA_ENABLED === 'true',
 
   // Hotmart Integration
   hotmartWebhookSecret: (process.env.HOTMART_WEBHOOK_SECRET || process.env.HOTMART_HOTTOK || '').trim(),
@@ -45,6 +46,67 @@ const config = {
   metaPixelId: (process.env.META_PIXEL_ID || '').trim(),
   metaCapiToken: (process.env.META_CAPI_TOKEN || '').trim(),
   metaCapiTestCode: (process.env.META_CAPI_TEST_CODE || '').trim(),
+};
+
+/**
+ * Startup Environment & Configuration Validation (Proteção 11)
+ */
+config.validateEnvironment = function validateEnvironment() {
+  const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
+  const isProduction = process.env.NODE_ENV === 'production' && !isStaging;
+  const errors = [];
+  const warnings = [];
+
+  // 1. Production Critical Checks
+  if (isProduction) {
+    if (!config.adminPassword || config.adminPassword.length < 8) {
+      errors.push('ADMIN_PASSWORD não configurada ou muito curta em ambiente de produção (mínimo 8 caracteres).');
+    }
+    if (['admin123', 'admin', 'password', '12345678'].includes(config.adminPassword.toLowerCase())) {
+      errors.push('ADMIN_PASSWORD configurada com valor fraco/óbvio em produção.');
+    }
+    if (!config.adminApiKey || config.adminApiKey.length < 16) {
+      warnings.push('ADMIN_API_KEY recomendada com entropia elevada (mínimo 16 caracteres).');
+    }
+    if (!config.hotmartWebhookSecret) {
+      warnings.push('HOTMART_WEBHOOK_SECRET não definida no ambiente de produção.');
+    }
+    if (!config.asaasWebhookSecret) {
+      warnings.push('ASAAS_WEBHOOK_SECRET não definida no ambiente de produção.');
+    }
+  }
+
+  // 2. Staging Gate Checks
+  if (isStaging && (process.env.STAGING_PROTECTION_ENABLED === 'true' || process.env.STAGING_AUTH_ENABLED === 'true')) {
+    if (!process.env.STAGING_PASSWORD || process.env.STAGING_PASSWORD.trim().length < 6) {
+      errors.push('STAGING_PASSWORD ausente ou insuficiente com STAGING_PROTECTION_ENABLED ativado.');
+    }
+  }
+
+  // 3. Database Check
+  if (!config.dbPath) {
+    errors.push('DB_PATH inválido ou não definido.');
+  }
+
+  if (errors.length > 0) {
+    console.error('\n❌ [Security Startup Error] Falha de validação das variáveis de ambiente:');
+    for (const err of errors) console.error(`  - ${err}`);
+    if (isProduction) {
+      throw new Error(`Abortando inicialização por violação de segurança: ${errors.join('; ')}`);
+    }
+  }
+
+  if (warnings.length > 0) {
+    console.warn('\n⚠️ [Security Startup Warning] Alertas de configuração:');
+    for (const w of warnings) console.warn(`  - ${w}`);
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+    environment: isProduction ? 'production' : (isStaging ? 'staging' : 'development')
+  };
 };
 
 module.exports = config;
