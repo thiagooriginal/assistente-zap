@@ -2552,6 +2552,16 @@
       return Number(val).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     }
 
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function renderVariationBadge(elemId, varObj) {
       const el = document.getElementById(elemId);
       if (!el) return;
@@ -2655,7 +2665,7 @@
 
         dotsSvg += `
           <g class="chart-point-group cursor-pointer">
-            <title>${pt.label} | Receitas: R$ ${pt.receitas.toFixed(2)} | Despesas: R$ ${pt.despesas.toFixed(2)} | Resultado: R$ ${pt.resultado.toFixed(2)}</title>
+            <title>${escapeHtml(pt.label)} | Receitas: R$ ${pt.receitas.toFixed(2)} | Despesas: R$ ${pt.despesas.toFixed(2)} | Resultado: R$ ${pt.resultado.toFixed(2)}</title>
             <circle cx="${x}" cy="${yRec}" r="3" fill="#00F59B" stroke="#07080c" stroke-width="1.5" />
             <circle cx="${x}" cy="${yDesp}" r="3" fill="#EF4444" stroke="#07080c" stroke-width="1.5" />
             <circle cx="${x}" cy="${yRes}" r="3" fill="#8B5CF6" stroke="#07080c" stroke-width="1.5" />
@@ -2698,7 +2708,7 @@
             <div class="flex items-center gap-2.5">
               <span class="w-5 h-5 rounded-lg bg-white/5 text-slate-400 font-bold flex items-center justify-center text-[10px]">#${idx + 1}</span>
               <div>
-                <span class="font-bold text-white block">${s.name}</span>
+                <span class="font-bold text-white block">${escapeHtml(s.name)}</span>
                 <span class="text-[11px] text-slate-400">${s.count} atendimento${s.count === 1 ? '' : 's'}</span>
               </div>
             </div>
@@ -2729,7 +2739,7 @@
         const pct = Math.round((p.count / maxCount) * 100);
         html += `
           <div class="flex items-center gap-3 text-xs">
-            <span class="w-12 text-slate-400 font-mono text-[11px]">${p.hour}</span>
+            <span class="w-12 text-slate-400 font-mono text-[11px]">${escapeHtml(p.hour)}</span>
             <div class="flex-1 h-3 rounded-full bg-white/5 overflow-hidden">
               <div class="h-full rounded-full bg-gradient-to-r from-amber-500 to-[#00F59B] transition-all" style="width: ${pct}%"></div>
             </div>
@@ -2755,8 +2765,8 @@
       staff.forEach(st => {
         html += `
           <tr class="hover:bg-white/[0.02] transition-colors">
-            <td class="py-3 px-3 font-bold text-white">${st.name}</td>
-            <td class="py-3 px-3 text-slate-400">${st.specialty || 'Profissional'}</td>
+            <td class="py-3 px-3 font-bold text-white">${escapeHtml(st.name)}</td>
+            <td class="py-3 px-3 text-slate-400">${escapeHtml(st.specialty || 'Profissional')}</td>
             <td class="py-3 px-3 text-center font-bold text-slate-200">${st.appointments}</td>
             <td class="py-3 px-3 text-right font-bold text-[#00F59B]">${formatBRL(st.revenue)}</td>
             <td class="py-3 px-3 text-right text-slate-300">${formatBRL(st.avgTicket)}</td>
@@ -2770,11 +2780,11 @@
     }
 
     // Render Contas a Pagar
-    function renderBills(bills = {}, isPro = true) {
+    function renderBills(bills = null, isPro = true) {
       const banner = document.getElementById('billsLockedBanner');
       const content = document.getElementById('billsUnlockedContent');
 
-      if (!isPro) {
+      if (!isPro || !bills) {
         if (banner) banner.classList.remove('hidden');
         if (content) content.classList.add('hidden');
         return;
@@ -2810,15 +2820,16 @@
           ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">VENCIDA</span>'
           : '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">PENDENTE</span>';
 
+        // Audit protection: settled accounts cannot be deleted to preserve financial audit trail
         const actions = isPaid
-          ? `<button type="button" onclick="deleteBillItem(${b.id})" class="text-slate-500 hover:text-rose-400 p-1" title="Excluir histórico"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>`
+          ? `<span class="text-slate-500 text-[10px] flex items-center justify-center gap-1 font-semibold" title="Conta liquidada — histórico contábil preservado"><i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i> Liquidada</span>`
           : `
             <div class="flex items-center justify-center gap-1.5">
-              <button type="button" onclick="markBillPaid(${b.id})" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 font-bold text-[10px] flex items-center gap-1 transition-all" title="Marcar como Paga">
+              <button type="button" onclick="markBillPaid(${Number(b.id)})" class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 font-bold text-[10px] flex items-center gap-1 transition-all" title="Marcar como Paga">
                 <i data-lucide="check" class="w-3 h-3"></i>
                 <span>Pagar</span>
               </button>
-              <button type="button" onclick="deleteBillItem(${b.id})" class="text-slate-500 hover:text-rose-400 p-1" title="Excluir"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+              <button type="button" onclick="deleteBillItem(${Number(b.id)})" class="text-slate-500 hover:text-rose-400 p-1" title="Excluir"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
             </div>
           `;
 
@@ -2827,9 +2838,9 @@
 
         html += `
           <tr class="hover:bg-white/[0.02] transition-colors">
-            <td class="py-3 px-3 font-bold text-white">${b.title}</td>
-            <td class="py-3 px-3 text-slate-300 font-mono text-[11px]">${dateFormatted}</td>
-            <td class="py-3 px-3 text-slate-400">${b.category || 'Contas'}</td>
+            <td class="py-3 px-3 font-bold text-white">${escapeHtml(b.title)}</td>
+            <td class="py-3 px-3 text-slate-300 font-mono text-[11px]">${escapeHtml(dateFormatted)}</td>
+            <td class="py-3 px-3 text-slate-400">${escapeHtml(b.category || 'Contas')}</td>
             <td class="py-3 px-3">${statusBadge}</td>
             <td class="py-3 px-3 text-right font-bold text-white">${formatBRL(b.amount)}</td>
             <td class="py-3 px-3 text-center">${actions}</td>
@@ -2868,13 +2879,19 @@
           }
         } catch (e) {}
 
+        const descEscaped = escapeHtml(t.description || '');
+        const catEscaped = escapeHtml(t.category || '--');
+        const originEscaped = escapeHtml(t.origin || '--');
+        const dtEscaped = escapeHtml(dtFormatted);
+        const searchAttr = escapeHtml((t.description || '').toLowerCase());
+
         html += `
-          <tr class="hover:bg-white/[0.02] transition-colors" data-desc="${(t.description || '').toLowerCase()}">
-            <td class="py-3 px-3 text-slate-400 font-mono text-[11px]">${dtFormatted}</td>
+          <tr class="hover:bg-white/[0.02] transition-colors" data-desc="${searchAttr}">
+            <td class="py-3 px-3 text-slate-400 font-mono text-[11px]">${dtEscaped}</td>
             <td class="py-3 px-3">${typeBadge}</td>
-            <td class="py-3 px-3 font-bold text-white">${t.description}</td>
-            <td class="py-3 px-3 text-slate-400">${t.category || '--'}</td>
-            <td class="py-3 px-3 text-slate-400 text-[11px]">${t.origin || '--'}</td>
+            <td class="py-3 px-3 font-bold text-white">${descEscaped}</td>
+            <td class="py-3 px-3 text-slate-400">${catEscaped}</td>
+            <td class="py-3 px-3 text-slate-400 text-[11px]">${originEscaped}</td>
             <td class="py-3 px-3 text-right font-black ${amountColor}">${prefix} ${formatBRL(Math.abs(t.amount))}</td>
           </tr>
         `;

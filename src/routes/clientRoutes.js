@@ -734,16 +734,21 @@ router.get('/pro/dashboard', clientAuthMiddleware, requireProductAccess('JESSICA
       });
     }
 
+    const isPro = tier === 'JESSICA_PRO' || req.isDemo;
     const { period, startDate, endDate } = req.query;
     const data = await salonDashboardService.getSalonDashboard(req.clientUser.id, {
       period,
       startDate,
       endDate,
       isDemo: req.isDemo,
+      isPro,
     });
 
     data.userTier = tier;
-    data.isPro = tier === 'JESSICA_PRO' || req.isDemo;
+    data.isPro = isPro;
+    if (!isPro) {
+      data.bills = null;
+    }
 
     return res.json(data);
   } catch (err) {

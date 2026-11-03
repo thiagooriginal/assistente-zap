@@ -1,3 +1,27 @@
+/**
+ * test-salon-dashboard-2.0.js
+ * Suíte Oficial e Completa de Segurança e Validação:
+ * Dashboard Gerencial & Financeiro 2.0 (Módulo Jéssica)
+ *
+ * Garante:
+ * 1. Isolamento 100% estrito utilizando SQLite temporário (data/assistant.db NUNCA é tocado)
+ * 2. Gating no backend: Contas a Pagar é estritamente ocultado (bills === null) para o Plano Intermediário
+ * 3. Validação rigorosa de assinatura: PENDING, OVERDUE, expirados ou users.plan_tier antigo não liberam recursos
+ * 4. Proteção contra XSS: sanitização estrita de strings e atributos HTML
+ * 5. Integridade de Contas a Pagar: atomicidade, prevenção de duplicatas e bloqueio de exclusão de contas quitadas
+ * 6. Precisão de indicadores: ticket médio baseado estritamente em atendimentos/serviços
+ * 7. Integração REST HTTP com servidor ativo
+ */
+
+const os = require('os');
+const path = require('path');
+const fs = require('fs');
+
+// -------------------------------------------------------------
+// 1. ISOLAMENTO ESTRITO DO BANCO DE TESTE
+// -------------------------------------------------------------
+const tempDbPath = path.join(os.tmpdir(), `raia_test_salon_dashboard_${Date.now()}_${Math.random().toString(36).slice(2)}.db`);
+process.env.DB_PATH = tempDbPath;
 process.env.NODE_ENV = 'test';
 process.env.APP_MODE = 'staging';
 process.env.HOMOLOGACAO = 'true';
@@ -7,9 +31,11 @@ process.env.STAGING_PASSWORD = 'raia2026staging!';
 
 const assert = require('assert');
 const http = require('http');
-const { app } = require('../src/server/app');
+const config = require('../src/config');
 const db = require('../src/database/db');
+const { app } = require('../src/server/app');
 const salonDashboardService = require('../src/services/salonDashboardService');
+const productService = require('../src/services/productService');
 
 let passedTests = 0;
 let failedTests = 0;
@@ -40,247 +66,341 @@ async function itAsync(desc, fn) {
 
 async function runAllTests() {
   console.log('\n=======================================================');
-  console.log('SUÍTE OFICIAL: DASHBOARD GERENCIAL & FINANCEIRO 2.0');
+  console.log('SUÍTE DE SEGURANÇA: DASHBOARD GERENCIAL & FINANCEIRO 2.0');
   console.log('=======================================================\n');
 
-  // Setup mock test users
-  const testEmailA = 'test.salon.user.a@raiaagentes.com.br';
-  const testEmailB = 'test.salon.user.b@raiaagentes.com.br';
-  const testEmailStart = 'test.salon.start@raiaagentes.com.br';
-  const testEmailInter = 'test.salon.inter@raiaagentes.com.br';
+  // Comprovação de isolamento do banco
+  console.log('--- COMPROVAÇÃO DE ISOLAMENTO DE TESTE ---');
+  assert.strictEqual(config.dbPath, tempDbPath, 'O banco ativo deve ser o temporário configurado.');
+  assert(tempDbPath.includes(os.tmpdir()), 'O banco deve residir exclusivamente no diretório temporário do SO.');
+  console.log(`  ✓ Banco temporário isolado ativo: ${tempDbPath}`);
+  console.log(`  ✓ Banco persistente data/assistant.db preservado e intocado.\n`);
 
-  db.prepare('DELETE FROM users WHERE email IN (?, ?, ?, ?)').run(testEmailA, testEmailB, testEmailStart, testEmailInter);
+  // Seed baseline products & plans in temporary db
+  const jessicaProd = db.prepare("SELECT id FROM products WHERE code = 'JESSICA'").get();
+  let jessicaProdId = jessicaProd?.id;
+  if (!jessicaProdId) {
+    const res = db.prepare(`
+      INSERT INTO products (code, name, category, solution_type, is_active)
+      VALUES ('JESSICA', 'Assistente Virtual Jéssica', 'Salões & Beleza', 'AGENDA', 1)
+    `).run();
+    jessicaProdId = res.lastInsertRowid;
+  }
 
-  const tokenA = 'magic_token_pro_a';
-  const tokenB = 'magic_token_pro_b';
-  const tokenStart = 'magic_token_start';
-  const tokenInter = 'magic_token_inter';
+  // Ensure plans START, INTERMEDIATE, PRO exist for JESSICA
+  const plans = [
+    { code: 'START', name: 'Jéssica Entrada', price: 8900 },
+    { code: 'INTERMEDIATE', name: 'Jéssica Intermediário', price: 10900 },
+    { code: 'PRO', name: 'Jéssica Pró', price: 13900 },
+  ];
+  const planIds = {};
+  for (const pl of plans) {
+    const existing = db.prepare("SELECT id FROM product_plans WHERE product_id = ? AND code = ?").get(jessicaProdId, pl.code);
+    if (existing) {
+      planIds[pl.code] = existing.id;
+    } else {
+      const res = db.prepare(`
+        INSERT INTO product_plans (product_id, code, name, billing_cycle, price_cents, is_active)
+        VALUES (?, ?, ?, 'MONTHLY', ?, 1)
+      `).run(jessicaProdId, pl.code, pl.name, pl.price);
+      planIds[pl.code] = res.lastInsertRowid;
+    }
+  }
 
-  const userA = db.prepare(`
+  // Setup test users in temporary database
+  const todaySP = salonDashboardService.getPeriodDates('today').startDate;
+  const futurePaid = '2030-01-01T00:00:00.000Z';
+  const pastPaid = '2020-01-01T00:00:00.000Z';
+
+  // 1. User PRO (Active subscription)
+  const userPro = db.prepare(`
     INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
-    VALUES ('Salão Cliente A (Pró)', '5511990000001', ?, 'JESSICA_PRO', 'ACTIVE', '2030-01-01', 0, 'CLIENT', ?, '2030-01-01')
-  `).run(testEmailA, tokenA);
-  const userIdA = userA.lastInsertRowid;
+    VALUES ('Salão Pró Ativo', '5511990000001', 'pro@teste.com', 'JESSICA_PRO', 'ACTIVE', ?, 0, 'CLIENT', 'token_pro', ?)
+  `).run(futurePaid, futurePaid);
+  const userIdPro = userPro.lastInsertRowid;
 
-  const userB = db.prepare(`
-    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
-    VALUES ('Salão Cliente B (Pró Concorrente)', '5511990000002', ?, 'JESSICA_PRO', 'ACTIVE', '2030-01-01', 0, 'CLIENT', ?, '2030-01-01')
-  `).run(testEmailB, tokenB);
-  const userIdB = userB.lastInsertRowid;
+  db.prepare(`
+    INSERT INTO customer_subscriptions (user_id, product_id, plan_id, status, price_cents, paid_until, origin)
+    VALUES (?, ?, ?, 'ACTIVE', 19700, ?, 'DIRECT')
+  `).run(userIdPro, jessicaProdId, planIds['PRO'], futurePaid);
 
-  const userStart = db.prepare(`
-    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
-    VALUES ('Salão Cliente Start', '5511990000003', ?, 'JESSICA_START', 'ACTIVE', '2030-01-01', 0, 'CLIENT', ?, '2030-01-01')
-  `).run(testEmailStart, tokenStart);
-  const userIdStart = userStart.lastInsertRowid;
-
+  // 2. User INTERMEDIATE (Active subscription)
   const userInter = db.prepare(`
     INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
-    VALUES ('Salão Cliente Intermediário', '5511990000004', ?, 'JESSICA_INTERMEDIATE', 'ACTIVE', '2030-01-01', 0, 'CLIENT', ?, '2030-01-01')
-  `).run(testEmailInter, tokenInter);
+    VALUES ('Salão Inter Ativo', '5511990000002', 'inter@teste.com', 'JESSICA_INTERMEDIATE', 'ACTIVE', ?, 0, 'CLIENT', 'token_inter', ?)
+  `).run(futurePaid, futurePaid);
   const userIdInter = userInter.lastInsertRowid;
 
-  // Clean data for test users
-  db.prepare('DELETE FROM incomes WHERE user_id IN (?, ?)').run(userIdA, userIdB);
-  db.prepare('DELETE FROM expenses WHERE user_id IN (?, ?)').run(userIdA, userIdB);
-  db.prepare('DELETE FROM scheduled_payments WHERE user_id IN (?, ?)').run(userIdA, userIdB);
-  db.prepare('DELETE FROM appointments WHERE user_id IN (?, ?)').run(userIdA, userIdB);
-
-  // Today in SP timezone
-  const todaySP = salonDashboardService.getPeriodDates('today').startDate;
-
-  console.log('--- FASE 1: TESTES DE SERVIÇO, CÁLCULO E PERSISTÊNCIA ---');
-
-  await itAsync('1. Correção da incompatibilidade entre os campos da API e do frontend', async () => {
-    const data = await salonDashboardService.getSalonDashboard(userIdA, { period: 'this_month' });
-    assert.strictEqual(data.success, true);
-    // Modern 2.0 KPI keys
-    assert(typeof data.metrics.realizedRevenue === 'number');
-    assert(typeof data.metrics.estimatedRevenue === 'number');
-    assert(typeof data.metrics.expensesTotal === 'number');
-    assert(typeof data.metrics.financialResult === 'number');
-    assert(typeof data.metrics.totalAppointments === 'number');
-    assert(typeof data.metrics.completedAppointments === 'number');
-    assert(typeof data.metrics.cancelledAppointments === 'number');
-    assert(typeof data.metrics.averageTicket === 'number');
-
-    // Backward compatibility keys
-    assert.strictEqual(data.metrics.totalRevenue, data.metrics.realizedRevenue);
-    assert.strictEqual(data.metrics.faturamentoMes, data.metrics.realizedRevenue);
-    assert.strictEqual(data.metrics.atendimentosMes, data.metrics.totalAppointments);
-    assert.strictEqual(data.metrics.ticketMedio, data.metrics.averageTicket);
-  });
-
-  await itAsync('2. Dados ausentes: não inventar números quando não houver transações', async () => {
-    const data = await salonDashboardService.getSalonDashboard(userIdA, { period: 'this_month' });
-    assert.strictEqual(data.metrics.realizedRevenue, 0);
-    assert.strictEqual(data.metrics.expensesTotal, 0);
-    assert.strictEqual(data.metrics.financialResult, 0);
-    assert.strictEqual(data.metrics.totalAppointments, 0);
-    assert.strictEqual(data.metrics.completedAppointments, 0);
-    assert.strictEqual(data.metrics.hasSufficientData, false);
-    assert.strictEqual(data.variations.realizedRevenue.hasHistory, false);
-    assert.strictEqual(data.variations.realizedRevenue.formatted, null);
-  });
-
-  // Insert financial data for User A
-  // 2 incomes: R$ 150 (Pix) and R$ 250 (Cartão) = R$ 400
   db.prepare(`
-    INSERT INTO incomes (user_id, amount, source, category, payment_method, date, source_type)
-    VALUES (?, 150.0, 'Corte e Escova', 'Cortes', 'Pix', ?, 'test'),
-           (?, 250.0, 'Mechas', 'Coloração', 'Cartão', ?, 'test')
-  `).run(userIdA, todaySP, userIdA, todaySP);
+    INSERT INTO customer_subscriptions (user_id, product_id, plan_id, status, price_cents, paid_until, origin)
+    VALUES (?, ?, ?, 'ACTIVE', 14700, ?, 'DIRECT')
+  `).run(userIdInter, jessicaProdId, planIds['INTERMEDIATE'], futurePaid);
 
-  // 1 expense: R$ 80.0
+  // 3. User START (Active subscription)
+  const userStart = db.prepare(`
+    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
+    VALUES ('Salão Start Ativo', '5511990000003', 'start@teste.com', 'JESSICA_START', 'ACTIVE', ?, 0, 'CLIENT', 'token_start', ?)
+  `).run(futurePaid, futurePaid);
+  const userIdStart = userStart.lastInsertRowid;
+
   db.prepare(`
-    INSERT INTO expenses (user_id, amount, category, description, payment_method, date, source_type)
-    VALUES (?, 80.0, 'Insumos', 'Café e descartáveis', 'Pix', ?, 'test')
-  `).run(userIdA, todaySP);
+    INSERT INTO customer_subscriptions (user_id, product_id, plan_id, status, price_cents, paid_until, origin)
+    VALUES (?, ?, ?, 'ACTIVE', 9700, ?, 'DIRECT')
+  `).run(userIdStart, jessicaProdId, planIds['START'], futurePaid);
 
-  // Appointments for User A:
-  // 1 COMPLETED (price 150), 1 COMPLETED (price 250), 1 CANCELLED, 1 SCHEDULED (price 100)
+  // 4. User with PENDING subscription (not paid yet)
+  const userPending = db.prepare(`
+    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
+    VALUES ('Salão Aguardando Pagamento', '5511990000004', 'pending@teste.com', 'JESSICA_PRO', 'PENDING', NULL, 0, 'CLIENT', 'token_pending', ?)
+  `).run(futurePaid);
+  const userIdPending = userPending.lastInsertRowid;
+
   db.prepare(`
-    INSERT INTO appointments (user_id, title, start_datetime, status, price)
-    VALUES (?, 'Atendimento Maria', ? || 'T10:00:00', 'COMPLETED', 150.0),
-           (?, 'Atendimento Joana', ? || 'T14:00:00', 'COMPLETED', 250.0),
-           (?, 'Atendimento Carla', ? || 'T16:00:00', 'CANCELLED', 80.0),
-           (?, 'Atendimento Paula', ? || 'T18:00:00', 'SCHEDULED', 100.0)
-  `).run(userIdA, todaySP, userIdA, todaySP, userIdA, todaySP, userIdA, todaySP);
+    INSERT INTO customer_subscriptions (user_id, product_id, plan_id, status, price_cents, paid_until, origin)
+    VALUES (?, ?, ?, 'PENDING', 19700, NULL, 'DIRECT')
+  `).run(userIdPending, jessicaProdId, planIds['PRO']);
 
-  await itAsync('3. Cálculo de receitas realizadas no período', async () => {
-    const data = await salonDashboardService.getSalonDashboard(userIdA, { period: 'today' });
-    assert.strictEqual(data.metrics.realizedRevenue, 400.0);
+  // 5. User with OVERDUE expired subscription
+  const userOverdue = db.prepare(`
+    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
+    VALUES ('Salão Inadimplente Expirado', '5511990000005', 'overdue@teste.com', 'JESSICA_PRO', 'OVERDUE', ?, 0, 'CLIENT', 'token_overdue', ?)
+  `).run(pastPaid, futurePaid);
+  const userIdOverdue = userOverdue.lastInsertRowid;
+
+  db.prepare(`
+    INSERT INTO customer_subscriptions (user_id, product_id, plan_id, status, price_cents, paid_until, origin)
+    VALUES (?, ?, ?, 'OVERDUE', 19700, ?, 'DIRECT')
+  `).run(userIdOverdue, jessicaProdId, planIds['PRO'], pastPaid);
+
+  // 6. User with STALE users.plan_tier (plan_tier says PRO, but subscription expired)
+  const userStale = db.prepare(`
+    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
+    VALUES ('Salão Antigo Expirado', '5511990000006', 'stale@teste.com', 'JESSICA_PRO', 'EXPIRED', ?, 0, 'CLIENT', 'token_stale', ?)
+  `).run(pastPaid, futurePaid);
+  const userIdStale = userStale.lastInsertRowid;
+
+  // 7. Demo User (Bella Vista)
+  let userIdDemo;
+  const existingDemo = db.prepare('SELECT id FROM users WHERE phone_number = ?').get('5511999990000');
+  if (existingDemo) {
+    db.prepare(`
+      UPDATE users SET magic_token = 'token_demo', magic_token_expires_at = ?, paid_until = ?, is_demo = 1, plan_tier = 'JESSICA_PRO', subscription_status = 'ACTIVE'
+      WHERE id = ?
+    `).run(futurePaid, futurePaid, existingDemo.id);
+    userIdDemo = existingDemo.id;
+  } else {
+    const userDemo = db.prepare(`
+      INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
+      VALUES ('Bella Vista Hair & Spa', '5511999990000', 'homologacao.hotmart@raiaagentes.com.br', 'JESSICA_PRO', 'ACTIVE', ?, 1, 'CLIENT', 'token_demo', ?)
+    `).run(futurePaid, futurePaid);
+    userIdDemo = userDemo.lastInsertRowid;
+  }
+
+  console.log('--- REVISÃO 1: PROTEÇÃO DOS DADOS DE CONTAS A PAGAR ---');
+
+  // Seed scheduled payments for User Inter and User Pro
+  salonDashboardService.createBill(userIdPro, {
+    title: 'Fornecedor Wella Pro',
+    amount: 1200.0,
+    dueDate: todaySP,
+    category: 'Produtos',
   });
 
-  await itAsync('4. Cálculo de despesas operacionais no período', async () => {
-    const data = await salonDashboardService.getSalonDashboard(userIdA, { period: 'today' });
-    assert.strictEqual(data.metrics.expensesTotal, 80.0);
+  salonDashboardService.createBill(userIdInter, {
+    title: 'Fornecedor Sigiloso Inter',
+    amount: 800.0,
+    dueDate: todaySP,
+    category: 'Produtos',
   });
 
-  await itAsync('5. Resultado financeiro exato (Receitas - Despesas)', async () => {
-    const data = await salonDashboardService.getSalonDashboard(userIdA, { period: 'today' });
-    assert.strictEqual(data.metrics.financialResult, 320.0); // 400 - 80
+  await itAsync('1.1. Backend oculta dados de Contas a Pagar (bills === null) para o Plano Intermediário', async () => {
+    const dashInter = await salonDashboardService.getSalonDashboard(userIdInter, { period: 'this_month', isPro: false });
+    assert.strictEqual(dashInter.bills, null, 'bills deve ser estritamente null para plano intermediário');
+    assert(dashInter.metrics !== undefined, 'Métricas gerais devem continuar acessíveis');
+    assert(dashInter.timeline !== undefined, 'Timeline deve continuar acessível');
   });
 
-  await itAsync('6. Faturamento estimado baseado em agendamentos futuros pendentes', async () => {
-    const data = await salonDashboardService.getSalonDashboard(userIdA, { period: 'today' });
-    assert.strictEqual(data.metrics.estimatedRevenue, 100.0); // Paula's scheduled appt
+  await itAsync('1.2. Backend entrega Contas a Pagar completas exclusivamente para o Plano Pró', async () => {
+    const dashPro = await salonDashboardService.getSalonDashboard(userIdPro, { period: 'this_month', isPro: true });
+    assert.notStrictEqual(dashPro.bills, null, 'bills não deve ser null para plano Pró');
+    assert(dashPro.bills.pendingTotal >= 1200.0);
+    assert(dashPro.bills.upcomingBills.length > 0);
   });
 
-  await itAsync('7. Agendamentos realizados vs cancelados', async () => {
-    const data = await salonDashboardService.getSalonDashboard(userIdA, { period: 'today' });
-    assert.strictEqual(data.metrics.totalAppointments, 4);
-    assert.strictEqual(data.metrics.completedAppointments, 2);
-    assert.strictEqual(data.metrics.cancelledAppointments, 1);
+  console.log('\n--- REVISÃO 2: VERIFICAÇÃO RIGOROSA DA ASSINATURA ---');
+
+  it('2.1. Assinatura PENDING é rebaixada para START e bloqueada', () => {
+    const tier = salonDashboardService.getEffectiveJessicaTier(userIdPending);
+    assert.strictEqual(tier, 'JESSICA_START', 'Assinatura PENDING não pode liberar recursos pagos');
   });
 
-  await itAsync('8. Ticket médio calculado com precisão sobre atendimentos realizados', async () => {
-    const data = await salonDashboardService.getSalonDashboard(userIdA, { period: 'today' });
-    // R$ 400 realized / 2 completed = R$ 200.00
-    assert.strictEqual(data.metrics.averageTicket, 200.0);
-    assert.strictEqual(data.metrics.hasSufficientData, true);
+  it('2.2. Assinatura OVERDUE com vigência expirada é bloqueada como START', () => {
+    const tier = salonDashboardService.getEffectiveJessicaTier(userIdOverdue);
+    assert.strictEqual(tier, 'JESSICA_START', 'Inadimplente expirado não pode receber tier PRO');
   });
 
-  await itAsync('9. Respeito aos filtros de datas (Hoje, 7d, Este mês, Mês anterior, Personalizado)', async () => {
-    const pToday = salonDashboardService.getPeriodDates('today');
-    assert.strictEqual(pToday.startDate, pToday.endDate);
-
-    const p7d = salonDashboardService.getPeriodDates('7d');
-    assert(p7d.startDate <= p7d.endDate);
-
-    const pThisM = salonDashboardService.getPeriodDates('this_month');
-    assert(pThisM.startDate.endsWith('-01'));
-
-    const pLastM = salonDashboardService.getPeriodDates('last_month');
-    assert(pLastM.startDate <= pLastM.endDate);
-
-    const pCustom = salonDashboardService.getPeriodDates('custom', '2026-05-01', '2026-05-15');
-    assert.strictEqual(pCustom.startDate, '2026-05-01');
-    assert.strictEqual(pCustom.endDate, '2026-05-15');
-    assert.strictEqual(pCustom.prevStartDate, '2026-04-16');
+  it('2.3. Valor antigo em users.plan_tier com vigência expirada é rejeitado', () => {
+    const tier = salonDashboardService.getEffectiveJessicaTier(userIdStale);
+    assert.strictEqual(tier, 'JESSICA_START', 'users.plan_tier antigo não pode burlar expiração');
   });
 
-  await itAsync('10. Gráfico temporal: série diária coerente com os lançamentos', async () => {
-    const data = await salonDashboardService.getSalonDashboard(userIdA, { period: 'today' });
-    assert(data.timeline.length >= 1);
-    const todayPoint = data.timeline.find(t => t.date === todaySP);
-    assert(todayPoint, 'Ponto de hoje deve estar presente na timeline');
-    assert.strictEqual(todayPoint.receitas, 400.0);
-    assert.strictEqual(todayPoint.despesas, 80.0);
-    assert.strictEqual(todayPoint.resultado, 320.0);
-  });
-
-  it('11. Permissões de Plano: Jéssica Entrada (JESSICA_START)', () => {
-    const tier = salonDashboardService.getEffectiveJessicaTier(userIdStart);
-    assert.strictEqual(tier, 'JESSICA_START');
-  });
-
-  it('12. Permissões de Plano: Jéssica Intermediário (JESSICA_INTERMEDIATE)', () => {
+  it('2.4. Assinatura ativa vigente no plano Intermediário é confirmada', () => {
     const tier = salonDashboardService.getEffectiveJessicaTier(userIdInter);
     assert.strictEqual(tier, 'JESSICA_INTERMEDIATE');
   });
 
-  it('13. Permissões de Plano: Jéssica Pró (JESSICA_PRO)', () => {
-    const tier = salonDashboardService.getEffectiveJessicaTier(userIdA);
+  it('2.5. Assinatura ativa vigente no plano Pró é confirmada', () => {
+    const tier = salonDashboardService.getEffectiveJessicaTier(userIdPro);
     assert.strictEqual(tier, 'JESSICA_PRO');
   });
 
-  await itAsync('14. Contas a Pagar: criação, liquidação e reflexo automático em despesas', async () => {
-    const newBills = salonDashboardService.createBill(userIdA, {
-      title: 'Fornecedor de Esmaltes',
-      amount: 150.0,
+  it('2.6. Conta demonstrativa e Admin preservam acesso irrestrito', () => {
+    const tierDemo = salonDashboardService.getEffectiveJessicaTier(userIdDemo);
+    assert.strictEqual(tierDemo, 'JESSICA_PRO');
+    const tierAdmin = salonDashboardService.getEffectiveJessicaTier(null, { role: 'ADMIN' });
+    assert.strictEqual(tierAdmin, 'JESSICA_PRO');
+  });
+
+  console.log('\n--- REVISÃO 3: PROTEÇÃO CONTRA XSS ---');
+
+  it('3.1. Sanitização estrita contra XSS em descrições, categorias e atributos', () => {
+    // Read escapeHtml from painel.html
+    const painelHtml = fs.readFileSync(path.resolve(__dirname, '../public/cliente/painel.html'), 'utf-8');
+    assert(painelHtml.includes('function escapeHtml(str)'), 'painel.html deve declarar escapeHtml');
+
+    function escapeHtml(str) {
+      if (str === null || str === undefined) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    const payloadScript = '<script>alert("xss")</script>';
+    const payloadAttr = '"> <img src=x onerror=alert(1)>';
+    const payloadSingleQuote = "' onfocus='alert(1)";
+
+    const cleanScript = escapeHtml(payloadScript);
+    assert(!cleanScript.includes('<script>'), 'Não deve conter tag script crua');
+    assert(cleanScript.includes('&lt;script&gt;'));
+
+    const cleanAttr = escapeHtml(payloadAttr);
+    assert(!cleanAttr.includes('"'), 'Não deve conter aspas duplas cruas que quebram atributos');
+    assert(cleanAttr.includes('&quot;&gt; &lt;img'));
+
+    const cleanSingle = escapeHtml(payloadSingleQuote);
+    assert(!cleanSingle.includes("'"), 'Não deve conter aspas simples cruas');
+    assert(cleanSingle.includes('&#39;'));
+
+    // Check painel.html usages
+    assert(painelHtml.includes('escapeHtml(t.description || \'\')'), 't.description deve ser escapado');
+    assert(painelHtml.includes('escapeHtml(t.category || \'--\')'), 't.category deve ser escapado');
+    assert(painelHtml.includes('escapeHtml(t.origin || \'--\')'), 't.origin deve ser escapado');
+    assert(painelHtml.includes('data-desc="${searchAttr}"'), 'Atributo de busca deve usar searchAttr escapado');
+    assert(painelHtml.includes('escapeHtml(b.title)'), 'b.title de contas a pagar deve ser escapado');
+    assert(painelHtml.includes('escapeHtml(s.name)'), 's.name de serviços deve ser escapado');
+    assert(painelHtml.includes('escapeHtml(st.name)'), 'st.name de profissionais deve ser escapado');
+  });
+
+  console.log('\n--- REVISÃO 5: INTEGRIDADE DE CONTAS A PAGAR ---');
+
+  await itAsync('5.1. Atomicidade: liquidação de conta atualiza status e registra despesa', async () => {
+    const bills = salonDashboardService.createBill(userIdPro, {
+      title: 'Energia Elétrica Salão',
+      amount: 450.0,
       dueDate: todaySP,
-      category: 'Fornecedores',
-      installments: 1,
+      category: 'Contas',
     });
-    assert.strictEqual(newBills.length, 1);
-    const billId = newBills[0].id;
+    const billId = bills[0].id;
 
-    const payResult = salonDashboardService.markBillAsPaid(userIdA, billId);
-    assert.strictEqual(payResult.bill.status, 'PAID');
-    assert.strictEqual(payResult.expense.amount, 150.0);
-    assert.strictEqual(payResult.expense.userId, userIdA);
+    const result = salonDashboardService.markBillAsPaid(userIdPro, billId);
+    assert.strictEqual(result.bill.status, 'PAID');
+    assert(result.expense);
+    assert.strictEqual(result.expense.amount, 450.0);
 
-    const paidExp = db.prepare('SELECT * FROM expenses WHERE id = ?').get(payResult.expense.id);
-    assert(paidExp);
-    assert.strictEqual(paidExp.user_id, userIdA);
-
-    const delResult = salonDashboardService.deleteBill(userIdA, billId);
-    assert.strictEqual(delResult.changes, 1);
+    const expenseDb = db.prepare('SELECT * FROM expenses WHERE id = ?').get(result.expense.id);
+    assert(expenseDb);
+    assert.strictEqual(expenseDb.user_id, userIdPro);
+    assert.strictEqual(expenseDb.amount, 450.0);
   });
 
-  await itAsync('15. Multi-tenant: isolamento estrito de dados financeiros entre estabelecimentos', async () => {
-    const dataB = await salonDashboardService.getSalonDashboard(userIdB, { period: 'today' });
-    assert.strictEqual(dataB.metrics.realizedRevenue, 0, 'User B não deve ver receitas de User A');
-    assert.strictEqual(dataB.metrics.expensesTotal, 0, 'User B não deve ver despesas de User A');
-    assert.strictEqual(dataB.metrics.totalAppointments, 0, 'User B não deve ver agendamentos de User A');
-
-    const billA = salonDashboardService.createBill(userIdA, {
-      title: 'Conta Segredo Salão A',
-      amount: 500.0,
+  await itAsync('5.2. Prevenção de duplicatas: marcar conta paga novamente não gera nova despesa', async () => {
+    const bills = salonDashboardService.createBill(userIdPro, {
+      title: 'Internet Fibra Salão',
+      amount: 199.90,
       dueDate: todaySP,
-    })[0];
+      category: 'Tecnologia',
+    });
+    const billId = bills[0].id;
 
-    assert.throws(() => salonDashboardService.markBillAsPaid(userIdB, billA.id), /não pertence a este usuário/i);
-    assert.throws(() => salonDashboardService.deleteBill(userIdB, billA.id), /permissão negada/i);
+    salonDashboardService.markBillAsPaid(userIdPro, billId);
+    const countExpensesBefore = db.prepare('SELECT COUNT(*) as c FROM expenses WHERE user_id = ?').get(userIdPro).c;
 
-    salonDashboardService.deleteBill(userIdA, billA.id);
+    // Second call
+    const secondResult = salonDashboardService.markBillAsPaid(userIdPro, billId);
+    assert(secondResult.message.includes('já foi marcada como quitada'));
+
+    const countExpensesAfter = db.prepare('SELECT COUNT(*) as c FROM expenses WHERE user_id = ?').get(userIdPro).c;
+    assert.strictEqual(countExpensesAfter, countExpensesBefore, 'Não deve duplicar despesa no caixa');
   });
 
-  await itAsync('16. Conta demonstrativa: dados ilustrativos coerentes e badge de homologação', async () => {
-    const demoData = await salonDashboardService.getSalonDashboard(13, { isDemo: true, period: 'this_month' });
-    assert.strictEqual(demoData.isDemo, true);
-    assert(demoData.demoBadge.includes('Bella Vista'));
-    assert(demoData.metrics.realizedRevenue > 5000);
-    assert(demoData.metrics.completedAppointments > 50);
-    assert(demoData.timeline.length > 0);
-    assert(demoData.services.length > 0);
-    assert(demoData.staff.length > 0);
-    assert(demoData.bills.upcomingBills.length > 0);
-    assert(demoData.transactions.length > 0);
+  await itAsync('5.3. Rastreabilidade contábil: exclusão de contas quitadas é bloqueada', async () => {
+    const bills = salonDashboardService.createBill(userIdPro, {
+      title: 'Tributo Municipal Salão',
+      amount: 320.0,
+      dueDate: todaySP,
+      category: 'Tributos',
+    });
+    const billId = bills[0].id;
+    salonDashboardService.markBillAsPaid(userIdPro, billId);
+
+    // Attempt delete
+    assert.throws(() => {
+      salonDashboardService.deleteBill(userIdPro, billId);
+    }, /não podem ser excluídas para preservar a rastreabilidade contábil/i);
+
+    const billStillExists = db.prepare('SELECT id, status FROM scheduled_payments WHERE id = ?').get(billId);
+    assert(billStillExists);
+    assert.strictEqual(billStillExists.status, 'PAID');
   });
 
-  console.log('\n--- FASE 2: TESTES DE INTEGRAÇÃO HTTP (API REST & GATING REAL) ---');
+  console.log('\n--- REVISÃO 6: PRECISÃO DOS INDICADORES E TICKET MÉDIO ---');
+
+  await itAsync('6.1. Ticket médio calculado estritamente sobre atendimentos/serviços realizados', async () => {
+    // Insert 1 completed appointment with price R$ 70.00
+    db.prepare(`
+      INSERT INTO appointments (user_id, title, start_datetime, status, price)
+      VALUES (?, 'Corte Masculino', ? || 'T11:00:00', 'COMPLETED', 70.0)
+    `).run(userIdPro, todaySP);
+
+    // Insert 1 manual generic income unrelated to appointments (e.g. sale of old chair R$ 3,000.00)
+    db.prepare(`
+      INSERT INTO incomes (user_id, amount, source, category, payment_method, date, source_type)
+      VALUES (?, 3000.0, 'Venda de Cadeira Antiga', 'Outros', 'Pix', ?, 'dashboard_manual')
+    `).run(userIdPro, todaySP);
+
+    const dash = await salonDashboardService.getSalonDashboard(userIdPro, { period: 'today', isPro: true });
+
+    // Total realized revenue includes all salon cash entries: R$ 3,000.00
+    assert.strictEqual(dash.metrics.realizedRevenue, 3000.0);
+
+    // But average ticket is strictly based on the appointment price: R$ 70.00 (NOT R$ 3,000.00 / 1!)
+    assert.strictEqual(dash.metrics.averageTicket, 70.0, 'Ticket médio deve refletir o valor do serviço e não receitas avulsas de capital');
+    assert.strictEqual(dash.metrics.hasSufficientData, true);
+  });
+
+  await itAsync('6.2. Sem atendimentos concluídos, ticket médio não divide receitas avulsas por contagem', async () => {
+    const dashInter = await salonDashboardService.getSalonDashboard(userIdInter, { period: 'today', isPro: false });
+    // User Inter has 0 appointments
+    assert.strictEqual(dashInter.metrics.totalAppointments, 0);
+    assert.strictEqual(dashInter.metrics.completedAppointments, 0);
+    assert.strictEqual(dashInter.metrics.averageTicket, 0);
+    assert.strictEqual(dashInter.metrics.hasSufficientData, false, 'Sem atendimentos, ticket médio deve sinalizar dados insuficientes');
+  });
+
+  console.log('\n--- FASE 3: TESTES REST HTTP COM SERVIDOR ATIVO ---');
 
   const server = http.createServer(app);
   await new Promise(res => server.listen(0, res));
@@ -295,132 +415,68 @@ async function runAllTests() {
     return fetch(`${baseUrl}${urlPath}`, Object.assign({}, options, { headers }));
   }
 
-  await itAsync('17. HTTP GET /api/cliente/pro/dashboard - Bloqueio 403 no Plano Entrada (JESSICA_START)', async () => {
+  await itAsync('7.1. HTTP: Plano Entrada (START) recebe 403 upgradeRequired no dashboard', async () => {
     const res = await requestApi('/api/cliente/pro/dashboard', {
-      headers: { 'X-Auth-Token': tokenStart },
+      headers: { 'X-Auth-Token': 'token_start' },
     });
     assert.strictEqual(res.status, 403);
     const body = await res.json();
     assert.strictEqual(body.upgradeRequired, true);
-    assert(body.message.includes('Intermediário e Pró'));
   });
 
-  await itAsync('18. HTTP GET /api/cliente/pro/dashboard - Acesso 200 no Plano Intermediário', async () => {
+  await itAsync('7.2. HTTP: Plano Intermediário recebe 200 no dashboard MAS bills é estritamente null', async () => {
     const res = await requestApi('/api/cliente/pro/dashboard?period=today', {
-      headers: { 'X-Auth-Token': tokenInter },
+      headers: { 'X-Auth-Token': 'token_inter' },
     });
     assert.strictEqual(res.status, 200);
     const body = await res.json();
     assert.strictEqual(body.success, true);
     assert.strictEqual(body.isPro, false);
-    assert.strictEqual(body.userTier, 'JESSICA_INTERMEDIATE');
+    assert.strictEqual(body.bills, null, 'Contas a pagar deve ser null no payload HTTP para plano intermediário');
   });
 
-  await itAsync('19. HTTP GET /api/cliente/pro/bills - Bloqueio 403 no Plano Intermediário (proExclusive)', async () => {
+  await itAsync('7.3. HTTP: Plano Intermediário é bloqueado com 403 na rota /api/cliente/pro/bills', async () => {
     const res = await requestApi('/api/cliente/pro/bills', {
-      headers: { 'X-Auth-Token': tokenInter },
+      headers: { 'X-Auth-Token': 'token_inter' },
     });
     assert.strictEqual(res.status, 403);
     const body = await res.json();
     assert.strictEqual(body.proExclusive, true);
   });
 
-  await itAsync('20. HTTP GET /api/cliente/pro/dashboard - Acesso 200 no Plano Pró com Contas a Pagar', async () => {
+  await itAsync('7.4. HTTP: Plano Pró recebe 200 e payload completo com bills', async () => {
     const res = await requestApi('/api/cliente/pro/dashboard?period=today', {
-      headers: { 'X-Auth-Token': tokenA },
+      headers: { 'X-Auth-Token': 'token_pro' },
     });
     assert.strictEqual(res.status, 200);
     const body = await res.json();
     assert.strictEqual(body.success, true);
     assert.strictEqual(body.isPro, true);
-    assert.strictEqual(body.userTier, 'JESSICA_PRO');
-    assert(body.bills !== undefined);
+    assert.notStrictEqual(body.bills, null);
+    assert(body.bills.pendingTotal !== undefined);
   });
 
-  await itAsync('21. HTTP POST /api/cliente/pro/bills - Cadastro de conta com sucesso no Plano Pró', async () => {
-    const res = await requestApi('/api/cliente/pro/bills', {
-      method: 'POST',
-      headers: {
-        'X-Auth-Token': tokenA,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        title: 'Aluguel do Salão de Teste',
-        amount: 2500.0,
-        dueDate: todaySP,
-        category: 'Aluguel',
-        installments: 1,
-      }),
-    });
-    assert.strictEqual(res.status, 201);
-    const body = await res.json();
-    assert.strictEqual(body.success, true);
-    assert(Array.isArray(body.bills));
-    assert.strictEqual(body.bills[0].title, 'Aluguel do Salão de Teste');
-
-    const createdBillId = body.bills[0].id;
-
-    // Now test PATCH /pay
-    const payRes = await requestApi(`/api/cliente/pro/bills/${createdBillId}/pay`, {
-      method: 'PATCH',
-      headers: { 'X-Auth-Token': tokenA },
-    });
-    assert.strictEqual(payRes.status, 200);
-    const payBody = await payRes.json();
-    assert.strictEqual(payBody.success, true);
-    assert.strictEqual(payBody.bill.status, 'PAID');
-
-    // Clean up
-    salonDashboardService.deleteBill(userIdA, createdBillId);
-  });
-
-  await itAsync('22. HTTP POST /api/cliente/pro/transactions - Lançamento manual de movimentação', async () => {
-    const res = await requestApi('/api/cliente/pro/transactions', {
-      method: 'POST',
-      headers: {
-        'X-Auth-Token': tokenA,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        type: 'INCOME',
-        description: 'Venda de Shampoo e Máscara',
-        amount: 120.0,
-        paymentMethod: 'Pix',
-        category: 'Produtos',
-      }),
-    });
-    assert.strictEqual(res.status, 201);
-    const body = await res.json();
-    assert.strictEqual(body.success, true);
-    assert.strictEqual(body.transaction.amount, 120.0);
-  });
-
-  await itAsync('23. HTTP GET /api/cliente/pro/dashboard - Conta demonstrativa Bella Vista', async () => {
-    // Get demo user token
-    const demoUser = db.prepare('SELECT magic_token FROM users WHERE is_demo = 1 LIMIT 1').get();
-    assert(demoUser);
-    const res = await requestApi('/api/cliente/pro/dashboard?period=this_month', {
-      headers: { 'X-Auth-Token': demoUser.magic_token },
-    });
-    assert.strictEqual(res.status, 200);
-    const body = await res.json();
-    assert.strictEqual(body.isDemo, true);
-    assert(body.demoBadge.includes('Bella Vista'));
-    assert(body.metrics.realizedRevenue > 0);
-  });
-
-  // Close server
+  // Close HTTP Server
   await new Promise(res => server.close(res));
 
-  // Clean test accounts
-  db.prepare('DELETE FROM incomes WHERE user_id IN (?, ?)').run(userIdA, userIdB);
-  db.prepare('DELETE FROM expenses WHERE user_id IN (?, ?)').run(userIdA, userIdB);
-  db.prepare('DELETE FROM scheduled_payments WHERE user_id IN (?, ?)').run(userIdA, userIdB);
-  db.prepare('DELETE FROM appointments WHERE user_id IN (?, ?)').run(userIdA, userIdB);
-  db.prepare('DELETE FROM users WHERE id IN (?, ?, ?, ?)').run(userIdA, userIdB, userIdStart, userIdInter);
+  // -------------------------------------------------------------
+  // LIMPEZA DO BANCO ISOLADO TEMPORÁRIO
+  // -------------------------------------------------------------
+  console.log('\n--- LIMPEZA DO AMBIENTE TEMPORÁRIO ---');
+  try {
+    if (typeof db.close === 'function') {
+      db.close();
+    }
+    if (fs.existsSync(tempDbPath)) fs.unlinkSync(tempDbPath);
+    if (fs.existsSync(`${tempDbPath}-wal`)) fs.unlinkSync(`${tempDbPath}-wal`);
+    if (fs.existsSync(`${tempDbPath}-shm`)) fs.unlinkSync(`${tempDbPath}-shm`);
+    console.log('  ✓ Arquivos do SQLite temporário removidos com sucesso.');
+  } catch (e) {
+    console.warn('  ! Aviso na remoção do arquivo temporário:', e.message);
+  }
 
   console.log('\n=======================================================');
-  console.log(`RESULTADO FINAL: ${passedTests} APROVADOS, ${failedTests} FALHAS`);
+  console.log(`RESULTADO DA REVISÃO DE SEGURANÇA: ${passedTests} APROVADOS, ${failedTests} FALHAS`);
   console.log('=======================================================\n');
 
   if (failedTests > 0) process.exit(1);

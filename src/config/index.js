@@ -11,7 +11,7 @@ const config = {
   authorizedPhone: process.env.AUTHORIZED_PHONE || '', // e.g., '5511999999999' or comma-separated
   googleCalendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
   baseUrl: process.env.BASE_URL || 'https://raiaagentes.com.br',
-  dbPath: path.resolve(__dirname, '../../data/assistant.db'),
+  dbPath: process.env.DB_PATH ? path.resolve(process.env.DB_PATH) : path.resolve(__dirname, '../../data/assistant.db'),
   authDir: path.resolve(__dirname, '../../auth_info_baileys'),
   googleCredentialsPath: path.resolve(__dirname, '../../google_credentials.json'),
   googleTokenPath: path.resolve(__dirname, '../../google_token.json'),

@@ -1,6 +1,6 @@
 const db = require('../database/db');
 const financeService = require('./financeService');
-const billService = require('./billService');
+const productService = require('./productService');
 
 /**
  * Helper to get date string in America/Sao_Paulo (UTC-3)
@@ -108,42 +108,46 @@ function getPeriodDates(period = 'this_month', customStart = null, customEnd = n
 }
 
 /**
- * Determine effective Jéssica subscription tier
+ * Determine effective Jéssica subscription tier with strict verification
  */
 function getEffectiveJessicaTier(userId, user = null) {
   if (!user && userId) {
-    user = db.prepare('SELECT id, role, is_demo, plan_tier FROM users WHERE id = ?').get(userId);
+    user = db.prepare('SELECT id, role, is_demo, plan_tier, subscription_status, paid_until FROM users WHERE id = ?').get(userId);
   }
   if (!user) return 'JESSICA_START';
 
+  // Master Admin or authorized Demo Account
   if (user.role === 'ADMIN' || Boolean(user.is_demo)) {
     return 'JESSICA_PRO';
   }
 
-  // Look for product subscription in customer_subscriptions
-  try {
-    const sub = db.prepare(`
-      SELECT cs.status, pp.code as plan_code
-      FROM customer_subscriptions cs
-      JOIN products p ON p.id = cs.product_id
-      LEFT JOIN product_plans pp ON pp.id = cs.plan_id
-      WHERE cs.user_id = ? AND UPPER(p.code) = 'JESSICA'
-        AND cs.status IN ('ACTIVE', 'PENDING')
-      ORDER BY cs.id DESC LIMIT 1
-    `).get(user.id);
+  // Strictly check product access via productService
+  const access = productService.hasProductAccess(user.id, 'JESSICA');
+  if (!access.hasAccess) {
+    // Subscription is PENDING, OVERDUE, EXPIRED, CANCELED (past paid_until), or INACTIVE
+    return 'JESSICA_START';
+  }
 
-    if (sub && sub.plan_code) {
-      const code = sub.plan_code.toUpperCase();
-      if (code === 'PRO' || code === 'JESSICA_PRO') return 'JESSICA_PRO';
-      if (code === 'INTERMEDIATE' || code === 'JESSICA_INTERMEDIATE') return 'JESSICA_INTERMEDIATE';
-      if (code === 'START' || code === 'JESSICA_START') return 'JESSICA_START';
+  // If access is granted via customer_subscriptions
+  if (access.subscription) {
+    const code = String(access.subscription.planCode || access.subscription.plan_code || '').toUpperCase();
+    if (code === 'PRO' || code === 'JESSICA_PRO') return 'JESSICA_PRO';
+    if (code === 'INTERMEDIATE' || code === 'JESSICA_INTERMEDIATE') return 'JESSICA_INTERMEDIATE';
+    if (code === 'START' || code === 'JESSICA_START') return 'JESSICA_START';
+  }
+
+  // If access is granted via verified legacy contract
+  if (access.reason === 'LEGACY_ACTIVE') {
+    const isPaid = user.paid_until && new Date(user.paid_until) >= new Date();
+    const isActiveStatus = ['ACTIVE', 'TRIAL'].includes(String(user.subscription_status || '').toUpperCase());
+    if (isActiveStatus && isPaid) {
+      const rawTier = String(user.plan_tier || '').toUpperCase();
+      if (rawTier.includes('PRO')) return 'JESSICA_PRO';
+      if (rawTier.includes('INTERMEDIATE')) return 'JESSICA_INTERMEDIATE';
+      return 'JESSICA_START';
     }
-  } catch (e) {}
+  }
 
-  // Fallback to user.plan_tier
-  const rawTier = String(user.plan_tier || '').toUpperCase();
-  if (rawTier.includes('PRO')) return 'JESSICA_PRO';
-  if (rawTier.includes('INTERMEDIATE')) return 'JESSICA_INTERMEDIATE';
   return 'JESSICA_START';
 }
 
@@ -188,14 +192,12 @@ function getDateRangeArray(startStr, endStr) {
 /**
  * Get dashboard metrics for demo account (Bella Vista Hair & Spa)
  */
-function getDemoDashboardData(periodInfo) {
+function getDemoDashboardData(periodInfo, isPro = true) {
   const { period, startDate, endDate, periodLabel } = periodInfo;
 
-  // Multiplier depending on period length
   const dateArr = getDateRangeArray(startDate, endDate);
   const daysCount = Math.max(1, dateArr.length);
 
-  // Scaled values
   const baseDailyRealized = 428.33;
   const baseDailyEstimated = 114.00;
   const baseDailyExpenses = 159.33;
@@ -278,23 +280,26 @@ function getDemoDashboardData(periodInfo) {
     { hour: '17:00', count: Math.round(totalAppointments * 0.11) },
   ];
 
-  // Demo Bills to Pay
-  const bills = {
-    pendingTotal: 2750.00,
-    pendingCount: 3,
-    paidTotal: 3400.00,
-    paidCount: 4,
-    overdueCount: 0,
-    upcomingBills: [
-      { id: 901, title: 'Distribuidora L\'Oréal & Wella', amount: 1450.00, due_date: `${startDate.slice(0, 7)}-20`, category: 'Produtos', status: 'PENDING' },
-      { id: 902, title: 'Enel Energia Elétrica', amount: 680.00, due_date: `${startDate.slice(0, 7)}-22`, category: 'Contas Básicas', status: 'PENDING' },
-      { id: 903, title: 'Software & Internet Fibra', amount: 620.00, due_date: `${startDate.slice(0, 7)}-25`, category: 'Tecnologia', status: 'PENDING' },
-    ],
-    overdueBills: [],
-    paidBills: [
-      { id: 900, title: 'Aluguel do Salão Comercial', amount: 3400.00, due_date: `${startDate.slice(0, 7)}-05`, category: 'Imóvel', status: 'PAID' },
-    ],
-  };
+  // Demo Bills to Pay (Gated by isPro)
+  let bills = null;
+  if (isPro) {
+    bills = {
+      pendingTotal: 2750.00,
+      pendingCount: 3,
+      paidTotal: 3400.00,
+      paidCount: 4,
+      overdueCount: 0,
+      upcomingBills: [
+        { id: 901, title: 'Distribuidora L\'Oréal & Wella', amount: 1450.00, due_date: `${startDate.slice(0, 7)}-20`, category: 'Produtos', status: 'PENDING' },
+        { id: 902, title: 'Enel Energia Elétrica', amount: 680.00, due_date: `${startDate.slice(0, 7)}-22`, category: 'Contas Básicas', status: 'PENDING' },
+        { id: 903, title: 'Software & Internet Fibra', amount: 620.00, due_date: `${startDate.slice(0, 7)}-25`, category: 'Tecnologia', status: 'PENDING' },
+      ],
+      overdueBills: [],
+      paidBills: [
+        { id: 900, title: 'Aluguel do Salão Comercial', amount: 3400.00, due_date: `${startDate.slice(0, 7)}-05`, category: 'Imóvel', status: 'PAID' },
+      ],
+    };
+  }
 
   // Demo Transactions
   const transactions = [
@@ -314,8 +319,8 @@ function getDemoDashboardData(periodInfo) {
     startDate: startDate,
     endDate: endDate,
     metrics: {
-      // Modern 2.0 KPI keys
       realizedRevenue,
+      serviceRevenue: Math.round(realizedRevenue * 0.95 * 100) / 100,
       estimatedRevenue,
       expensesTotal,
       financialResult,
@@ -354,7 +359,7 @@ function getDemoDashboardData(periodInfo) {
 /**
  * Get real dashboard data for an authenticated client user
  */
-function getRealDashboardData(userId, periodInfo) {
+function getRealDashboardData(userId, periodInfo, isPro = true) {
   const { period, startDate, endDate, prevStartDate, prevEndDate, periodLabel } = periodInfo;
 
   // 1. Faturamento Realizado (Incomes where user_id = userId and date in range)
@@ -385,7 +390,7 @@ function getRealDashboardData(userId, periodInfo) {
   const expensesTotal = Math.round((expenseRow?.total || 0) * 100) / 100;
   const expensesCount = expenseRow?.count || 0;
 
-  // 3. Resultado Financeiro = Receitas - Despesas (não é lucro contábil)
+  // 3. Resultado Financeiro = Receitas - Despesas (resultado de caixa, não lucro contábil)
   const financialResult = Math.round((realizedRevenue - expensesTotal) * 100) / 100;
 
   // 4. Agendamentos no Período (Todos, Realizados, Cancelados)
@@ -404,11 +409,25 @@ function getRealDashboardData(userId, periodInfo) {
   let completedAppointments = 0;
   let cancelledAppointments = 0;
   let scheduledPendingAppointments = 0;
+  let appointmentCompletedRevenue = 0;
+
+  const userServices = db.prepare('SELECT id, name, price, category FROM client_services WHERE user_id = ?').all(userId);
+  const avgServicePrice = userServices.length > 0
+    ? userServices.reduce((acc, s) => acc + (s.price || 0), 0) / userServices.length
+    : 0;
 
   appointmentRows.forEach(a => {
     const st = String(a.status || '').toUpperCase();
     if (['COMPLETED', 'REALIZADO', 'CONCLUIDO'].includes(st)) {
       completedAppointments++;
+      let aptPrice = 0;
+      if (a.price && Number(a.price) > 0) {
+        aptPrice = Number(a.price);
+      } else if (a.service_id) {
+        const svc = userServices.find(s => s.id === a.service_id);
+        aptPrice = svc?.price || 0;
+      }
+      appointmentCompletedRevenue += aptPrice;
     } else if (['CANCELLED', 'CANCELED', 'CANCELADO'].includes(st)) {
       cancelledAppointments++;
     } else {
@@ -416,13 +435,23 @@ function getRealDashboardData(userId, periodInfo) {
     }
   });
 
-  // 5. Faturamento Estimado (Agendamentos pendentes/confirmados no período)
-  // Get user's average service price as fallback
-  const userServices = db.prepare('SELECT id, name, price, category FROM client_services WHERE user_id = ?').all(userId);
-  const avgServicePrice = userServices.length > 0
-    ? userServices.reduce((acc, s) => acc + (s.price || 0), 0) / userServices.length
-    : 0;
+  // Verified service incomes from incomes table (linked to appointments or matching salon services)
+  const serviceIncomes = db.prepare(`
+    SELECT COALESCE(SUM(amount), 0) AS total
+    FROM incomes
+    WHERE user_id = ?
+      AND substr(date, 1, 10) >= ?
+      AND substr(date, 1, 10) <= ?
+      AND (
+        appointment_id IS NOT NULL
+        OR source_type IN ('appointment', 'agendamento', 'jessica_service', 'service')
+        OR category IN (SELECT name FROM client_services WHERE user_id = ?)
+      )
+  `).get(userId, startDate, endDate, userId);
 
+  const serviceRevenue = Math.round((serviceIncomes?.total || 0) * 100) / 100;
+
+  // 5. Faturamento Estimado (Agendamentos pendentes/confirmados no período)
   let estimatedRevenue = 0;
   if (scheduledPendingAppointments > 0) {
     appointmentRows.forEach(a => {
@@ -441,17 +470,28 @@ function getRealDashboardData(userId, periodInfo) {
   }
   estimatedRevenue = Math.round(estimatedRevenue * 100) / 100;
 
-  // 6. Ticket Médio
+  // 6. Ticket Médio Rigoroso (baseado exclusivamente em atendimentos concluídos com receita identificada)
   let averageTicket = 0;
   let hasSufficientData = false;
-  if (completedAppointments > 0 && realizedRevenue > 0) {
-    averageTicket = Math.round((realizedRevenue / completedAppointments) * 100) / 100;
-    hasSufficientData = true;
-  } else if (incomesCount > 0 && realizedRevenue > 0) {
-    averageTicket = Math.round((realizedRevenue / incomesCount) * 100) / 100;
-    hasSufficientData = true;
-  } else if (completedAppointments > 0) {
-    hasSufficientData = true;
+
+  if (completedAppointments > 0) {
+    if (appointmentCompletedRevenue > 0) {
+      averageTicket = Math.round((appointmentCompletedRevenue / completedAppointments) * 100) / 100;
+      hasSufficientData = true;
+    } else if (serviceRevenue > 0) {
+      averageTicket = Math.round((serviceRevenue / completedAppointments) * 100) / 100;
+      hasSufficientData = true;
+    } else if (realizedRevenue > 0 && incomesCount === completedAppointments) {
+      // Direct 1-to-1 match between completed appointments and incomes
+      averageTicket = Math.round((realizedRevenue / completedAppointments) * 100) / 100;
+      hasSufficientData = true;
+    } else {
+      averageTicket = 0;
+      hasSufficientData = false;
+    }
+  } else {
+    averageTicket = 0;
+    hasSufficientData = false;
   }
 
   // 7. Comparative Metrics (Previous period)
@@ -523,7 +563,6 @@ function getRealDashboardData(userId, periodInfo) {
   });
 
   // 9. Services Ranking
-  // Group by service_id or appointment title matching service name
   const serviceStatsMap = {};
   userServices.forEach(s => {
     serviceStatsMap[s.id] = { id: s.id, name: s.name, count: 0, revenue: 0, price: s.price || 0 };
@@ -534,7 +573,6 @@ function getRealDashboardData(userId, periodInfo) {
       serviceStatsMap[a.service_id].count++;
       serviceStatsMap[a.service_id].revenue += Number(a.price) || serviceStatsMap[a.service_id].price;
     } else if (a.title) {
-      // Find matching service by title substring
       const matched = userServices.find(s => a.title.toLowerCase().includes(s.name.toLowerCase()));
       if (matched && serviceStatsMap[matched.id]) {
         serviceStatsMap[matched.id].count++;
@@ -593,7 +631,6 @@ function getRealDashboardData(userId, periodInfo) {
 
   appointmentRows.forEach(a => {
     if (a.start_datetime) {
-      // Extract hour
       const timePart = a.start_datetime.includes('T')
         ? a.start_datetime.split('T')[1]
         : a.start_datetime.split(' ')[1];
@@ -609,37 +646,40 @@ function getRealDashboardData(userId, periodInfo) {
 
   const peakHours = Object.entries(hoursCountMap).map(([hour, count]) => ({ hour, count }));
 
-  // 12. Contas a Pagar (Scheduled Payments)
-  const todayStr = getSaoPauloDate();
-  const pendingRows = db.prepare(`
-    SELECT id, title, amount, due_date, category, status, installment_current, installment_total
-    FROM scheduled_payments
-    WHERE user_id = ? AND status = 'PENDING'
-    ORDER BY due_date ASC
-  `).all(userId);
+  // 12. Contas a Pagar (Scheduled Payments) - Exclusivo do Plano Jéssica Pró
+  let bills = null;
+  if (isPro) {
+    const todayStr = getSaoPauloDate();
+    const pendingRows = db.prepare(`
+      SELECT id, title, amount, due_date, category, status, installment_current, installment_total
+      FROM scheduled_payments
+      WHERE user_id = ? AND status = 'PENDING'
+      ORDER BY due_date ASC
+    `).all(userId);
 
-  const pendingTotal = Math.round(pendingRows.reduce((acc, b) => acc + (b.amount || 0), 0) * 100) / 100;
-  const overdueBills = pendingRows.filter(b => b.due_date < todayStr);
-  const upcomingBills = pendingRows.filter(b => b.due_date >= todayStr).slice(0, 10);
+    const pendingTotal = Math.round(pendingRows.reduce((acc, b) => acc + (b.amount || 0), 0) * 100) / 100;
+    const overdueBills = pendingRows.filter(b => b.due_date < todayStr);
+    const upcomingBills = pendingRows.filter(b => b.due_date >= todayStr).slice(0, 10);
 
-  const paidRows = db.prepare(`
-    SELECT id, title, amount, due_date, category, status, paid_at
-    FROM scheduled_payments
-    WHERE user_id = ? AND status = 'PAID'
-    ORDER BY due_date DESC LIMIT 10
-  `).all(userId);
-  const paidTotal = Math.round(paidRows.reduce((acc, b) => acc + (b.amount || 0), 0) * 100) / 100;
+    const paidRows = db.prepare(`
+      SELECT id, title, amount, due_date, category, status, paid_at
+      FROM scheduled_payments
+      WHERE user_id = ? AND status = 'PAID'
+      ORDER BY due_date DESC LIMIT 10
+    `).all(userId);
+    const paidTotal = Math.round(paidRows.reduce((acc, b) => acc + (b.amount || 0), 0) * 100) / 100;
 
-  const bills = {
-    pendingTotal,
-    pendingCount: pendingRows.length,
-    overdueCount: overdueBills.length,
-    overdueBills,
-    upcomingBills,
-    paidBills: paidRows,
-    paidTotal,
-    paidCount: paidRows.length,
-  };
+    bills = {
+      pendingTotal,
+      pendingCount: pendingRows.length,
+      overdueCount: overdueBills.length,
+      overdueBills,
+      upcomingBills,
+      paidBills: paidRows,
+      paidTotal,
+      paidCount: paidRows.length,
+    };
+  }
 
   // 13. Movimentações Recentes (Extrato Incomes + Expenses)
   const recentIncomes = db.prepare(`
@@ -688,6 +728,7 @@ function getRealDashboardData(userId, periodInfo) {
     endDate,
     metrics: {
       realizedRevenue,
+      serviceRevenue,
       estimatedRevenue,
       expensesTotal,
       financialResult,
@@ -724,14 +765,14 @@ function getRealDashboardData(userId, periodInfo) {
  * Main function to retrieve salon dashboard data
  */
 async function getSalonDashboard(userId, options = {}) {
-  const { period = 'this_month', startDate = null, endDate = null, isDemo = false } = options;
+  const { period = 'this_month', startDate = null, endDate = null, isDemo = false, isPro = true } = options;
   const periodInfo = getPeriodDates(period, startDate, endDate);
 
   if (isDemo) {
-    return getDemoDashboardData(periodInfo);
+    return getDemoDashboardData(periodInfo, isPro);
   }
 
-  return getRealDashboardData(userId, periodInfo);
+  return getRealDashboardData(userId, periodInfo, isPro);
 }
 
 /**
@@ -801,42 +842,74 @@ function createBill(userId, data) {
 }
 
 /**
- * Mark a bill as paid with strict user isolation and automatic expense logging
+ * Mark a bill as paid with strict user isolation, atomic transaction and duplicate expense prevention
  */
 function markBillAsPaid(userId, billId) {
-  const bill = db.prepare('SELECT * FROM scheduled_payments WHERE id = ? AND user_id = ?').get(billId, userId);
-  if (!bill) {
-    throw new Error('Conta agendada não encontrada ou não pertence a este usuário.');
+  if (!userId || !billId) {
+    throw new Error('Identificadores de usuário e conta são obrigatórios.');
   }
 
-  if (bill.status === 'PAID') {
-    return { bill, message: 'Esta conta já foi marcada como quitada anteriormente.' };
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const bill = db.prepare('SELECT * FROM scheduled_payments WHERE id = ? AND user_id = ?').get(billId, userId);
+    if (!bill) {
+      throw new Error('Conta agendada não encontrada ou não pertence a este usuário.');
+    }
+
+    if (bill.status === 'PAID') {
+      db.exec('ROLLBACK');
+      return { bill, message: 'Esta conta já foi marcada como quitada anteriormente.' };
+    }
+
+    const nowIso = new Date().toISOString();
+    db.prepare(`UPDATE scheduled_payments SET status = 'PAID', paid_at = ? WHERE id = ? AND user_id = ?`).run(nowIso, billId, userId);
+
+    // Prevent duplicate expense entries if one already exists for this exact bill
+    const existingExpense = db.prepare(`
+      SELECT id, amount, category, description, date FROM expenses
+      WHERE user_id = ? AND source_type = 'dashboard_bill' AND description = ?
+      LIMIT 1
+    `).get(userId, `Pagamento de Conta: ${bill.title}`);
+
+    let expense = null;
+    if (existingExpense) {
+      expense = existingExpense;
+    } else {
+      expense = financeService.addExpense({
+        userId,
+        amount: bill.amount,
+        category: bill.category || 'Contas',
+        description: `Pagamento de Conta: ${bill.title}`,
+        paymentMethod: 'Boleto / Transferência',
+        date: nowIso,
+        sourceType: 'dashboard_bill',
+      });
+    }
+
+    db.exec('COMMIT');
+    return { bill: { ...bill, status: 'PAID', paid_at: nowIso }, expense };
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    throw err;
   }
-
-  const nowIso = new Date().toISOString();
-  db.prepare(`UPDATE scheduled_payments SET status = 'PAID', paid_at = ? WHERE id = ? AND user_id = ?`).run(nowIso, billId, userId);
-
-  // Automatically register in expenses table with bill's user_id
-  const expense = financeService.addExpense({
-    userId,
-    amount: bill.amount,
-    category: bill.category || 'Contas',
-    description: `Pagamento de Conta: ${bill.title}`,
-    paymentMethod: 'Boleto / Transferência',
-    date: nowIso,
-    sourceType: 'dashboard_bill',
-  });
-
-  return { bill: { ...bill, status: 'PAID', paid_at: nowIso }, expense };
 }
 
 /**
- * Delete a bill with strict user isolation
+ * Delete a bill with strict user isolation and audit protection
  */
 function deleteBill(userId, billId) {
-  const bill = db.prepare('SELECT id FROM scheduled_payments WHERE id = ? AND user_id = ?').get(billId, userId);
+  if (!userId || !billId) {
+    throw new Error('Identificadores de usuário e conta são obrigatórios.');
+  }
+
+  const bill = db.prepare('SELECT id, status, title FROM scheduled_payments WHERE id = ? AND user_id = ?').get(billId, userId);
   if (!bill) {
     throw new Error('Conta não encontrada ou permissão negada.');
+  }
+
+  // Audit protection: Settled/paid bills must NEVER be deleted to maintain accounting auditability
+  if (bill.status === 'PAID') {
+    throw new Error('Contas já quitadas não podem ser excluídas para preservar a rastreabilidade contábil.');
   }
 
   return db.prepare('DELETE FROM scheduled_payments WHERE id = ? AND user_id = ?').run(billId, userId);
