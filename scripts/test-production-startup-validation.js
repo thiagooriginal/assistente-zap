@@ -195,15 +195,17 @@ test('6. Bloqueio quando ADMIN_MFA_ENABLED=true e chave de criptografia MFA for 
 // -------------------------------------------------------------
 // Test 7: Staging Compatibility (HOMOLOGACAO=true e APP_MODE=staging)
 // -------------------------------------------------------------
-test('7. Compatibilidade com APP_MODE=staging e HOMOLOGACAO=true', () => {
+test('7. Compatibilidade com APP_MODE=staging e HOMOLOGACAO=true em domínio de staging', () => {
   const resHomolog = runValidationProcess({
     NODE_ENV: 'production',
     HOMOLOGACAO: 'true',
     APP_MODE: 'staging',
+    BASE_URL: 'https://staging.raiaagentes.com.br',
+    ADMIN_PASSWORD: 'StagingAdminPassword#2026',
     DB_PATH: 'data/assistant.db'
   });
 
-  // In staging mode, missing production secrets should not throw/exit with fatal error
+  // In staging mode with valid staging domain, missing production secrets should not throw/exit with fatal error
   assert.strictEqual(resHomolog.status, 0, `Staging should start without throwing fatal prod errors. Stderr: ${resHomolog.stderr}`);
   assert.ok(resHomolog.stdout.includes('"environment":"staging"'), 'Environment must be recognized as staging');
 });
@@ -242,6 +244,82 @@ test('8. Ausência de vazamento de segredos nos logs de inicialização e erro',
   const errOutput = (resErr.stdout + '\n' + resErr.stderr);
   assert.ok(!errOutput.includes(canarySessionSecret), 'SESSION_SECRET canary leaked during error handling!');
   assert.ok(!errOutput.includes(canaryClientSecret), 'CLIENT_AUTH_SECRET canary leaked during error handling!');
+});
+
+// -------------------------------------------------------------
+// Test 9: Conflicting Environment Flags (APP_MODE=production vs HOMOLOGACAO=true)
+// -------------------------------------------------------------
+test('9. Bloqueio de combinações conflitantes (APP_MODE=production com HOMOLOGACAO=true)', () => {
+  const res = runValidationProcess({
+    NODE_ENV: 'production',
+    APP_MODE: 'production',
+    HOMOLOGACAO: 'true',
+    ADMIN_PASSWORD: 'SuperSecretAdminPassword#2026',
+    SESSION_SECRET: 'production_session_secret_32_characters_long_123',
+    CLIENT_AUTH_SECRET: 'production_client_auth_secret_32_characters_456',
+    DB_PATH: 'data/assistant.db'
+  });
+
+  assert.notStrictEqual(res.status, 0, 'Must abort when APP_MODE=production conflicts with HOMOLOGACAO=true');
+  assert.ok(res.stderr.includes('CONFLITO DE AMBIENTE'), 'Stderr must identify environment conflict');
+});
+
+// -------------------------------------------------------------
+// Test 10: Canonical Production Domain Conflict with Staging Flag
+// -------------------------------------------------------------
+test('10. Bloqueio de tentativa de ativar staging no domínio canônico de produção', () => {
+  const res = runValidationProcess({
+    NODE_ENV: 'production',
+    BASE_URL: 'https://raiaagentes.com.br',
+    HOMOLOGACAO: 'true',
+    APP_MODE: 'staging',
+    DB_PATH: 'data/assistant.db'
+  });
+
+  assert.notStrictEqual(res.status, 0, 'Must abort when staging flag points to canonical production domain');
+  assert.ok(
+    res.stderr.includes('CONFLITO CRÍTICO DE AMBIENTE') || res.stderr.includes('domínio canônico de produção'),
+    'Stderr must indicate critical domain conflict'
+  );
+});
+
+// -------------------------------------------------------------
+// Test 11: Weak Password Rejection Even with Staging Flag
+// -------------------------------------------------------------
+test('11. Rejeição de senha fraca mesmo quando flag de homologação estiver ativa', () => {
+  const res = runValidationProcess({
+    NODE_ENV: 'production',
+    HOMOLOGACAO: 'true',
+    APP_MODE: 'staging',
+    BASE_URL: 'https://staging.raiaagentes.com.br',
+    ADMIN_PASSWORD: 'admin',
+    DB_PATH: 'data/assistant.db'
+  });
+
+  assert.notStrictEqual(res.status, 0, 'Weak password must be rejected even in staging');
+  assert.ok(res.stderr.includes('ADMIN_PASSWORD'), 'Stderr must flag weak ADMIN_PASSWORD');
+});
+
+// -------------------------------------------------------------
+// Test 12: Independent MFA Key Enforcement (Cannot Reuse Session Secret)
+// -------------------------------------------------------------
+test('12. Bloqueio quando MFA_ENCRYPTION_KEY reutilizar SESSION_SECRET em produção', () => {
+  const sharedSecret = 'shared_secret_between_mfa_and_session_123456';
+  const res = runValidationProcess({
+    NODE_ENV: 'production',
+    ADMIN_PASSWORD: 'SuperSecretAdminPassword#2026',
+    SESSION_SECRET: sharedSecret,
+    CLIENT_AUTH_SECRET: 'production_client_auth_secret_32_characters_456',
+    ADMIN_MFA_ENABLED: 'true',
+    MFA_ENCRYPTION_KEY: sharedSecret, // reused secret!
+    DB_PATH: 'data/assistant.db'
+  });
+
+  assert.notStrictEqual(res.status, 0, 'Reusing session secret as MFA key must fail');
+  assert.ok(
+    res.stderr.includes('MFA_ENCRYPTION_KEY deve ser uma chave independente') || res.stderr.includes('MFA_ENCRYPTION_KEY'),
+    'Stderr must report MFA key independence violation'
+  );
 });
 
 console.log('\n----------------------------------------------------------------');

@@ -578,6 +578,7 @@ function authMiddleware(req, res, next) {
     const user = userService.getUserBySessionToken(token);
     if (user) {
       req.user = user;
+      req.authMethod = 'SESSION';
       return next();
     }
   }
@@ -588,9 +589,32 @@ function authMiddleware(req, res, next) {
     const keyBuf = Buffer.from(String(apiKeyHeader));
     const expectedBuf = Buffer.from(String(config.adminApiKey));
     if (keyBuf.length === expectedBuf.length && crypto.timingSafeEqual(keyBuf, expectedBuf)) {
+      // Least Privilege: Prohibit using ADMIN_API_KEY on client-specific tenant routes
+      if (req.path.startsWith('/api/cliente/')) {
+        return res.status(403).json({
+          success: false,
+          error: 'Acesso negado: ADMIN_API_KEY não possui permissão para acessar rotas privativas de clientes.',
+          code: 'FORBIDDEN_CLIENT_ROUTE_VIA_API_KEY',
+        });
+      }
+
       const admin = db.prepare("SELECT * FROM users WHERE role = 'ADMIN' ORDER BY id ASC LIMIT 1").get() || userService.getUserById(1);
       if (admin) {
         req.user = admin;
+        req.authMethod = 'API_KEY';
+
+        // Traceability & Audit Logging for API Key automation usage
+        try {
+          const { logSecurityEvent, AUDIT_EVENTS } = require('../services/securityAuditService');
+          logSecurityEvent({
+            eventType: AUDIT_EVENTS.ADMIN_API_KEY_USED || 'ADMIN_API_KEY_USED',
+            userId: admin.id,
+            req,
+            status: 'SUCCESS',
+            details: { path: req.path, method: req.method },
+          });
+        } catch (_) {}
+
         return next();
       }
     }
@@ -610,6 +634,32 @@ function requireAdmin(req, res, next) {
       return res.status(403).json({
         success: false,
         error: 'Acesso negado. Recurso exclusivo para administradores.',
+      });
+    }
+    return next();
+  });
+}
+
+// Strict Admin Middleware requiring Interactive Session (MFA protected)
+// Rejects automated API keys for human-only operations (MFA config, credential mutation, user deletion)
+function requireInteractiveAdmin(req, res, next) {
+  return requireAdmin(req, res, () => {
+    if (req.authMethod === 'API_KEY') {
+      try {
+        const { logSecurityEvent, AUDIT_EVENTS } = require('../services/securityAuditService');
+        logSecurityEvent({
+          eventType: AUDIT_EVENTS.UNAUTHORIZED_ACCESS_BLOCKED,
+          userId: req.user?.id,
+          req,
+          status: 'BLOCKED',
+          details: { reason: 'api_key_not_permitted_for_interactive_mfa', path: req.path },
+        });
+      } catch (_) {}
+
+      return res.status(403).json({
+        success: false,
+        error: 'Operação restrita a administradores autenticados interativamente via sessão com MFA. Automações via API Key não possuem permissão para esta ação.',
+        code: 'FORBIDDEN_INTERACTIVE_SESSION_REQUIRED',
       });
     }
     return next();
@@ -1689,7 +1739,7 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
 });
 
 // Admin MFA Status: Check whether MFA is currently enforced or active
-app.get('/api/admin/mfa/status', requireAdmin, (req, res) => {
+app.get('/api/admin/mfa/status', requireInteractiveAdmin, (req, res) => {
   const admin = db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(req.user.id);
   const isGlobalMfa = (config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true') && Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
   const userMfaEnabled = Boolean(admin && admin.totp_enabled === 1);
@@ -1702,7 +1752,7 @@ app.get('/api/admin/mfa/status', requireAdmin, (req, res) => {
 });
 
 // Admin MFA Setup: Generate TOTP Secret & In-Process Local QR Code (Proteção 01)
-app.post('/api/admin/mfa/setup', requireAdmin, async (req, res) => {
+app.post('/api/admin/mfa/setup', requireInteractiveAdmin, async (req, res) => {
   const secret = totpService.generateSecret();
   const otpAuthUri = totpService.generateOtpAuthUri({
     secret,
@@ -1735,7 +1785,7 @@ app.post('/api/admin/mfa/setup', requireAdmin, async (req, res) => {
 });
 
 // Admin MFA Enable: Reinforced Authentication & Server-Generated Hashed Recovery Codes (Proteção 01)
-app.post('/api/admin/mfa/enable', requireAdmin, (req, res) => {
+app.post('/api/admin/mfa/enable', requireInteractiveAdmin, (req, res) => {
   const { password, secret, code } = req.body || {};
   if (!secret || !code) {
     return res.status(400).json({ success: false, error: 'Secret e código TOTP são obrigatórios para ativação.' });
@@ -1788,7 +1838,7 @@ app.post('/api/admin/mfa/enable', requireAdmin, (req, res) => {
 });
 
 // Admin MFA Disable: Reinforced Authentication (Requires admin password + current MFA verification) (Proteção 01)
-app.post('/api/admin/mfa/disable', requireAdmin, (req, res) => {
+app.post('/api/admin/mfa/disable', requireInteractiveAdmin, (req, res) => {
   const { password, code } = req.body || {};
   const configuredPass = (config.adminPassword || '').trim();
 
@@ -1929,7 +1979,7 @@ app.post('/api/admin/users/:id/extend-trial', requireAdmin, (req, res) => {
   }
 });
 
-app.delete('/api/admin/users/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/users/:id', requireInteractiveAdmin, (req, res) => {
   try {
     userService.deleteUser(Number(req.params.id));
     res.json({ success: true, message: 'Usuário removido com sucesso' });

@@ -42,11 +42,13 @@ const AUDIT_EVENTS = {
   ADMIN_MFA_FAILED: 'ADMIN_MFA_FAILED',
   ADMIN_MFA_ENABLED: 'ADMIN_MFA_ENABLED',
   ADMIN_MFA_DISABLED: 'ADMIN_MFA_DISABLED',
+  ADMIN_API_KEY_USED: 'ADMIN_API_KEY_USED',
   PRIVILEGE_ESCALATION_BLOCKED: 'PRIVILEGE_ESCALATION_BLOCKED',
 
   // Multi-Tenant Isolation & IDOR
   CROSS_TENANT_ACCESS_BLOCKED: 'CROSS_TENANT_ACCESS_BLOCKED',
   UNAUTHORIZED_API_ACCESS: 'UNAUTHORIZED_API_ACCESS',
+  UNAUTHORIZED_ACCESS_BLOCKED: 'UNAUTHORIZED_ACCESS_BLOCKED',
 
   // Subscriptions, Contracts & Financial
   PLAN_CHANGE: 'PLAN_CHANGE',
@@ -150,13 +152,14 @@ function logSecurityEvent({
 
     const cleanResource = sanitizeResource(resource);
     const cleanDetails = details ? JSON.stringify(sanitizeDetails(details)) : null;
+    const cleanEventType = String(eventType || 'SECURITY_EVENT');
 
     db.prepare(`
       INSERT INTO security_audit_logs (
         event_type, user_id, ip_address, user_agent, resource, status, details_json
       ) VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
-      eventType,
+      cleanEventType,
       userId,
       clientIp,
       clientUa ? String(clientUa).substring(0, 255) : null,

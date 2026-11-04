@@ -55,6 +55,15 @@ function clearSessionCookie(res, name, req = null) {
 
 // Client Multi-Tenant Authentication & Subscription Enforcement Middleware (Proteção 01 & 17)
 function clientAuthMiddleware(req, res, next) {
+  // Explicit Least Privilege: Reject attempts to access client endpoints using administrative automation keys
+  if (req.headers['x-admin-key'] || req.headers['x-api-key']) {
+    return res.status(403).json({
+      success: false,
+      error: 'Acesso negado: ADMIN_API_KEY não possui permissão para acessar rotas privativas de clientes.',
+      code: 'FORBIDDEN_CLIENT_ROUTE_VIA_API_KEY',
+    });
+  }
+
   let token = null;
 
   const authHeader = req.headers.authorization;

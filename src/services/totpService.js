@@ -18,32 +18,42 @@ const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
 /**
  * Returns the primary encryption key for MFA at rest.
- * In production, strictly requires a configured master secret without falling back to fixed known keys.
+ * In production, strictly requires its own independent MFA_ENCRYPTION_KEY (Proteção 01, 11).
  */
 function getPrimaryMfaKey() {
   const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
   const isProduction = process.env.NODE_ENV === 'production' && !isStaging;
 
-  const masterSecret = (process.env.MFA_ENCRYPTION_KEY || process.env.SESSION_SECRET || process.env.CLIENT_AUTH_SECRET || '').trim();
-
-  // In production, strictly prohibit fixed or missing keys
-  if (!masterSecret || masterSecret === 'raia-mfa-default-key-fallback') {
-    if (isProduction) {
-      throw new Error('MFA_ENCRYPTION_KEY (ou segredo mestre equivalente) não configurada ou insegura em produção.');
+  // In production, strictly require independent MFA_ENCRYPTION_KEY (no fallback to session secrets)
+  if (isProduction) {
+    const mfaSecret = (process.env.MFA_ENCRYPTION_KEY || '').trim();
+    if (!mfaSecret || mfaSecret === 'raia-mfa-default-key-fallback' || mfaSecret.length < 16) {
+      throw new Error('MFA_ENCRYPTION_KEY obrigatória e independente não configurada ou insuficiente em produção (mínimo 16 caracteres).');
     }
-    // Only in non-production environments (test/dev)
+    if (mfaSecret === process.env.SESSION_SECRET || mfaSecret === process.env.CLIENT_AUTH_SECRET) {
+      throw new Error('MFA_ENCRYPTION_KEY não pode reutilizar SESSION_SECRET ou CLIENT_AUTH_SECRET em produção.');
+    }
+    return crypto.createHash('sha256').update(mfaSecret).digest();
+  }
+
+  // Non-production (staging/dev/test): allow configured key or dev fallback
+  const devSecret = (process.env.MFA_ENCRYPTION_KEY || process.env.SESSION_SECRET || process.env.CLIENT_AUTH_SECRET || '').trim();
+  if (!devSecret || devSecret === 'raia-mfa-default-key-fallback') {
     return crypto.createHash('sha256').update('raia-mfa-dev-test-isolated-key').digest();
   }
 
-  return crypto.createHash('sha256').update(masterSecret).digest();
+  return crypto.createHash('sha256').update(devSecret).digest();
 }
 
 /**
  * Returns candidate decryption keys to preserve access to existing records
  * during key rotation or migrations without losing legitimate access.
  */
-function getCandidateDecryptionKeys() {
+function getCandidateDecryptionKeys({ includeLegacy = true } = {}) {
+  const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
+  const isProduction = process.env.NODE_ENV === 'production' && !isStaging;
   const keys = [];
+
   try {
     keys.push(getPrimaryMfaKey());
   } catch (_) {}
@@ -54,7 +64,7 @@ function getCandidateDecryptionKeys() {
     if (!keys.some(x => x.equals(k))) keys.push(k);
   }
 
-  // Candidate from SESSION_SECRET
+  // Candidate from SESSION_SECRET (for historical records encrypted prior to key separation)
   if (process.env.SESSION_SECRET) {
     const k = crypto.createHash('sha256').update(process.env.SESSION_SECRET.trim()).digest();
     if (!keys.some(x => x.equals(k))) keys.push(k);
@@ -66,12 +76,17 @@ function getCandidateDecryptionKeys() {
     if (!keys.some(x => x.equals(k))) keys.push(k);
   }
 
-  // Candidate from legacy development fallback (strictly for decrypting pre-existing records)
-  const legacyFallback = crypto.createHash('sha256').update('raia-mfa-default-key-fallback').digest();
-  if (!keys.some(x => x.equals(legacyFallback))) keys.push(legacyFallback);
+  // Legacy fallback keys: strictly for migrating pre-existing records during transition
+  const disableLegacy = process.env.MFA_DISABLE_LEGACY_KEYS === 'true';
+  if (includeLegacy && !disableLegacy) {
+    const legacyFallback = crypto.createHash('sha256').update('raia-mfa-default-key-fallback').digest();
+    if (!keys.some(x => x.equals(legacyFallback))) keys.push(legacyFallback);
 
-  const devFallback = crypto.createHash('sha256').update('raia-mfa-dev-test-isolated-key').digest();
-  if (!keys.some(x => x.equals(devFallback))) keys.push(devFallback);
+    if (!isProduction) {
+      const devFallback = crypto.createHash('sha256').update('raia-mfa-dev-test-isolated-key').digest();
+      if (!keys.some(x => x.equals(devFallback))) keys.push(devFallback);
+    }
+  }
 
   return keys;
 }
@@ -301,9 +316,73 @@ function generateOtpAuthUri({ secret, accountName = 'admin@raiaagentes.com.br', 
   return `otpauth://totp/${encIssuer}:${encAccount}?secret=${cleanSecret}&issuer=${encIssuer}&algorithm=SHA1&digits=6&period=30`;
 }
 
+/**
+ * Safe Migration and Re-encryption of existing MFA secrets under the primary key
+ * Guarantees zero downtime and safe decommission of legacy fallback keys.
+ */
+function migrateMfaSecrets(dbInstance) {
+  if (!dbInstance || typeof dbInstance.prepare !== 'function') {
+    throw new Error('Database instance is required for MFA migration.');
+  }
+
+  const primaryKey = getPrimaryMfaKey();
+  const users = dbInstance.prepare("SELECT id, totp_secret, totp_recovery_codes FROM users WHERE totp_secret IS NOT NULL").all();
+
+  let scanned = 0;
+  let migrated = 0;
+  let alreadyCurrent = 0;
+  let failed = 0;
+
+  for (const user of users) {
+    scanned++;
+    const storedSecret = user.totp_secret;
+    const decrypted = decryptSecret(storedSecret);
+
+    if (!decrypted) {
+      failed++;
+      console.error(`[MFA Migration] ALERTA: Não foi possível descriptografar o segredo do usuário #${user.id}.`);
+      continue;
+    }
+
+    // Check if storedSecret is already encrypted with the current primary key
+    let isCurrent = false;
+    if (storedSecret.startsWith('enc:v1:')) {
+      const parts = storedSecret.split(':');
+      if (parts.length === 5) {
+        try {
+          const iv = Buffer.from(parts[2], 'hex');
+          const authTag = Buffer.from(parts[3], 'hex');
+          const decipher = crypto.createDecipheriv('aes-256-gcm', primaryKey, iv);
+          decipher.setAuthTag(authTag);
+          let testDec = decipher.update(parts[4], 'hex', 'utf8');
+          testDec += decipher.final('utf8');
+          if (testDec === decrypted) {
+            isCurrent = true;
+          }
+        } catch (_) {
+          isCurrent = false;
+        }
+      }
+    }
+
+    if (isCurrent) {
+      alreadyCurrent++;
+      continue;
+    }
+
+    // Re-encrypt with primary key
+    const newEncryptedSecret = encryptSecret(decrypted);
+    dbInstance.prepare("UPDATE users SET totp_secret = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(newEncryptedSecret, user.id);
+    migrated++;
+  }
+
+  return { scanned, migrated, alreadyCurrent, failed };
+}
+
 module.exports = {
   getPrimaryMfaKey,
   getCandidateDecryptionKeys,
+  migrateMfaSecrets,
   encryptSecret,
   decryptSecret,
   hashRecoveryCode,

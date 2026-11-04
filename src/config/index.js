@@ -58,8 +58,6 @@ const config = {
  * Startup Environment & Configuration Validation (Proteção 11)
  */
 config.validateEnvironment = function validateEnvironment({ throwOnError = false } = {}) {
-  const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
-  const isProduction = process.env.NODE_ENV === 'production' && !isStaging;
   const errors = [];
   const warnings = [];
 
@@ -69,36 +67,65 @@ config.validateEnvironment = function validateEnvironment({ throwOnError = false
     'change_me', 'secret', 'raia-mfa-default-key-fallback'
   ];
 
+  // 0. Environment Conflict & Canonical Domain Checks (Separação Rigorosa de Ambientes)
+  const isNodeProd = process.env.NODE_ENV === 'production';
+  const hasStagingFlag = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
+  const isExplicitProdMode = process.env.APP_MODE === 'production';
+  let isCanonicalProdDomain = false;
+  try {
+    const u = new URL(config.baseUrl || 'https://raiaagentes.com.br');
+    isCanonicalProdDomain = (u.hostname === 'raiaagentes.com.br' || u.hostname === 'www.raiaagentes.com.br');
+  } catch (_) {}
+
+  // Disallow mutually contradictory environment declarations
+  if (isExplicitProdMode && process.env.HOMOLOGACAO === 'true') {
+    errors.push('CONFLITO DE AMBIENTE: APP_MODE=production é incompatível com HOMOLOGACAO=true.');
+  }
+
+  // Strictly disallow running staging mode against the canonical production domain when in production
+  if (isNodeProd && isCanonicalProdDomain && hasStagingFlag) {
+    errors.push('CONFLITO CRÍTICO DE AMBIENTE: Tentativa de ativar modo homologação/staging apontando para o domínio canônico de produção (raiaagentes.com.br).');
+  }
+
+  const isProduction = isNodeProd && !hasStagingFlag;
+  const isStaging = hasStagingFlag && !isProduction;
+
+  // Universal checks: weak/default secrets are prohibited in any production or staging environment
+  if (config.adminPassword && WEAK_OR_DEFAULT_SECRETS.includes(String(config.adminPassword).toLowerCase())) {
+    errors.push('ADMIN_PASSWORD configurada com valor fraco ou padrão proibido.');
+  }
+  if (config.sessionSecret && WEAK_OR_DEFAULT_SECRETS.includes(String(config.sessionSecret).toLowerCase())) {
+    errors.push('SESSION_SECRET configurado com valor padrão proibido.');
+  }
+  if (config.clientAuthSecret && WEAK_OR_DEFAULT_SECRETS.includes(String(config.clientAuthSecret).toLowerCase())) {
+    errors.push('CLIENT_AUTH_SECRET configurado com valor padrão proibido.');
+  }
+
   // 1. Production Critical Checks
   if (isProduction) {
     // Admin Password
     if (!config.adminPassword || config.adminPassword.length < 8) {
       errors.push('ADMIN_PASSWORD não configurada ou muito curta em ambiente de produção (mínimo 8 caracteres).');
-    } else if (WEAK_OR_DEFAULT_SECRETS.includes(String(config.adminPassword).toLowerCase())) {
-      errors.push('ADMIN_PASSWORD configurada com valor fraco ou padrão em produção.');
     }
 
     // Session Secret
     if (!config.sessionSecret || config.sessionSecret.length < 16) {
       errors.push('SESSION_SECRET não configurado ou muito curto em produção (mínimo 16 caracteres).');
-    } else if (WEAK_OR_DEFAULT_SECRETS.includes(String(config.sessionSecret).toLowerCase())) {
-      errors.push('SESSION_SECRET configurado com valor padrão ou trivial em produção.');
     }
 
     // Client Auth Secret
     if (!config.clientAuthSecret || config.clientAuthSecret.length < 16) {
       errors.push('CLIENT_AUTH_SECRET não configurado ou muito curto em produção (mínimo 16 caracteres).');
-    } else if (WEAK_OR_DEFAULT_SECRETS.includes(String(config.clientAuthSecret).toLowerCase())) {
-      errors.push('CLIENT_AUTH_SECRET configurado com valor padrão ou trivial em produção.');
     }
 
-    // MFA Encryption Key (required when MFA is enabled in production)
+    // MFA Encryption Key: In production, requires its OWN independent key (cannot reuse session secret)
     if (config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true') {
-      const mfaKey = config.mfaEncryptionKey || config.sessionSecret || config.clientAuthSecret;
-      if (!mfaKey || mfaKey.length < 16) {
-        errors.push('MFA_ENCRYPTION_KEY não configurada ou insuficiente com MFA ativo em produção.');
-      } else if (WEAK_OR_DEFAULT_SECRETS.includes(String(mfaKey).toLowerCase())) {
+      if (!config.mfaEncryptionKey || config.mfaEncryptionKey.length < 16) {
+        errors.push('MFA_ENCRYPTION_KEY obrigatória e independente não configurada ou insuficiente em produção (mínimo 16 caracteres).');
+      } else if (WEAK_OR_DEFAULT_SECRETS.includes(String(config.mfaEncryptionKey).toLowerCase())) {
         errors.push('MFA_ENCRYPTION_KEY configurada com valor padrão ou trivial em produção.');
+      } else if (config.mfaEncryptionKey === config.sessionSecret || config.mfaEncryptionKey === config.clientAuthSecret) {
+        errors.push('MFA_ENCRYPTION_KEY deve ser uma chave independente e não pode ser reutilizada de SESSION_SECRET ou CLIENT_AUTH_SECRET.');
       }
     }
 

@@ -667,6 +667,19 @@ runVersionedMigration('20261104_02_strict_session_unification', 'Enforce session
   `).run();
 });
 
+// Migration: Persistent & Cluster-Coordinated Rate Limiting (Proteção 12)
+runVersionedMigration('20261104_03_persistent_rate_limiting', 'Create rate_limit_entries table for persistent and cluster-coordinated rate limiting', () => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS rate_limit_entries (
+      key TEXT PRIMARY KEY,
+      count INTEGER NOT NULL,
+      reset_time INTEGER NOT NULL,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_rate_limit_reset ON rate_limit_entries(reset_time);
+  `);
+});
+
 // User columns for Client Authentication & Hotmart Subscriptions
 ensureColumnExists('users', 'session_token', 'TEXT');
 ensureColumnExists('users', 'session_expires_at', 'TEXT');

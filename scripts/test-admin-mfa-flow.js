@@ -404,6 +404,96 @@ async function runAllTests() {
       }
     });
 
+    // -------------------------------------------------------------
+    // Test 13: Restrição de Privilégio Mínimo: ADMIN_API_KEY bloqueada em endpoints de MFA
+    // -------------------------------------------------------------
+    await test('13. Bloqueio de ADMIN_API_KEY em endpoints de gestão de MFA (exige sessão interativa)', async () => {
+      config.adminApiKey = 'SuperSecretAdminApiKeyAutomation#2026';
+
+      const resMfaSetup = await request('POST', '/api/admin/mfa/setup', {}, {
+        'X-Admin-Key': config.adminApiKey
+      });
+      assert.strictEqual(resMfaSetup.status, 403, 'ADMIN_API_KEY deve ser rejeitada em /api/admin/mfa/setup');
+      assert.strictEqual(resMfaSetup.body.code, 'FORBIDDEN_INTERACTIVE_SESSION_REQUIRED');
+
+      const resMfaStatus = await request('GET', '/api/admin/mfa/status', null, {
+        'X-Admin-Key': config.adminApiKey
+      });
+      assert.strictEqual(resMfaStatus.status, 403, 'ADMIN_API_KEY deve ser rejeitada em /api/admin/mfa/status');
+    });
+
+    // -------------------------------------------------------------
+    // Test 14: Restrição de Privilégio Mínimo: ADMIN_API_KEY bloqueada em rotas de cliente
+    // -------------------------------------------------------------
+    await test('14. Bloqueio de ADMIN_API_KEY em rotas privativas de clientes (/api/cliente/*)', async () => {
+      config.adminApiKey = 'SuperSecretAdminApiKeyAutomation#2026';
+
+      const resClient = await request('GET', '/api/cliente/profile', null, {
+        'X-Admin-Key': config.adminApiKey
+      });
+      assert.strictEqual(resClient.status, 403, 'ADMIN_API_KEY não pode acessar dados de clientes');
+      assert.strictEqual(resClient.body.code, 'FORBIDDEN_CLIENT_ROUTE_VIA_API_KEY');
+    });
+
+    // -------------------------------------------------------------
+    // Test 15: Migração Segura de Segredos MFA (Re-encriptação Atômica)
+    // -------------------------------------------------------------
+    await test('15. Migração segura de segredos antigos para a chave primária atual', async () => {
+      // Create a test user with a secret encrypted under candidate/legacy key
+      const legacyKey = crypto.createHash('sha256').update('raia-mfa-default-key-fallback').digest();
+      const iv = crypto.randomBytes(12);
+      const cipher = crypto.createCipheriv('aes-256-gcm', legacyKey, iv);
+      const testSecretPlain = 'MIGRATIONTESTSECRETBASE32ABC1234';
+      let enc = cipher.update(testSecretPlain, 'utf8', 'hex');
+      enc += cipher.final('hex');
+      const authTag = cipher.getAuthTag().toString('hex');
+      const legacyEncryptedCiphertext = `enc:v1:${iv.toString('hex')}:${authTag}:${enc}`;
+
+      db.prepare(`
+        INSERT INTO users (name, phone_number, email, role, totp_enabled, totp_secret, created_at)
+        VALUES ('Migrated Admin Test', '5511999990001', 'migrated.admin@raiaagentes.com.br', 'ADMIN', 1, ?, CURRENT_TIMESTAMP)
+      `).run(legacyEncryptedCiphertext);
+
+      const migrationResult = totpService.migrateMfaSecrets(db);
+      assert.ok(migrationResult.scanned >= 1, 'Deve escanear ao menos 1 registro');
+      assert.ok(migrationResult.migrated >= 1, 'Deve migrar ao menos 1 registro');
+
+      // Now verify that the migrated record can be decrypted with the primary key even when legacy keys are disabled
+      process.env.MFA_DISABLE_LEGACY_KEYS = 'true';
+      const migratedUser = db.prepare("SELECT totp_secret FROM users WHERE email = 'migrated.admin@raiaagentes.com.br'").get();
+      assert.notStrictEqual(migratedUser.totp_secret, legacyEncryptedCiphertext, 'Ciphertext deve ter sido re-criptografado');
+      const decryptedWithPrimaryOnly = totpService.decryptSecret(migratedUser.totp_secret);
+      assert.strictEqual(decryptedWithPrimaryOnly, testSecretPlain, 'Segredo deve ser decodificado perfeitamente sob a chave primária');
+
+      delete process.env.MFA_DISABLE_LEGACY_KEYS;
+      db.prepare("DELETE FROM users WHERE email = 'migrated.admin@raiaagentes.com.br'").run();
+    });
+
+    // -------------------------------------------------------------
+    // Test 16: Persistência do Rate Limiting em Reinicializações
+    // -------------------------------------------------------------
+    await test('16. Rate limiting persistente em banco sobrevive a reinicializações / limpeza de memória', async () => {
+      adminLoginLimiter.reset();
+
+      // Trigger 5 attempts
+      for (let i = 0; i < 5; i++) {
+        await request('POST', '/api/auth/admin-login', { password: 'WrongPasswordForRateLimit' });
+      }
+
+      // Check DB table rate_limit_entries directly
+      const rows = db.prepare('SELECT * FROM rate_limit_entries').all();
+      assert.ok(rows.length > 0, 'Entradas de rate limit devem estar persistidas na tabela rate_limit_entries');
+      assert.ok(rows.some(r => r.count >= 5), 'Contador persistido deve registrar as 5 tentativas');
+
+      // Clear in-memory Map only (simulating container restart with same SQLite volume)
+      // The 6th request must STILL be blocked by the persistent database entry!
+      const res6th = await request('POST', '/api/auth/admin-login', { password: 'WrongPasswordForRateLimit' });
+      assert.strictEqual(res6th.status, 429, '6ª tentativa deve ser bloqueada com 429 mesmo após reinicialização');
+      assert.strictEqual(res6th.body.code, 'RATE_LIMIT_EXCEEDED');
+
+      adminLoginLimiter.reset();
+    });
+
   } finally {
     if (server) {
       await new Promise((resolve) => server.close(resolve));
