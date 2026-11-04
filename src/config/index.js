@@ -51,7 +51,7 @@ const config = {
 /**
  * Startup Environment & Configuration Validation (Proteção 11)
  */
-config.validateEnvironment = function validateEnvironment() {
+config.validateEnvironment = function validateEnvironment({ throwOnError = false } = {}) {
   const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
   const isProduction = process.env.NODE_ENV === 'production' && !isStaging;
   const errors = [];
@@ -62,8 +62,14 @@ config.validateEnvironment = function validateEnvironment() {
     if (!config.adminPassword || config.adminPassword.length < 8) {
       errors.push('ADMIN_PASSWORD não configurada ou muito curta em ambiente de produção (mínimo 8 caracteres).');
     }
-    if (['admin123', 'admin', 'password', '12345678'].includes(config.adminPassword.toLowerCase())) {
+    if (['admin123', 'admin', 'password', '12345678'].includes(String(config.adminPassword).toLowerCase())) {
       errors.push('ADMIN_PASSWORD configurada com valor fraco/óbvio em produção.');
+    }
+    if (!config.sessionSecret || config.sessionSecret === 'segredo_padrao_trocar_em_producao') {
+      errors.push('SESSION_SECRET não configurado ou com valor padrão em produção.');
+    }
+    if (!config.clientAuthSecret || config.clientAuthSecret === 'segredo_padrao_trocar_em_producao') {
+      errors.push('CLIENT_AUTH_SECRET não configurado ou com valor padrão em produção.');
     }
     if (!config.adminApiKey || config.adminApiKey.length < 16) {
       warnings.push('ADMIN_API_KEY recomendada com entropia elevada (mínimo 16 caracteres).');
@@ -91,7 +97,7 @@ config.validateEnvironment = function validateEnvironment() {
   if (errors.length > 0) {
     console.error('\n❌ [Security Startup Error] Falha de validação das variáveis de ambiente:');
     for (const err of errors) console.error(`  - ${err}`);
-    if (isProduction) {
+    if (isProduction || throwOnError) {
       throw new Error(`Abortando inicialização por violação de segurança: ${errors.join('; ')}`);
     }
   }

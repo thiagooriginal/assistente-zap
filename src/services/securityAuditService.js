@@ -40,6 +40,8 @@ const AUDIT_EVENTS = {
   ADMIN_MFA_CHALLENGE: 'ADMIN_MFA_CHALLENGE',
   ADMIN_MFA_SUCCESS: 'ADMIN_MFA_SUCCESS',
   ADMIN_MFA_FAILED: 'ADMIN_MFA_FAILED',
+  ADMIN_MFA_ENABLED: 'ADMIN_MFA_ENABLED',
+  ADMIN_MFA_DISABLED: 'ADMIN_MFA_DISABLED',
   PRIVILEGE_ESCALATION_BLOCKED: 'PRIVILEGE_ESCALATION_BLOCKED',
 
   // Multi-Tenant Isolation & IDOR
@@ -70,15 +72,39 @@ const AUDIT_EVENTS = {
 };
 
 /**
+ * Sanitize resource path to strictly remove query parameters, tokens and fragments
+ */
+function sanitizeResource(resPath) {
+  if (!resPath || typeof resPath !== 'string') return null;
+  // Strip any query parameters or hash fragments
+  const cleanPath = resPath.split('?')[0].split('#')[0].trim();
+  return cleanPath ? cleanPath.substring(0, 255) : null;
+}
+
+/**
+ * Sanitize string values that might contain sensitive URL parameters or tokens
+ */
+function sanitizeStringValue(str) {
+  if (typeof str !== 'string') return str;
+  // If the string contains query parameters with sensitive keys, redact their values
+  if (str.includes('?') || str.includes('&')) {
+    return str.replace(/([?&](?:token|key|secret|password|pass|code|auth|sig|magic_token)=)[^&]*/gi, '$1[REDACTED]');
+  }
+  return str;
+}
+
+/**
  * Remove sensitive credentials from audit details
  */
 function sanitizeDetails(data) {
-  if (!data || typeof data !== 'object') return data;
+  if (!data || typeof data !== 'object') return sanitizeStringValue(data);
   
   const sensitiveKeys = [
     'password', 'password_hash', 'password_salt', 'currentPassword', 'newPassword',
     'secret', 'token', 'magic_token', 'apiKey', 'access_token', 'cookie',
-    'authorization', 'key', 'admin_pin', 'creditCard', 'cvv'
+    'authorization', 'key', 'admin_pin', 'creditCard', 'cvv', 'activation_token',
+    'reset_token', 'mfaCode', 'mfaToken', 'totpSecret', 'totp_secret', 'pin',
+    'recoveryCode', 'code', 'session_token'
   ];
 
   const sanitized = Array.isArray(data) ? [] : {};
@@ -90,7 +116,7 @@ function sanitizeDetails(data) {
     } else if (value && typeof value === 'object') {
       sanitized[key] = sanitizeDetails(value);
     } else {
-      sanitized[key] = value;
+      sanitized[key] = sanitizeStringValue(value);
     }
   }
 
@@ -117,9 +143,11 @@ function logSecurityEvent({
     if (req) {
       clientIp = clientIp || req.ip || req.socket?.remoteAddress || '127.0.0.1';
       clientUa = clientUa || req.headers?.['user-agent'] || null;
-      resource = resource || req.originalUrl || req.url || null;
+      // Proteção 02: Always use safe path (req.path) instead of raw req.originalUrl
+      resource = resource || req.path || req.baseUrl || req.url || null;
     }
 
+    const cleanResource = sanitizeResource(resource);
     const cleanDetails = details ? JSON.stringify(sanitizeDetails(details)) : null;
 
     db.prepare(`
@@ -131,7 +159,7 @@ function logSecurityEvent({
       userId,
       clientIp,
       clientUa ? String(clientUa).substring(0, 255) : null,
-      resource ? String(resource).substring(0, 255) : null,
+      cleanResource,
       status,
       cleanDetails
     );
@@ -174,4 +202,6 @@ module.exports = {
   logSecurityEvent,
   getRecentSecurityLogs,
   sanitizeDetails,
+  sanitizeResource,
+  sanitizeStringValue,
 };

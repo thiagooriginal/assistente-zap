@@ -416,7 +416,7 @@ async function runAsaasMultichannelTests() {
       // Tentar adicionar 2º profissional sem contratar extra -> DEVE RETORNAR 403
       const staffBlocked = await fetch(`${baseUrl}/api/cliente/staff`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Cookie': clientCookie },
+        headers: { 'Content-Type': 'application/json', 'Cookie': clientCookie, 'Origin': baseUrl },
         body: JSON.stringify({ name: 'Cabeleireira Ana', specialty: 'Coloração' })
       });
       assert.strictEqual(staffBlocked.status, 403, 'Exceder limite de profissionais sem extra deve retornar 403');
@@ -425,7 +425,7 @@ async function runAsaasMultichannelTests() {
       db.prepare('UPDATE users SET extra_professionals = 1 WHERE id = ?').run(testUserId);
       const staffAllowed = await fetch(`${baseUrl}/api/cliente/staff`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Cookie': clientCookie },
+        headers: { 'Content-Type': 'application/json', 'Cookie': clientCookie, 'Origin': baseUrl },
         body: JSON.stringify({ name: 'Cabeleireira Ana', specialty: 'Coloração' })
       });
       assert.strictEqual(staffAllowed.status, 200, 'Com profissional extra contratado, adição deve ser 200');

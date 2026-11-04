@@ -32,14 +32,27 @@ const {
   whatsappTestLimiter,
 } = require('../middlewares/rateLimiter');
 const { AUDIT_EVENTS, logSecurityEvent, getRecentSecurityLogs } = require('../services/securityAuditService');
+const totpService = require('../services/totpService');
 
 // Execute Startup Environment & Configuration Validation (Proteção 11)
+const isStagingEnv = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
+const isProdEnv = process.env.NODE_ENV === 'production' && !isStagingEnv;
+
 try {
   if (typeof config.validateEnvironment === 'function') {
-    config.validateEnvironment();
+    const envValidation = config.validateEnvironment({ throwOnError: isProdEnv });
+    if (!envValidation.valid && isProdEnv) {
+      console.error('\n🚨 FATAL: Abortando inicialização do servidor por erro crítico de configuração em produção.');
+      process.exit(1);
+    }
   }
 } catch (envErr) {
-  console.error('[Config Error]', envErr.message);
+  if (isProdEnv) {
+    console.error('\n🚨 FATAL: Abortando inicialização do servidor por erro crítico de configuração em produção:', envErr.message);
+    process.exit(1);
+  } else {
+    console.warn('\n⚠️ [Config Warning em Staging/Dev]:', envErr.message);
+  }
 }
 
 // Initialize isolated demo account for Hotmart compliance
@@ -55,18 +68,51 @@ const app = express();
 // Prevents trusting spoofed X-Forwarded-* headers from untrusted external clients.
 app.set('trust proxy', 1);
 
-// Validate host header to prevent Host Header Injection / Open Redirect attacks (Proteção 04)
+// Exact allowlist for legitimate Host headers (Proteção 04)
+const EXACT_ALLOWED_HOSTS = new Set([
+  'raiaagentes.com.br',
+  'www.raiaagentes.com.br',
+  'staging.raiaagentes.com.br',
+  'localhost',
+  'localhost:3000',
+  'localhost:3333',
+  '127.0.0.1',
+  '127.0.0.1:3000',
+  '127.0.0.1:3333',
+]);
+
+// Validate host header strictly to prevent Host Header Injection / Open Redirect attacks (Proteção 04)
 function getValidatedRedirectHost(req, fallbackHost) {
   const rawHost = (req.get('x-forwarded-host') || req.get('host') || '').trim().toLowerCase();
   if (!rawHost) return fallbackHost;
-  const isAllowed = rawHost === 'raiaagentes.com.br' ||
-                    rawHost.endsWith('.raiaagentes.com.br') ||
-                    rawHost.startsWith('localhost') ||
-                    rawHost.startsWith('127.0.0.1');
-  return isAllowed ? rawHost : fallbackHost;
+  return EXACT_ALLOWED_HOSTS.has(rawHost) ? rawHost : fallbackHost;
 }
 
-// Application-level HTTPS redirect and security headers (Proteção 04 & 14)
+// Strict validator for legitimate browser origins (Proteção 13 & 16)
+function isAllowedOrigin(origin) {
+  if (!origin) return false;
+  try {
+    const parsed = new URL(origin);
+    const host = parsed.hostname.toLowerCase();
+    const proto = parsed.protocol.toLowerCase();
+
+    // 1. Official RAIA production and staging domains (HTTPS only, exact host)
+    if (['raiaagentes.com.br', 'www.raiaagentes.com.br', 'staging.raiaagentes.com.br'].includes(host)) {
+      return proto === 'https:';
+    }
+
+    // 2. Localhost and loopback development/test servers (HTTP only, exact loopback host)
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return proto === 'http:';
+    }
+
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
+// Application-level HTTPS redirect and security headers (Proteção 04, 14 & 07)
 // NOTE: TLS certificate provisioning is managed by Traefik / Let's Encrypt at the ingress proxy layer.
 app.use((req, res, next) => {
   const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
@@ -79,21 +125,17 @@ app.use((req, res, next) => {
   if (isStagingOrProd && proto && proto.toLowerCase() === 'http') {
     const defaultHost = isStaging ? 'staging.raiaagentes.com.br' : 'raiaagentes.com.br';
     const host = getValidatedRedirectHost(req, defaultHost);
-    return res.redirect(301, `https://${host}${req.originalUrl || req.url}`);
+    return res.redirect(301, `https://${host}${req.path || ''}`);
   }
 
-  // HSTS Policy:
-  // - Homologation/Staging: Do NOT send includeSubDomains or preload.
-  //   HSTS is only enabled in staging if TLS certificate validation has been confirmed (via ENABLE_HSTS_STAGING),
-  //   using a conservative max-age without subdomains or preload to prevent certificate locking issues.
-  // - Production: Send standard max-age=31536000 once certificate is validated.
+  // HSTS Policy
   if (isProduction) {
     res.setHeader('Strict-Transport-Security', 'max-age=31536000');
   } else if (isStaging && process.env.ENABLE_HSTS_STAGING === 'true') {
     res.setHeader('Strict-Transport-Security', 'max-age=86400');
   }
 
-  // Response defense-in-depth headers (Proteção 14)
+  // Response defense-in-depth headers (Proteção 14 & 07)
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -101,27 +143,31 @@ app.use((req, res, next) => {
   res.setHeader('X-XSS-Protection', '0');
 
   if (isStagingOrProd) {
-    res.setHeader('Content-Security-Policy', "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'; base-uri 'self'; upgrade-insecure-requests;");
+    // Enforced baseline CSP compatible with current frontends
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'; base-uri 'self'; upgrade-insecure-requests;"
+    );
+    // Report-Only CSP preparing transition away from unsafe-inline and unsafe-eval
+    res.setHeader(
+      'Content-Security-Policy-Report-Only',
+      "default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://staging.raiaagentes.com.br https://raiaagentes.com.br; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; report-uri /api/security/csp-report;"
+    );
   }
 
   next();
 });
 
-// Restricted CORS configuration (Proteção 13)
-const allowedOrigins = [
-  'https://raiaagentes.com.br',
-  'https://staging.raiaagentes.com.br',
-  'http://localhost:3333',
-  'http://127.0.0.1:3333',
-];
+// Endpoint to receive CSP violation reports without throwing errors
+app.post('/api/security/csp-report', express.json({ type: ['application/json', 'application/csp-report'] }), (req, res) => {
+  res.status(204).end();
+});
+
+// Restricted CORS configuration with exact origin matching (Proteção 13)
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true); // Allow server-to-server or non-browser tools
-    const isAllowed = allowedOrigins.includes(origin) ||
-                      origin.endsWith('.raiaagentes.com.br') ||
-                      origin.includes('localhost') ||
-                      origin.includes('127.0.0.1');
-    if (isAllowed) {
+    if (isAllowedOrigin(origin)) {
       return callback(null, true);
     }
     // Disallow without throwing internal server error (browser will enforce origin block)
@@ -140,46 +186,82 @@ app.use((req, res, next) => {
   if (!mutatingMethods.includes(req.method)) return next();
 
   // Webhooks and anonymous public endpoints are exempted from browser CSRF checks
-  const exemptPrefixes = ['/api/webhooks', '/api/analytics/event', '/api/leads/request-test', '/api/test-agent'];
+  const exemptPrefixes = [
+    '/api/webhooks',
+    '/api/analytics/event',
+    '/api/leads/request-test',
+    '/api/test-agent',
+    '/api/security/csp-report',
+    '/api/auth/admin-login',
+    '/api/cliente/auth/login',
+    '/api/cliente/auth/request-reset',
+    '/api/cliente/auth/reset-password',
+  ];
   if (exemptPrefixes.some(p => req.path.startsWith(p))) {
     return next();
   }
 
-  // If request uses custom Authorization header or API keys, CSRF does not apply
-  const hasCustomAuthHeader = Boolean(
-    req.headers.authorization ||
-    req.headers['x-auth-token'] ||
-    req.headers['x-admin-key'] ||
-    req.headers['x-staging-key'] ||
-    req.headers['x-staging-token']
-  );
-  if (hasCustomAuthHeader) {
-    return next();
-  }
-
-  // If request relies purely on cookies for authentication, verify Origin / Referer
-  const cookieHeader = req.headers.cookie || '';
-  const hasAuthCookie = cookieHeader.includes('auth_token') || cookieHeader.includes('client_auth_token');
+  // Check if request relies on cookie authentication
+  const hasAuthCookie = Boolean(getCookie(req, 'auth_token') || getCookie(req, 'client_auth_token'));
   if (hasAuthCookie) {
-    const origin = req.headers.origin || req.headers.referer;
+    const origin = req.headers.origin;
+    const referer = req.headers.referer;
+
     if (origin) {
+      if (!isAllowedOrigin(origin)) {
+        logSecurityEvent({
+          eventType: AUDIT_EVENTS.CSRF_VIOLATION_BLOCKED,
+          req,
+          status: 'BLOCKED',
+          details: { reason: 'invalid_origin', origin, path: req.path },
+        });
+        return res.status(403).json({
+          success: false,
+          error: 'Acesso bloqueado por validação Anti-CSRF: origem não autorizada.',
+          code: 'CSRF_INVALID_ORIGIN'
+        });
+      }
+    } else if (referer) {
       try {
-        const parsed = new URL(origin).hostname.toLowerCase();
-        const isAllowed = parsed === 'raiaagentes.com.br' ||
-                          parsed.endsWith('.raiaagentes.com.br') ||
-                          parsed === 'localhost' ||
-                          parsed === '127.0.0.1';
-        if (!isAllowed) {
+        const refUrl = new URL(referer);
+        const refOrigin = refUrl.origin.toLowerCase();
+        if (!isAllowedOrigin(refOrigin)) {
           logSecurityEvent({
             eventType: AUDIT_EVENTS.CSRF_VIOLATION_BLOCKED,
             req,
             status: 'BLOCKED',
-            details: { origin, path: req.path },
+            details: { reason: 'invalid_referer', refererOrigin: refOrigin, path: req.path },
           });
-          return res.status(403).json({ success: false, error: 'Acesso bloqueado: validação de origem CSRF falhou.' });
+          return res.status(403).json({
+            success: false,
+            error: 'Acesso bloqueado por validação Anti-CSRF: Referer não autorizado.',
+            code: 'CSRF_INVALID_REFERER'
+          });
         }
       } catch (_) {
-        return res.status(403).json({ success: false, error: 'Origem da requisição inválida.' });
+        return res.status(403).json({
+          success: false,
+          error: 'Referer inválido na requisição.',
+          code: 'CSRF_INVALID_REFERER'
+        });
+      }
+    } else {
+      // Both Origin and Referer are absent on a cookie-authenticated mutation
+      // Require explicit Double-Submit CSRF token header
+      const submittedCsrf = req.headers['x-csrf-token'];
+      const cookieCsrf = getCookie(req, 'csrf_token');
+      if (!submittedCsrf || !cookieCsrf || submittedCsrf !== cookieCsrf) {
+        logSecurityEvent({
+          eventType: AUDIT_EVENTS.CSRF_VIOLATION_BLOCKED,
+          req,
+          status: 'BLOCKED',
+          details: { reason: 'missing_origin_and_csrf_token', path: req.path },
+        });
+        return res.status(403).json({
+          success: false,
+          error: 'Acesso bloqueado por validação Anti-CSRF: requisições autenticadas por cookie exigem comprovação de origem ou token CSRF válido.',
+          code: 'CSRF_PROOF_MISSING'
+        });
       }
     }
   }
@@ -465,7 +547,8 @@ function authMiddleware(req, res, next) {
   }
 
   if (token) {
-    const user = userService.getUserByMagicToken(token);
+    // Proteção 01 & 17: Validate session token first, fallback to magic token during migration
+    const user = userService.getUserBySessionToken(token) || userService.getUserByMagicToken(token);
     if (user) {
       req.user = user;
       return next();
@@ -1343,6 +1426,12 @@ app.get('/auth/magic', (req, res) => {
 
   const user = userService.getUserByMagicToken(token);
   if (!user) {
+    logSecurityEvent({
+      eventType: AUDIT_EVENTS.MAGIC_TOKEN_EXPIRED,
+      req,
+      status: 'FAILED',
+      details: { reason: 'invalid_or_expired' }
+    });
     return res.status(401).send(`
       <!DOCTYPE html>
       <html lang="pt-BR">
@@ -1366,17 +1455,21 @@ app.get('/auth/magic', (req, res) => {
     `);
   }
 
-  // Proteção 01 & 17: Rotate single-use magic token into a fresh session token
-  const newSessionToken = crypto.randomBytes(32).toString('hex');
-  const sessionExpiresAt = new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString();
-  db.prepare(`
-    UPDATE users 
-    SET magic_token = ?, magic_token_expires_at = ?, last_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ?
-  `).run(newSessionToken, sessionExpiresAt, user.id);
+  // Proteção 01 & 17: Consume single-use magic token IMMEDIATELY
+  userService.consumeMagicToken(user.id);
+
+  // Proteção 01 & 17: Issue a dedicated, persistent session token
+  const { sessionToken } = userService.createUserSession(user.id, 7);
 
   // Set secure auth cookie with HttpOnly & SameSite=Lax (7 days)
-  setSessionCookie(res, 'auth_token', newSessionToken, req, 7 * 24 * 3600);
+  setSessionCookie(res, 'auth_token', sessionToken, req, 7 * 24 * 3600);
+
+  // Issue Double-Submit CSRF cookie (readable by frontend)
+  const csrfToken = crypto.randomBytes(32).toString('hex');
+  const isHttps = req.secure || (req.headers['x-forwarded-proto'] || '').toLowerCase() === 'https';
+  let csrfCookie = `csrf_token=${csrfToken}; Path=/; Max-Age=${7 * 24 * 3600}; SameSite=Lax`;
+  if (isHttps) csrfCookie += '; Secure';
+  res.setHeader('Set-Cookie', [res.getHeader('Set-Cookie'), csrfCookie].flat().filter(Boolean));
 
   logSecurityEvent({
     eventType: AUDIT_EVENTS.MAGIC_TOKEN_USED,
@@ -1391,7 +1484,7 @@ app.get('/auth/magic', (req, res) => {
 });
 
 // ==========================================
-// DIRECT ADMIN LOGIN VIA API (PASSWORD / PIN / MFA) (PROTEÇÃO 01 & 09)
+// DIRECT ADMIN LOGIN VIA API (TRUE TOTP MFA) (PROTEÇÃO 01 & 09)
 // ==========================================
 app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
   const { password, mfaCode } = req.body || {};
@@ -1402,10 +1495,11 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
   }
 
   const configuredPass = (config.adminPassword || '').trim();
-  const configuredPin = (config.adminPin || '').trim();
+  if (!configuredPass) {
+    return res.status(500).json({ success: false, error: 'ADMIN_PASSWORD não configurada no servidor.' });
+  }
 
-  let isValid = false;
-
+  // Timing-safe comparison for primary authentication
   const timingSafeMatch = (candidate, secret) => {
     if (!secret || !candidate) return false;
     const a = crypto.createHash('sha256').update(candidate).digest();
@@ -1413,13 +1507,8 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
     return crypto.timingSafeEqual(a, b);
   };
 
-  if (configuredPass && timingSafeMatch(input, configuredPass)) {
-    isValid = true;
-  } else if (configuredPin && timingSafeMatch(input, configuredPin)) {
-    isValid = true;
-  }
-
-  if (!isValid) {
+  // Primary authentication: accepts ONLY admin password (PIN is NEVER accepted as primary password)
+  if (!timingSafeMatch(input, configuredPass)) {
     logSecurityEvent({
       eventType: AUDIT_EVENTS.ADMIN_LOGIN_FAILED,
       req,
@@ -1428,39 +1517,8 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
     });
     return res.status(401).json({
       success: false,
-      error: 'Senha ou PIN de administrador incorreto.'
+      error: 'Senha de administrador incorreta.'
     });
-  }
-
-  // Admin MFA Verification (Proteção 01)
-  const isMfaActive = config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true';
-  if (isMfaActive) {
-    if (!mfaCode) {
-      logSecurityEvent({
-        eventType: AUDIT_EVENTS.ADMIN_MFA_CHALLENGE,
-        req,
-        status: 'CHALLENGE_REQUIRED',
-      });
-      return res.status(200).json({
-        success: false,
-        mfaRequired: true,
-        message: 'Autenticação multifator (MFA) obrigatória para administradores. Informe o código MFA.',
-      });
-    }
-
-    const expectedMfa = (config.adminPin || process.env.ADMIN_MFA_PIN || '').trim();
-    if (!expectedMfa || !timingSafeMatch(String(mfaCode).trim(), expectedMfa)) {
-      logSecurityEvent({
-        eventType: AUDIT_EVENTS.ADMIN_MFA_FAILED,
-        req,
-        status: 'FAILED',
-        details: { reason: 'invalid_mfa_code' },
-      });
-      return res.status(401).json({
-        success: false,
-        error: 'Código MFA incorreto ou inválido.',
-      });
-    }
   }
 
   // Find or ensure master admin user
@@ -1475,12 +1533,95 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
     db.prepare("UPDATE users SET role = 'ADMIN', plan = 'PRO' WHERE id = ?").run(admin.id);
   }
 
-  // Generate 7-day session token (Proteção 01 - Session Rotation)
-  const token = crypto.randomBytes(32).toString('hex');
-  db.prepare("UPDATE users SET magic_token = ?, magic_token_expires_at = datetime('now', '+7 days') WHERE id = ?").run(token, admin.id);
+  // Determine if MFA is active for this admin
+  const isGlobalMfa = (config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true') && Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
+  const isUserMfa = Boolean(admin && admin.totp_enabled === 1 && admin.totp_secret);
+  const isMfaActive = isGlobalMfa || isUserMfa;
+  const totpSecret = (admin && admin.totp_enabled === 1 && admin.totp_secret) ? admin.totp_secret : (process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
+
+  if (isMfaActive && totpSecret) {
+    if (!mfaCode) {
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.ADMIN_MFA_CHALLENGE,
+        userId: admin.id,
+        req,
+        status: 'CHALLENGE_REQUIRED',
+      });
+      return res.status(200).json({
+        success: false,
+        mfaRequired: true,
+        message: 'Autenticação multifator (TOTP) obrigatória para administradores. Informe o código de 6 dígitos gerado pelo seu aplicativo autenticador.',
+      });
+    }
+
+    const cleanMfaCode = String(mfaCode).trim();
+
+    // Prevent using the same credential as primary password and MFA code
+    if (cleanMfaCode === input) {
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.ADMIN_MFA_FAILED,
+        userId: admin.id,
+        req,
+        status: 'FAILED',
+        details: { reason: 'mfa_identical_to_primary_password' },
+      });
+      return res.status(401).json({
+        success: false,
+        error: 'O código MFA deve ser um código temporário independente (TOTP), não a senha primária.',
+      });
+    }
+
+    // Verify TOTP token with ±1 window (±30s drift tolerance)
+    const totpVerification = totpService.verifyToken(cleanMfaCode, totpSecret, { window: 1 });
+    let mfaValid = totpVerification.valid;
+
+    // Check single-use recovery codes if TOTP verification failed
+    if (!mfaValid && admin.totp_recovery_codes) {
+      try {
+        const recoveryCodes = JSON.parse(admin.totp_recovery_codes);
+        const codeIdx = recoveryCodes.indexOf(cleanMfaCode.toUpperCase());
+        if (codeIdx !== -1) {
+          mfaValid = true;
+          recoveryCodes.splice(codeIdx, 1);
+          db.prepare('UPDATE users SET totp_recovery_codes = ? WHERE id = ?').run(JSON.stringify(recoveryCodes), admin.id);
+        }
+      } catch (_) {}
+    }
+
+    if (!mfaValid) {
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.ADMIN_MFA_FAILED,
+        userId: admin.id,
+        req,
+        status: 'FAILED',
+        details: { reason: totpVerification.reason || 'invalid_mfa_code' },
+      });
+      return res.status(401).json({
+        success: false,
+        error: 'Código MFA incorreto ou expirado. Verifique o relógio do seu dispositivo.',
+      });
+    }
+
+    logSecurityEvent({
+      eventType: AUDIT_EVENTS.ADMIN_MFA_SUCCESS,
+      userId: admin.id,
+      req,
+      status: 'SUCCESS',
+    });
+  }
+
+  // Generate 7-day session token via dedicated session model (Proteção 01 & 17)
+  const { sessionToken } = userService.createUserSession(admin.id, 7);
 
   // Set secure HttpOnly cookie
-  setSessionCookie(res, 'auth_token', token, req, 7 * 24 * 3600);
+  setSessionCookie(res, 'auth_token', sessionToken, req, 7 * 24 * 3600);
+
+  // Issue CSRF cookie
+  const csrfToken = crypto.randomBytes(32).toString('hex');
+  const isHttps = req.secure || (req.headers['x-forwarded-proto'] || '').toLowerCase() === 'https';
+  let csrfCookie = `csrf_token=${csrfToken}; Path=/; Max-Age=${7 * 24 * 3600}; SameSite=Lax`;
+  if (isHttps) csrfCookie += '; Secure';
+  res.setHeader('Set-Cookie', [res.getHeader('Set-Cookie'), csrfCookie].flat().filter(Boolean));
 
   logSecurityEvent({
     eventType: AUDIT_EVENTS.ADMIN_LOGIN_SUCCESS,
@@ -1492,7 +1633,8 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
 
   return res.json({
     success: true,
-    token,
+    token: sessionToken,
+    csrfToken,
     user: {
       id: admin.id,
       name: admin.name || 'Administrador',
@@ -1503,15 +1645,101 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
   });
 });
 
+// Admin MFA Setup: Generate TOTP Secret and Recovery Codes (Proteção 01)
+app.post('/api/admin/mfa/setup', requireAdmin, (req, res) => {
+  const secret = totpService.generateSecret();
+  const recoveryCodes = totpService.generateRecoveryCodes(8);
+  const otpAuthUri = totpService.generateOtpAuthUri({
+    secret,
+    accountName: req.user.email || req.user.phone_number || 'admin@raiaagentes.com.br',
+    issuer: 'RAIA AGENTES'
+  });
+
+  return res.json({
+    success: true,
+    secret,
+    otpAuthUri,
+    recoveryCodes,
+  });
+});
+
+// Admin MFA Enable: Confirm first code before activating MFA (Proteção 01)
+app.post('/api/admin/mfa/enable', requireAdmin, (req, res) => {
+  const { secret, code, recoveryCodes } = req.body || {};
+  if (!secret || !code) {
+    return res.status(400).json({ success: false, error: 'Secret e código TOTP são obrigatórios para ativação.' });
+  }
+
+  const verification = totpService.verifyToken(String(code).trim(), secret, { window: 1 });
+  if (!verification.valid) {
+    return res.status(400).json({ success: false, error: 'Código TOTP incorreto. Verifique o código exibido no seu aplicativo autenticador.' });
+  }
+
+  const recCodesJson = Array.isArray(recoveryCodes) ? JSON.stringify(recoveryCodes) : JSON.stringify(totpService.generateRecoveryCodes(8));
+  db.prepare(`
+    UPDATE users
+    SET totp_secret = ?,
+        totp_enabled = 1,
+        totp_recovery_codes = ?,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(secret, recCodesJson, req.user.id);
+
+  logSecurityEvent({
+    eventType: AUDIT_EVENTS.ADMIN_MFA_ENABLED,
+    userId: req.user.id,
+    req,
+    status: 'SUCCESS',
+  });
+
+  return res.json({ success: true, message: 'Autenticação multifator (TOTP) ativada com sucesso.' });
+});
+
+// Admin MFA Disable: Requires current admin password to deactivate (Proteção 01)
+app.post('/api/admin/mfa/disable', requireAdmin, (req, res) => {
+  const { password } = req.body || {};
+  const configuredPass = (config.adminPassword || '').trim();
+
+  const timingSafeMatch = (candidate, secret) => {
+    if (!secret || !candidate) return false;
+    const a = crypto.createHash('sha256').update(candidate).digest();
+    const b = crypto.createHash('sha256').update(secret).digest();
+    return crypto.timingSafeEqual(a, b);
+  };
+
+  if (!password || !timingSafeMatch(String(password).trim(), configuredPass)) {
+    return res.status(401).json({ success: false, error: 'Senha de administrador incorreta.' });
+  }
+
+  db.prepare(`
+    UPDATE users
+    SET totp_enabled = 0,
+        totp_secret = NULL,
+        totp_recovery_codes = NULL,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(req.user.id);
+
+  logSecurityEvent({
+    eventType: AUDIT_EVENTS.ADMIN_MFA_DISABLED,
+    userId: req.user.id,
+    req,
+    status: 'SUCCESS',
+  });
+
+  return res.json({ success: true, message: 'Autenticação multifator (TOTP) desativada.' });
+});
+
 // ==========================================
 // ADMIN LOGOUT (REVOKES TOKEN IN DB & CLEARS COOKIE)
 // ==========================================
 app.post('/api/auth/logout', authMiddleware, (req, res) => {
   if (req.user?.id) {
-    db.prepare('UPDATE users SET magic_token = NULL, magic_token_expires_at = NULL WHERE id = ?').run(req.user.id);
+    userService.revokeUserTokens(req.user.id);
   }
   clearSessionCookie(res, 'auth_token', req);
   clearSessionCookie(res, 'client_auth_token', req);
+  clearSessionCookie(res, 'csrf_token', req);
   return res.json({ success: true, message: 'Sessão encerrada com sucesso.' });
 });
 

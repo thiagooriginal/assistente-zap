@@ -50,6 +50,7 @@ async function request(path, options = {}) {
     ...options,
     headers: {
       'Content-Type': 'application/json',
+      'Origin': baseUrl,
       ...options.headers,
     },
   });

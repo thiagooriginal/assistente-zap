@@ -613,7 +613,46 @@ runVersionedMigration('20261103_01_security_hardening_27_protections', 'Eliminat
   `);
 });
 
+// Versioned migration: Separation of Magic Login Links from Session Tokens & TOTP Support (Proteção 01, 09, 17)
+runVersionedMigration('20261104_01_explicit_session_separation_and_totp', 'Separate short-lived magic links from persistent session tokens and invalidate legacy magic links', () => {
+  // 1. Ensure columns exist before executing migration queries
+  ensureColumnExists('users', 'session_token', 'TEXT');
+  ensureColumnExists('users', 'session_expires_at', 'TEXT');
+  ensureColumnExists('users', 'totp_secret', 'TEXT');
+  ensureColumnExists('users', 'totp_enabled', 'INTEGER DEFAULT 0');
+  ensureColumnExists('users', 'totp_recovery_codes', 'TEXT');
+
+  // 2. Ensure existing active browser sessions continue to work seamlessly via session_token
+  db.prepare(`
+    UPDATE users
+    SET session_token = magic_token,
+        session_expires_at = COALESCE(magic_token_expires_at, datetime('now', '+7 days')),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE magic_token IS NOT NULL AND (session_token IS NULL OR session_token = '')
+  `).run();
+
+  // 3. Safely invalidate/clear legacy magic tokens so old WhatsApp messages cannot be reused
+  db.prepare(`
+    UPDATE users
+    SET magic_token = NULL,
+        magic_token_expires_at = datetime('now', '-1 minute'),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE magic_token IS NOT NULL
+  `).run();
+
+  // 4. Create index for fast session validation
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_users_session_token ON users(session_token);
+    CREATE INDEX IF NOT EXISTS idx_users_magic_token ON users(magic_token);
+  `);
+});
+
 // User columns for Client Authentication & Hotmart Subscriptions
+ensureColumnExists('users', 'session_token', 'TEXT');
+ensureColumnExists('users', 'session_expires_at', 'TEXT');
+ensureColumnExists('users', 'totp_secret', 'TEXT');
+ensureColumnExists('users', 'totp_enabled', 'INTEGER DEFAULT 0');
+ensureColumnExists('users', 'totp_recovery_codes', 'TEXT');
 ensureColumnExists('users', 'email', 'TEXT');
 ensureColumnExists('users', 'password_hash', 'TEXT');
 ensureColumnExists('users', 'password_salt', 'TEXT');

@@ -498,6 +498,27 @@ async function handleWebhookEvent(eventData) {
     return { received: true, ignored: true, reason: 'HOTMART_ISOLATION' };
   }
 
+  // If no user found, record unlinked event audit log and do NOT alter any contracts
+  if (!user) {
+    logSecurityEvent({
+      eventType: AUDIT_EVENTS.WEBHOOK_PROCESSED,
+      status: 'UNLINKED_EVENT',
+      details: {
+        event,
+        paymentId: payment?.id || null,
+        subId: subId || null,
+        reason: 'Nenhum usuário ou contrato correspondente encontrado no sistema. Nenhuma alteração financeira executada.'
+      }
+    });
+    return {
+      received: true,
+      unlinked: true,
+      event,
+      paymentId: payment?.id,
+      subscriptionId: subId,
+    };
+  }
+
   let activationUrl = null;
 
   // 4. Handle State Transitions
@@ -800,6 +821,12 @@ async function handleWebhookEvent(eventData) {
       }
 
       db.prepare(`UPDATE users SET subscription_status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(user.id);
+
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.CONTRACT_RENEWED,
+        userId: user.id,
+        details: { event, paymentId: payment?.id, subId, status: 'RESTORED' },
+      });
     } else if (event === 'SUBSCRIPTION_DELETED' || event === 'SUBSCRIPTION_INACTIVATED') {
       // Cancellation without penalty (sem fidelidade) -> keeps access until paid_until expires
       let targetSub = null;
@@ -866,6 +893,14 @@ async function handleWebhookEvent(eventData) {
         eventType: AUDIT_EVENTS.CONTRACT_CANCELLED,
         userId: user.id,
         details: { event, subId, status: 'CANCELED' },
+      });
+    } else {
+      // Unknown or informational event type that does NOT mutate financial contracts
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.WEBHOOK_PROCESSED,
+        userId: user.id,
+        status: 'IGNORED_EVENT_TYPE',
+        details: { event, paymentId: payment?.id, subId, note: 'Tipo de evento não altera contratos financeiros.' },
       });
     }
   }

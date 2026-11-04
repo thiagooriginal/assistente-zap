@@ -67,7 +67,7 @@ function createRateLimiter({
           eventType: AUDIT_EVENTS.RATE_LIMIT_BLOCKED,
           req,
           status: 'BLOCKED',
-          details: { endpoint: req.originalUrl || req.path, count: record.count, maxAttempts, retryAfterSec },
+          details: { endpoint: req.path, count: record.count, maxAttempts, retryAfterSec },
         });
       } catch (_) {}
 

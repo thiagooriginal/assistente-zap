@@ -128,7 +128,21 @@ function generateMagicToken(userId, baseUrl = '', expirationMinutes = 30) {
 }
 
 /**
- * Validate magic token and return user with strict expiration check (Proteção 01 & 17)
+ * Validate session token and return user with strict expiration check (Proteção 01 & 17)
+ */
+function getUserBySessionToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const clean = token.trim();
+  const user = db.prepare(`
+    SELECT * FROM users 
+    WHERE session_token = ? 
+      AND (session_expires_at IS NULL OR datetime(session_expires_at) >= datetime('now'))
+  `).get(clean);
+  return user || null;
+}
+
+/**
+ * Validate magic login link token and return user with strict expiration check (Proteção 17)
  */
 function getUserByMagicToken(token) {
   if (!token || typeof token !== 'string') return null;
@@ -154,6 +168,37 @@ function getUserByMagicToken(token) {
 }
 
 /**
+ * Single-use: consume/burn magic token immediately after successful login
+ */
+function consumeMagicToken(userId) {
+  if (!userId) return;
+  db.prepare(`
+    UPDATE users
+    SET magic_token = NULL,
+        magic_token_expires_at = datetime('now', '-1 minute'),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(userId);
+}
+
+/**
+ * Create a dedicated persistent session for an authenticated user
+ */
+function createUserSession(userId, durationDays = 7) {
+  const sessionToken = crypto.randomBytes(32).toString('hex');
+  const sessionExpiresAt = new Date(Date.now() + durationDays * 24 * 3600 * 1000).toISOString();
+  db.prepare(`
+    UPDATE users
+    SET session_token = ?,
+        session_expires_at = ?,
+        last_login_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(sessionToken, sessionExpiresAt, userId);
+  return { sessionToken, sessionExpiresAt };
+}
+
+/**
  * Revoke all active sessions and tokens for a user (Proteção 01)
  */
 function revokeUserTokens(userId) {
@@ -162,6 +207,8 @@ function revokeUserTokens(userId) {
     UPDATE users
     SET magic_token = NULL,
         magic_token_expires_at = NULL,
+        session_token = NULL,
+        session_expires_at = NULL,
         reset_token = NULL,
         reset_expires_at = NULL,
         updated_at = CURRENT_TIMESTAMP
@@ -486,6 +533,9 @@ module.exports = {
   updateUser,
   generateMagicToken,
   getUserByMagicToken,
+  getUserBySessionToken,
+  consumeMagicToken,
+  createUserSession,
   isUserActive,
   isUserAdmin,
   getAllUsers,

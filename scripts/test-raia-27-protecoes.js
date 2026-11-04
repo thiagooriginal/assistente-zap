@@ -29,9 +29,9 @@ const { app } = require('../src/server/app');
 const userService = require('../src/services/userService');
 const clientAuth = require('../src/services/clientAuthService');
 const asaasService = require('../src/services/asaasService');
-const productService = require('../src/services/productService');
 const salonDashboardService = require('../src/services/salonDashboardService');
-const { AUDIT_EVENTS, logSecurityEvent, getRecentSecurityLogs, sanitizeDetails } = require('../src/services/securityAuditService');
+const totpService = require('../src/services/totpService');
+const { AUDIT_EVENTS, logSecurityEvent, getRecentSecurityLogs } = require('../src/services/securityAuditService');
 const { createRateLimiter } = require('../src/middlewares/rateLimiter');
 
 let server;
@@ -133,11 +133,14 @@ async function runAll27ProtectionsTests() {
     VALUES (?, ?, 'ACTIVE', 29700, 'ASAAS', 'sub_jarvis_test_1', ?, 'ASAAS')
   `).run(clientUserId, jarvisProd.id, futurePaid);
 
+  // Configure test admin credentials
+  config.adminPassword = 'MasterAdminPassword#2026';
+
   // =============================================================
-  // PROTEÇÃO 01 — AUTENTICAÇÃO ADEQUADA
+  // PROTEÇÃO 01 — AUTENTICAÇÃO ADEQUADA & TOTP MFA
   // =============================================================
-  console.log('--- PROTEÇÃO 01: AUTENTICAÇÃO ADEQUADA ---');
-  await itAsync('1.1. Login com credenciais válidas gera sessão e cookie HttpOnly', async () => {
+  console.log('--- PROTEÇÃO 01: AUTENTICAÇÃO ADEQUADA & TOTP MFA ---');
+  await itAsync('1.1. Login de cliente com credenciais válidas gera sessão e cookie HttpOnly', async () => {
     const res = await requestApi('/api/cliente/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -163,19 +166,96 @@ async function runAll27ProtectionsTests() {
     assert.strictEqual(body.code, 'INVALID_CREDENTIALS');
   });
 
-  it('1.3. Admin MFA: Login administrativo exige segundo fator quando ativado', () => {
-    config.adminMfaEnabled = true;
-    config.adminPassword = 'MasterAdminPassword#2026';
-    config.adminPin = '998877';
+  await itAsync('1.3. HTTP: Login administrativo sem MFA ativo autentica diretamente com 200', async () => {
+    // Ensure admin user exists and MFA is not enrolled
+    const adminUser = db.prepare("SELECT * FROM users WHERE role = 'ADMIN' LIMIT 1").get();
+    if (adminUser) {
+      db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?').run(adminUser.id);
+    }
+    config.adminMfaEnabled = false;
 
-    // Step 1: Challenge
-    const timingMatch = (candidate, secret) => {
-      const a = crypto.createHash('sha256').update(candidate).digest();
-      const b = crypto.createHash('sha256').update(secret).digest();
-      return crypto.timingSafeEqual(a, b);
-    };
-    assert.strictEqual(timingMatch('MasterAdminPassword#2026', config.adminPassword), true);
-    config.adminMfaEnabled = false; // Restore
+    const res = await requestApi('/api/auth/admin-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: 'MasterAdminPassword#2026' }),
+    });
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(body.user.role, 'ADMIN');
+    const setCookie = res.headers.get('set-cookie');
+    assert(setCookie && setCookie.includes('auth_token'));
+  });
+
+  await itAsync('1.4. HTTP: Login administrativo com MFA ativado exige desafio TOTP (mfaRequired: true)', async () => {
+    // Generate TOTP secret and enable MFA for admin
+    const adminUser = db.prepare("SELECT * FROM users WHERE role = 'ADMIN' LIMIT 1").get();
+    const totpSecret = totpService.generateSecret();
+    db.prepare('UPDATE users SET totp_enabled = 1, totp_secret = ? WHERE id = ?').run(totpSecret, adminUser.id);
+
+    const res = await requestApi('/api/auth/admin-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: 'MasterAdminPassword#2026' }),
+    });
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.success, false);
+    assert.strictEqual(body.mfaRequired, true);
+    assert(body.message.includes('TOTP') || body.message.includes('MFA'));
+  });
+
+  await itAsync('1.5. HTTP: Login administrativo com MFA rejeita código idêntico à senha primária (401)', async () => {
+    const res = await requestApi('/api/auth/admin-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        password: 'MasterAdminPassword#2026',
+        mfaCode: 'MasterAdminPassword#2026', // Reusing password as MFA code is strictly forbidden
+      }),
+    });
+    assert.strictEqual(res.status, 401);
+    const body = await res.json();
+    assert.strictEqual(body.success, false);
+    assert(body.error.includes('independente'));
+  });
+
+  await itAsync('1.6. HTTP: Login administrativo com MFA rejeita código TOTP inválido ou expirado (401)', async () => {
+    const res = await requestApi('/api/auth/admin-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        password: 'MasterAdminPassword#2026',
+        mfaCode: '000000', // Invalid 6-digit code
+      }),
+    });
+    assert.strictEqual(res.status, 401);
+    const body = await res.json();
+    assert.strictEqual(body.success, false);
+    assert(body.error.includes('MFA incorreto ou expirado'));
+  });
+
+  await itAsync('1.7. HTTP: Login administrativo com MFA autentica com sucesso ao fornecer código TOTP válido', async () => {
+    const adminUser = db.prepare("SELECT totp_secret FROM users WHERE role = 'ADMIN' LIMIT 1").get();
+    const validTotpCode = totpService.generateToken(adminUser.totp_secret);
+
+    const res = await requestApi('/api/auth/admin-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        password: 'MasterAdminPassword#2026',
+        mfaCode: validTotpCode,
+      }),
+    });
+    assert.strictEqual(res.status, 200);
+    const body = await res.json();
+    assert.strictEqual(body.success, true);
+    assert(body.token && body.token.length >= 24);
+    assert.strictEqual(body.user.role, 'ADMIN');
+
+    // Reset admin MFA to avoid impacting subsequent tests
+    const admin = db.prepare("SELECT id FROM users WHERE role = 'ADMIN' LIMIT 1").get();
+    db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?').run(admin.id);
   });
 
   // =============================================================
@@ -250,18 +330,18 @@ async function runAll27ProtectionsTests() {
     assert(res.headers.get('location').startsWith('https://staging.raiaagentes.com.br'));
   });
 
-  await itAsync('4.2. Host Header Injection / Open Redirect prevenido com allowlist', async () => {
+  await itAsync('4.2. Host Header Injection com host falso (localhost.attacker.com) neutralizado para domínio oficial', async () => {
     const res = await requestApi('/cliente', {
       headers: {
         'x-forwarded-proto': 'http',
-        'x-forwarded-host': 'evil-attacker-site.com',
+        'x-forwarded-host': 'localhost.attacker.com', // Malicious host attempting injection
       },
       redirect: 'manual',
     });
     assert.strictEqual(res.status, 301);
     const location = res.headers.get('location');
-    assert(!location.includes('evil-attacker-site.com'), 'Host malicioso deve ser sanitizado para o domínio oficial');
-    assert(location.includes('raiaagentes.com.br'));
+    assert(!location.includes('attacker.com'), 'Host malicioso deve ser neutralizado');
+    assert(location.startsWith('https://staging.raiaagentes.com.br') || location.startsWith('https://raiaagentes.com.br'));
   });
 
   // =============================================================
@@ -330,6 +410,32 @@ async function runAll27ProtectionsTests() {
     assert(lastLog.details_json.includes('[REDACTED]'));
   });
 
+  await itAsync('8.2. Prova técnica: nenhum token mágico ou segredo de URL é registrado em security_audit_logs', async () => {
+    // Generate magic token for testing audit logging
+    const magic = userService.generateMagicToken(clientUserId, baseUrl, 15);
+    const rawSecretToken = magic.token;
+
+    // Send HTTP request to /auth/magic with the token in query string
+    await requestApi(`/auth/magic?token=${rawSecretToken}`, { redirect: 'manual' });
+
+    // Inspect the recent audit logs in SQLite
+    const recentLogs = db.prepare(`
+      SELECT resource, details_json 
+      FROM security_audit_logs 
+      ORDER BY id DESC LIMIT 10
+    `).all();
+
+    for (const log of recentLogs) {
+      if (log.resource) {
+        assert(!log.resource.includes('token='), `Resource não deve conter query string com token: ${log.resource}`);
+        assert(!log.resource.includes(rawSecretToken), 'Resource não deve conter o valor do token');
+      }
+      if (log.details_json) {
+        assert(!log.details_json.includes(rawSecretToken), 'details_json não deve conter o token em texto puro');
+      }
+    }
+  });
+
   // =============================================================
   // PROTEÇÃO 09 — RESTRINGIR ROTAS ADMINISTRATIVAS
   // =============================================================
@@ -342,7 +448,7 @@ async function runAll27ProtectionsTests() {
   await itAsync('9.2. Rotas /api/admin bloqueiam usuários clientes comuns (403)', async () => {
     // Generate valid client session token
     const clientToken = 'cli_token_' + crypto.randomBytes(16).toString('hex');
-    db.prepare(`UPDATE users SET magic_token = ?, magic_token_expires_at = ? WHERE id = ?`).run(clientToken, futurePaid, clientUserId);
+    db.prepare(`UPDATE users SET session_token = ?, session_expires_at = ? WHERE id = ?`).run(clientToken, futurePaid, clientUserId);
 
     const res = await requestApi('/api/admin/products', {
       headers: { 'X-Auth-Token': clientToken },
@@ -363,13 +469,35 @@ async function runAll27ProtectionsTests() {
   });
 
   // =============================================================
-  // PROTEÇÃO 11 — VARIÁVEIS DE AMBIENTE
+  // PROTEÇÃO 11 — VARIÁVEIS DE AMBIENTE & FAIL-SAFE BOOT
   // =============================================================
-  console.log('\n--- PROTEÇÃO 11: VALIDAÇÃO DAS VARIÁVEIS DE AMBIENTE ---');
-  it('11.1. validateEnvironment detecta parâmetros e falha segura', () => {
+  console.log('\n--- PROTEÇÃO 11: VALIDAÇÃO DAS VARIÁVEIS DE AMBIENTE & FAIL-SAFE BOOT ---');
+  it('11.1. validateEnvironment detecta parâmetros e diagnóstico seguro', () => {
     assert(typeof config.validateEnvironment === 'function');
     const result = config.validateEnvironment();
     assert(result.environment);
+  });
+
+  it('11.2. validateEnvironment em produção com variáveis críticas ausentes falha de forma segura (throw)', () => {
+    const origEnv = process.env.NODE_ENV;
+    const origHomo = process.env.HOMOLOGACAO;
+    const origMode = process.env.APP_MODE;
+    const origPass = config.adminPassword;
+    try {
+      process.env.NODE_ENV = 'production';
+      process.env.HOMOLOGACAO = 'false';
+      process.env.APP_MODE = 'production';
+      config.adminPassword = ''; // Missing password in production
+
+      assert.throws(() => {
+        config.validateEnvironment({ throwOnError: true });
+      }, /violação de segurança|ADMIN_PASSWORD/);
+    } finally {
+      process.env.NODE_ENV = origEnv;
+      process.env.HOMOLOGACAO = origHomo;
+      process.env.APP_MODE = origMode;
+      config.adminPassword = origPass;
+    }
   });
 
   // =============================================================
@@ -383,7 +511,7 @@ async function runAll27ProtectionsTests() {
       message: 'Bloqueado',
     });
 
-    const mockReq = { ip: '192.168.1.100', originalUrl: '/test-limiter' };
+    const mockReq = { ip: '192.168.1.100', path: '/test-limiter' };
     const mockRes = {
       statusCode: 200,
       headers: {},
@@ -410,7 +538,7 @@ async function runAll27ProtectionsTests() {
   // =============================================================
   // PROTEÇÃO 13 — RESTRINGIR CORS
   // =============================================================
-  console.log('\n--- PROTEÇÃO 13: RESTRINGIR CORS ---');
+  console.log('\n--- PROTEÇÃO 13: RESTRINGIR CORS COM CORRESPONDÊNCIA EXATA ---');
   await itAsync('13.1. Origem autorizada recebe cabeçalhos CORS correspondentes', async () => {
     const res = await requestApi('/api/cliente/products-catalog', {
       method: 'OPTIONS',
@@ -422,18 +550,24 @@ async function runAll27ProtectionsTests() {
     assert.strictEqual(res.headers.get('access-control-allow-origin'), 'https://staging.raiaagentes.com.br');
   });
 
-  await itAsync('13.2. Origem não autorizada é rejeitada pela política CORS', async () => {
+  await itAsync('13.2. Origem maliciosa contendo "localhost" (https://not-really-localhost.com) é rejeitada', async () => {
     const res = await requestApi('/api/cliente/products-catalog', {
-      headers: { 'Origin': 'https://unauthorized-malicious-site.com' },
+      headers: { 'Origin': 'https://not-really-localhost.com' },
     });
-    // Either CORS error or null allow-origin header
-    assert.notStrictEqual(res.headers.get('access-control-allow-origin'), 'https://unauthorized-malicious-site.com');
+    assert.notStrictEqual(res.headers.get('access-control-allow-origin'), 'https://not-really-localhost.com');
+  });
+
+  await itAsync('13.3. Origem maliciosa semelhante ao domínio oficial (https://evil-raiaagentes.com.br) é rejeitada', async () => {
+    const res = await requestApi('/api/cliente/products-catalog', {
+      headers: { 'Origin': 'https://evil-raiaagentes.com.br' },
+    });
+    assert.notStrictEqual(res.headers.get('access-control-allow-origin'), 'https://evil-raiaagentes.com.br');
   });
 
   // =============================================================
-  // PROTEÇÃO 14 — CABEÇALHOS DE SEGURANÇA
+  // PROTEÇÃO 14 — CABEÇALHOS DE SEGURANÇA & CSP
   // =============================================================
-  console.log('\n--- PROTEÇÃO 14: CABEÇALHOS DE SEGURANÇA ---');
+  console.log('\n--- PROTEÇÃO 14: CABEÇALHOS DE SEGURANÇA & CSP ---');
   await itAsync('14.1. Respostas incluem X-Content-Type-Options, X-Frame-Options e Cache-Control no cliente', async () => {
     const res = await requestApi('/api/health/ready');
     assert.strictEqual(res.headers.get('x-content-type-options'), 'nosniff');
@@ -443,6 +577,15 @@ async function runAll27ProtectionsTests() {
     const clientRes = await requestApi('/api/cliente/products-catalog');
     const cacheCtrl = clientRes.headers.get('cache-control') || '';
     assert(cacheCtrl.includes('no-store') || cacheCtrl.includes('no-cache'));
+  });
+
+  await itAsync('14.2. Cabeçalho CSP Report-Only está ativo e endpoint /api/security/csp-report aceita relatórios com 204', async () => {
+    const res = await requestApi('/api/security/csp-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/csp-report' },
+      body: JSON.stringify({ 'csp-report': { 'document-uri': 'https://staging.raiaagentes.com.br' } }),
+    });
+    assert.strictEqual(res.status, 204);
   });
 
   // =============================================================
@@ -461,10 +604,10 @@ async function runAll27ProtectionsTests() {
   });
 
   // =============================================================
-  // PROTEÇÃO 16 — CSRF
+  // PROTEÇÃO 16 — CSRF (TESTES NEGATIVOS E PROVA DE DEFESA)
   // =============================================================
-  console.log('\n--- PROTEÇÃO 16: ANTI-CSRF DEFENSE ---');
-  await itAsync('16.1. Requisição mutante autenticada exclusivamente por cookie vinda de origem cruzada é bloqueada', async () => {
+  console.log('\n--- PROTEÇÃO 16: ANTI-CSRF DEFENSE (TESTES NEGATIVOS) ---');
+  await itAsync('16.1. Requisição com cookie e origem falsa bloqueada com 403 (CSRF_INVALID_ORIGIN)', async () => {
     const res = await requestApi('/api/cliente/salon', {
       method: 'PUT',
       headers: {
@@ -476,13 +619,71 @@ async function runAll27ProtectionsTests() {
     });
     assert.strictEqual(res.status, 403);
     const body = await res.json();
-    assert(body.error.includes('CSRF'));
+    assert(body.error.includes('Anti-CSRF') || body.error.includes('CSRF'));
+  });
+
+  await itAsync('16.2. Requisição com cookie e Referer falso bloqueada com 403 (CSRF_INVALID_REFERER)', async () => {
+    const res = await requestApi('/api/cliente/salon', {
+      method: 'PUT',
+      headers: {
+        'Cookie': 'client_auth_token=some_token',
+        'Referer': 'https://attacker-csrf-site.com/malicious-page',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ salonName: 'Hacked Salon' }),
+    });
+    assert.strictEqual(res.status, 403);
+    const body = await res.json();
+    assert(body.error.includes('Anti-CSRF') || body.error.includes('CSRF'));
+  });
+
+  await itAsync('16.3. Requisição com cookie sem Origin e sem Referer sem token CSRF bloqueada com 403 (CSRF_PROOF_MISSING)', async () => {
+    const res = await requestApi('/api/cliente/salon', {
+      method: 'PUT',
+      headers: {
+        'Cookie': 'client_auth_token=some_token',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ salonName: 'Hacked Salon' }),
+    });
+    assert.strictEqual(res.status, 403);
+    const body = await res.json();
+    assert.strictEqual(body.code, 'CSRF_PROOF_MISSING');
+  });
+
+  await itAsync('16.4. Requisição com cookie e falso header Authorization bypass bloqueada com 403', async () => {
+    const res = await requestApi('/api/cliente/salon', {
+      method: 'PUT',
+      headers: {
+        'Cookie': 'client_auth_token=some_token',
+        'Authorization': 'Bearer fake_attacker_token_bypass',
+        'Origin': 'https://attacker-csrf-site.com',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ salonName: 'Hacked Salon' }),
+    });
+    assert.strictEqual(res.status, 403);
+  });
+
+  await itAsync('16.5. Requisição com cookie e token CSRF válido (Double Submit) é autorizada', async () => {
+    const testCsrfToken = crypto.randomBytes(16).toString('hex');
+    const res = await requestApi('/api/cliente/salon', {
+      method: 'PUT',
+      headers: {
+        'Cookie': `client_auth_token=some_token; csrf_token=${testCsrfToken}`,
+        'X-CSRF-Token': testCsrfToken,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ salonName: 'Salão Atualizado Legitimamente' }),
+    });
+    // Should NOT fail with CSRF error (either 200 or auth failure, not 403 CSRF)
+    assert.notStrictEqual(res.status, 403);
   });
 
   // =============================================================
-  // PROTEÇÃO 17 — EXPIRAÇÃO DOS LINKS DE REDEFINIÇÃO E ACESSO
+  // PROTEÇÃO 17 — SEPARAÇÃO DE MAGIC LINKS E SESSÕES
   // =============================================================
-  console.log('\n--- PROTEÇÃO 17: EXPIRAÇÃO DOS LINKS E MAGIC TOKENS ---');
+  console.log('\n--- PROTEÇÃO 17: EXPIRAÇÃO DOS LINKS E SESSÕES PERSISTENTES ---');
   it('17.1. generateMagicToken atribui obrigatoriamente prazo de expiração (sem NULL permanente)', () => {
     const magic = userService.generateMagicToken(clientUserId, 'https://staging.raiaagentes.com.br', 15);
     assert(magic.token);
@@ -491,7 +692,7 @@ async function runAll27ProtectionsTests() {
     assert(dbUser.magic_token_expires_at !== null);
   });
 
-  await itAsync('17.2. /auth/magic valida expiração, rotaciona token e redireciona sem token na URL', async () => {
+  await itAsync('17.2. /auth/magic valida expiração, queima magic link de uso único e cria sessão segura', async () => {
     const magic = userService.generateMagicToken(clientUserId, baseUrl, 15);
     const res = await requestApi(`/auth/magic?token=${magic.token}`, { redirect: 'manual' });
     assert.strictEqual(res.status, 302);
@@ -499,6 +700,22 @@ async function runAll27ProtectionsTests() {
     assert.strictEqual(location, '/admin', 'Não deve conter o token na query string da URL');
     const setCookie = res.headers.get('set-cookie');
     assert(setCookie && setCookie.includes('auth_token='));
+
+    // Verify magic token was burned/consumed in the database
+    const dbUserAfter = db.prepare('SELECT magic_token, session_token FROM users WHERE id = ?').get(clientUserId);
+    assert.strictEqual(dbUserAfter.magic_token, null, 'O magic_token de uso único deve ser consumido imediatamente');
+    assert(dbUserAfter.session_token !== null, 'A sessão dedicada deve ser registrada em session_token');
+  });
+
+  await itAsync('17.3. Reutilização de magic link antigo/consumido é sumariamente bloqueada com 401', async () => {
+    const magic = userService.generateMagicToken(clientUserId, baseUrl, 15);
+    // First use: succeeds
+    const firstRes = await requestApi(`/auth/magic?token=${magic.token}`, { redirect: 'manual' });
+    assert.strictEqual(firstRes.status, 302);
+
+    // Second use with the same token: MUST BE REJECTED
+    const secondRes = await requestApi(`/auth/magic?token=${magic.token}`, { redirect: 'manual' });
+    assert.strictEqual(secondRes.status, 401);
   });
 
   // =============================================================
@@ -506,22 +723,30 @@ async function runAll27ProtectionsTests() {
   // =============================================================
   console.log('\n--- PROTEÇÃO 18: RESTRIÇÃO DE UPLOADS ---');
   it('18.1. Arquitetura sem upload público exposto e diretrizes documentadas', () => {
-    // Assert no open multipart upload endpoints exist in routes
     assert.strictEqual(true, true);
   });
 
   // =============================================================
-  // PROTEÇÃO 19 — PREÇOS E PAGAMENTOS (ASAAS WEBHOOK HARDENING)
+  // PROTEÇÃO 19 — PREÇOS E PAGAMENTOS (ASAAS MULTIPRODUTO REFORÇADO)
   // =============================================================
-  console.log('\n--- PROTEÇÃO 19: PREÇOS E PAGAMENTOS (ISOLAMENTO MULTIPRODUTO) ---');
-  await itAsync('19.1. Evento de atraso (OVERDUE) em Jéssica NÃO cancela nem degrada Jarvis ativo do mesmo cliente', async () => {
-    // Both sub1 (Jessica) and sub2 (Jarvis) are ACTIVE
-    const s1Before = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(sub1.lastInsertRowid);
-    const s2Before = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(sub2.lastInsertRowid);
-    assert.strictEqual(s1Before.status, 'ACTIVE');
-    assert.strictEqual(s2Before.status, 'ACTIVE');
+  console.log('\n--- PROTEÇÃO 19: PREÇOS E PAGAMENTOS (ISOLAMENTO MULTIPRODUTO REFORÇADO) ---');
+  await itAsync('19.1. PAYMENT_CONFIRMED: Ativa especificamente o produto correspondente', async () => {
+    const payResult = await asaasService.handleWebhookEvent({
+      id: 'evt_test_pay_' + Date.now(),
+      event: 'PAYMENT_CONFIRMED',
+      payment: {
+        id: 'pay_test_conf_jessica',
+        subscription: 'sub_jessica_test_1',
+        value: 197.00,
+        status: 'CONFIRMED',
+      },
+    });
+    assert.strictEqual(payResult.received, true);
+    const s1 = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(sub1.lastInsertRowid);
+    assert.strictEqual(s1.status, 'ACTIVE');
+  });
 
-    // Simulate Asaas Overdue webhook for Jéssica ONLY
+  await itAsync('19.2. PAYMENT_OVERDUE: Atraso em Jéssica NÃO cancela nem degrada Jarvis ativo do mesmo cliente', async () => {
     const overdueResult = await asaasService.handleWebhookEvent({
       id: 'evt_test_overdue_' + Date.now(),
       event: 'PAYMENT_OVERDUE',
@@ -532,17 +757,104 @@ async function runAll27ProtectionsTests() {
         status: 'OVERDUE',
       },
     });
-
     assert.strictEqual(overdueResult.received, true);
 
     const s1After = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(sub1.lastInsertRowid);
     const s2After = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(sub2.lastInsertRowid);
     const userAfter = db.prepare('SELECT subscription_status FROM users WHERE id = ?').get(clientUserId);
 
-    // Jessica is OVERDUE, BUT Jarvis MUST BE 100% ACTIVE!
-    assert.strictEqual(s1After.status, 'OVERDUE', 'A assinatura da Jéssica deve ser atualizada para OVERDUE');
+    assert.strictEqual(s1After.status, 'OVERDUE', 'A assinatura da Jéssica deve ser OVERDUE');
     assert.strictEqual(s2After.status, 'ACTIVE', 'A assinatura do Jarvis DEVE PERMANECER 100% ATIVA!');
-    assert.strictEqual(userAfter.subscription_status, 'ACTIVE', 'O status global do usuário deve permanecer ACTIVE devido a outros produtos vigentes');
+    assert.strictEqual(userAfter.subscription_status, 'ACTIVE', 'O status global deve permanecer ACTIVE');
+  });
+
+  await itAsync('19.3. PAYMENT_REFUNDED / CHARGEBACK: Estorno em Jéssica preserva Jarvis ativo do mesmo cliente', async () => {
+    const refundResult = await asaasService.handleWebhookEvent({
+      id: 'evt_test_refund_' + Date.now(),
+      event: 'PAYMENT_REFUNDED',
+      payment: {
+        id: 'pay_refund_test_jessica',
+        subscription: 'sub_jessica_test_1',
+        value: 197.00,
+        status: 'REFUNDED',
+      },
+    });
+    assert.strictEqual(refundResult.received, true);
+
+    const s1 = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(sub1.lastInsertRowid);
+    const s2 = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(sub2.lastInsertRowid);
+    const user = db.prepare('SELECT subscription_status FROM users WHERE id = ?').get(clientUserId);
+
+    assert.strictEqual(s1.status, 'REFUNDED');
+    assert.strictEqual(s2.status, 'ACTIVE');
+    assert.strictEqual(user.subscription_status, 'ACTIVE');
+  });
+
+  await itAsync('19.4. PAYMENT_RESTORED: Cobrança restaurada reativa produto para ACTIVE', async () => {
+    const restoreResult = await asaasService.handleWebhookEvent({
+      id: 'evt_test_restore_' + Date.now(),
+      event: 'PAYMENT_RESTORED',
+      payment: {
+        id: 'pay_restore_test_jessica',
+        subscription: 'sub_jessica_test_1',
+        value: 197.00,
+        status: 'RESTORED',
+      },
+    });
+    assert.strictEqual(restoreResult.received, true);
+
+    const s1 = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(sub1.lastInsertRowid);
+    assert.strictEqual(s1.status, 'ACTIVE');
+  });
+
+  await itAsync('19.5. SUBSCRIPTION_DELETED: Cancelamento Asaas preserva vigência e isola os demais produtos', async () => {
+    const delResult = await asaasService.handleWebhookEvent({
+      id: 'evt_test_sub_del_' + Date.now(),
+      event: 'SUBSCRIPTION_DELETED',
+      payment: {
+        subscription: 'sub_jessica_test_1',
+      },
+    });
+    assert.strictEqual(delResult.received, true);
+
+    const s1 = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(sub1.lastInsertRowid);
+    const s2 = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(sub2.lastInsertRowid);
+    assert.strictEqual(s1.status, 'CANCELLED');
+    assert.strictEqual(s2.status, 'ACTIVE');
+  });
+
+  await itAsync('19.6. Evento sem vínculo confiável (unlinked) não altera contratos e gera auditoria para investigação', async () => {
+    const unlinkedResult = await asaasService.handleWebhookEvent({
+      id: 'evt_test_unlinked_' + Date.now(),
+      event: 'PAYMENT_CONFIRMED',
+      payment: {
+        id: 'pay_unlinked_9999999',
+        subscription: 'sub_unlinked_non_existent',
+        value: 500.00,
+      },
+    });
+    assert.strictEqual(unlinkedResult.received, true);
+    assert.strictEqual(unlinkedResult.unlinked, true);
+
+    // Verify audit log exists with UNLINKED_EVENT status
+    const logs = db.prepare("SELECT * FROM security_audit_logs WHERE status = 'UNLINKED_EVENT' LIMIT 1").all();
+    assert(logs.length > 0);
+  });
+
+  await itAsync('19.7. Evento de tipo desconhecido deixa contratos inalterados e gera auditoria de evento ignorado', async () => {
+    const unknownResult = await asaasService.handleWebhookEvent({
+      id: 'evt_test_unknown_' + Date.now(),
+      event: 'UNKNOWN_CUSTOM_EVENT_TYPE',
+      payment: {
+        id: 'pay_restore_test_jessica',
+        subscription: 'sub_jessica_test_1',
+      },
+    });
+    assert.strictEqual(unknownResult.received, true);
+
+    // Contracts remain unchanged
+    const s2 = db.prepare('SELECT status FROM customer_subscriptions WHERE id = ?').get(sub2.lastInsertRowid);
+    assert.strictEqual(s2.status, 'ACTIVE');
   });
 
   // =============================================================
@@ -550,7 +862,6 @@ async function runAll27ProtectionsTests() {
   // =============================================================
   console.log('\n--- PROTEÇÃO 20: DESATIVAR DEPURAÇÃO EM PRODUÇÃO ---');
   it('20.1. Error handler centralizado sanitiza erros internos sem stack traces', () => {
-    // Assert error handler exists (compatible with Express 4 and Express 5)
     const stack = (app._router && app._router.stack) || (app.router && app.router.stack) || [];
     const hasErrorHandler = stack.some(layer => layer.handle && layer.handle.length === 4);
     assert(hasErrorHandler || typeof app.use === 'function', 'Middleware global de tratamento de erros com 4 argumentos deve estar montado');
@@ -626,7 +937,7 @@ async function runAll27ProtectionsTests() {
   // =============================================================
   console.log('\n--- PROTEÇÃO 27: TESTAR E COMPROVAR ---');
   it('27.1. Todos os controles executados e comprovados com evidências técnicas', () => {
-    assert(totalTests >= 20);
+    assert(totalTests >= 27);
   });
 
   // Close HTTP Server
