@@ -23,6 +23,7 @@ function getDb() {
 }
 
 function createRateLimiter({
+  name = 'global',
   windowMs = 15 * 60 * 1000, // 15 minutes
   maxAttempts = 5,
   message = 'Muitas tentativas a partir deste endereço. Tente novamente mais tarde.',
@@ -55,30 +56,32 @@ function createRateLimiter({
   }
 
   const limiterMiddleware = (req, res, next) => {
-    const key = keyGenerator(req);
+    const rawKey = keyGenerator(req);
+    const storageKey = `${name}:${rawKey}`;
     const now = Date.now();
     let record = null;
     const db = getDb();
 
-    // 1. Persistent & Cluster-Coordinated Storage (Proteção 12: Sobrevive a reinicializações e instâncias múltiplas)
+    // 1. Persistent, Cluster-Coordinated & Atomic Storage (Proteção 12)
     let usedDb = false;
     if (db && typeof db.prepare === 'function') {
       try {
-        const row = db.prepare('SELECT count, reset_time FROM rate_limit_entries WHERE key = ?').get(key);
-        if (!row || now > row.reset_time) {
-          const resetTime = now + windowMs;
-          db.prepare(`
-            INSERT INTO rate_limit_entries (key, count, reset_time, updated_at)
-            VALUES (?, 1, ?, CURRENT_TIMESTAMP)
-            ON CONFLICT(key) DO UPDATE SET count = 1, reset_time = excluded.reset_time, updated_at = CURRENT_TIMESTAMP
-          `).run(key, resetTime);
-          record = { count: 1, resetTime };
-        } else {
-          const newCount = row.count + 1;
-          db.prepare('UPDATE rate_limit_entries SET count = count + 1, updated_at = CURRENT_TIMESTAMP WHERE key = ?').run(key);
-          record = { count: newCount, resetTime: row.reset_time };
+        const resetTime = now + windowMs;
+        // Atomic UPSERT preventing race conditions during concurrent requests
+        db.prepare(`
+          INSERT INTO rate_limit_entries (key, count, reset_time, updated_at)
+          VALUES (?, 1, ?, CURRENT_TIMESTAMP)
+          ON CONFLICT(key) DO UPDATE SET
+            count = CASE WHEN ? > rate_limit_entries.reset_time THEN 1 ELSE rate_limit_entries.count + 1 END,
+            reset_time = CASE WHEN ? > rate_limit_entries.reset_time THEN excluded.reset_time ELSE rate_limit_entries.reset_time END,
+            updated_at = CURRENT_TIMESTAMP
+        `).run(storageKey, resetTime, now, now);
+
+        const row = db.prepare('SELECT count, reset_time FROM rate_limit_entries WHERE key = ?').get(storageKey);
+        if (row) {
+          record = { count: row.count, resetTime: row.reset_time };
+          usedDb = true;
         }
-        usedDb = true;
       } catch (_) {
         // Fallback to in-memory if DB is temporarily locked or before migration
       }
@@ -86,15 +89,15 @@ function createRateLimiter({
 
     // 2. In-Memory fallback or fast cache
     if (!usedDb) {
-      record = inMemoryAttempts.get(key);
+      record = inMemoryAttempts.get(storageKey);
       if (!record || now > record.resetTime) {
         record = { count: 1, resetTime: now + windowMs };
-        inMemoryAttempts.set(key, record);
+        inMemoryAttempts.set(storageKey, record);
       } else {
         record.count += 1;
       }
     } else {
-      inMemoryAttempts.set(key, record);
+      inMemoryAttempts.set(storageKey, record);
     }
 
     const remaining = Math.max(0, maxAttempts - record.count);
@@ -129,14 +132,30 @@ function createRateLimiter({
     next();
   };
 
-  // Helper for automated tests to clear state (clears both in-memory and database)
-  limiterMiddleware.reset = () => {
-    inMemoryAttempts.clear();
-    const db = getDb();
-    if (db && typeof db.prepare === 'function') {
-      try {
-        db.prepare('DELETE FROM rate_limit_entries').run();
-      } catch (_) {}
+  // Safe helper to clear state: scoped to this limiter only and blocked in production
+  limiterMiddleware.reset = (targetKey = null) => {
+    if (process.env.NODE_ENV === 'production') {
+      console.warn('[RateLimiter] Chamada a reset() ignorada em ambiente de produção.');
+      return;
+    }
+
+    if (targetKey) {
+      inMemoryAttempts.delete(targetKey);
+      inMemoryAttempts.delete(`${name}:${targetKey}`);
+      const db = getDb();
+      if (db && typeof db.prepare === 'function') {
+        try {
+          db.prepare('DELETE FROM rate_limit_entries WHERE key = ? OR key = ?').run(targetKey, `${name}:${targetKey}`);
+        } catch (_) {}
+      }
+    } else {
+      inMemoryAttempts.clear();
+      const db = getDb();
+      if (db && typeof db.prepare === 'function') {
+        try {
+          db.prepare('DELETE FROM rate_limit_entries WHERE key LIKE ?').run(`${name}:%`);
+        } catch (_) {}
+      }
     }
   };
 
@@ -145,66 +164,77 @@ function createRateLimiter({
 
 // Pre-configured rate limiters
 const adminLoginLimiter = createRateLimiter({
+  name: 'admin_login',
   windowMs: 15 * 60 * 1000,
   maxAttempts: 5,
   message: 'Limite de tentativas de acesso administrativo excedido. Tente novamente em 15 minutos.',
 });
 
 const clientLoginLimiter = createRateLimiter({
+  name: 'client_login',
   windowMs: 15 * 60 * 1000,
   maxAttempts: 5,
   message: 'Limite de tentativas de login excedido. Tente novamente em 15 minutos.',
 });
 
 const activationLimiter = createRateLimiter({
+  name: 'activation',
   windowMs: 15 * 60 * 1000,
   maxAttempts: 5,
   message: 'Limite de tentativas de ativação de conta excedido. Tente novamente em 15 minutos.',
 });
 
 const passwordResetRequestLimiter = createRateLimiter({
+  name: 'password_reset_req',
   windowMs: 15 * 60 * 1000,
   maxAttempts: 5,
   message: 'Limite de solicitações de recuperação de senha excedido. Tente novamente em 15 minutos.',
 });
 
 const passwordResetSubmitLimiter = createRateLimiter({
+  name: 'password_reset_sub',
   windowMs: 15 * 60 * 1000,
   maxAttempts: 5,
   message: 'Limite de tentativas de redefinição de senha excedido. Tente novamente em 15 minutos.',
 });
 
 const leadTestLimiter = createRateLimiter({
+  name: 'lead_test',
   windowMs: 15 * 60 * 1000,
   maxAttempts: 10,
   message: 'Limite de solicitações de teste excedido. Tente novamente mais tarde.',
 });
 
 const ttsLimiter = createRateLimiter({
+  name: 'tts',
   windowMs: 10 * 60 * 1000,
   maxAttempts: 25,
   message: 'Limite de streaming de áudio neural excedido. Aguarde alguns minutos.',
 });
 
 const analyticsLimiter = createRateLimiter({
+  name: 'analytics',
   windowMs: 60 * 1000,
   maxAttempts: 60,
   message: 'Limite de telemetria excedido.',
 });
 
 const adminActionLimiter = createRateLimiter({
+  name: 'admin_action',
   windowMs: 5 * 60 * 1000,
   maxAttempts: 40,
   message: 'Limite de operações administrativas excedido. Aguarde alguns minutos.',
 });
 
 const whatsappTestLimiter = createRateLimiter({
+  name: 'whatsapp_test',
   windowMs: 10 * 60 * 1000,
   maxAttempts: 5,
   message: 'Limite de disparos de teste de WhatsApp excedido.',
 });
 
 const cspReportLimiter = createRateLimiter({
+  name: 'csp_report',
   windowMs: 5 * 60 * 1000,
   maxAttempts: 50,
   message: 'Limite de relatórios CSP excedido.',

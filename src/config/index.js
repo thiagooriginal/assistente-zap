@@ -71,22 +71,28 @@ config.validateEnvironment = function validateEnvironment({ throwOnError = false
   const isNodeProd = process.env.NODE_ENV === 'production';
   const hasStagingFlag = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
   const isExplicitProdMode = process.env.APP_MODE === 'production';
-  let isCanonicalProdDomain = false;
-  try {
-    const u = new URL(config.baseUrl || 'https://raiaagentes.com.br');
-    isCanonicalProdDomain = (u.hostname === 'raiaagentes.com.br' || u.hostname === 'www.raiaagentes.com.br');
-  } catch (_) {}
+
+  const rawBaseUrl = (process.env.BASE_URL || '').trim();
+  let isExplicitCanonicalProdDomain = false;
+  if (rawBaseUrl) {
+    try {
+      const u = new URL(rawBaseUrl);
+      isExplicitCanonicalProdDomain = (u.hostname === 'raiaagentes.com.br' || u.hostname === 'www.raiaagentes.com.br');
+    } catch (_) {}
+  }
+  const isCanonicalProdDomain = isExplicitCanonicalProdDomain || (isNodeProd && !rawBaseUrl);
 
   // Disallow mutually contradictory environment declarations
   if (isExplicitProdMode && process.env.HOMOLOGACAO === 'true') {
     errors.push('CONFLITO DE AMBIENTE: APP_MODE=production é incompatível com HOMOLOGACAO=true.');
   }
 
-  // Strictly disallow running staging mode against the canonical production domain when in production
-  if (isNodeProd && isCanonicalProdDomain && hasStagingFlag) {
+  // Strictly disallow running staging mode against the canonical production domain (regardless of isProdEnv)
+  if (isCanonicalProdDomain && hasStagingFlag) {
     errors.push('CONFLITO CRÍTICO DE AMBIENTE: Tentativa de ativar modo homologação/staging apontando para o domínio canônico de produção (raiaagentes.com.br).');
   }
 
+  const hasCriticalConflict = errors.some(e => e.includes('CONFLITO'));
   const isProduction = isNodeProd && !hasStagingFlag;
   const isStaging = hasStagingFlag && !isProduction;
 
@@ -155,7 +161,7 @@ config.validateEnvironment = function validateEnvironment({ throwOnError = false
   if (errors.length > 0) {
     console.error('\n❌ [Security Startup Error] Falha de validação das variáveis de ambiente:');
     for (const err of errors) console.error(`  - ${err}`);
-    if (isProduction || throwOnError) {
+    if (isProduction || throwOnError || hasCriticalConflict) {
       throw new Error(`Abortando inicialização por violação de segurança: ${errors.join('; ')}`);
     }
   }
@@ -167,6 +173,7 @@ config.validateEnvironment = function validateEnvironment({ throwOnError = false
 
   return {
     valid: errors.length === 0,
+    hasConflict: hasCriticalConflict,
     errors,
     warnings,
     environment: isProduction ? 'production' : (isStaging ? 'staging' : 'development')

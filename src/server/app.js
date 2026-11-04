@@ -42,14 +42,18 @@ const isProdEnv = process.env.NODE_ENV === 'production' && !isStagingEnv;
 try {
   if (typeof config.validateEnvironment === 'function') {
     const envValidation = config.validateEnvironment({ throwOnError: isProdEnv });
-    if (!envValidation.valid && isProdEnv) {
-      console.error('\n🚨 FATAL: Abortando inicialização do servidor por erro crítico de configuração em produção.');
-      process.exit(1);
+    if (!envValidation.valid) {
+      const hasCriticalConflict = Boolean(envValidation.hasConflict || (envValidation.errors && envValidation.errors.some(e => e.includes('CONFLITO'))));
+      if (isProdEnv || hasCriticalConflict) {
+        console.error('\n🚨 FATAL: Abortando inicialização do servidor por erro crítico de configuração ou conflito de ambiente.');
+        process.exit(1);
+      }
     }
   }
 } catch (envErr) {
-  if (isProdEnv) {
-    console.error('\n🚨 FATAL: Abortando inicialização do servidor por erro crítico de configuração em produção:', envErr.message);
+  const isConflict = Boolean(envErr.message && envErr.message.includes('CONFLITO'));
+  if (isProdEnv || isConflict) {
+    console.error('\n🚨 FATAL: Abortando inicialização do servidor por erro crítico de configuração ou conflito de ambiente:', envErr.message);
     process.exit(1);
   } else {
     console.warn('\n⚠️ [Config Warning em Staging/Dev]:', envErr.message);
@@ -641,10 +645,11 @@ function requireAdmin(req, res, next) {
 }
 
 // Strict Admin Middleware requiring Interactive Session (MFA protected)
-// Rejects automated API keys for human-only operations (MFA config, credential mutation, user deletion)
+// Rejects automated API keys and any non-session authentication for human-only operations
 function requireInteractiveAdmin(req, res, next) {
   return requireAdmin(req, res, () => {
-    if (req.authMethod === 'API_KEY') {
+    // 1. Strictly accept ONLY valid interactive sessions (never API keys or non-session tokens)
+    if (!req.authMethod || req.authMethod !== 'SESSION') {
       try {
         const { logSecurityEvent, AUDIT_EVENTS } = require('../services/securityAuditService');
         logSecurityEvent({
@@ -652,16 +657,43 @@ function requireInteractiveAdmin(req, res, next) {
           userId: req.user?.id,
           req,
           status: 'BLOCKED',
-          details: { reason: 'api_key_not_permitted_for_interactive_mfa', path: req.path },
+          details: { reason: 'non_session_auth_rejected_for_interactive_admin', authMethod: req.authMethod, path: req.path },
         });
       } catch (_) {}
 
       return res.status(403).json({
         success: false,
-        error: 'Operação restrita a administradores autenticados interativamente via sessão com MFA. Automações via API Key não possuem permissão para esta ação.',
+        error: 'Operação restrita a administradores autenticados interativamente via sessão com MFA. Automações e chaves de API não possuem permissão para esta ação.',
         code: 'FORBIDDEN_INTERACTIVE_SESSION_REQUIRED',
       });
     }
+
+    // 2. Validate admin role and session user integrity
+    if (!req.user || req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        error: 'Acesso negado: privilégios administrativos requeridos.',
+        code: 'FORBIDDEN_ADMIN_ROLE_REQUIRED',
+      });
+    }
+
+    // 3. Enforce MFA Policy
+    const isMfaMandatory = config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true';
+    const isUserMfaActive = Boolean(req.user.totp_enabled === 1 && req.user.totp_secret);
+    const isGlobalMfaActive = Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
+    const mfaConfigured = isUserMfaActive || isGlobalMfaActive;
+
+    // Setup routes allow configuring MFA for the first time
+    const isMfaSetupPath = req.path === '/api/admin/mfa/status' || req.path === '/api/admin/mfa/setup' || req.path === '/api/admin/mfa/enable';
+
+    if (isMfaMandatory && !mfaConfigured && !isMfaSetupPath) {
+      return res.status(403).json({
+        success: false,
+        error: 'Política de segurança: Acesso bloqueado pois o MFA não está configurado nesta conta de administrador. Configure o MFA para prosseguir.',
+        code: 'FORBIDDEN_MFA_POLICY_ENFORCEMENT',
+      });
+    }
+
     return next();
   });
 }

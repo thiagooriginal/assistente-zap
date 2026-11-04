@@ -322,6 +322,42 @@ test('12. Bloqueio quando MFA_ENCRYPTION_KEY reutilizar SESSION_SECRET em produ�
   );
 });
 
+// -------------------------------------------------------------
+// Test 13: Mandatory Termination on Canonical Domain Conflict Even When isProdEnv Is False
+// -------------------------------------------------------------
+test('13. Encerramento obrigatório em conflito de domínio canônico mesmo quando isProdEnv for falso', () => {
+  // NODE_ENV is staging or unset (not production), but pointing to canonical production domain with HOMOLOGACAO=true
+  const res = runValidationProcess({
+    NODE_ENV: 'staging',
+    BASE_URL: 'https://raiaagentes.com.br',
+    HOMOLOGACAO: 'true',
+    APP_MODE: 'staging',
+    DB_PATH: 'data/assistant.db'
+  });
+
+  assert.notStrictEqual(res.status, 0, 'Must abort with exit code != 0 even when isProdEnv is false');
+  assert.ok(
+    res.stderr.includes('CONFLITO CRÍTICO DE AMBIENTE') || res.stderr.includes('domínio canônico de produção'),
+    'Stderr must report critical environment conflict'
+  );
+});
+
+// -------------------------------------------------------------
+// Test 14: Conflicting Flags (APP_MODE=production with HOMOLOGACAO=true) Aborts When isProdEnv Is False
+// -------------------------------------------------------------
+test('14. Encerramento obrigatório para APP_MODE=production com HOMOLOGACAO=true mesmo sem NODE_ENV=production', () => {
+  const res = runValidationProcess({
+    NODE_ENV: 'test',
+    APP_MODE: 'production',
+    HOMOLOGACAO: 'true',
+    ADMIN_PASSWORD: 'SuperSecretAdminPassword#2026',
+    DB_PATH: 'data/assistant.db'
+  });
+
+  assert.notStrictEqual(res.status, 0, 'Must abort with non-zero exit code on contradictory flags');
+  assert.ok(res.stderr.includes('CONFLITO DE AMBIENTE'), 'Stderr must identify environment conflict');
+});
+
 console.log('\n----------------------------------------------------------------');
 console.log(`RESULTADO FINAL: ${passedTests}/${totalTests} testes de inicialização passaram.`);
 console.log('----------------------------------------------------------------\n');

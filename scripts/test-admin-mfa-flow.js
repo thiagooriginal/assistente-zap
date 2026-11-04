@@ -439,6 +439,8 @@ async function runAllTests() {
     // Test 15: Migração Segura de Segredos MFA (Re-encriptação Atômica)
     // -------------------------------------------------------------
     await test('15. Migração segura de segredos antigos para a chave primária atual', async () => {
+      db.prepare("DELETE FROM users WHERE email = 'migrated.admin@raiaagentes.com.br' OR phone_number = '5511999990001'").run();
+
       // Create a test user with a secret encrypted under candidate/legacy key
       const legacyKey = crypto.createHash('sha256').update('raia-mfa-default-key-fallback').digest();
       const iv = crypto.randomBytes(12);
@@ -485,13 +487,183 @@ async function runAllTests() {
       assert.ok(rows.length > 0, 'Entradas de rate limit devem estar persistidas na tabela rate_limit_entries');
       assert.ok(rows.some(r => r.count >= 5), 'Contador persistido deve registrar as 5 tentativas');
 
-      // Clear in-memory Map only (simulating container restart with same SQLite volume)
       // The 6th request must STILL be blocked by the persistent database entry!
       const res6th = await request('POST', '/api/auth/admin-login', { password: 'WrongPasswordForRateLimit' });
       assert.strictEqual(res6th.status, 429, '6ª tentativa deve ser bloqueada com 429 mesmo após reinicialização');
       assert.strictEqual(res6th.body.code, 'RATE_LIMIT_EXCEEDED');
 
       adminLoginLimiter.reset();
+    });
+
+    // -------------------------------------------------------------
+    // Test 17: Transacionalidade Real com Rollback em migrateMfaSecrets()
+    // -------------------------------------------------------------
+    await test('17. Transacionalidade real com rollback atômico em migrateMfaSecrets()', async () => {
+      db.prepare("DELETE FROM users WHERE email IN ('rollback1@raiaagentes.com.br', 'rollback2@raiaagentes.com.br') OR phone_number IN ('5511999990002', '5511999990003')").run();
+
+      const validSecret = totpService.encryptSecret('JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP');
+      const unreadableCorruptedSecret = 'enc:v1:0123456789abcdef:0123456789abcdef0123456789abcdef:corrupted';
+
+      db.prepare(`
+        INSERT INTO users (name, phone_number, email, role, totp_enabled, totp_secret, created_at)
+        VALUES ('Rollback User 1', '5511999990002', 'rollback1@raiaagentes.com.br', 'ADMIN', 1, ?, CURRENT_TIMESTAMP)
+      `).run(validSecret);
+
+      db.prepare(`
+        INSERT INTO users (name, phone_number, email, role, totp_enabled, totp_secret, created_at)
+        VALUES ('Rollback User 2 Corrupted', '5511999990003', 'rollback2@raiaagentes.com.br', 'ADMIN', 1, ?, CURRENT_TIMESTAMP)
+      `).run(unreadableCorruptedSecret);
+
+      let migrationFailed = false;
+      try {
+        totpService.migrateMfaSecrets(db, { strict: true });
+      } catch (err) {
+        migrationFailed = true;
+        assert.ok(err.message.includes('Rollback'), 'Erro deve indicar rollback da transação');
+      }
+
+      assert.strictEqual(migrationFailed, true, 'Migração com registro corrompido deve falhar atomicamente');
+
+      // Verify that User 1 was ROLLED BACK and NOT partially migrated
+      const user1 = db.prepare("SELECT totp_secret FROM users WHERE email = 'rollback1@raiaagentes.com.br'").get();
+      assert.strictEqual(user1.totp_secret, validSecret, 'Transação abortada deve restaurar o estado original no banco');
+
+      db.prepare("DELETE FROM users WHERE email IN ('rollback1@raiaagentes.com.br', 'rollback2@raiaagentes.com.br')").run();
+    });
+
+    // -------------------------------------------------------------
+    // Test 18: Tratamento de Códigos de Recuperação e Validação de Compatibilidade
+    // -------------------------------------------------------------
+    await test('18. Migração de códigos de recuperação legados e validação de compatibilidade', async () => {
+      db.prepare("DELETE FROM users WHERE email = 'recovery@raiaagentes.com.br' OR phone_number = '5511999990004'").run();
+
+      const plainCodes = ['1111-2222', '3333-4444', '5555-6666'];
+      const validSecret = totpService.encryptSecret('JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP');
+
+      db.prepare(`
+        INSERT INTO users (name, phone_number, email, role, totp_enabled, totp_secret, totp_recovery_codes, created_at)
+        VALUES ('Recovery User', '5511999990004', 'recovery@raiaagentes.com.br', 'ADMIN', 1, ?, ?, CURRENT_TIMESTAMP)
+      `).run(validSecret, JSON.stringify(plainCodes));
+
+      const res = totpService.migrateMfaSecrets(db, { strict: true });
+      assert.ok(res.canSafelyDisableLegacyKeys, 'Deve permitir desativação segura de chaves legadas');
+      assert.strictEqual(res.recoveryCodesMigrated, 1, 'Deve migrar códigos de recuperação em texto plano para hashes');
+
+      const updatedUser = db.prepare("SELECT totp_recovery_codes FROM users WHERE email = 'recovery@raiaagentes.com.br'").get();
+      const updatedCodes = JSON.parse(updatedUser.totp_recovery_codes);
+      assert.strictEqual(updatedCodes.length, 3);
+      // All codes must now be 64-char HMAC hashes
+      assert.ok(updatedCodes.every(c => typeof c === 'string' && c.length === 64), 'Códigos devem ser hashes HMAC-SHA256');
+
+      // Verify that code verification works with the migrated hashes
+      const verifyResult = totpService.verifyRecoveryCode('1111-2222', updatedCodes);
+      assert.strictEqual(verifyResult.valid, true, 'Código deve validar com sucesso após migração');
+
+      db.prepare("DELETE FROM users WHERE email = 'recovery@raiaagentes.com.br'").run();
+    });
+
+    // -------------------------------------------------------------
+    // Test 19: Proteção contra Exclusão Indiscriminada em reset() e Isolamento por Namespace
+    // -------------------------------------------------------------
+    await test('19. Proteção do rate limiter: reset() em produção é bloqueado e reset() local preserva outros limitadores', async () => {
+      const { createRateLimiter } = require('../src/middlewares/rateLimiter');
+
+      // Create two independent limiters
+      const limiterA = createRateLimiter({ name: 'limiter_a', maxAttempts: 5, windowMs: 60000 });
+      const limiterB = createRateLimiter({ name: 'limiter_b', maxAttempts: 5, windowMs: 60000 });
+
+      const fakeReqA = { ip: '10.0.0.1', baseUrl: '/testA', path: '' };
+      const fakeReqB = { ip: '10.0.0.1', baseUrl: '/testB', path: '' };
+      const dummyRes = { setHeader: () => {}, status: () => ({ json: () => {} }) };
+
+      // Record attempts on both
+      limiterA(fakeReqA, dummyRes, () => {});
+      limiterB(fakeReqB, dummyRes, () => {});
+
+      // Verify both exist in SQLite
+      const rowsBefore = db.prepare("SELECT key FROM rate_limit_entries WHERE key LIKE 'limiter_%'").all();
+      assert.ok(rowsBefore.some(r => r.key.startsWith('limiter_a:')));
+      assert.ok(rowsBefore.some(r => r.key.startsWith('limiter_b:')));
+
+      // Test production protection: reset() in production must NOT delete from SQLite
+      const origNodeEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+      limiterA.reset();
+      process.env.NODE_ENV = origNodeEnv;
+
+      const rowsAfterProdReset = db.prepare("SELECT key FROM rate_limit_entries WHERE key LIKE 'limiter_%'").all();
+      assert.ok(rowsAfterProdReset.some(r => r.key.startsWith('limiter_a:')), 'reset() em produção não deve apagar registros do SQLite');
+
+      // Test scoped reset in non-production: reset limiterA must ONLY remove limiter_a keys, leaving limiter_b intact
+      limiterA.reset();
+      const rowsAfterScopedReset = db.prepare("SELECT key FROM rate_limit_entries WHERE key LIKE 'limiter_%'").all();
+      assert.ok(!rowsAfterScopedReset.some(r => r.key.startsWith('limiter_a:')), 'limiter_a deve ter sido apagado');
+      assert.ok(rowsAfterScopedReset.some(r => r.key.startsWith('limiter_b:')), 'limiter_b deve permanecer intacto');
+
+      limiterB.reset();
+    });
+
+    // -------------------------------------------------------------
+    // Test 20: Concorrência Atômica de Atualizações no Rate Limiter
+    // -------------------------------------------------------------
+    await test('20. Concorrência atômica de atualizações no rate limiter sem condição de corrida', async () => {
+      const { createRateLimiter } = require('../src/middlewares/rateLimiter');
+      const concurrentLimiter = createRateLimiter({ name: 'concurrent_test', maxAttempts: 50, windowMs: 60000 });
+      const fakeReq = { ip: '10.99.99.99', baseUrl: '/concurrent', path: '' };
+      const dummyRes = { setHeader: () => {}, status: () => ({ json: () => {} }) };
+
+      concurrentLimiter.reset();
+
+      // Fire 10 concurrent requests simultaneously
+      const promises = [];
+      for (let i = 0; i < 10; i++) {
+        promises.push(new Promise((resolve) => {
+          concurrentLimiter(fakeReq, dummyRes, () => resolve());
+        }));
+      }
+
+      await Promise.all(promises);
+
+      // Verify exact counter in SQLite
+      const row = db.prepare("SELECT count FROM rate_limit_entries WHERE key = 'concurrent_test:10.99.99.99:/concurrent'").get();
+      assert.strictEqual(row.count, 10, 'Contador persistido deve ser exatamente 10 após 10 requisições simultâneas');
+
+      // Test destruction & recreation of instance: completely new limiter instance reading from same SQLite
+      const freshLimiterInstance = createRateLimiter({ name: 'concurrent_test', maxAttempts: 50, windowMs: 60000 });
+      freshLimiterInstance(fakeReq, dummyRes, () => {});
+
+      const updatedRow = db.prepare("SELECT count FROM rate_limit_entries WHERE key = 'concurrent_test:10.99.99.99:/concurrent'").get();
+      assert.strictEqual(updatedRow.count, 11, 'Nova instância deve retomar a contagem de 10 para 11 através do SQLite');
+
+      concurrentLimiter.reset();
+    });
+
+    // -------------------------------------------------------------
+    // Test 21: requireInteractiveAdmin e Aplicação Estrita da Política de MFA
+    // -------------------------------------------------------------
+    await test('21. requireInteractiveAdmin impõe política de MFA e rejeita credenciais não interativas', async () => {
+      config.adminApiKey = 'SuperSecretAdminApiKeyAutomation#2026';
+
+      // 1. Valid API Key request is blocked by requireInteractiveAdmin with 403
+      const resApiKey = await request('DELETE', '/api/admin/users/999999', null, {
+        'X-Admin-Key': config.adminApiKey
+      });
+      assert.strictEqual(resApiKey.status, 403, 'ADMIN_API_KEY deve ser bloqueada em operações restritas a sessões interativas');
+      assert.strictEqual(resApiKey.body.code, 'FORBIDDEN_INTERACTIVE_SESSION_REQUIRED');
+
+      // 2. Unauthenticated request without token or key is rejected with 401
+      const resUnauth = await request('DELETE', '/api/admin/users/999999');
+      assert.strictEqual(resUnauth.status, 401, 'Requisição sem autenticação deve retornar 401');
+
+      // 3. Active admin with MFA policy enabled accesses /api/admin/mfa/status with valid session
+      const resLogin = await request('POST', '/api/auth/admin-login', { password: TEST_ADMIN_PASSWORD });
+      assert.strictEqual(resLogin.status, 200);
+      const sessionToken = resLogin.body.token;
+
+      const resMfaStatus = await request('GET', '/api/admin/mfa/status', null, {
+        'Authorization': `Bearer ${sessionToken}`
+      });
+      assert.strictEqual(resMfaStatus.status, 200, 'Sessão interativa legítima deve ter acesso ao status de MFA');
     });
 
   } finally {

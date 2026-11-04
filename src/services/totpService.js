@@ -165,12 +165,26 @@ function generateHashedRecoveryCodes(count = 8) {
 
 /**
  * Verify a user-submitted recovery code against an array of stored hashes with candidate key fallback
+ * and backward-compatible support for legacy plaintext codes.
  */
 function verifyRecoveryCode(candidateCode, hashedCodes) {
   if (!candidateCode || !Array.isArray(hashedCodes) || hashedCodes.length === 0) {
     return { valid: false, matchedIndex: -1 };
   }
 
+  const cleanCandidate = String(candidateCode).toUpperCase().replace(/[\s-]/g, '').trim();
+
+  // 1. Direct match for legacy plaintext recovery codes
+  for (let i = 0; i < hashedCodes.length; i++) {
+    const stored = hashedCodes[i];
+    if (typeof stored !== 'string') continue;
+    const cleanStored = stored.toUpperCase().replace(/[\s-]/g, '').trim();
+    if (cleanStored.length >= 8 && cleanStored.length <= 16 && cleanStored === cleanCandidate) {
+      return { valid: true, matchedIndex: i, isLegacyPlain: true };
+    }
+  }
+
+  // 2. HMAC-SHA256 match across candidate keys
   const candidateKeys = getCandidateDecryptionKeys();
   for (const key of candidateKeys) {
     const candidateHash = hashRecoveryCode(candidateCode, key);
@@ -181,7 +195,7 @@ function verifyRecoveryCode(candidateCode, hashedCodes) {
       if (typeof storedHash !== 'string') continue;
       const storedBuf = Buffer.from(storedHash, 'hex');
       if (storedBuf.length === candBuf.length && crypto.timingSafeEqual(storedBuf, candBuf)) {
-        return { valid: true, matchedIndex: i };
+        return { valid: true, matchedIndex: i, isLegacyPlain: false };
       }
     }
   }
@@ -318,65 +332,142 @@ function generateOtpAuthUri({ secret, accountName = 'admin@raiaagentes.com.br', 
 
 /**
  * Safe Migration and Re-encryption of existing MFA secrets under the primary key
- * Guarantees zero downtime and safe decommission of legacy fallback keys.
+ * Truly transactional with automatic rollback on error.
+ * Guarantees zero downtime and validates compatibility before decommissioning legacy keys.
  */
-function migrateMfaSecrets(dbInstance) {
+function migrateMfaSecrets(dbInstance, { strict = true } = {}) {
   if (!dbInstance || typeof dbInstance.prepare !== 'function') {
     throw new Error('Database instance is required for MFA migration.');
   }
 
   const primaryKey = getPrimaryMfaKey();
-  const users = dbInstance.prepare("SELECT id, totp_secret, totp_recovery_codes FROM users WHERE totp_secret IS NOT NULL").all();
+  const isBetterSqlite = typeof dbInstance.transaction === 'function';
 
-  let scanned = 0;
-  let migrated = 0;
-  let alreadyCurrent = 0;
-  let failed = 0;
+  const runMigrationLogic = () => {
+    const users = dbInstance.prepare("SELECT id, totp_secret, totp_recovery_codes FROM users WHERE totp_secret IS NOT NULL").all();
 
-  for (const user of users) {
-    scanned++;
-    const storedSecret = user.totp_secret;
-    const decrypted = decryptSecret(storedSecret);
+    let scanned = 0;
+    let migrated = 0;
+    let alreadyCurrent = 0;
+    let failed = 0;
+    let recoveryCodesMigrated = 0;
+    let legacyRecoveryCodesCount = 0;
 
-    if (!decrypted) {
-      failed++;
-      console.error(`[MFA Migration] ALERTA: Não foi possível descriptografar o segredo do usuário #${user.id}.`);
-      continue;
-    }
+    for (const user of users) {
+      scanned++;
+      const storedSecret = user.totp_secret;
+      const decrypted = decryptSecret(storedSecret);
 
-    // Check if storedSecret is already encrypted with the current primary key
-    let isCurrent = false;
-    if (storedSecret.startsWith('enc:v1:')) {
-      const parts = storedSecret.split(':');
-      if (parts.length === 5) {
+      if (!decrypted) {
+        failed++;
+        console.error(`[MFA Migration] ALERTA: Não foi possível descriptografar o segredo do usuário #${user.id}.`);
+        if (strict) {
+          throw new Error(`[MFA Migration Rollback] Falha ao descriptografar segredo do usuário #${user.id}. Transação revertida.`);
+        }
+        continue;
+      }
+
+      // Check if storedSecret is already encrypted with the current primary key
+      let isCurrent = false;
+      if (storedSecret.startsWith('enc:v1:')) {
+        const parts = storedSecret.split(':');
+        if (parts.length === 5) {
+          try {
+            const iv = Buffer.from(parts[2], 'hex');
+            const authTag = Buffer.from(parts[3], 'hex');
+            const decipher = crypto.createDecipheriv('aes-256-gcm', primaryKey, iv);
+            decipher.setAuthTag(authTag);
+            let testDec = decipher.update(parts[4], 'hex', 'utf8');
+            testDec += decipher.final('utf8');
+            if (testDec === decrypted) {
+              isCurrent = true;
+            }
+          } catch (_) {
+            isCurrent = false;
+          }
+        }
+      }
+
+      let newEncryptedSecret = storedSecret;
+      let secretNeedsUpdate = false;
+      if (!isCurrent) {
+        newEncryptedSecret = encryptSecret(decrypted);
+        secretNeedsUpdate = true;
+      }
+
+      // Validate & migrate recovery codes
+      let updatedRecoveryCodesJson = user.totp_recovery_codes;
+      let recoveryNeedsUpdate = false;
+      if (user.totp_recovery_codes) {
         try {
-          const iv = Buffer.from(parts[2], 'hex');
-          const authTag = Buffer.from(parts[3], 'hex');
-          const decipher = crypto.createDecipheriv('aes-256-gcm', primaryKey, iv);
-          decipher.setAuthTag(authTag);
-          let testDec = decipher.update(parts[4], 'hex', 'utf8');
-          testDec += decipher.final('utf8');
-          if (testDec === decrypted) {
-            isCurrent = true;
+          const parsed = JSON.parse(user.totp_recovery_codes);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            let hasPlain = false;
+            const newCodes = parsed.map(c => {
+              if (typeof c === 'string' && c.length !== 64) {
+                // Plaintext recovery code -> convert to HMAC-SHA256 under primaryKey
+                hasPlain = true;
+                return hashRecoveryCode(c, primaryKey);
+              }
+              return c;
+            });
+
+            if (hasPlain) {
+              updatedRecoveryCodesJson = JSON.stringify(newCodes);
+              recoveryNeedsUpdate = true;
+              recoveryCodesMigrated++;
+            } else {
+              legacyRecoveryCodesCount += parsed.length;
+            }
           }
         } catch (_) {
-          isCurrent = false;
+          if (strict) {
+            throw new Error(`[MFA Migration Rollback] JSON inválido em totp_recovery_codes do usuário #${user.id}. Transação revertida.`);
+          }
         }
+      }
+
+      if (secretNeedsUpdate || recoveryNeedsUpdate) {
+        dbInstance.prepare(`
+          UPDATE users 
+          SET totp_secret = ?, 
+              totp_recovery_codes = ?, 
+              updated_at = CURRENT_TIMESTAMP 
+          WHERE id = ?
+        `).run(newEncryptedSecret, updatedRecoveryCodesJson, user.id);
+        migrated++;
+      } else {
+        alreadyCurrent++;
       }
     }
 
-    if (isCurrent) {
-      alreadyCurrent++;
-      continue;
-    }
+    return {
+      scanned,
+      migrated,
+      alreadyCurrent,
+      failed,
+      recoveryCodesMigrated,
+      legacyRecoveryCodesCount,
+      canSafelyDisableLegacyKeys: failed === 0,
+    };
+  };
 
-    // Re-encrypt with primary key
-    const newEncryptedSecret = encryptSecret(decrypted);
-    dbInstance.prepare("UPDATE users SET totp_secret = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(newEncryptedSecret, user.id);
-    migrated++;
+  if (isBetterSqlite) {
+    return dbInstance.transaction(runMigrationLogic)();
   }
 
-  return { scanned, migrated, alreadyCurrent, failed };
+  // Native node:sqlite DatabaseSync transaction
+  dbInstance.exec('BEGIN TRANSACTION');
+  try {
+    const result = runMigrationLogic();
+    dbInstance.exec('COMMIT');
+    return result;
+  } catch (err) {
+    try {
+      dbInstance.exec('ROLLBACK');
+    } catch (_) {}
+    throw err;
+  }
 }
 
 module.exports = {
