@@ -1688,8 +1688,21 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
   });
 });
 
-// Admin MFA Setup: Generate TOTP Secret (Proteção 01)
-app.post('/api/admin/mfa/setup', requireAdmin, (req, res) => {
+// Admin MFA Status: Check whether MFA is currently enforced or active
+app.get('/api/admin/mfa/status', requireAdmin, (req, res) => {
+  const admin = db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(req.user.id);
+  const isGlobalMfa = (config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true') && Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
+  const userMfaEnabled = Boolean(admin && admin.totp_enabled === 1);
+  return res.json({
+    success: true,
+    enabled: userMfaEnabled || isGlobalMfa,
+    isGlobalMfa,
+    userMfaEnabled,
+  });
+});
+
+// Admin MFA Setup: Generate TOTP Secret & In-Process Local QR Code (Proteção 01)
+app.post('/api/admin/mfa/setup', requireAdmin, async (req, res) => {
   const secret = totpService.generateSecret();
   const otpAuthUri = totpService.generateOtpAuthUri({
     secret,
@@ -1697,10 +1710,27 @@ app.post('/api/admin/mfa/setup', requireAdmin, (req, res) => {
     issuer: 'RAIA AGENTES'
   });
 
+  // Pure in-process local QR code generation - NEVER sends secrets to external web services
+  let qrCodeDataUrl = null;
+  try {
+    const QRCode = require('qrcode');
+    qrCodeDataUrl = await QRCode.toDataURL(otpAuthUri, {
+      width: 220,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    });
+  } catch (qrErr) {
+    console.warn('[Admin MFA Setup] Aviso ao gerar QR code local:', qrErr.message);
+  }
+
   return res.json({
     success: true,
     secret,
     otpAuthUri,
+    qrCodeDataUrl,
   });
 });
 

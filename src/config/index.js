@@ -25,10 +25,16 @@ const config = {
   asaasWebhookSecret: (process.env.ASAAS_WEBHOOK_SECRET || '').trim(),
 
   // Security & Administrative Credentials
-  adminPassword: (process.env.ADMIN_PASSWORD || '').trim(),
+  adminPassword: (process.env.ADMIN_PASSWORD || process.env.ADMIN_MASTER_PASSWORD || '').trim(),
   adminPin: (process.env.ADMIN_PIN || '').trim(),
   adminApiKey: (process.env.ADMIN_API_KEY || '').trim(),
   adminMfaEnabled: process.env.ADMIN_MFA_ENABLED === 'true',
+  adminTotpSecret: (process.env.ADMIN_TOTP_SECRET || '').trim(),
+  mfaEncryptionKey: (process.env.MFA_ENCRYPTION_KEY || '').trim(),
+
+  // Session & Authentication Secrets (Proteção 01, 11 & 17)
+  sessionSecret: (process.env.SESSION_SECRET || '').trim(),
+  clientAuthSecret: (process.env.CLIENT_AUTH_SECRET || '').trim(),
 
   // Hotmart Integration
   hotmartWebhookSecret: (process.env.HOTMART_WEBHOOK_SECRET || process.env.HOTMART_HOTTOK || '').trim(),
@@ -57,20 +63,45 @@ config.validateEnvironment = function validateEnvironment({ throwOnError = false
   const errors = [];
   const warnings = [];
 
+  const WEAK_OR_DEFAULT_SECRETS = [
+    'admin123', 'admin', 'password', '12345678', 'mestre123', 'raiaadmin',
+    'segredo_padrao_trocar_em_producao', 'default_secret', 'raia_secret',
+    'change_me', 'secret', 'raia-mfa-default-key-fallback'
+  ];
+
   // 1. Production Critical Checks
   if (isProduction) {
+    // Admin Password
     if (!config.adminPassword || config.adminPassword.length < 8) {
       errors.push('ADMIN_PASSWORD não configurada ou muito curta em ambiente de produção (mínimo 8 caracteres).');
+    } else if (WEAK_OR_DEFAULT_SECRETS.includes(String(config.adminPassword).toLowerCase())) {
+      errors.push('ADMIN_PASSWORD configurada com valor fraco ou padrão em produção.');
     }
-    if (['admin123', 'admin', 'password', '12345678'].includes(String(config.adminPassword).toLowerCase())) {
-      errors.push('ADMIN_PASSWORD configurada com valor fraco/óbvio em produção.');
+
+    // Session Secret
+    if (!config.sessionSecret || config.sessionSecret.length < 16) {
+      errors.push('SESSION_SECRET não configurado ou muito curto em produção (mínimo 16 caracteres).');
+    } else if (WEAK_OR_DEFAULT_SECRETS.includes(String(config.sessionSecret).toLowerCase())) {
+      errors.push('SESSION_SECRET configurado com valor padrão ou trivial em produção.');
     }
-    if (!config.sessionSecret || config.sessionSecret === 'segredo_padrao_trocar_em_producao') {
-      errors.push('SESSION_SECRET não configurado ou com valor padrão em produção.');
+
+    // Client Auth Secret
+    if (!config.clientAuthSecret || config.clientAuthSecret.length < 16) {
+      errors.push('CLIENT_AUTH_SECRET não configurado ou muito curto em produção (mínimo 16 caracteres).');
+    } else if (WEAK_OR_DEFAULT_SECRETS.includes(String(config.clientAuthSecret).toLowerCase())) {
+      errors.push('CLIENT_AUTH_SECRET configurado com valor padrão ou trivial em produção.');
     }
-    if (!config.clientAuthSecret || config.clientAuthSecret === 'segredo_padrao_trocar_em_producao') {
-      errors.push('CLIENT_AUTH_SECRET não configurado ou com valor padrão em produção.');
+
+    // MFA Encryption Key (required when MFA is enabled in production)
+    if (config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true') {
+      const mfaKey = config.mfaEncryptionKey || config.sessionSecret || config.clientAuthSecret;
+      if (!mfaKey || mfaKey.length < 16) {
+        errors.push('MFA_ENCRYPTION_KEY não configurada ou insuficiente com MFA ativo em produção.');
+      } else if (WEAK_OR_DEFAULT_SECRETS.includes(String(mfaKey).toLowerCase())) {
+        errors.push('MFA_ENCRYPTION_KEY configurada com valor padrão ou trivial em produção.');
+      }
     }
+
     if (!config.adminApiKey || config.adminApiKey.length < 16) {
       warnings.push('ADMIN_API_KEY recomendada com entropia elevada (mínimo 16 caracteres).');
     }

@@ -1357,6 +1357,43 @@
 
     lucide.createIcons();
 
+    // Cleanse query strings containing tokens immediately on load (Proteção 17)
+    if (window.location.search) {
+      const currentUrl = new URL(window.location.href);
+      let queryCleaned = false;
+      ['token', 'magic', 'session', 'key', 'auth'].forEach(param => {
+        if (currentUrl.searchParams.has(param)) {
+          currentUrl.searchParams.delete(param);
+          queryCleaned = true;
+        }
+      });
+      if (queryCleaned) {
+        window.history.replaceState({}, document.title, currentUrl.pathname + (currentUrl.search ? currentUrl.search : ''));
+      }
+    }
+
+    // CSRF & Secure Fetch Protection (Proteção 16 & 17)
+    function getCsrfToken() {
+      const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+      return match ? decodeURIComponent(match[1]) : '';
+    }
+
+    // Intercept native fetch to always include CSRF token on mutations & credentials
+    const originalFetch = window.fetch;
+    window.fetch = function (url, options = {}) {
+      const opt = { ...options };
+      opt.credentials = opt.credentials || 'same-origin';
+      const method = (opt.method || 'GET').toUpperCase();
+      if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(method)) {
+        opt.headers = { ...(opt.headers || {}) };
+        const csrf = getCsrfToken();
+        if (csrf && !opt.headers['X-CSRF-Token']) {
+          opt.headers['X-CSRF-Token'] = csrf;
+        }
+      }
+      return originalFetch(url, opt);
+    };
+
     let clientData = null;
     let catalogState = {
       products: [],

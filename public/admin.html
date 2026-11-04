@@ -114,31 +114,93 @@
       </div>
 
       <form id="adminLoginForm" onsubmit="event.preventDefault(); executeAdminLogin();" class="space-y-4 text-left">
-        <div class="space-y-1.5">
-          <label class="text-xs font-bold text-zinc-300">Senha ou PIN do Administrador</label>
-          <div class="relative">
+        <!-- ETAPA 1: SENHA PRIMÁRIA -->
+        <div id="passwordStep" class="space-y-4">
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-zinc-300">Senha Mestra do Administrador</label>
+            <div class="relative">
+              <input 
+                type="password" 
+                id="adminPassInput" 
+                placeholder="Digite a senha mestra de administrador" 
+                class="w-full px-4 py-3.5 bg-black/50 border border-zinc-700/80 rounded-2xl text-white text-sm focus:outline-none focus:border-[#00F59B] transition pr-12"
+                autofocus
+              >
+              <button type="button" onclick="togglePassPeek()" title="Mostrar/ocultar senha" class="absolute right-3 top-3 p-1.5 text-zinc-400 hover:text-white text-base cursor-pointer z-20 transition select-none flex items-center justify-center">
+                <span id="peekIcon">👁️</span>
+              </button>
+            </div>
+            <p class="text-[11px] text-zinc-500">
+              🔒 Acesso restrito a administradores autorizados da RAIA.
+            </p>
+          </div>
+
+          <button type="submit" id="btnLoginSubmit" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 via-violet-600 to-[#00F59B] hover:opacity-95 text-black font-black text-sm shadow-lg shadow-cyan-500/30 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer">
+            <span id="btnLoginText">Acessar Painel</span>
+            <i data-lucide="arrow-right" class="w-4 h-4 text-black"></i>
+          </button>
+        </div>
+
+        <!-- ETAPA 2: SEGUNDO FATOR DE AUTENTICAÇÃO (MFA / TOTP) -->
+        <div id="mfaStep" class="hidden space-y-3.5">
+          <div class="p-3.5 bg-cyan-950/40 border border-cyan-500/30 rounded-2xl space-y-1">
+            <div class="flex items-center gap-1.5 text-cyan-300 font-bold text-xs">
+              <i data-lucide="shield-check" class="w-4 h-4 text-[#00F59B]"></i>
+              <span>Autenticação em Dois Fatores (MFA)</span>
+            </div>
+            <p class="text-[11px] text-zinc-300">
+              Informe o código temporário gerado no Google Authenticator, 1Password ou use um código de recuperação.
+            </p>
+          </div>
+
+          <!-- TOTP Mode (6 dígitos) -->
+          <div id="mfaTotpContainer" class="space-y-1.5">
+            <label class="text-xs font-bold text-zinc-300">Código do Authenticator (6 dígitos)</label>
             <input 
-              type="password" 
-              id="adminPassInput" 
-              placeholder="Digite a senha ou PIN de administrador" 
-              class="w-full px-4 py-3.5 bg-black/50 border border-zinc-700/80 rounded-2xl text-white text-sm focus:outline-none focus:border-[#00F59B] transition pr-12"
-              autofocus
+              type="text" 
+              id="adminMfaInput" 
+              placeholder="000000" 
+              maxlength="6"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              class="w-full px-4 py-3 bg-black/60 border border-cyan-500/50 rounded-2xl text-white font-mono text-center text-2xl tracking-[0.3em] focus:outline-none focus:border-[#00F59B] focus:ring-1 focus:ring-[#00F59B] transition"
             >
-            <button type="button" onclick="togglePassPeek()" title="Mostrar/ocultar senha" class="absolute right-3 top-3 p-1.5 text-zinc-400 hover:text-white text-base cursor-pointer z-20 transition select-none flex items-center justify-center">
-              <span id="peekIcon">👁️</span>
+            <p class="text-[10px] text-zinc-400">
+              ⏱️ Os códigos temporários expiram a cada 30 segundos.
+            </p>
+          </div>
+
+          <!-- Recovery Code Mode (XXXX-XXXX) -->
+          <div id="mfaRecoveryContainer" class="hidden space-y-1.5">
+            <label class="text-xs font-bold text-amber-300">Código de Recuperação (Uso Único)</label>
+            <input 
+              type="text" 
+              id="adminRecoveryInput" 
+              placeholder="XXXX-XXXX" 
+              maxlength="9"
+              class="w-full px-4 py-3 bg-black/60 border border-amber-500/50 rounded-2xl text-white font-mono text-center text-lg uppercase tracking-widest focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition"
+            >
+            <p class="text-[10px] text-zinc-400">
+              🔑 Insira um dos 8 códigos gerados na ativação. Cada código queima após o uso.
+            </p>
+          </div>
+
+          <div class="flex items-center justify-between text-xs pt-0.5">
+            <button type="button" id="btnToggleMfaMode" onclick="toggleMfaRecoveryMode()" class="text-cyan-400 hover:text-cyan-300 underline cursor-pointer">
+              Usar código de recuperação
+            </button>
+            <button type="button" onclick="cancelMfaStep()" class="text-zinc-400 hover:text-zinc-200 cursor-pointer">
+              ← Alterar senha
             </button>
           </div>
-          <p class="text-[11px] text-zinc-500">
-            🔒 Acesso restrito a administradores autorizados da RAIA.
-          </p>
+
+          <button type="button" onclick="executeMfaVerification()" id="btnConfirmMfa" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-[#00F59B] hover:opacity-95 text-black font-black text-sm shadow-lg shadow-emerald-500/30 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer">
+            <span id="btnConfirmMfaText">Confirmar Segundo Fator</span>
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-black"></i>
+          </button>
         </div>
 
         <div id="loginAlertBox" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs"></div>
-
-        <button type="submit" id="btnLoginSubmit" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 via-violet-600 to-[#00F59B] hover:opacity-95 text-black font-black text-sm shadow-lg shadow-cyan-500/30 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer">
-          <span id="btnLoginText">Acessar Painel</span>
-          <i data-lucide="arrow-right" class="w-4 h-4 text-black"></i>
-        </button>
 
         <div class="pt-2 text-center border-t border-zinc-800/80">
           <a href="/" class="text-xs text-zinc-400 hover:text-[#00F59B] transition flex items-center justify-center gap-1.5">
@@ -1520,6 +1582,56 @@
           </div>
         </div>
       </div>
+
+      <!-- MFA / TOTP SECURITY SETTINGS CARD (Proteção 01) -->
+      <div class="p-5 rounded-3xl bg-[#11131a] border border-zinc-800 space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-zinc-800 pb-3 gap-2">
+          <div>
+            <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+              <i data-lucide="shield-check" class="w-5 h-5 text-cyan-400"></i>
+              <span>Autenticação Multifator (MFA / TOTP)</span>
+            </h3>
+            <p class="text-xs text-zinc-400">Proteção em dois fatores RFC 6238 com códigos temporários e 8 códigos de recuperação</p>
+          </div>
+          <div id="mfaStatusBadgeContainer">
+            <span id="mfaStatusBadge" class="px-3 py-1 rounded-full text-xs font-bold bg-zinc-800 text-zinc-400">Consultando...</span>
+          </div>
+        </div>
+
+        <div id="mfaCardContent" class="space-y-3">
+          <!-- Active State -->
+          <div id="mfaActiveCard" class="hidden p-4 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                <i data-lucide="shield" class="w-4 h-4"></i>
+                <span>Proteção MFA Ativada no Administrador</span>
+              </div>
+              <p class="text-xs text-zinc-400">
+                O acesso administrativo exige validação do código temporário gerado no seu aplicativo autenticador.
+              </p>
+            </div>
+            <button onclick="openMfaDisableModal()" class="px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-bold transition cursor-pointer shrink-0">
+              Desativar MFA
+            </button>
+          </div>
+
+          <!-- Inactive State -->
+          <div id="mfaInactiveCard" class="p-4 rounded-2xl bg-amber-950/20 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 text-amber-300 font-bold text-sm">
+                <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i>
+                <span>Segundo Fator Não Configurado</span>
+              </div>
+              <p class="text-xs text-zinc-400">
+                Ative o MFA para proteger o painel contra invasões mesmo em caso de vazamento da senha primária.
+              </p>
+            </div>
+            <button onclick="startMfaSetup()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-[#00F59B] hover:opacity-95 text-black font-extrabold text-xs shadow-md transition cursor-pointer shrink-0">
+              Configurar MFA Agora
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
   
@@ -1853,18 +1965,30 @@
     // -------------------------------------------------------------
     let authToken = null;
     let currentUser = null;
+    let _pendingAdminPassword = null;
+    let _mfaRecoveryMode = false;
+    let _currentMfaSetupSecret = null;
+    let _latestRecoveryCodes = [];
 
     function getQueryParam(name) {
       const url = new URLSearchParams(window.location.search);
       return url.get(name);
     }
 
+    function getCsrfToken() {
+      const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+      return match ? decodeURIComponent(match[1]) : '';
+    }
+
     function initAuth() {
-      // 1. From URL
+      // 1. From URL (clean immediately to prevent leakage)
       const qToken = getQueryParam('token');
       if (qToken) {
         authToken = qToken;
         try { localStorage.setItem('auth_token', qToken); } catch (e) {}
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
       }
 
       // 2. From LocalStorage
@@ -1872,16 +1996,44 @@
         try { authToken = localStorage.getItem('auth_token'); } catch (e) {}
       }
 
-      // 3. Verify
-      if (authToken) {
-        verifyAuth();
-      } else {
-        showAuthOverlay();
+      // 3. Always verify via server (HttpOnly cookie prioritized)
+      verifyAuth();
+
+      // 4. Auto-advance and keyboard submission on MFA inputs (Proteção 01)
+      const mfaInput = document.getElementById('adminMfaInput');
+      if (mfaInput) {
+        mfaInput.addEventListener('input', () => {
+          mfaInput.value = mfaInput.value.replace(/\D/g, '').slice(0, 6);
+          if (mfaInput.value.length === 6) {
+            executeMfaVerification();
+          }
+        });
+        mfaInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            executeMfaVerification();
+          }
+        });
+      }
+
+      const recInput = document.getElementById('adminRecoveryInput');
+      if (recInput) {
+        recInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            executeMfaVerification();
+          }
+        });
       }
     }
 
     async function authFetch(url, options = {}) {
       options.headers = options.headers || {};
+      options.credentials = 'same-origin';
+      const csrf = getCsrfToken();
+      if (csrf && ['POST', 'PUT', 'DELETE', 'PATCH'].includes((options.method || 'GET').toUpperCase())) {
+        options.headers['X-CSRF-Token'] = csrf;
+      }
       if (authToken) {
         options.headers['Authorization'] = `Bearer ${authToken}`;
       }
@@ -1916,6 +2068,7 @@
     function showAuthOverlay(msg = '') {
       document.getElementById('adminAuthOverlay').classList.remove('hidden');
       document.getElementById('adminMainContent').classList.add('hidden');
+      cancelMfaStep();
       if (msg) {
         const box = document.getElementById('loginAlertBox');
         box.innerText = msg;
@@ -1963,6 +2116,19 @@
           body: JSON.stringify({ password: pass })
         });
         const json = await res.json();
+
+        // Desafio MFA Requerido pelo Backend
+        if (json.mfaRequired) {
+          _pendingAdminPassword = pass;
+          document.getElementById('passwordStep').classList.add('hidden');
+          document.getElementById('mfaStep').classList.remove('hidden');
+          document.getElementById('adminMfaInput').value = '';
+          document.getElementById('adminMfaInput').focus();
+          lucide.createIcons();
+          return;
+        }
+
+        // Login direto bem-sucedido (quando MFA não está ativo para a conta)
         if (json.success && json.token) {
           authToken = json.token;
           try { localStorage.setItem('auth_token', json.token); } catch (e) {}
@@ -1970,7 +2136,7 @@
           hideAuthOverlay();
           loadAllAdminData();
         } else {
-          alertBox.innerText = json.error || 'Senha ou PIN de administrador incorreto.';
+          alertBox.innerText = json.error || 'Senha de administrador incorreta.';
           alertBox.classList.remove('hidden');
         }
       } catch (err) {
@@ -1979,6 +2145,109 @@
       } finally {
         btnTxt.innerText = 'Acessar Painel';
       }
+    }
+
+    async function executeMfaVerification() {
+      const alertBox = document.getElementById('loginAlertBox');
+      const btnTxt = document.getElementById('btnConfirmMfaText');
+      if (!_pendingAdminPassword) {
+        cancelMfaStep();
+        return;
+      }
+
+      let code = '';
+      if (_mfaRecoveryMode) {
+        code = document.getElementById('adminRecoveryInput')?.value?.trim();
+        if (!code) {
+          alertBox.innerText = 'Informe o código de recuperação (XXXX-XXXX).';
+          alertBox.classList.remove('hidden');
+          return;
+        }
+      } else {
+        code = document.getElementById('adminMfaInput')?.value?.trim();
+        if (!code || code.length < 6) {
+          alertBox.innerText = 'Informe o código TOTP de 6 dígitos.';
+          alertBox.classList.remove('hidden');
+          return;
+        }
+      }
+
+      alertBox.classList.add('hidden');
+      btnTxt.innerText = 'Verificando...';
+
+      try {
+        const res = await fetch('/api/auth/admin-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            password: _pendingAdminPassword,
+            mfaCode: code
+          })
+        });
+        const json = await res.json();
+
+        if (json.success && json.token) {
+          authToken = json.token;
+          try { localStorage.setItem('auth_token', json.token); } catch (e) {}
+          currentUser = json.user;
+          _pendingAdminPassword = null;
+          cancelMfaStep();
+          hideAuthOverlay();
+          loadAllAdminData();
+        } else {
+          alertBox.innerText = json.error || 'Código MFA incorreto ou expirado. Verifique o relógio do seu celular.';
+          alertBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        alertBox.innerText = 'Erro ao validar código MFA com o servidor.';
+        alertBox.classList.remove('hidden');
+      } finally {
+        btnTxt.innerText = 'Confirmar Segundo Fator';
+      }
+    }
+
+    function toggleMfaRecoveryMode() {
+      _mfaRecoveryMode = !_mfaRecoveryMode;
+      const totpCont = document.getElementById('mfaTotpContainer');
+      const recCont = document.getElementById('mfaRecoveryContainer');
+      const btnToggle = document.getElementById('btnToggleMfaMode');
+      const alertBox = document.getElementById('loginAlertBox');
+      alertBox.classList.add('hidden');
+
+      if (_mfaRecoveryMode) {
+        totpCont.classList.add('hidden');
+        recCont.classList.remove('hidden');
+        btnToggle.innerText = 'Usar código de 6 dígitos do Authenticator';
+        document.getElementById('adminRecoveryInput').focus();
+      } else {
+        totpCont.classList.remove('hidden');
+        recCont.classList.add('hidden');
+        btnToggle.innerText = 'Usar código de recuperação';
+        document.getElementById('adminMfaInput').focus();
+      }
+    }
+
+    function cancelMfaStep() {
+      _pendingAdminPassword = null;
+      _mfaRecoveryMode = false;
+      const mfaInp = document.getElementById('adminMfaInput');
+      if (mfaInp) mfaInp.value = '';
+      const recInp = document.getElementById('adminRecoveryInput');
+      if (recInp) recInp.value = '';
+      const mfaStep = document.getElementById('mfaStep');
+      if (mfaStep) mfaStep.classList.add('hidden');
+      const passStep = document.getElementById('passwordStep');
+      if (passStep) passStep.classList.remove('hidden');
+      const totpCont = document.getElementById('mfaTotpContainer');
+      if (totpCont) totpCont.classList.remove('hidden');
+      const recCont = document.getElementById('mfaRecoveryContainer');
+      if (recCont) recCont.classList.add('hidden');
+      const btnToggle = document.getElementById('btnToggleMfaMode');
+      if (btnToggle) btnToggle.innerText = 'Usar código de recuperação';
+      const alertBox = document.getElementById('loginAlertBox');
+      if (alertBox) alertBox.classList.add('hidden');
+      const passInp = document.getElementById('adminPassInput');
+      if (passInp) passInp.focus();
     }
 
     async function handleLogout() {
@@ -1992,6 +2261,7 @@
         try {
           localStorage.removeItem('auth_token');
           document.cookie = 'auth_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+          document.cookie = 'csrf_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
         } catch (e) {}
         window.location.href = '/';
       }
@@ -2931,6 +3201,7 @@
       loadRecentTransactions();
       checkSystemHealth();
       loadAsaasDashboard();
+      checkAdminMfaStatus();
     }
 
     let currentAdminUserOriginFilter = 'ALL';
@@ -3225,6 +3496,224 @@
           elCal.className = json.calendar?.connected ? 'text-sm font-extrabold text-emerald-400' : 'text-sm font-extrabold text-zinc-400';
         }
       } catch (e) {}
+    }
+
+    // -------------------------------------------------------------
+    // MFA / 2FA ADMINISTRATIVE MANAGEMENT
+    // -------------------------------------------------------------
+    async function checkAdminMfaStatus() {
+      try {
+        const res = await authFetch('/api/admin/mfa/status');
+        if (!res.ok) return;
+        const data = await res.json();
+        const badge = document.getElementById('mfaStatusBadge');
+        const activeCard = document.getElementById('mfaActiveCard');
+        const inactiveCard = document.getElementById('mfaInactiveCard');
+
+        if (data.enabled) {
+          if (badge) {
+            badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+            badge.innerText = '🟢 Ativo (RFC 6238)';
+          }
+          if (activeCard) activeCard.classList.remove('hidden');
+          if (inactiveCard) inactiveCard.classList.add('hidden');
+        } else {
+          if (badge) {
+            badge.className = 'px-3 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+            badge.innerText = '🟡 Desativado';
+          }
+          if (activeCard) activeCard.classList.add('hidden');
+          if (inactiveCard) inactiveCard.classList.remove('hidden');
+        }
+        lucide.createIcons();
+      } catch (e) {
+        console.warn('Erro ao verificar status MFA:', e);
+      }
+    }
+
+    async function startMfaSetup() {
+      try {
+        const res = await authFetch('/api/admin/mfa/setup', { method: 'POST' });
+        const data = await res.json();
+        if (!data.success) {
+          alert(data.error || 'Falha ao iniciar setup de MFA.');
+          return;
+        }
+
+        _currentMfaSetupSecret = data.secret;
+        const secInput = document.getElementById('mfaSecretInput');
+        if (secInput) secInput.value = data.secret;
+        const qrImg = document.getElementById('mfaQrCodeImg');
+        if (qrImg && data.qrCodeDataUrl) {
+          qrImg.src = data.qrCodeDataUrl;
+        }
+        const passInp = document.getElementById('mfaConfirmPassInput');
+        if (passInp) passInp.value = '';
+        const codeInp = document.getElementById('mfaConfirmCodeInput');
+        if (codeInp) codeInp.value = '';
+        const alertBox = document.getElementById('mfaSetupAlert');
+        if (alertBox) alertBox.classList.add('hidden');
+
+        document.getElementById('mfaSetupModal').classList.remove('hidden');
+        lucide.createIcons();
+      } catch (err) {
+        alert('Erro de conexão ao iniciar setup de MFA.');
+      }
+    }
+
+    function closeMfaSetupModal() {
+      document.getElementById('mfaSetupModal').classList.add('hidden');
+      _currentMfaSetupSecret = null;
+    }
+
+    function copyMfaSecret() {
+      const val = document.getElementById('mfaSecretInput')?.value;
+      if (val) {
+        navigator.clipboard.writeText(val);
+        const btnTxt = document.getElementById('copySecretBtnText');
+        if (btnTxt) {
+          btnTxt.innerText = 'Copiado!';
+          setTimeout(() => { btnTxt.innerText = 'Copiar'; }, 2000);
+        }
+      }
+    }
+
+    async function submitMfaEnable() {
+      const pass = document.getElementById('mfaConfirmPassInput')?.value?.trim();
+      const code = document.getElementById('mfaConfirmCodeInput')?.value?.trim();
+      const alertBox = document.getElementById('mfaSetupAlert');
+      const btnTxt = document.getElementById('btnSubmitMfaEnableText');
+
+      if (!pass || !code) {
+        alertBox.innerText = 'Informe sua senha mestra e o código de 6 dígitos gerado pelo aplicativo.';
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
+      alertBox.classList.add('hidden');
+      btnTxt.innerText = 'Ativando...';
+
+      try {
+        const res = await authFetch('/api/admin/mfa/enable', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            password: pass,
+            secret: _currentMfaSetupSecret,
+            code: code,
+          })
+        });
+        const data = await res.json();
+
+        if (data.success && Array.isArray(data.recoveryCodes)) {
+          closeMfaSetupModal();
+          _latestRecoveryCodes = data.recoveryCodes;
+          renderRecoveryCodes(data.recoveryCodes);
+          document.getElementById('mfaRecoveryModal').classList.remove('hidden');
+          lucide.createIcons();
+          checkAdminMfaStatus();
+        } else {
+          alertBox.innerText = data.error || 'Código incorreto ou senha inválida. Tente novamente.';
+          alertBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        alertBox.innerText = 'Erro ao ativar MFA no servidor.';
+        alertBox.classList.remove('hidden');
+      } finally {
+        btnTxt.innerText = 'Ativar MFA';
+      }
+    }
+
+    function renderRecoveryCodes(codes) {
+      const grid = document.getElementById('recoveryCodesGrid');
+      if (!grid) return;
+      grid.innerHTML = codes.map((c, i) => `
+        <div class="p-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-center font-mono font-bold text-sm text-cyan-300">
+          <span class="text-[10px] text-zinc-500 mr-1.5">#${i + 1}</span>${c}
+        </div>
+      `).join('');
+    }
+
+    function copyRecoveryCodes() {
+      if (_latestRecoveryCodes && _latestRecoveryCodes.length > 0) {
+        const text = _latestRecoveryCodes.map((c, i) => `#${i + 1}: ${c}`).join('\n');
+        navigator.clipboard.writeText(text);
+        const btnTxt = document.getElementById('copyRecoveryBtnText');
+        if (btnTxt) {
+          btnTxt.innerText = 'Copiados!';
+          setTimeout(() => { btnTxt.innerText = 'Copiar Códigos'; }, 2000);
+        }
+      }
+    }
+
+    function downloadRecoveryCodes() {
+      if (!_latestRecoveryCodes || _latestRecoveryCodes.length === 0) return;
+      const text = `RAIA AGENTES — CÓDIGOS DE RECUPERAÇÃO MFA\nData: ${new Date().toISOString()}\n\n` +
+        _latestRecoveryCodes.map((c, i) => `Código ${i + 1}: ${c}`).join('\n') +
+        `\n\nATENÇÃO: Cada código pode ser utilizado apenas UMA VEZ caso você perca seu aplicativo autenticador.`;
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `raia_mfa_recovery_codes_${Date.now()}.txt`;
+      a.click();
+    }
+
+    function finishMfaSetup() {
+      document.getElementById('mfaRecoveryModal').classList.add('hidden');
+      checkAdminMfaStatus();
+    }
+
+    function openMfaDisableModal() {
+      const passInp = document.getElementById('mfaDisablePassInput');
+      if (passInp) passInp.value = '';
+      const codeInp = document.getElementById('mfaDisableCodeInput');
+      if (codeInp) codeInp.value = '';
+      const alertBox = document.getElementById('mfaDisableAlert');
+      if (alertBox) alertBox.classList.add('hidden');
+      document.getElementById('mfaDisableModal').classList.remove('hidden');
+    }
+
+    function closeMfaDisableModal() {
+      document.getElementById('mfaDisableModal').classList.add('hidden');
+    }
+
+    async function submitMfaDisable() {
+      const pass = document.getElementById('mfaDisablePassInput')?.value?.trim();
+      const code = document.getElementById('mfaDisableCodeInput')?.value?.trim();
+      const alertBox = document.getElementById('mfaDisableAlert');
+      const btnTxt = document.getElementById('btnSubmitMfaDisableText');
+
+      if (!pass || !code) {
+        alertBox.innerText = 'Informe sua senha mestra e o código de confirmação.';
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
+      alertBox.classList.add('hidden');
+      btnTxt.innerText = 'Desativando...';
+
+      try {
+        const res = await authFetch('/api/admin/mfa/disable', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pass, code })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          closeMfaDisableModal();
+          alert('MFA desativado com sucesso.');
+          checkAdminMfaStatus();
+        } else {
+          alertBox.innerText = data.error || 'Falha ao desativar MFA. Verifique sua senha e código.';
+          alertBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        alertBox.innerText = 'Erro ao comunicar com o servidor.';
+        alertBox.classList.remove('hidden');
+      } finally {
+        btnTxt.innerText = 'Confirmar Desativação';
+      }
     }
 
     // Modal Helpers
@@ -3899,6 +4388,152 @@
       <div class="p-3 border-t border-zinc-800 bg-zinc-900/40 text-center text-[11px] text-zinc-500 flex items-center justify-center gap-1.5">
         <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
         Diálogo interativo gerado pela IA da RAIA RH em tempo real
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- MODAIS DE MFA / 2FA (SETUP, RECOVERY CODES & DISABLE)        -->
+  <!-- ============================================================ -->
+
+  <!-- Modal 1: Configuração do MFA (QR Code local & Chave Base32) -->
+  <div id="mfaSetupModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-zinc-950 border border-zinc-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div class="p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/60">
+        <div class="flex items-center gap-2">
+          <i data-lucide="shield-check" class="w-5 h-5 text-[#00F59B]"></i>
+          <h3 class="text-white font-extrabold text-base">Configurar Google Authenticator</h3>
+        </div>
+        <button onclick="closeMfaSetupModal()" class="text-zinc-400 hover:text-white p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 transition cursor-pointer">✕</button>
+      </div>
+
+      <div class="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+        <!-- Passo 1 -->
+        <div class="space-y-2">
+          <p class="text-xs font-bold text-cyan-300 uppercase tracking-wider">Passo 1: Escanear QR Code no Celular</p>
+          <p class="text-xs text-zinc-400">Abra o Google Authenticator ou 1Password e aponte a câmera para o QR Code abaixo:</p>
+          <div class="flex justify-center p-3 bg-white rounded-2xl w-fit mx-auto shadow-inner">
+            <img id="mfaQrCodeImg" src="" alt="QR Code MFA" class="w-48 h-48 object-contain">
+          </div>
+        </div>
+
+        <!-- Chave Manual Base32 -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-zinc-300">Ou digite a chave manual no aplicativo:</label>
+          <div class="flex items-center gap-2">
+            <input type="text" id="mfaSecretInput" readonly class="w-full px-3.5 py-2.5 bg-black/60 border border-zinc-700 rounded-xl text-white font-mono text-xs text-center tracking-wider select-all">
+            <button onclick="copyMfaSecret()" class="px-3.5 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-white rounded-xl transition shrink-0 flex items-center gap-1.5 cursor-pointer">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span id="copySecretBtnText">Copiar</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Passo 2 -->
+        <div class="space-y-3 pt-2 border-t border-zinc-800/80">
+          <p class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Passo 2: Confirmar Ativação</p>
+          
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-zinc-300">Sua Senha Mestra de Administrador</label>
+            <input type="password" id="mfaConfirmPassInput" placeholder="Digite sua senha atual" class="w-full px-4 py-2.5 bg-black/60 border border-zinc-700 rounded-xl text-white text-sm focus:outline-none focus:border-[#00F59B]">
+          </div>
+
+          <div class="space-y-1">
+            <label class="text-xs font-bold text-zinc-300">Código de 6 dígitos gerado pelo App</label>
+            <input type="text" id="mfaConfirmCodeInput" placeholder="000000" maxlength="6" inputmode="numeric" class="w-full px-4 py-2.5 bg-black/60 border border-cyan-500/50 rounded-xl text-white font-mono text-center text-lg tracking-[0.25em] focus:outline-none focus:border-[#00F59B]">
+          </div>
+
+          <div id="mfaSetupAlert" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs"></div>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-zinc-800 bg-zinc-900/40 flex items-center justify-end gap-2">
+        <button onclick="closeMfaSetupModal()" class="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-300 transition cursor-pointer">
+          Cancelar
+        </button>
+        <button onclick="submitMfaEnable()" id="btnSubmitMfaEnable" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-[#00F59B] text-black font-extrabold text-xs shadow-md transition cursor-pointer">
+          <span id="btnSubmitMfaEnableText">Ativar MFA</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Códigos de Recuperação Exclusivos (One-Time Display) -->
+  <div id="mfaRecoveryModal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-zinc-950 border border-amber-500/40 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div class="p-5 border-b border-zinc-800 bg-amber-950/20 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-amber-400 font-extrabold text-base">
+          <i data-lucide="key" class="w-5 h-5"></i>
+          <span>Códigos de Recuperação de Uso Único</span>
+        </div>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <div class="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-xs text-amber-300 space-y-1">
+          <p class="font-bold">⚠️ ATENÇÃO: Guarde estes códigos em um cofre de senhas agora.</p>
+          <p class="text-zinc-300 text-[11px]">Estes códigos são exibidos apenas UMA VEZ e são armazenados no banco exclusivamente em hash irreversível. Cada código permite um único acesso caso você perca seu celular.</p>
+        </div>
+
+        <div id="recoveryCodesGrid" class="grid grid-cols-2 gap-2 p-3 bg-black/60 border border-zinc-800 rounded-2xl">
+          <!-- Rendered codes -->
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="copyRecoveryCodes()" class="w-1/2 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span id="copyRecoveryBtnText">Copiar Códigos</span>
+          </button>
+          <button onclick="downloadRecoveryCodes()" class="w-1/2 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 cursor-pointer">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+            <span>Baixar (.txt)</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-zinc-800 bg-zinc-900/40 text-center">
+        <button onclick="finishMfaSetup()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-[#00F59B] text-black font-extrabold text-sm shadow-md transition cursor-pointer">
+          Já Salvei Meus Códigos com Segurança
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Desativação do MFA com Autenticação Reforçada -->
+  <div id="mfaDisableModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-zinc-950 border border-rose-500/30 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
+      <div class="p-5 border-b border-zinc-800 flex items-center justify-between bg-rose-950/20">
+        <div class="flex items-center gap-2 text-rose-400 font-extrabold text-base">
+          <i data-lucide="shield-alert" class="w-5 h-5"></i>
+          <span>Desativar Segundo Fator (MFA)</span>
+        </div>
+        <button onclick="closeMfaDisableModal()" class="text-zinc-400 hover:text-white p-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 transition cursor-pointer">✕</button>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <p class="text-xs text-zinc-300">
+          Por motivos de segurança, a desativação do MFA exige a confirmação da sua senha de administrador e de um código de verificação atual.
+        </p>
+
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-zinc-300">Senha Mestra de Administrador</label>
+          <input type="password" id="mfaDisablePassInput" placeholder="Digite sua senha mestra" class="w-full px-4 py-2.5 bg-black/60 border border-zinc-700 rounded-xl text-white text-sm focus:outline-none focus:border-rose-500">
+        </div>
+
+        <div class="space-y-1">
+          <label class="text-xs font-bold text-zinc-300">Código TOTP Atual ou Código de Recuperação</label>
+          <input type="text" id="mfaDisableCodeInput" placeholder="000000 ou XXXX-XXXX" class="w-full px-4 py-2.5 bg-black/60 border border-zinc-700 rounded-xl text-white font-mono text-center text-sm focus:outline-none focus:border-rose-500">
+        </div>
+
+        <div id="mfaDisableAlert" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs"></div>
+      </div>
+
+      <div class="p-4 border-t border-zinc-800 bg-zinc-900/40 flex items-center justify-end gap-2">
+        <button onclick="closeMfaDisableModal()" class="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-300 transition cursor-pointer">
+          Cancelar
+        </button>
+        <button onclick="submitMfaDisable()" id="btnSubmitMfaDisable" class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow-md transition cursor-pointer">
+          <span id="btnSubmitMfaDisableText">Confirmar Desativação</span>
+        </button>
       </div>
     </div>
   </div>

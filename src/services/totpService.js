@@ -16,18 +16,73 @@ const crypto = require('crypto');
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
-function getMfaMasterKey() {
-  const masterSecret = process.env.MFA_ENCRYPTION_KEY || process.env.SESSION_SECRET || process.env.CLIENT_AUTH_SECRET || 'raia-mfa-default-key-fallback';
+/**
+ * Returns the primary encryption key for MFA at rest.
+ * In production, strictly requires a configured master secret without falling back to fixed known keys.
+ */
+function getPrimaryMfaKey() {
+  const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging';
+  const isProduction = process.env.NODE_ENV === 'production' && !isStaging;
+
+  const masterSecret = (process.env.MFA_ENCRYPTION_KEY || process.env.SESSION_SECRET || process.env.CLIENT_AUTH_SECRET || '').trim();
+
+  // In production, strictly prohibit fixed or missing keys
+  if (!masterSecret || masterSecret === 'raia-mfa-default-key-fallback') {
+    if (isProduction) {
+      throw new Error('MFA_ENCRYPTION_KEY (ou segredo mestre equivalente) não configurada ou insegura em produção.');
+    }
+    // Only in non-production environments (test/dev)
+    return crypto.createHash('sha256').update('raia-mfa-dev-test-isolated-key').digest();
+  }
+
   return crypto.createHash('sha256').update(masterSecret).digest();
 }
 
 /**
- * Encrypt a plain Base32 secret at rest using AES-256-GCM
+ * Returns candidate decryption keys to preserve access to existing records
+ * during key rotation or migrations without losing legitimate access.
+ */
+function getCandidateDecryptionKeys() {
+  const keys = [];
+  try {
+    keys.push(getPrimaryMfaKey());
+  } catch (_) {}
+
+  // Candidate from MFA_ENCRYPTION_KEY
+  if (process.env.MFA_ENCRYPTION_KEY) {
+    const k = crypto.createHash('sha256').update(process.env.MFA_ENCRYPTION_KEY.trim()).digest();
+    if (!keys.some(x => x.equals(k))) keys.push(k);
+  }
+
+  // Candidate from SESSION_SECRET
+  if (process.env.SESSION_SECRET) {
+    const k = crypto.createHash('sha256').update(process.env.SESSION_SECRET.trim()).digest();
+    if (!keys.some(x => x.equals(k))) keys.push(k);
+  }
+
+  // Candidate from CLIENT_AUTH_SECRET
+  if (process.env.CLIENT_AUTH_SECRET) {
+    const k = crypto.createHash('sha256').update(process.env.CLIENT_AUTH_SECRET.trim()).digest();
+    if (!keys.some(x => x.equals(k))) keys.push(k);
+  }
+
+  // Candidate from legacy development fallback (strictly for decrypting pre-existing records)
+  const legacyFallback = crypto.createHash('sha256').update('raia-mfa-default-key-fallback').digest();
+  if (!keys.some(x => x.equals(legacyFallback))) keys.push(legacyFallback);
+
+  const devFallback = crypto.createHash('sha256').update('raia-mfa-dev-test-isolated-key').digest();
+  if (!keys.some(x => x.equals(devFallback))) keys.push(devFallback);
+
+  return keys;
+}
+
+/**
+ * Encrypt a plain Base32 secret at rest using AES-256-GCM with primary key
  */
 function encryptSecret(plainBase32Secret) {
   if (!plainBase32Secret || typeof plainBase32Secret !== 'string') return plainBase32Secret;
   if (plainBase32Secret.startsWith('enc:v1:')) return plainBase32Secret; // Already encrypted
-  const key = getMfaMasterKey();
+  const key = getPrimaryMfaKey();
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
   let encrypted = cipher.update(plainBase32Secret, 'utf8', 'hex');
@@ -37,37 +92,45 @@ function encryptSecret(plainBase32Secret) {
 }
 
 /**
- * Decrypt an AES-256-GCM encrypted TOTP secret
+ * Decrypt an AES-256-GCM encrypted TOTP secret using multi-key candidate resolution
  */
 function decryptSecret(storedSecret) {
   if (!storedSecret || typeof storedSecret !== 'string') return storedSecret;
   if (!storedSecret.startsWith('enc:v1:')) return storedSecret; // Plain Base32 backwards-compatible
-  try {
-    const parts = storedSecret.split(':');
-    if (parts.length !== 5) return null;
-    const iv = Buffer.from(parts[2], 'hex');
-    const authTag = Buffer.from(parts[3], 'hex');
-    const encryptedText = parts[4];
-    const key = getMfaMasterKey();
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(authTag);
-    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  } catch (err) {
-    console.error('[TOTP Service] Falha ao descriptografar segredo TOTP:', err.message);
-    return null;
+
+  const parts = storedSecret.split(':');
+  if (parts.length !== 5) return null;
+  const iv = Buffer.from(parts[2], 'hex');
+  const authTag = Buffer.from(parts[3], 'hex');
+  const encryptedText = parts[4];
+
+  const candidateKeys = getCandidateDecryptionKeys();
+  for (const key of candidateKeys) {
+    try {
+      const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+      decipher.setAuthTag(authTag);
+      let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      if (decrypted && decrypted.length >= 16) {
+        return decrypted;
+      }
+    } catch (_) {
+      // Try next candidate key
+    }
   }
+
+  console.error('[TOTP Service] Falha ao descriptografar segredo TOTP com chaves disponíveis.');
+  return null;
 }
 
 /**
  * Hash a recovery code for secure storage at rest (HMAC-SHA256 with pepper)
  */
-function hashRecoveryCode(code) {
+function hashRecoveryCode(code, key = null) {
   if (!code || typeof code !== 'string') return '';
   const clean = code.toUpperCase().replace(/[\s-]/g, '').trim();
-  const key = getMfaMasterKey();
-  return crypto.createHmac('sha256', key).update(clean).digest('hex');
+  const masterKey = key || getPrimaryMfaKey();
+  return crypto.createHmac('sha256', masterKey).update(clean).digest('hex');
 }
 
 /**
@@ -86,21 +149,25 @@ function generateHashedRecoveryCodes(count = 8) {
 }
 
 /**
- * Verify a user-submitted recovery code against an array of stored hashes
+ * Verify a user-submitted recovery code against an array of stored hashes with candidate key fallback
  */
 function verifyRecoveryCode(candidateCode, hashedCodes) {
   if (!candidateCode || !Array.isArray(hashedCodes) || hashedCodes.length === 0) {
     return { valid: false, matchedIndex: -1 };
   }
-  const candidateHash = hashRecoveryCode(candidateCode);
-  const candBuf = Buffer.from(candidateHash, 'hex');
 
-  for (let i = 0; i < hashedCodes.length; i++) {
-    const storedHash = hashedCodes[i];
-    if (typeof storedHash !== 'string') continue;
-    const storedBuf = Buffer.from(storedHash, 'hex');
-    if (storedBuf.length === candBuf.length && crypto.timingSafeEqual(storedBuf, candBuf)) {
-      return { valid: true, matchedIndex: i };
+  const candidateKeys = getCandidateDecryptionKeys();
+  for (const key of candidateKeys) {
+    const candidateHash = hashRecoveryCode(candidateCode, key);
+    const candBuf = Buffer.from(candidateHash, 'hex');
+
+    for (let i = 0; i < hashedCodes.length; i++) {
+      const storedHash = hashedCodes[i];
+      if (typeof storedHash !== 'string') continue;
+      const storedBuf = Buffer.from(storedHash, 'hex');
+      if (storedBuf.length === candBuf.length && crypto.timingSafeEqual(storedBuf, candBuf)) {
+        return { valid: true, matchedIndex: i };
+      }
     }
   }
 
@@ -235,6 +302,8 @@ function generateOtpAuthUri({ secret, accountName = 'admin@raiaagentes.com.br', 
 }
 
 module.exports = {
+  getPrimaryMfaKey,
+  getCandidateDecryptionKeys,
   encryptSecret,
   decryptSecret,
   hashRecoveryCode,
@@ -242,6 +311,7 @@ module.exports = {
   verifyRecoveryCode,
   generateSecret,
   generateToken,
+  generateCurrentTOTP: (secret) => generateToken(secret),
   verifyToken,
   generateRecoveryCodes,
   generateOtpAuthUri,

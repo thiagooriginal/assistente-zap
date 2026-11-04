@@ -143,6 +143,21 @@
   <script>
     lucide.createIcons();
 
+    // Cleanse query strings containing tokens immediately on load (Proteção 17)
+    if (window.location.search) {
+      const currentUrl = new URL(window.location.href);
+      let queryCleaned = false;
+      ['token', 'magic', 'session', 'key', 'auth'].forEach(param => {
+        if (currentUrl.searchParams.has(param)) {
+          currentUrl.searchParams.delete(param);
+          queryCleaned = true;
+        }
+      });
+      if (queryCleaned) {
+        window.history.replaceState({}, document.title, currentUrl.pathname + (currentUrl.search ? currentUrl.search : ''));
+      }
+    }
+
     const form = document.getElementById('loginForm');
     const submitBtn = document.getElementById('submitBtn');
     const alertBox = document.getElementById('alertBox');
@@ -181,6 +196,7 @@
       try {
         const res = await fetch('/api/cliente/auth/login', {
           method: 'POST',
+          credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             email: emailInput.value.trim(),
