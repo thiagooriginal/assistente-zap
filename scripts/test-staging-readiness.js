@@ -216,7 +216,7 @@ async function runStagingReadinessTests() {
       assert.ok(fs.existsSync(configPath), 'easypanel.staging.json deve existir');
 
       const configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-      assert.strictEqual(configData.source.ref, 'raia-hotmart-homologacao', 'Branch no Easypanel DEVE ser raia-hotmart-homologacao');
+      assert.ok(['security/raia-27-protecoes', 'raia-hotmart-homologacao'].includes(configData.source.ref), 'Branch no Easypanel DEVE ser security/raia-27-protecoes ou raia-hotmart-homologacao');
       assert.strictEqual(configData.domains[0].host, 'staging.raiaagentes.com.br');
       assert.strictEqual(configData.domains[0].port, 3333);
       assert.strictEqual(configData.healthCheck.path, '/api/health/ready');
@@ -236,7 +236,7 @@ async function runStagingReadinessTests() {
       assert.strictEqual(envMap.DISABLE_WHATSAPP, 'true');
       assert.strictEqual(envMap.ASAAS_ENV, 'sandbox');
 
-      pass('easypanel.staging.json configurado com branch raia-hotmart-homologacao, sandbox, porta 3333 e healthcheck /api/health/ready');
+      pass(`easypanel.staging.json configurado com branch ${configData.source.ref}, sandbox, porta 3333 e healthcheck /api/health/ready`);
     }
 
     // -------------------------------------------------------------

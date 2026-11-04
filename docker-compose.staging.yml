@@ -17,8 +17,17 @@ services:
       - HOMOLOGACAO=true
       - DISABLE_WHATSAPP=true
       - PAUSE_PERSONAL_ASSISTANT=true
+      # Segredos de Autenticação e Sessão (Proteções 01, 11 e 17)
+      - SESSION_SECRET=${SESSION_SECRET:-}
+      - CLIENT_AUTH_SECRET=${CLIENT_AUTH_SECRET:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+      - ADMIN_MFA_ENABLED=${ADMIN_MFA_ENABLED:-true}
+      - MFA_ENCRYPTION_KEY=${MFA_ENCRYPTION_KEY:-}
+      - ADMIN_API_KEY=${ADMIN_API_KEY:-}
+      - CORS_ORIGIN=https://staging.raiaagentes.com.br
       # Asaas Sandbox (Exclusivo para testes, NUNCA tokens de produção)
       - ASAAS_ENV=sandbox
+      - ASAAS_API_URL=https://sandbox.asaas.com/api/v3
       - ASAAS_API_KEY=${ASAAS_SANDBOX_API_KEY:-}
       - ASAAS_WEBHOOK_SECRET=${ASAAS_SANDBOX_WEBHOOK_SECRET:-}
       # Hotmart Testes
@@ -29,8 +38,8 @@ services:
       # Conta Demonstrativa Homologação
       - DEMO_ACCOUNT_EMAIL=homologacao.hotmart@raiaagentes.com.br
       - DEMO_ACCOUNT_PASSWORD=${DEMO_ACCOUNT_PASSWORD:-}
-      # Proteção HTTP Basic Auth Opcional para Homologação
-      - STAGING_PROTECTION_ENABLED=${STAGING_PROTECTION_ENABLED:-false}
+      # Proteção HTTP Basic Auth para Homologação (Staging Gate)
+      - STAGING_PROTECTION_ENABLED=${STAGING_PROTECTION_ENABLED:-true}
       - STAGING_USER=${STAGING_USER:-raia-staging}
       - STAGING_PASSWORD=${STAGING_PASSWORD:-}
     volumes:
