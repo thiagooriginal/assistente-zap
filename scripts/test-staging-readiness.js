@@ -18,6 +18,8 @@ process.env.APP_MODE = 'staging';
 process.env.HOMOLOGACAO = 'true';
 process.env.DISABLE_WHATSAPP = 'true';
 process.env.PAUSE_PERSONAL_ASSISTANT = 'true';
+process.env.ASAAS_ENV = 'sandbox';
+process.env.ASAAS_API_URL = 'https://sandbox.asaas.com/api/v3';
 process.env.PORT = '0'; // Ephemeral port for test
 process.env.BASE_URL = 'https://staging.raiaagentes.com.br';
 

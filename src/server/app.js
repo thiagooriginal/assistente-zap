@@ -904,8 +904,9 @@ app.post('/api/webhooks/asaas', async (req, res) => {
       return res.json({ success: true, duplicate: true, eventId: result.eventId });
     }
 
-    // 2. WhatsApp Notification on First Payment / Activation
-    if (result.isPaid) {
+    // 2. WhatsApp Notification on First Payment / Activation (Strictly suppressed in Staging)
+    const isStagingEnvWebhook = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging' || process.env.APP_MODE === 'homologacao';
+    if (!isStagingEnvWebhook && result.isPaid) {
       const payment = eventData.payment;
       try {
         const row = db.prepare('SELECT customer_name, customer_phone, value FROM asaas_payments WHERE asaas_id = ?').get(payment?.id);
@@ -960,8 +961,9 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
     const payload = req.body || {};
     const result = await hotmartService.processWebhook(payload, whatsappClient.sendWhatsAppMessage);
 
-    // If purchase was approved, dispatch Meta CAPI server-side event
-    if (result.action === 'USER_CREATED_PENDING' || result.action === 'USER_UPDATED') {
+    // If purchase was approved, dispatch Meta CAPI server-side event (Strictly suppressed in Staging)
+    const isStagingHotmart = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging' || process.env.APP_MODE === 'homologacao';
+    if (!isStagingHotmart && (result.action === 'USER_CREATED_PENDING' || result.action === 'USER_UPDATED')) {
       const buyer = payload.data?.buyer || {};
       const purchase = payload.data?.purchase || {};
       metaCapiService.sendMetaCapiEvent({

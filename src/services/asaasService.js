@@ -26,7 +26,22 @@ function isConfigured() {
  * Helper to make HTTP requests using native fetch
  */
 async function asaasRequest(endpoint, options = {}) {
-  const url = `${getApiUrl()}${endpoint}`;
+  const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging' || process.env.APP_MODE === 'homologacao';
+  const targetUrl = getApiUrl();
+  if (isStaging && targetUrl.includes('api.asaas.com') && !targetUrl.includes('sandbox.asaas.com')) {
+    const blockedErr = new Error('BLOQUEIO DE SEGURANÇA (FAIL-CLOSED): Operação financeira Asaas cancelada. Endpoint de produção (api.asaas.com) estritamente proibido em ambiente de homologação/staging.');
+    blockedErr.code = 'ASAAS_PRODUCTION_API_FORBIDDEN_IN_STAGING';
+    try {
+      logSecurityEvent({
+        eventType: 'CRITICAL_CONFIGURATION_ERROR',
+        status: 'BLOCKED',
+        details: { endpoint, targetUrl, reason: 'Tentativa de chamada para API de produção do Asaas em homologação' }
+      });
+    } catch (_) {}
+    throw blockedErr;
+  }
+
+  const url = `${targetUrl}${endpoint}`;
   const response = await fetch(url, {
     ...options,
     headers: {

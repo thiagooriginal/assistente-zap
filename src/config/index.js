@@ -21,7 +21,7 @@ const config = {
   pixPrice: process.env.PIX_PRICE || '29.00',
   pausePersonalAssistant: process.env.PAUSE_PERSONAL_ASSISTANT !== 'false', // Pausado por padrão para não conflitar no mesmo número
   asaasApiKey: (process.env.ASAAS_API_KEY || '').trim(),
-  asaasApiUrl: process.env.ASAAS_API_URL || 'https://api.asaas.com/v3',
+  asaasApiUrl: process.env.ASAAS_API_URL || ((process.env.ASAAS_ENV === 'sandbox' || process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging') ? 'https://sandbox.asaas.com/api/v3' : 'https://api.asaas.com/v3'),
   asaasWebhookSecret: (process.env.ASAAS_WEBHOOK_SECRET || '').trim(),
 
   // Security & Administrative Credentials
@@ -146,10 +146,22 @@ config.validateEnvironment = function validateEnvironment({ throwOnError = false
     }
   }
 
-  // 2. Staging Gate Checks
-  if (isStaging && (process.env.STAGING_PROTECTION_ENABLED === 'true' || process.env.STAGING_AUTH_ENABLED === 'true')) {
-    if (!process.env.STAGING_PASSWORD || process.env.STAGING_PASSWORD.trim().length < 6) {
-      errors.push('STAGING_PASSWORD ausente ou insuficiente com STAGING_PROTECTION_ENABLED ativado.');
+  // 2. Staging Gate & Asaas Sandbox Fail-Closed Validation
+  if (isStaging) {
+    const asaasEnv = (process.env.ASAAS_ENV || '').toLowerCase().trim();
+    const asaasUrl = (config.asaasApiUrl || process.env.ASAAS_API_URL || '').toLowerCase().trim();
+
+    if (asaasEnv && asaasEnv !== 'sandbox') {
+      errors.push('CONFLITO CRÍTICO DE AMBIENTE: ASAAS_ENV deve ser "sandbox" em ambiente de homologação/staging. Tentativa de configurar ambiente de produção bloqueada.');
+    }
+    if (asaasUrl.includes('api.asaas.com') && !asaasUrl.includes('sandbox.asaas.com')) {
+      errors.push('CONFLITO CRÍTICO DE AMBIENTE: Endpoint de produção do Asaas (api.asaas.com) estritamente proibido em ambiente de homologação/staging. Configure ASAAS_API_URL=https://sandbox.asaas.com/api/v3.');
+    }
+
+    if (process.env.STAGING_PROTECTION_ENABLED === 'true' || process.env.STAGING_AUTH_ENABLED === 'true') {
+      if (!process.env.STAGING_PASSWORD || process.env.STAGING_PASSWORD.trim().length < 6) {
+        errors.push('STAGING_PASSWORD ausente ou insuficiente com STAGING_PROTECTION_ENABLED ativado.');
+      }
     }
   }
 

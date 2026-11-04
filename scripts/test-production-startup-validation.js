@@ -202,6 +202,8 @@ test('7. Compatibilidade com APP_MODE=staging e HOMOLOGACAO=true em domínio de 
     APP_MODE: 'staging',
     BASE_URL: 'https://staging.raiaagentes.com.br',
     ADMIN_PASSWORD: 'StagingAdminPassword#2026',
+    ASAAS_ENV: 'sandbox',
+    ASAAS_API_URL: 'https://sandbox.asaas.com/api/v3',
     DB_PATH: 'data/assistant.db'
   });
 
@@ -356,6 +358,82 @@ test('14. Encerramento obrigatório para APP_MODE=production com HOMOLOGACAO=tru
 
   assert.notStrictEqual(res.status, 0, 'Must abort with non-zero exit code on contradictory flags');
   assert.ok(res.stderr.includes('CONFLITO DE AMBIENTE'), 'Stderr must identify environment conflict');
+});
+
+// -------------------------------------------------------------
+// Test 15: Fail-Closed Asaas Validation: ASAAS_ENV=production Blocked in Staging
+// -------------------------------------------------------------
+test('15. Bloqueio fail-closed na inicialização quando ASAAS_ENV=production for configurado em staging', () => {
+  const res = runValidationProcess({
+    NODE_ENV: 'production',
+    APP_MODE: 'staging',
+    HOMOLOGACAO: 'true',
+    BASE_URL: 'https://staging.raiaagentes.com.br',
+    ASAAS_ENV: 'production',
+    DB_PATH: 'data/assistant.db'
+  });
+
+  assert.notStrictEqual(res.status, 0, 'Deve abortar a inicialização com código de erro');
+  assert.ok(
+    res.stderr.includes('CONFLITO CRÍTICO DE AMBIENTE') && res.stderr.includes('ASAAS_ENV deve ser "sandbox"'),
+    'Stderr deve conter mensagem de conflito crítico proibindo ASAAS_ENV=production em staging'
+  );
+});
+
+// -------------------------------------------------------------
+// Test 16: Fail-Closed Asaas Validation: api.asaas.com URL Blocked in Staging
+// -------------------------------------------------------------
+test('16. Bloqueio fail-closed na inicialização quando ASAAS_API_URL de produção for apontado em staging', () => {
+  const res = runValidationProcess({
+    NODE_ENV: 'production',
+    APP_MODE: 'staging',
+    HOMOLOGACAO: 'true',
+    BASE_URL: 'https://staging.raiaagentes.com.br',
+    ASAAS_ENV: 'sandbox',
+    ASAAS_API_URL: 'https://api.asaas.com/v3',
+    DB_PATH: 'data/assistant.db'
+  });
+
+  assert.notStrictEqual(res.status, 0, 'Deve abortar a inicialização com código de erro');
+  assert.ok(
+    res.stderr.includes('CONFLITO CRÍTICO DE AMBIENTE') && res.stderr.includes('Endpoint de produção do Asaas'),
+    'Stderr deve conter mensagem de conflito crítico proibindo api.asaas.com em staging'
+  );
+});
+
+// -------------------------------------------------------------
+// Test 17: Runtime Fail-Closed Check in asaasService Prevents HTTP Calls to Production
+// -------------------------------------------------------------
+test('17. Bloqueio fail-closed em runtime no asaasService impedindo requisições para produção em staging', async () => {
+  const runnerScript = `
+    process.env.HOMOLOGACAO = 'true';
+    process.env.APP_MODE = 'staging';
+    process.env.ASAAS_API_URL = 'https://api.asaas.com/v3';
+    process.env.ASAAS_API_KEY = 'dummy_test_key_1234567890';
+    const asaasService = require('./src/services/asaasService.js');
+    asaasService.getAccount()
+      .then(() => {
+        console.error('FAIL: Deveria ter sido bloqueado');
+        process.exit(1);
+      })
+      .catch((err) => {
+        if (err.code === 'ASAAS_PRODUCTION_API_FORBIDDEN_IN_STAGING') {
+          console.log('SUCCESS_FAIL_CLOSED');
+          process.exit(0);
+        } else {
+          console.error('UNEXPECTED_ERROR:', err.message);
+          process.exit(2);
+        }
+      });
+  `;
+
+  const proc = spawnSync(NODE_BIN, ['-e', runnerScript], {
+    cwd: ROOT_DIR,
+    encoding: 'utf8'
+  });
+
+  assert.strictEqual(proc.status, 0, 'Runtime fail-closed deve disparar erro ASAAS_PRODUCTION_API_FORBIDDEN_IN_STAGING');
+  assert.ok(proc.stdout.includes('SUCCESS_FAIL_CLOSED'), 'Requisição para api de produção do Asaas deve ser abortada antes do envio');
 });
 
 console.log('\n----------------------------------------------------------------');
