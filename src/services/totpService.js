@@ -139,26 +139,39 @@ function decryptSecret(storedSecret) {
 }
 
 /**
- * Hash a recovery code for secure storage at rest (HMAC-SHA256 with pepper)
+ * Generate a short 8-char SHA-256 fingerprint for a key (used to tag recovery hashes)
  */
-function hashRecoveryCode(code, key = null) {
-  if (!code || typeof code !== 'string') return '';
-  const clean = code.toUpperCase().replace(/[\s-]/g, '').trim();
-  const masterKey = key || getPrimaryMfaKey();
-  return crypto.createHmac('sha256', masterKey).update(clean).digest('hex');
+function getKeyFingerprint(key = null) {
+  const k = key || getPrimaryMfaKey();
+  return crypto.createHash('sha256').update(k).digest('hex').slice(0, 8);
 }
 
 /**
- * Generate 8 random alphanumeric recovery codes with hashes
+ * Hash a recovery code for secure storage at rest (HMAC-SHA256 with key fingerprint)
  */
-function generateHashedRecoveryCodes(count = 8) {
+function hashRecoveryCode(code, key = null, { versioned = true } = {}) {
+  if (!code || typeof code !== 'string') return '';
+  const clean = code.toUpperCase().replace(/[\s-]/g, '').trim();
+  const masterKey = key || getPrimaryMfaKey();
+  const rawHash = crypto.createHmac('sha256', masterKey).update(clean).digest('hex');
+  if (versioned) {
+    return `hmac:v2:${getKeyFingerprint(masterKey)}:${rawHash}`;
+  }
+  return rawHash;
+}
+
+/**
+ * Generate 8 random alphanumeric recovery codes with versioned hashes
+ */
+function generateHashedRecoveryCodes(count = 8, key = null) {
+  const masterKey = key || getPrimaryMfaKey();
   const plainCodes = [];
   const hashedCodes = [];
   for (let i = 0; i < count; i++) {
     const raw = crypto.randomBytes(4).toString('hex').toUpperCase();
     const formatted = `${raw.slice(0, 4)}-${raw.slice(4, 8)}`;
     plainCodes.push(formatted);
-    hashedCodes.push(hashRecoveryCode(formatted));
+    hashedCodes.push(hashRecoveryCode(formatted, masterKey, { versioned: true }));
   }
   return { plainCodes, hashedCodes };
 }
@@ -179,23 +192,49 @@ function verifyRecoveryCode(candidateCode, hashedCodes) {
     const stored = hashedCodes[i];
     if (typeof stored !== 'string') continue;
     const cleanStored = stored.toUpperCase().replace(/[\s-]/g, '').trim();
-    if (cleanStored.length >= 8 && cleanStored.length <= 16 && cleanStored === cleanCandidate) {
-      return { valid: true, matchedIndex: i, isLegacyPlain: true };
+    if (cleanStored.length >= 8 && cleanStored.length <= 16 && !cleanStored.startsWith('HMAC:V2:') && cleanStored === cleanCandidate) {
+      return { valid: true, matchedIndex: i, isLegacyPlain: true, keyMatchesPrimary: false };
     }
   }
 
-  // 2. HMAC-SHA256 match across candidate keys
+  // 2. Match versioned hashes (hmac:v2:<keyId>:<rawHash>) or bare 64-char hex hashes
   const candidateKeys = getCandidateDecryptionKeys();
+  const primaryFingerprint = getKeyFingerprint(getPrimaryMfaKey());
+
   for (const key of candidateKeys) {
-    const candidateHash = hashRecoveryCode(candidateCode, key);
-    const candBuf = Buffer.from(candidateHash, 'hex');
+    const keyFp = getKeyFingerprint(key);
+    const candidateRawHash = crypto.createHmac('sha256', key).update(cleanCandidate).digest('hex');
+    const candBuf = Buffer.from(candidateRawHash, 'hex');
 
     for (let i = 0; i < hashedCodes.length; i++) {
-      const storedHash = hashedCodes[i];
-      if (typeof storedHash !== 'string') continue;
-      const storedBuf = Buffer.from(storedHash, 'hex');
-      if (storedBuf.length === candBuf.length && crypto.timingSafeEqual(storedBuf, candBuf)) {
-        return { valid: true, matchedIndex: i, isLegacyPlain: false };
+      const stored = hashedCodes[i];
+      if (typeof stored !== 'string') continue;
+
+      let storedRawHash = stored;
+      if (stored.startsWith('hmac:v2:')) {
+        const parts = stored.split(':');
+        if (parts.length === 4) {
+          const storedKeyFp = parts[2];
+          storedRawHash = parts[3];
+          // If stored has a fingerprint, verify only against matching key
+          if (storedKeyFp !== keyFp) {
+            continue;
+          }
+        }
+      }
+
+      if (storedRawHash.length === 64) {
+        const storedBuf = Buffer.from(storedRawHash, 'hex');
+        if (storedBuf.length === candBuf.length && crypto.timingSafeEqual(storedBuf, candBuf)) {
+          const isPrimary = (keyFp === primaryFingerprint);
+          return {
+            valid: true,
+            matchedIndex: i,
+            isLegacyPlain: false,
+            isLegacyKey: !isPrimary,
+            keyMatchesPrimary: isPrimary,
+          };
+        }
       }
     }
   }
@@ -398,26 +437,37 @@ function migrateMfaSecrets(dbInstance, { strict = true } = {}) {
       // Validate & migrate recovery codes
       let updatedRecoveryCodesJson = user.totp_recovery_codes;
       let recoveryNeedsUpdate = false;
+      const primaryFp = getKeyFingerprint(primaryKey);
+
       if (user.totp_recovery_codes) {
         try {
           const parsed = JSON.parse(user.totp_recovery_codes);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            let hasPlain = false;
+            let hasPlainToMigrate = false;
             const newCodes = parsed.map(c => {
-              if (typeof c === 'string' && c.length !== 64) {
-                // Plaintext recovery code -> convert to HMAC-SHA256 under primaryKey
-                hasPlain = true;
-                return hashRecoveryCode(c, primaryKey);
+              if (typeof c === 'string') {
+                // If already versioned under current primary key:
+                if (c.startsWith(`hmac:v2:${primaryFp}:`)) {
+                  return c;
+                }
+                // If legacy plaintext code (XXXX-XXXX or 8-16 chars):
+                const isPlain = !c.startsWith('hmac:') && c.length >= 8 && c.length <= 16;
+                if (isPlain) {
+                  hasPlainToMigrate = true;
+                  return hashRecoveryCode(c, primaryKey, { versioned: true });
+                }
+                // Unversioned bare 64-char hash or hash under another key fingerprint:
+                // Cannot be verified without plaintext code, so it requires administrator regeneration
+                legacyRecoveryCodesCount++;
+                return c;
               }
               return c;
             });
 
-            if (hasPlain) {
+            if (hasPlainToMigrate) {
               updatedRecoveryCodesJson = JSON.stringify(newCodes);
               recoveryNeedsUpdate = true;
               recoveryCodesMigrated++;
-            } else {
-              legacyRecoveryCodesCount += parsed.length;
             }
           }
         } catch (_) {
@@ -448,7 +498,7 @@ function migrateMfaSecrets(dbInstance, { strict = true } = {}) {
       failed,
       recoveryCodesMigrated,
       legacyRecoveryCodesCount,
-      canSafelyDisableLegacyKeys: failed === 0,
+      canSafelyDisableLegacyKeys: (failed === 0 && legacyRecoveryCodesCount === 0),
     };
   };
 
@@ -472,6 +522,7 @@ function migrateMfaSecrets(dbInstance, { strict = true } = {}) {
 
 module.exports = {
   getPrimaryMfaKey,
+  getKeyFingerprint,
   getCandidateDecryptionKeys,
   migrateMfaSecrets,
   encryptSecret,

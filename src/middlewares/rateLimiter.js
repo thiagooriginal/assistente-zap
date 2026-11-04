@@ -24,6 +24,7 @@ function getDb() {
 
 function createRateLimiter({
   name = 'global',
+  db: injectedDb = null,
   windowMs = 15 * 60 * 1000, // 15 minutes
   maxAttempts = 5,
   message = 'Muitas tentativas a partir deste endereço. Tente novamente mais tarde.',
@@ -34,6 +35,7 @@ function createRateLimiter({
     return `${ip}:${req.baseUrl || ''}${req.path || ''}`;
   },
 }) {
+  let customDb = injectedDb;
   const inMemoryAttempts = new Map();
 
   // Periodic cleanup of expired entries without keeping process active
@@ -44,7 +46,7 @@ function createRateLimiter({
         inMemoryAttempts.delete(key);
       }
     }
-    const db = getDb();
+    const db = customDb || getDb();
     if (db && typeof db.prepare === 'function') {
       try {
         db.prepare('DELETE FROM rate_limit_entries WHERE reset_time < ?').run(now);
@@ -60,7 +62,7 @@ function createRateLimiter({
     const storageKey = `${name}:${rawKey}`;
     const now = Date.now();
     let record = null;
-    const db = getDb();
+    const db = customDb || getDb();
 
     // 1. Persistent, Cluster-Coordinated & Atomic Storage (Proteção 12)
     let usedDb = false;
@@ -82,8 +84,9 @@ function createRateLimiter({
           record = { count: row.count, resetTime: row.reset_time };
           usedDb = true;
         }
-      } catch (_) {
-        // Fallback to in-memory if DB is temporarily locked or before migration
+      } catch (dbErr) {
+        // Resilient Fallback: Never crash critical endpoints on storage glitches or transient SQLite locks
+        console.warn(`[RateLimiter:${name}] Armazenamento persistente indisponível temporariamente. Ativando fallback resiliente em memória:`, dbErr.message);
       }
     }
 
@@ -157,6 +160,10 @@ function createRateLimiter({
         } catch (_) {}
       }
     }
+  };
+
+  limiterMiddleware.setDb = (newDb) => {
+    customDb = newDb;
   };
 
   return limiterMiddleware;

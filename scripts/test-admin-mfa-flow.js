@@ -121,6 +121,10 @@ async function runAllTests() {
     WHERE id = ?
   `).run(adminId);
 
+  // Clean persistent rate limit entries from prior test runs
+  adminLoginLimiter.reset();
+  db.prepare("DELETE FROM rate_limit_entries").run();
+
   let adminAuthToken = null;
   let mfaSetupSecret = null;
   let savedRecoveryCodes = [];
@@ -259,6 +263,7 @@ async function runAllTests() {
     // Test 8: Successful login with valid TOTP code
     // -------------------------------------------------------------
     await test('8. Sucesso no login com senha + código TOTP válido de 6 dígitos', async () => {
+      adminLoginLimiter.reset();
       const currentValidTotp = totpService.generateCurrentTOTP(mfaSetupSecret);
       const res = await request('POST', '/api/auth/admin-login', {
         password: TEST_ADMIN_PASSWORD,
@@ -534,9 +539,10 @@ async function runAllTests() {
     // -------------------------------------------------------------
     // Test 18: Tratamento de Códigos de Recuperação e Validação de Compatibilidade
     // -------------------------------------------------------------
-    await test('18. Migração de códigos de recuperação legados e validação de compatibilidade', async () => {
-      db.prepare("DELETE FROM users WHERE email = 'recovery@raiaagentes.com.br' OR phone_number = '5511999990004'").run();
+    await test('18. Migração de códigos de recuperação legados, detecção de hashes antigos e regeneração segura', async () => {
+      db.prepare("DELETE FROM users WHERE email IN ('recovery@raiaagentes.com.br', 'legacyhash@raiaagentes.com.br') OR phone_number IN ('5511999990004', '5511999990005')").run();
 
+      // Case A: User with legacy plaintext codes
       const plainCodes = ['1111-2222', '3333-4444', '5555-6666'];
       const validSecret = totpService.encryptSecret('JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP');
 
@@ -545,21 +551,70 @@ async function runAllTests() {
         VALUES ('Recovery User', '5511999990004', 'recovery@raiaagentes.com.br', 'ADMIN', 1, ?, ?, CURRENT_TIMESTAMP)
       `).run(validSecret, JSON.stringify(plainCodes));
 
-      const res = totpService.migrateMfaSecrets(db, { strict: true });
-      assert.ok(res.canSafelyDisableLegacyKeys, 'Deve permitir desativação segura de chaves legadas');
-      assert.strictEqual(res.recoveryCodesMigrated, 1, 'Deve migrar códigos de recuperação em texto plano para hashes');
+      // Case B: User with unversioned legacy bare 64-char hashes (cannot be re-hashed without original code)
+      const bareLegacyHashes = [
+        crypto.createHash('sha256').update('old_code_1').digest('hex'),
+        crypto.createHash('sha256').update('old_code_2').digest('hex')
+      ];
+      db.prepare(`
+        INSERT INTO users (name, phone_number, email, role, totp_enabled, totp_secret, totp_recovery_codes, created_at)
+        VALUES ('Legacy Hash User', '5511999990005', 'legacyhash@raiaagentes.com.br', 'ADMIN', 1, ?, ?, CURRENT_TIMESTAMP)
+      `).run(validSecret, JSON.stringify(bareLegacyHashes));
 
+      // Migration must detect the legacy hashes and flag canSafelyDisableLegacyKeys = false
+      const res1 = totpService.migrateMfaSecrets(db, { strict: true });
+      assert.strictEqual(res1.canSafelyDisableLegacyKeys, false, 'canSafelyDisableLegacyKeys deve ser falso enquanto existirem hashes legados');
+      assert.strictEqual(res1.legacyRecoveryCodesCount, 2, 'Deve identificar exatamente os 2 hashes legados');
+      assert.strictEqual(res1.recoveryCodesMigrated, 1, 'Deve migrar o usuário com códigos em texto plano');
+
+      // Verify that plainCodes user now has versioned hashes
       const updatedUser = db.prepare("SELECT totp_recovery_codes FROM users WHERE email = 'recovery@raiaagentes.com.br'").get();
       const updatedCodes = JSON.parse(updatedUser.totp_recovery_codes);
       assert.strictEqual(updatedCodes.length, 3);
-      // All codes must now be 64-char HMAC hashes
-      assert.ok(updatedCodes.every(c => typeof c === 'string' && c.length === 64), 'Códigos devem ser hashes HMAC-SHA256');
+      assert.ok(updatedCodes.every(c => c.startsWith('hmac:v2:')), 'Códigos em texto plano devem ser migrados para hmac:v2');
 
-      // Verify that code verification works with the migrated hashes
-      const verifyResult = totpService.verifyRecoveryCode('1111-2222', updatedCodes);
-      assert.strictEqual(verifyResult.valid, true, 'Código deve validar com sucesso após migração');
+      // Now test secure regeneration endpoint via authenticated interactive session
+      // Ensure admin has MFA enabled for this test
+      db.prepare("UPDATE users SET totp_enabled = 1, totp_secret = ? WHERE id = ?").run(validSecret, adminId);
+      adminLoginLimiter.reset();
+      const plainSecret = totpService.decryptSecret(validSecret);
+      const mfaCode = totpService.generateCurrentTOTP(plainSecret);
+      const resLogin = await request('POST', '/api/auth/admin-login', {
+        password: TEST_ADMIN_PASSWORD,
+        mfaCode
+      });
+      assert.strictEqual(resLogin.status, 200);
+      const sessionToken = resLogin.body.token;
+      assert.ok(sessionToken, 'Token de sessão deve ser emitido');
 
-      db.prepare("DELETE FROM users WHERE email = 'recovery@raiaagentes.com.br'").run();
+      const resRegen = await request('POST', '/api/admin/mfa/regenerate-recovery-codes', {
+        password: TEST_ADMIN_PASSWORD
+      }, {
+        'Authorization': `Bearer ${sessionToken}`
+      });
+      assert.strictEqual(resRegen.status, 200);
+      assert.strictEqual(resRegen.body.success, true);
+      assert.strictEqual(resRegen.body.recoveryCodes.length, 8);
+
+      // Clean up the legacy hash user so database has only current versioned keys
+      db.prepare("DELETE FROM users WHERE email IN ('recovery@raiaagentes.com.br', 'legacyhash@raiaagentes.com.br')").run();
+
+      // Now re-running migration on clean state must report canSafelyDisableLegacyKeys = true
+      const resClean = totpService.migrateMfaSecrets(db, { strict: true });
+      assert.strictEqual(resClean.canSafelyDisableLegacyKeys, true, 'canSafelyDisableLegacyKeys deve ser verdadeiro após regeneração');
+
+      // Test that fresh codes verify properly even with legacy keys disabled
+      process.env.MFA_DISABLE_LEGACY_KEYS = 'true';
+      const adminCodesRow = db.prepare("SELECT totp_recovery_codes FROM users WHERE id = ?").get(adminId);
+      const parsedAdminCodes = JSON.parse(adminCodesRow.totp_recovery_codes);
+      const testCode = resRegen.body.recoveryCodes[0];
+      const verifyRegenResult = totpService.verifyRecoveryCode(testCode, parsedAdminCodes);
+      assert.strictEqual(verifyRegenResult.valid, true, 'Código regenerado deve ser verificado mesmo com MFA_DISABLE_LEGACY_KEYS=true');
+      assert.strictEqual(verifyRegenResult.keyMatchesPrimary, true);
+      delete process.env.MFA_DISABLE_LEGACY_KEYS;
+
+      // Clean admin state for subsequent tests
+      db.prepare("UPDATE users SET totp_enabled = 0, totp_secret = NULL, totp_recovery_codes = NULL WHERE id = ?").run(adminId);
     });
 
     // -------------------------------------------------------------
@@ -656,6 +711,7 @@ async function runAllTests() {
       assert.strictEqual(resUnauth.status, 401, 'Requisição sem autenticação deve retornar 401');
 
       // 3. Active admin with MFA policy enabled accesses /api/admin/mfa/status with valid session
+      adminLoginLimiter.reset();
       const resLogin = await request('POST', '/api/auth/admin-login', { password: TEST_ADMIN_PASSWORD });
       assert.strictEqual(resLogin.status, 200);
       const sessionToken = resLogin.body.token;
@@ -664,6 +720,98 @@ async function runAllTests() {
         'Authorization': `Bearer ${sessionToken}`
       });
       assert.strictEqual(resMfaStatus.status, 200, 'Sessão interativa legítima deve ter acesso ao status de MFA');
+    });
+
+    // -------------------------------------------------------------
+    // Test 22: Indisponibilidade Temporária do SQLite e Resiliência em Rotas Críticas
+    // -------------------------------------------------------------
+    await test('22. Resiliência do rate limiter: indisponibilidade do SQLite degrada suavemente para in-memory sem causar 500', async () => {
+      const { createRateLimiter } = require('../src/middlewares/rateLimiter');
+      const resilientLimiter = createRateLimiter({ name: 'resilience_test', maxAttempts: 3, windowMs: 60000 });
+      const fakeReq = { ip: '10.88.88.88', baseUrl: '/critical-auth', path: '' };
+
+      let lastStatus = 200;
+      let lastBody = null;
+      const mockRes = {
+        setHeader: () => {},
+        status: (s) => {
+          lastStatus = s;
+          return {
+            json: (b) => { lastBody = b; return b; }
+          };
+        }
+      };
+
+      // Mock a database instance that throws SQLITE_BUSY / disk error
+      const mockFailingDb = {
+        prepare: () => {
+          throw new Error('SQLITE_BUSY: database is locked (simulated temporary storage outage)');
+        }
+      };
+
+      resilientLimiter.setDb(mockFailingDb);
+
+      // Requests 1, 2, 3 must pass through via in-memory fallback without 500
+      let nextCalledCount = 0;
+      for (let i = 0; i < 3; i++) {
+        resilientLimiter(fakeReq, mockRes, () => { nextCalledCount++; });
+      }
+      assert.strictEqual(nextCalledCount, 3, 'Primeiras 3 tentativas devem passar para next() mesmo com SQLite fora do ar');
+
+      // Request 4 must be BLOCKED with 429 by in-memory limiter without throwing error
+      resilientLimiter(fakeReq, mockRes, () => {
+        assert.fail('4ª tentativa não deveria chamar next()');
+      });
+      assert.strictEqual(lastStatus, 429, '4ª tentativa deve retornar 429 Rate Limit Exceeded');
+      assert.strictEqual(lastBody.code, 'RATE_LIMIT_EXCEEDED');
+
+      // Restore real DB and reset
+      resilientLimiter.setDb(null);
+      resilientLimiter.reset();
+    });
+
+    // -------------------------------------------------------------
+    // Test 23: Preservação de Bloqueios entre Múltiplas Instâncias e Reinicializações
+    // -------------------------------------------------------------
+    await test('23. Preservação de bloqueios de rate limit entre múltiplas instâncias de cluster', async () => {
+      const { createRateLimiter } = require('../src/middlewares/rateLimiter');
+
+      // Cluster Instance A and Cluster Instance B share the same SQLite database
+      const instanceA = createRateLimiter({ name: 'cluster_login', maxAttempts: 4, windowMs: 60000 });
+      const instanceB = createRateLimiter({ name: 'cluster_login', maxAttempts: 4, windowMs: 60000 });
+
+      const attackerReq = { ip: '198.51.100.77', baseUrl: '/login', path: '' };
+
+      instanceA.reset();
+
+      // Instance A receives 4 requests and increments SQLite to 4
+      const dummyRes = { setHeader: () => {}, status: () => ({ json: () => {} }) };
+      for (let i = 0; i < 4; i++) {
+        instanceA(attackerReq, dummyRes, () => {});
+      }
+
+      // Instance B receives the 5th request from the same IP
+      // Instance B has an EMPTY in-memory map, but SQLite holds count = 4
+      let instanceBLastStatus = 200;
+      let instanceBLastBody = null;
+      const resB = {
+        setHeader: () => {},
+        status: (s) => {
+          instanceBLastStatus = s;
+          return {
+            json: (b) => { instanceBLastBody = b; return b; }
+          };
+        }
+      };
+
+      instanceB(attackerReq, resB, () => {
+        assert.fail('Instance B não deveria permitir o 5º acesso');
+      });
+
+      assert.strictEqual(instanceBLastStatus, 429, 'Instance B deve bloquear imediatamente com 429 lendo do SQLite compartilhado');
+      assert.strictEqual(instanceBLastBody.code, 'RATE_LIMIT_EXCEEDED');
+
+      instanceA.reset();
     });
 
   } finally {

@@ -1772,14 +1772,71 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
 
 // Admin MFA Status: Check whether MFA is currently enforced or active
 app.get('/api/admin/mfa/status', requireInteractiveAdmin, (req, res) => {
-  const admin = db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(req.user.id);
+  const admin = db.prepare('SELECT totp_enabled, totp_recovery_codes FROM users WHERE id = ?').get(req.user.id);
   const isGlobalMfa = (config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true') && Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
   const userMfaEnabled = Boolean(admin && admin.totp_enabled === 1);
+
+  let hasLegacyRecoveryCodes = false;
+  if (userMfaEnabled && admin && admin.totp_recovery_codes) {
+    try {
+      const parsed = JSON.parse(admin.totp_recovery_codes);
+      const currentFp = totpService.getKeyFingerprint();
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        hasLegacyRecoveryCodes = parsed.some(c => typeof c === 'string' && !c.startsWith(`hmac:v2:${currentFp}:`));
+      }
+    } catch (_) {}
+  }
+
   return res.json({
     success: true,
     enabled: userMfaEnabled || isGlobalMfa,
     isGlobalMfa,
     userMfaEnabled,
+    hasLegacyRecoveryCodes,
+  });
+});
+
+// Admin MFA: Secure Regeneration of Recovery Codes by Authenticated Admin
+app.post('/api/admin/mfa/regenerate-recovery-codes', requireInteractiveAdmin, (req, res) => {
+  const { password } = req.body || {};
+  const configuredPass = (config.adminPassword || '').trim();
+  const timingSafeMatch = (candidate, expected) => {
+    if (!expected || !candidate) return false;
+    const a = crypto.createHash('sha256').update(candidate).digest();
+    const b = crypto.createHash('sha256').update(expected).digest();
+    return crypto.timingSafeEqual(a, b);
+  };
+
+  if (!password || !timingSafeMatch(String(password).trim(), configuredPass)) {
+    return res.status(401).json({ success: false, error: 'Senha de administrador obrigatória e incorreta para regenerar códigos de recuperação.' });
+  }
+
+  const admin = db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(req.user.id);
+  if (!admin || admin.totp_enabled !== 1) {
+    return res.status(400).json({ success: false, error: 'MFA não está ativo para este administrador.' });
+  }
+
+  const { plainCodes, hashedCodes } = totpService.generateHashedRecoveryCodes(8);
+
+  db.prepare(`
+    UPDATE users
+    SET totp_recovery_codes = ?,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(JSON.stringify(hashedCodes), req.user.id);
+
+  logSecurityEvent({
+    eventType: AUDIT_EVENTS.ADMIN_MFA_RECOVERY_CODES_REGENERATED,
+    userId: req.user.id,
+    req,
+    status: 'SUCCESS',
+    details: { count: plainCodes.length },
+  });
+
+  return res.json({
+    success: true,
+    recoveryCodes: plainCodes,
+    message: 'Novos códigos de recuperação gerados com sucesso e protegidos com a chave primária atual.',
   });
 });
 
