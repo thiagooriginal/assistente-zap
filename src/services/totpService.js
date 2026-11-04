@@ -10,10 +10,102 @@ const crypto = require('crypto');
  * - 6-digit numeric codes
  * - Clock drift tolerance (window: ±1 step = ±30s)
  * - Base32 secret generation and decoding
- * - One-time recovery codes
+ * - Secure hashed one-time recovery codes
+ * - AES-256-GCM encryption at rest for TOTP secrets with key external to SQLite
  */
 
 const BASE32_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+
+function getMfaMasterKey() {
+  const masterSecret = process.env.MFA_ENCRYPTION_KEY || process.env.SESSION_SECRET || process.env.CLIENT_AUTH_SECRET || 'raia-mfa-default-key-fallback';
+  return crypto.createHash('sha256').update(masterSecret).digest();
+}
+
+/**
+ * Encrypt a plain Base32 secret at rest using AES-256-GCM
+ */
+function encryptSecret(plainBase32Secret) {
+  if (!plainBase32Secret || typeof plainBase32Secret !== 'string') return plainBase32Secret;
+  if (plainBase32Secret.startsWith('enc:v1:')) return plainBase32Secret; // Already encrypted
+  const key = getMfaMasterKey();
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  let encrypted = cipher.update(plainBase32Secret, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag().toString('hex');
+  return `enc:v1:${iv.toString('hex')}:${authTag}:${encrypted}`;
+}
+
+/**
+ * Decrypt an AES-256-GCM encrypted TOTP secret
+ */
+function decryptSecret(storedSecret) {
+  if (!storedSecret || typeof storedSecret !== 'string') return storedSecret;
+  if (!storedSecret.startsWith('enc:v1:')) return storedSecret; // Plain Base32 backwards-compatible
+  try {
+    const parts = storedSecret.split(':');
+    if (parts.length !== 5) return null;
+    const iv = Buffer.from(parts[2], 'hex');
+    const authTag = Buffer.from(parts[3], 'hex');
+    const encryptedText = parts[4];
+    const key = getMfaMasterKey();
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(authTag);
+    let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    return decrypted;
+  } catch (err) {
+    console.error('[TOTP Service] Falha ao descriptografar segredo TOTP:', err.message);
+    return null;
+  }
+}
+
+/**
+ * Hash a recovery code for secure storage at rest (HMAC-SHA256 with pepper)
+ */
+function hashRecoveryCode(code) {
+  if (!code || typeof code !== 'string') return '';
+  const clean = code.toUpperCase().replace(/[\s-]/g, '').trim();
+  const key = getMfaMasterKey();
+  return crypto.createHmac('sha256', key).update(clean).digest('hex');
+}
+
+/**
+ * Generate 8 random alphanumeric recovery codes with hashes
+ */
+function generateHashedRecoveryCodes(count = 8) {
+  const plainCodes = [];
+  const hashedCodes = [];
+  for (let i = 0; i < count; i++) {
+    const raw = crypto.randomBytes(4).toString('hex').toUpperCase();
+    const formatted = `${raw.slice(0, 4)}-${raw.slice(4, 8)}`;
+    plainCodes.push(formatted);
+    hashedCodes.push(hashRecoveryCode(formatted));
+  }
+  return { plainCodes, hashedCodes };
+}
+
+/**
+ * Verify a user-submitted recovery code against an array of stored hashes
+ */
+function verifyRecoveryCode(candidateCode, hashedCodes) {
+  if (!candidateCode || !Array.isArray(hashedCodes) || hashedCodes.length === 0) {
+    return { valid: false, matchedIndex: -1 };
+  }
+  const candidateHash = hashRecoveryCode(candidateCode);
+  const candBuf = Buffer.from(candidateHash, 'hex');
+
+  for (let i = 0; i < hashedCodes.length; i++) {
+    const storedHash = hashedCodes[i];
+    if (typeof storedHash !== 'string') continue;
+    const storedBuf = Buffer.from(storedHash, 'hex');
+    if (storedBuf.length === candBuf.length && crypto.timingSafeEqual(storedBuf, candBuf)) {
+      return { valid: true, matchedIndex: i };
+    }
+  }
+
+  return { valid: false, matchedIndex: -1 };
+}
 
 /**
  * Encode a Buffer into a Base32 string (RFC 4648)
@@ -78,7 +170,8 @@ function generateSecret(byteLength = 20) {
 /**
  * Generate a 6-digit TOTP token for a given timestamp and secret
  */
-function generateToken(secretBase32, { stepDelta = 0, timestampMs = Date.now(), digits = 6 } = {}) {
+function generateToken(secretBase32OrEncrypted, { stepDelta = 0, timestampMs = Date.now(), digits = 6 } = {}) {
+  const secretBase32 = decryptSecret(secretBase32OrEncrypted);
   const key = base32Decode(secretBase32);
   if (!key || key.length === 0) return '';
 
@@ -102,8 +195,11 @@ function generateToken(secretBase32, { stepDelta = 0, timestampMs = Date.now(), 
  * Verify a user-submitted TOTP code against a secret with window tolerance
  * window = 1 allows current step, 1 step back (-30s) and 1 step forward (+30s)
  */
-function verifyToken(token, secretBase32, { window = 1, timestampMs = Date.now(), digits = 6 } = {}) {
-  if (!token || !secretBase32) return { valid: false, reason: 'missing_parameters' };
+function verifyToken(token, secretBase32OrEncrypted, { window = 1, timestampMs = Date.now(), digits = 6 } = {}) {
+  if (!token || !secretBase32OrEncrypted) return { valid: false, reason: 'missing_parameters' };
+
+  const secretBase32 = decryptSecret(secretBase32OrEncrypted);
+  if (!secretBase32) return { valid: false, reason: 'invalid_secret' };
 
   const cleanToken = String(token).trim().replace(/\s+/g, '');
   if (cleanToken.length !== digits || !/^\d+$/.test(cleanToken)) {
@@ -121,33 +217,32 @@ function verifyToken(token, secretBase32, { window = 1, timestampMs = Date.now()
 }
 
 /**
- * Generate single-use alphanumeric recovery codes
+ * Generate legacy single-use alphanumeric recovery codes (returns array of strings)
  */
 function generateRecoveryCodes(count = 8) {
-  const codes = [];
-  for (let i = 0; i < count; i++) {
-    // 8-character hex code formatted as XXXX-XXXX
-    const raw = crypto.randomBytes(4).toString('hex').toUpperCase();
-    codes.push(`${raw.slice(0, 4)}-${raw.slice(4, 8)}`);
-  }
-  return codes;
+  const { plainCodes } = generateHashedRecoveryCodes(count);
+  return plainCodes;
 }
 
 /**
  * Generate standard otpauth URI for QR code generators / Authenticator apps
  */
 function generateOtpAuthUri({ secret, accountName = 'admin@raiaagentes.com.br', issuer = 'RAIA AGENTES' }) {
+  const cleanSecret = decryptSecret(secret) || secret;
   const encIssuer = encodeURIComponent(issuer);
   const encAccount = encodeURIComponent(accountName);
-  return `otpauth://totp/${encIssuer}:${encAccount}?secret=${secret}&issuer=${encIssuer}&algorithm=SHA1&digits=6&period=30`;
+  return `otpauth://totp/${encIssuer}:${encAccount}?secret=${cleanSecret}&issuer=${encIssuer}&algorithm=SHA1&digits=6&period=30`;
 }
 
 module.exports = {
+  encryptSecret,
+  decryptSecret,
+  hashRecoveryCode,
+  generateHashedRecoveryCodes,
+  verifyRecoveryCode,
   generateSecret,
   generateToken,
   verifyToken,
   generateRecoveryCodes,
   generateOtpAuthUri,
-  base32Encode,
-  base32Decode,
 };

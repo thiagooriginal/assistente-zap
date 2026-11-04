@@ -647,6 +647,26 @@ runVersionedMigration('20261104_01_explicit_session_separation_and_totp', 'Separ
   `);
 });
 
+// Versioned migration: Strict Session Unification & Enforce Expiration (Proteção 01, 17)
+runVersionedMigration('20261104_02_strict_session_unification', 'Enforce session_expires_at on active sessions and purge expired tokens', () => {
+  // 1. Ensure any legacy sessions without explicit expiration get a 30-day window
+  db.prepare(`
+    UPDATE users
+    SET session_expires_at = datetime('now', '+30 days'),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE session_token IS NOT NULL AND (session_expires_at IS NULL OR session_expires_at = '')
+  `).run();
+
+  // 2. Ensure magic_token is strictly nullified if expired
+  db.prepare(`
+    UPDATE users
+    SET magic_token = NULL,
+        magic_token_expires_at = datetime('now', '-1 minute'),
+        updated_at = CURRENT_TIMESTAMP
+    WHERE magic_token IS NOT NULL AND datetime(magic_token_expires_at) < datetime('now')
+  `).run();
+});
+
 // User columns for Client Authentication & Hotmart Subscriptions
 ensureColumnExists('users', 'session_token', 'TEXT');
 ensureColumnExists('users', 'session_expires_at', 'TEXT');

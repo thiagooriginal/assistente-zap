@@ -149,6 +149,12 @@ const whatsappTestLimiter = createRateLimiter({
   message: 'Limite de disparos de teste de WhatsApp excedido.',
 });
 
+const cspReportLimiter = createRateLimiter({
+  windowMs: 5 * 60 * 1000,
+  maxAttempts: 50,
+  message: 'Limite de relatórios CSP excedido.',
+});
+
 module.exports = {
   createRateLimiter,
   adminLoginLimiter,
@@ -161,4 +167,5 @@ module.exports = {
   analyticsLimiter,
   adminActionLimiter,
   whatsappTestLimiter,
+  cspReportLimiter,
 };

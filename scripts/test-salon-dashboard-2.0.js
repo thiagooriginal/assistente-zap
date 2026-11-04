@@ -114,7 +114,7 @@ async function runAllTests() {
 
   // 1. User PRO (Active subscription)
   const userPro = db.prepare(`
-    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
+    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, session_token, session_expires_at)
     VALUES ('Salão Pró Ativo', '5511990000001', 'pro@teste.com', 'JESSICA_PRO', 'ACTIVE', ?, 0, 'CLIENT', 'token_pro', ?)
   `).run(futurePaid, futurePaid);
   const userIdPro = userPro.lastInsertRowid;
@@ -126,7 +126,7 @@ async function runAllTests() {
 
   // 2. User INTERMEDIATE (Active subscription)
   const userInter = db.prepare(`
-    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
+    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, session_token, session_expires_at)
     VALUES ('Salão Inter Ativo', '5511990000002', 'inter@teste.com', 'JESSICA_INTERMEDIATE', 'ACTIVE', ?, 0, 'CLIENT', 'token_inter', ?)
   `).run(futurePaid, futurePaid);
   const userIdInter = userInter.lastInsertRowid;
@@ -138,7 +138,7 @@ async function runAllTests() {
 
   // 3. User START (Active subscription)
   const userStart = db.prepare(`
-    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
+    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, session_token, session_expires_at)
     VALUES ('Salão Start Ativo', '5511990000003', 'start@teste.com', 'JESSICA_START', 'ACTIVE', ?, 0, 'CLIENT', 'token_start', ?)
   `).run(futurePaid, futurePaid);
   const userIdStart = userStart.lastInsertRowid;
@@ -150,7 +150,7 @@ async function runAllTests() {
 
   // 4. User with PENDING subscription (not paid yet)
   const userPending = db.prepare(`
-    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
+    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, session_token, session_expires_at)
     VALUES ('Salão Aguardando Pagamento', '5511990000004', 'pending@teste.com', 'JESSICA_PRO', 'PENDING', NULL, 0, 'CLIENT', 'token_pending', ?)
   `).run(futurePaid);
   const userIdPending = userPending.lastInsertRowid;
@@ -162,7 +162,7 @@ async function runAllTests() {
 
   // 5. User with OVERDUE expired subscription
   const userOverdue = db.prepare(`
-    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
+    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, session_token, session_expires_at)
     VALUES ('Salão Inadimplente Expirado', '5511990000005', 'overdue@teste.com', 'JESSICA_PRO', 'OVERDUE', ?, 0, 'CLIENT', 'token_overdue', ?)
   `).run(pastPaid, futurePaid);
   const userIdOverdue = userOverdue.lastInsertRowid;
@@ -174,7 +174,7 @@ async function runAllTests() {
 
   // 6. User with STALE users.plan_tier (plan_tier says PRO, but subscription expired)
   const userStale = db.prepare(`
-    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, magic_token, magic_token_expires_at)
+    INSERT INTO users (name, phone_number, email, plan_tier, subscription_status, paid_until, is_demo, role, session_token, session_expires_at)
     VALUES ('Salão Antigo Expirado', '5511990000006', 'stale@teste.com', 'JESSICA_PRO', 'EXPIRED', ?, 0, 'CLIENT', 'token_stale', ?)
   `).run(pastPaid, futurePaid);
   const userIdStale = userStale.lastInsertRowid;

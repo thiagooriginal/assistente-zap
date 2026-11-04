@@ -129,6 +129,7 @@ function generateMagicToken(userId, baseUrl = '', expirationMinutes = 30) {
 
 /**
  * Validate session token and return user with strict expiration check (Proteção 01 & 17)
+ * Sessions without expiration date or with expired date are strictly rejected.
  */
 function getUserBySessionToken(token) {
   if (!token || typeof token !== 'string') return null;
@@ -136,7 +137,8 @@ function getUserBySessionToken(token) {
   const user = db.prepare(`
     SELECT * FROM users 
     WHERE session_token = ? 
-      AND (session_expires_at IS NULL OR datetime(session_expires_at) >= datetime('now'))
+      AND session_expires_at IS NOT NULL 
+      AND datetime(session_expires_at) >= datetime('now')
   `).get(clean);
   return user || null;
 }

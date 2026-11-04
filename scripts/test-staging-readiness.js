@@ -121,7 +121,7 @@ async function runStagingReadinessTests() {
       // Cria cliente de teste ativo
       const testEmail = `staging.wa.test.${Date.now()}@raia.test`;
       db.prepare(`
-        INSERT INTO users (name, email, phone_number, role, plan_tier, subscription_status, paid_until, magic_token, magic_token_expires_at)
+        INSERT INTO users (name, email, phone_number, role, plan_tier, subscription_status, paid_until, session_token, session_expires_at)
         VALUES ('Cliente Staging Test', ?, '5511999998877', 'CLIENT', 'JESSICA_PRO', 'ACTIVE', datetime('now', '+30 days'), 'token_stg_wa_test', datetime('now', '+1 day'))
       `).run(testEmail);
 
@@ -165,7 +165,7 @@ async function runStagingReadinessTests() {
       const testEmail = `staging.hub.${Date.now()}@raia.test`;
       const stgToken = `token_stg_hub_${Date.now()}`;
       db.prepare(`
-        INSERT INTO users (name, email, phone_number, role, plan_tier, subscription_status, paid_until, magic_token, magic_token_expires_at)
+        INSERT INTO users (name, email, phone_number, role, plan_tier, subscription_status, paid_until, session_token, session_expires_at)
         VALUES ('Cliente Hub Staging', ?, '5511999997766', 'CLIENT', 'JESSICA_START', 'ACTIVE', datetime('now', '+30 days'), ?, datetime('now', '+1 day'))
       `).run(testEmail, stgToken);
 

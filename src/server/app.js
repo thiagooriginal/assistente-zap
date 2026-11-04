@@ -30,6 +30,7 @@ const {
   analyticsLimiter,
   adminActionLimiter,
   whatsappTestLimiter,
+  cspReportLimiter,
 } = require('../middlewares/rateLimiter');
 const { AUDIT_EVENTS, logSecurityEvent, getRecentSecurityLogs } = require('../services/securityAuditService');
 const totpService = require('../services/totpService');
@@ -143,25 +144,44 @@ app.use((req, res, next) => {
   res.setHeader('X-XSS-Protection', '0');
 
   if (isStagingOrProd) {
-    // Enforced baseline CSP compatible with current frontends
+    // Enforced baseline CSP without unsafe-eval, allowlisting required CDNs & assets
     res.setHeader(
       'Content-Security-Policy',
-      "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self'; base-uri 'self'; upgrade-insecure-requests;"
+      "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' https://staging.raiaagentes.com.br https://raiaagentes.com.br; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests;"
     );
-    // Report-Only CSP preparing transition away from unsafe-inline and unsafe-eval
+    // Report-Only CSP preparing transition away from unsafe-inline
     res.setHeader(
       'Content-Security-Policy-Report-Only',
-      "default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://staging.raiaagentes.com.br https://raiaagentes.com.br; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; report-uri /api/security/csp-report;"
+      "default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://staging.raiaagentes.com.br https://raiaagentes.com.br; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; report-uri /api/security/csp-report;"
     );
   }
 
   next();
 });
 
-// Endpoint to receive CSP violation reports without throwing errors
-app.post('/api/security/csp-report', express.json({ type: ['application/json', 'application/csp-report'] }), (req, res) => {
-  res.status(204).end();
-});
+// Endpoint to receive CSP violation reports with payload limits, rate limiting & sanitized logging
+app.post(
+  '/api/security/csp-report',
+  cspReportLimiter,
+  express.json({ type: ['application/json', 'application/csp-report'], limit: '10kb' }),
+  (req, res) => {
+    try {
+      const report = req.body?.['csp-report'] || req.body || {};
+      const { sanitizeResource } = require('../services/securityAuditService');
+      const blockedUri = sanitizeResource(report['blocked-uri'] || report['blockedURI']);
+      const documentUri = sanitizeResource(report['document-uri'] || report['documentURI']);
+      const violatedDirective = String(report['violated-directive'] || report['effective-directive'] || 'unknown').slice(0, 100);
+
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.CSP_VIOLATION,
+        req,
+        status: 'REPORTED',
+        details: { blockedUri, documentUri, violatedDirective },
+      });
+    } catch (_) {}
+    return res.status(204).end();
+  }
+);
 
 // Restricted CORS configuration with exact origin matching (Proteção 13)
 app.use(cors({
@@ -399,7 +419,7 @@ function stagingProtectionMiddleware(req, res, next) {
     const bearerToken = authHeader.slice(7).trim();
     try {
       const isClientToken = clientAuth.verifyToken(bearerToken);
-      const isAdminToken = isClientToken ? null : db.prepare("SELECT id FROM users WHERE magic_token = ? AND role = 'ADMIN'").get(bearerToken);
+      const isAdminToken = isClientToken ? null : db.prepare("SELECT id FROM users WHERE session_token = ? AND role = 'ADMIN' AND session_expires_at IS NOT NULL AND datetime(session_expires_at) >= datetime('now')").get(bearerToken);
       if (isClientToken || isAdminToken) {
         return next(); // Authenticated system user is granted passage through staging gate
       }
@@ -508,8 +528,8 @@ app.get(['/admin', '/admin.html', '/dashboard', '/painel'], (req, res) => {
 
   if (isTunnelOrExternal) {
     const cookieToken = getCookie(req, 'auth_token');
-    const existingAdmin = cookieToken ? db.prepare("SELECT * FROM users WHERE magic_token = ? AND role = 'ADMIN'").get(cookieToken) : null;
-    if (!existingAdmin) {
+    const existingAdmin = cookieToken ? userService.getUserBySessionToken(cookieToken) : null;
+    if (!existingAdmin || existingAdmin.role !== 'ADMIN') {
       return res.redirect('/cliente/login');
     }
   }
@@ -521,7 +541,7 @@ app.get(['/', '/index.html', '/vitrine'], (req, res) => {
   res.sendFile(path.resolve(__dirname, '../../public/index.html'));
 });
 
-// Multi-Tenant Authentication Middleware
+// Multi-Tenant Authentication Middleware (Proteção 01 & 17)
 function authMiddleware(req, res, next) {
   let token = null;
 
@@ -536,19 +556,26 @@ function authMiddleware(req, res, next) {
     token = req.headers['x-auth-token'];
   }
 
-  // 3. Query string token
-  if (!token && req.query.token) {
-    token = req.query.token;
-  }
+  // Tokens in query string are strictly rejected for authenticated APIs (Proteção 02 & 17)
 
-  // 4. Cookie
+  // 3. Cookie
   if (!token) {
     token = getCookie(req, 'auth_token') || getCookie(req, 'client_auth_token');
   }
 
   if (token) {
-    // Proteção 01 & 17: Validate session token first, fallback to magic token during migration
-    const user = userService.getUserBySessionToken(token) || userService.getUserByMagicToken(token);
+    // Magic links are strictly single-use and CANNOT be used as API session tokens
+    const magicCheck = db.prepare('SELECT id FROM users WHERE magic_token = ?').get(token);
+    if (magicCheck) {
+      return res.status(401).json({
+        success: false,
+        error: 'Magic links são de uso único e não podem ser utilizados como Bearer token de sessão comum. Utilize o link via navegador.',
+        code: 'MAGIC_TOKEN_NOT_SESSION',
+      });
+    }
+
+    // Proteção 01 & 17: Validate session token strictly with expiration check
+    const user = userService.getUserBySessionToken(token);
     if (user) {
       req.user = user;
       return next();
@@ -1574,16 +1601,31 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
     // Verify TOTP token with ±1 window (±30s drift tolerance)
     const totpVerification = totpService.verifyToken(cleanMfaCode, totpSecret, { window: 1 });
     let mfaValid = totpVerification.valid;
+    let recoveryCodeUsed = false;
 
-    // Check single-use recovery codes if TOTP verification failed
+    // Check single-use hashed recovery codes if TOTP verification failed
     if (!mfaValid && admin.totp_recovery_codes) {
       try {
-        const recoveryCodes = JSON.parse(admin.totp_recovery_codes);
-        const codeIdx = recoveryCodes.indexOf(cleanMfaCode.toUpperCase());
-        if (codeIdx !== -1) {
-          mfaValid = true;
-          recoveryCodes.splice(codeIdx, 1);
-          db.prepare('UPDATE users SET totp_recovery_codes = ? WHERE id = ?').run(JSON.stringify(recoveryCodes), admin.id);
+        const storedCodes = JSON.parse(admin.totp_recovery_codes);
+        if (Array.isArray(storedCodes) && storedCodes.length > 0) {
+          // Check hashed codes first (Proteção 01)
+          const recCheck = totpService.verifyRecoveryCode(cleanMfaCode, storedCodes);
+          if (recCheck.valid) {
+            mfaValid = true;
+            recoveryCodeUsed = true;
+            storedCodes.splice(recCheck.matchedIndex, 1);
+            db.prepare('UPDATE users SET totp_recovery_codes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(JSON.stringify(storedCodes), admin.id);
+          } else {
+            // Backward-compatible check for legacy plain-text recovery codes (auto-migrating to hashes)
+            const plainIdx = storedCodes.findIndex(c => typeof c === 'string' && c.toUpperCase().replace(/[\s-]/g, '') === cleanMfaCode.toUpperCase().replace(/[\s-]/g, ''));
+            if (plainIdx !== -1) {
+              mfaValid = true;
+              recoveryCodeUsed = true;
+              storedCodes.splice(plainIdx, 1);
+              const updatedHashes = storedCodes.map(c => c.length === 64 ? c : totpService.hashRecoveryCode(c));
+              db.prepare('UPDATE users SET totp_recovery_codes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(JSON.stringify(updatedHashes), admin.id);
+            }
+          }
         }
       } catch (_) {}
     }
@@ -1607,6 +1649,7 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
       userId: admin.id,
       req,
       status: 'SUCCESS',
+      details: { method: recoveryCodeUsed ? 'recovery_code' : 'totp' }
     });
   }
 
@@ -1645,10 +1688,9 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
   });
 });
 
-// Admin MFA Setup: Generate TOTP Secret and Recovery Codes (Proteção 01)
+// Admin MFA Setup: Generate TOTP Secret (Proteção 01)
 app.post('/api/admin/mfa/setup', requireAdmin, (req, res) => {
   const secret = totpService.generateSecret();
-  const recoveryCodes = totpService.generateRecoveryCodes(8);
   const otpAuthUri = totpService.generateOtpAuthUri({
     secret,
     accountName: req.user.email || req.user.phone_number || 'admin@raiaagentes.com.br',
@@ -1659,23 +1701,39 @@ app.post('/api/admin/mfa/setup', requireAdmin, (req, res) => {
     success: true,
     secret,
     otpAuthUri,
-    recoveryCodes,
   });
 });
 
-// Admin MFA Enable: Confirm first code before activating MFA (Proteção 01)
+// Admin MFA Enable: Reinforced Authentication & Server-Generated Hashed Recovery Codes (Proteção 01)
 app.post('/api/admin/mfa/enable', requireAdmin, (req, res) => {
-  const { secret, code, recoveryCodes } = req.body || {};
+  const { password, secret, code } = req.body || {};
   if (!secret || !code) {
     return res.status(400).json({ success: false, error: 'Secret e código TOTP são obrigatórios para ativação.' });
   }
 
+  // Reinforced Authentication: Admin password is required to enable MFA
+  const configuredPass = (config.adminPassword || '').trim();
+  const timingSafeMatch = (candidate, expected) => {
+    if (!expected || !candidate) return false;
+    const a = crypto.createHash('sha256').update(candidate).digest();
+    const b = crypto.createHash('sha256').update(expected).digest();
+    return crypto.timingSafeEqual(a, b);
+  };
+
+  if (!password || !timingSafeMatch(String(password).trim(), configuredPass)) {
+    return res.status(401).json({ success: false, error: 'Senha de administrador obrigatória e incorreta para ativar MFA.' });
+  }
+
+  // Validate TOTP code against provided secret
   const verification = totpService.verifyToken(String(code).trim(), secret, { window: 1 });
   if (!verification.valid) {
     return res.status(400).json({ success: false, error: 'Código TOTP incorreto. Verifique o código exibido no seu aplicativo autenticador.' });
   }
 
-  const recCodesJson = Array.isArray(recoveryCodes) ? JSON.stringify(recoveryCodes) : JSON.stringify(totpService.generateRecoveryCodes(8));
+  // Server strictly generates fresh recovery codes and stores ONLY hashes in DB
+  const { plainCodes, hashedCodes } = totpService.generateHashedRecoveryCodes(8);
+  const encryptedSecret = totpService.encryptSecret(secret);
+
   db.prepare(`
     UPDATE users
     SET totp_secret = ?,
@@ -1683,7 +1741,7 @@ app.post('/api/admin/mfa/enable', requireAdmin, (req, res) => {
         totp_recovery_codes = ?,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(secret, recCodesJson, req.user.id);
+  `).run(encryptedSecret, JSON.stringify(hashedCodes), req.user.id);
 
   logSecurityEvent({
     eventType: AUDIT_EVENTS.ADMIN_MFA_ENABLED,
@@ -1692,23 +1750,57 @@ app.post('/api/admin/mfa/enable', requireAdmin, (req, res) => {
     status: 'SUCCESS',
   });
 
-  return res.json({ success: true, message: 'Autenticação multifator (TOTP) ativada com sucesso.' });
+  return res.json({
+    success: true,
+    recoveryCodes: plainCodes,
+    message: 'Autenticação multifator (TOTP) ativada com sucesso. Guarde seus 8 códigos de recuperação em local seguro.',
+  });
 });
 
-// Admin MFA Disable: Requires current admin password to deactivate (Proteção 01)
+// Admin MFA Disable: Reinforced Authentication (Requires admin password + current MFA verification) (Proteção 01)
 app.post('/api/admin/mfa/disable', requireAdmin, (req, res) => {
-  const { password } = req.body || {};
+  const { password, code } = req.body || {};
   const configuredPass = (config.adminPassword || '').trim();
 
-  const timingSafeMatch = (candidate, secret) => {
-    if (!secret || !candidate) return false;
+  const timingSafeMatch = (candidate, expected) => {
+    if (!expected || !candidate) return false;
     const a = crypto.createHash('sha256').update(candidate).digest();
-    const b = crypto.createHash('sha256').update(secret).digest();
+    const b = crypto.createHash('sha256').update(expected).digest();
     return crypto.timingSafeEqual(a, b);
   };
 
+  // 1. Password verification
   if (!password || !timingSafeMatch(String(password).trim(), configuredPass)) {
     return res.status(401).json({ success: false, error: 'Senha de administrador incorreta.' });
+  }
+
+  // 2. Reinforced second factor verification if MFA is enrolled
+  const admin = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (admin && admin.totp_enabled === 1 && admin.totp_secret) {
+    if (!code) {
+      return res.status(400).json({
+        success: false,
+        error: 'Código TOTP ou código de recuperação é obrigatório para confirmar a desativação do MFA.',
+      });
+    }
+
+    const cleanCode = String(code).trim();
+    const totpVerification = totpService.verifyToken(cleanCode, admin.totp_secret, { window: 1 });
+    let codeValid = totpVerification.valid;
+
+    if (!codeValid && admin.totp_recovery_codes) {
+      try {
+        const storedCodes = JSON.parse(admin.totp_recovery_codes);
+        const recCheck = totpService.verifyRecoveryCode(cleanCode, storedCodes);
+        if (recCheck.valid) {
+          codeValid = true;
+        }
+      } catch (_) {}
+    }
+
+    if (!codeValid) {
+      return res.status(401).json({ success: false, error: 'Código de confirmação MFA inválido.' });
+    }
   }
 
   db.prepare(`

@@ -88,7 +88,7 @@ async function runTests() {
 
     const masterAdmin = db.prepare("SELECT * FROM users WHERE role = 'ADMIN' LIMIT 1").get();
     const adminToken = 'test_multiproduct_admin_' + Date.now();
-    db.prepare("UPDATE users SET magic_token = ?, magic_token_expires_at = datetime('now', '+1 hour') WHERE id = ?")
+    db.prepare("UPDATE users SET session_token = ?, session_expires_at = datetime('now', '+1 hour') WHERE id = ?")
       .run(adminToken, masterAdmin.id);
     adminCookie = `auth_token=${adminToken}`;
 
@@ -157,7 +157,7 @@ async function runTests() {
     const tokenExp = new Date(Date.now() + 24 * 3600000).toISOString();
 
     const insertUserRes = db.prepare(`
-      INSERT INTO users (name, email, phone_number, password_hash, password_salt, role, magic_token, magic_token_expires_at, subscription_status)
+      INSERT INTO users (name, email, phone_number, password_hash, password_salt, role, session_token, session_expires_at, subscription_status)
       VALUES ('Dra. Helena Multi', ?, ?, ?, ?, 'USER', ?, ?, 'ACTIVE')
     `).run(clientEmail, clientPhone, clientPassHash, clientPassSalt, clientToken, tokenExp);
     const clientId = Number(insertUserRes.lastInsertRowid);
@@ -402,7 +402,7 @@ async function runTests() {
     deleteUserAndChildren('client.b@raia.test', '5511966660002');
     const clientBToken = 'token_client_b_' + Date.now();
     const insertClientB = db.prepare(`
-      INSERT INTO users (name, email, phone_number, role, magic_token, magic_token_expires_at, subscription_status)
+      INSERT INTO users (name, email, phone_number, role, session_token, session_expires_at, subscription_status)
       VALUES ('Cliente B Salão', 'client.b@raia.test', '5511966660002', 'USER', ?, datetime('now', '+1 hour'), 'ACTIVE')
     `).run(clientBToken);
     const clientBId = Number(insertClientB.lastInsertRowid);

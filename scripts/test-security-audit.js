@@ -154,7 +154,7 @@ async function runSecurityAudit() {
     {
       // Create regular client user (role: USER, plan: JESSICA_START)
       db.prepare(`
-        INSERT INTO users (name, email, password_hash, phone_number, role, plan_tier, plan, subscription_status, paid_until, magic_token, magic_token_expires_at)
+        INSERT INTO users (name, email, password_hash, phone_number, role, plan_tier, plan, subscription_status, paid_until, session_token, session_expires_at)
         VALUES ('Cliente Alpha', 'sec.client.a@raia.test', 'hash', '5511999990001', 'USER', 'JESSICA_START', 'START', 'ACTIVE', datetime('now', '+30 days'), 'token_client_alpha_valid', datetime('now', '+30 days'))
       `).run();
 
@@ -279,8 +279,8 @@ async function runSecurityAudit() {
       assert.strictEqual(logoutRes.status, 200, 'Logout deve retornar 200');
 
       // Verify token is nullified in DB
-      const adminInDb = db.prepare('SELECT magic_token FROM users WHERE id = ?').get(adminLoginData.user.id);
-      assert.strictEqual(adminInDb.magic_token, null, 'magic_token deve ser NULL no banco após logout');
+      const adminInDb = db.prepare('SELECT session_token FROM users WHERE id = ?').get(adminLoginData.user.id);
+      assert.strictEqual(adminInDb.session_token, null, 'session_token deve ser NULL no banco após logout');
 
       // Subsequent access with revoked token must return 401
       const afterLogout = await fetch(`${baseUrl}/api/admin/users`, {
@@ -291,7 +291,7 @@ async function runSecurityAudit() {
 
       // Client session logout
       const clientAlpha = db.prepare("SELECT * FROM users WHERE email = 'sec.client.a@raia.test'").get();
-      db.prepare("UPDATE users SET magic_token = 'token_client_logout_test', magic_token_expires_at = datetime('now', '+30 days') WHERE id = ?")
+      db.prepare("UPDATE users SET session_token = 'token_client_logout_test', session_expires_at = datetime('now', '+30 days') WHERE id = ?")
         .run(clientAlpha.id);
 
       const clientLogoutRes = await fetch(`${baseUrl}/api/cliente/auth/logout`, {
@@ -300,8 +300,8 @@ async function runSecurityAudit() {
       });
       assert.strictEqual(clientLogoutRes.status, 200);
 
-      const clientInDb = db.prepare('SELECT magic_token FROM users WHERE id = ?').get(clientAlpha.id);
-      assert.strictEqual(clientInDb.magic_token, null, 'magic_token do cliente deve ser NULL após logout');
+      const clientInDb = db.prepare('SELECT session_token FROM users WHERE id = ?').get(clientAlpha.id);
+      assert.strictEqual(clientInDb.session_token, null, 'session_token do cliente deve ser NULL após logout');
 
       const clientAfterLogout = await fetch(`${baseUrl}/api/cliente/profile`, {
         headers: { 'Authorization': 'Bearer token_client_logout_test' }
@@ -317,7 +317,7 @@ async function runSecurityAudit() {
     {
       // 6.1 Inactive subscription check
       db.prepare(`
-        INSERT INTO users (name, email, password_hash, phone_number, role, plan_tier, subscription_status, magic_token, magic_token_expires_at)
+        INSERT INTO users (name, email, password_hash, phone_number, role, plan_tier, subscription_status, session_token, session_expires_at)
         VALUES ('Cliente Inativo', 'sec.inactive@raia.test', 'hash', '5511999990002', 'USER', 'JESSICA_START', 'INACTIVE', 'token_inactive', datetime('now', '+30 days'))
       `).run();
       const inactRes = await fetch(`${baseUrl}/api/cliente/profile`, {
@@ -330,7 +330,7 @@ async function runSecurityAudit() {
 
       // 6.2 Refunded subscription check
       db.prepare(`
-        INSERT INTO users (name, email, password_hash, phone_number, role, plan_tier, subscription_status, magic_token, magic_token_expires_at)
+        INSERT INTO users (name, email, password_hash, phone_number, role, plan_tier, subscription_status, session_token, session_expires_at)
         VALUES ('Cliente Reembolsado', 'sec.refunded@raia.test', 'hash', '5511999990003', 'USER', 'JESSICA_START', 'REFUNDED', 'token_refunded', datetime('now', '+30 days'))
       `).run();
       const refRes = await fetch(`${baseUrl}/api/cliente/profile`, {
@@ -343,7 +343,7 @@ async function runSecurityAudit() {
 
       // 6.3 Expired paid period (paid_until in past)
       db.prepare(`
-        INSERT INTO users (name, email, password_hash, phone_number, role, plan_tier, subscription_status, paid_until, magic_token, magic_token_expires_at)
+        INSERT INTO users (name, email, password_hash, phone_number, role, plan_tier, subscription_status, paid_until, session_token, session_expires_at)
         VALUES ('Cliente Vencido', 'sec.expired@raia.test', 'hash', '5511999990004', 'USER', 'JESSICA_START', 'ACTIVE', datetime('now', '-2 days'), 'token_expired', datetime('now', '+30 days'))
       `).run();
       const expRes = await fetch(`${baseUrl}/api/cliente/profile`, {
@@ -357,7 +357,7 @@ async function runSecurityAudit() {
       // 6.4 Plan Tier Gating: Start vs Pro
       // Reset Client Alpha as active START
       const clientAlpha = db.prepare("SELECT * FROM users WHERE email = 'sec.client.a@raia.test'").get();
-      db.prepare("UPDATE users SET plan_tier = 'JESSICA_START', subscription_status = 'ACTIVE', paid_until = datetime('now', '+30 days'), magic_token = 'token_client_a_start', magic_token_expires_at = datetime('now', '+30 days') WHERE id = ?")
+      db.prepare("UPDATE users SET plan_tier = 'JESSICA_START', subscription_status = 'ACTIVE', paid_until = datetime('now', '+30 days'), session_token = 'token_client_a_start', session_expires_at = datetime('now', '+30 days') WHERE id = ?")
         .run(clientAlpha.id);
 
       const proDashRes = await fetch(`${baseUrl}/api/cliente/pro/dashboard`, {
@@ -371,7 +371,7 @@ async function runSecurityAudit() {
       // 6.5 Strict Multi-Tenant Isolation between Client Alpha and Client Beta
       // Create Client Beta
       db.prepare(`
-        INSERT INTO users (name, email, password_hash, phone_number, role, plan_tier, subscription_status, paid_until, magic_token, magic_token_expires_at)
+        INSERT INTO users (name, email, password_hash, phone_number, role, plan_tier, subscription_status, paid_until, session_token, session_expires_at)
         VALUES ('Cliente Beta', 'sec.client.b@raia.test', 'hash', '5511999990005', 'USER', 'JESSICA_START', 'ACTIVE', datetime('now', '+30 days'), 'token_client_b', datetime('now', '+30 days'))
       `).run();
       const clientBeta = db.prepare("SELECT * FROM users WHERE email = 'sec.client.b@raia.test'").get();

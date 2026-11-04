@@ -3,6 +3,7 @@ const router = express.Router();
 const path = require('path');
 const db = require('../database/db');
 const clientAuth = require('../services/clientAuthService');
+const userService = require('../services/userService');
 const config = require('../config');
 const productService = require('../services/productService');
 const salonDashboardService = require('../services/salonDashboardService');
@@ -52,7 +53,7 @@ function clearSessionCookie(res, name, req = null) {
   );
 }
 
-// Client Multi-Tenant Authentication & Subscription Enforcement Middleware
+// Client Multi-Tenant Authentication & Subscription Enforcement Middleware (Proteção 01 & 17)
 function clientAuthMiddleware(req, res, next) {
   let token = null;
 
@@ -65,10 +66,7 @@ function clientAuthMiddleware(req, res, next) {
     token = req.headers['x-auth-token'];
   }
 
-  if (!token && req.query.token) {
-    token = req.query.token;
-  }
-
+  // Tokens in query string are strictly rejected for authenticated APIs (Proteção 02 & 17)
   if (!token) {
     token = getCookie(req, 'client_auth_token') || getCookie(req, 'auth_token');
   }
@@ -81,25 +79,34 @@ function clientAuthMiddleware(req, res, next) {
     });
   }
 
-  const user = db.prepare('SELECT * FROM users WHERE magic_token = ?').get(token);
+  // Magic links are strictly single-use for initial redemption and CANNOT be used as API session tokens
+  const magicCheck = db.prepare('SELECT id FROM users WHERE magic_token = ?').get(token);
+  if (magicCheck) {
+    return res.status(401).json({
+      success: false,
+      error: 'Magic links são de uso único e não podem ser utilizados como Bearer token de sessão comum. Utilize o link via navegador.',
+      code: 'MAGIC_TOKEN_NOT_SESSION',
+    });
+  }
+
+  // Strictly authenticate against persistent session_token with valid expiration
+  const user = userService.getUserBySessionToken(token);
   if (!user) {
+    const rawUser = db.prepare('SELECT id, session_expires_at FROM users WHERE session_token = ?').get(token);
+    if (rawUser) {
+      if (!rawUser.session_expires_at || new Date(rawUser.session_expires_at) < new Date()) {
+        return res.status(401).json({
+          success: false,
+          error: 'Sua sessão expirou ou não possui prazo de validade. Faça login novamente.',
+          code: 'SESSION_EXPIRED',
+        });
+      }
+    }
     return res.status(401).json({
       success: false,
       error: 'Token inválido ou sessão revogada. Faça login novamente.',
       code: 'INVALID_TOKEN',
     });
-  }
-
-  // 1. Session expiration verification
-  if (user.magic_token_expires_at) {
-    const expires = new Date(user.magic_token_expires_at);
-    if (expires < new Date()) {
-      return res.status(401).json({
-        success: false,
-        error: 'Sua sessão expirou. Faça login novamente.',
-        code: 'SESSION_EXPIRED',
-      });
-    }
   }
 
   const isDemo = Boolean(user.is_demo);
@@ -207,10 +214,7 @@ function optionalClientAuthMiddleware(req, res, next) {
     token = req.headers['x-auth-token'];
   }
 
-  if (!token && req.query.token) {
-    token = req.query.token;
-  }
-
+  // Tokens in query string are strictly rejected for authenticated APIs
   if (!token) {
     token = getCookie(req, 'client_auth_token') || getCookie(req, 'auth_token');
   }
@@ -220,20 +224,11 @@ function optionalClientAuthMiddleware(req, res, next) {
   }
 
   try {
-    const user = db.prepare('SELECT * FROM users WHERE magic_token = ?').get(token);
-    if (!user) {
-      return next();
+    const user = userService.getUserBySessionToken(token);
+    if (user) {
+      req.clientUser = user;
+      req.isDemo = Boolean(user.is_demo);
     }
-
-    if (user.magic_token_expires_at) {
-      const expires = new Date(user.magic_token_expires_at);
-      if (expires < new Date()) {
-        return next();
-      }
-    }
-
-    req.clientUser = user;
-    req.isDemo = Boolean(user.is_demo);
   } catch (e) {}
 
   return next();
@@ -349,13 +344,14 @@ router.post('/auth/reset-password', passwordResetSubmitLimiter, (req, res) => {
   return res.json(result);
 });
 
-// Session Revocation & Logout
+// Session Revocation & Logout (Proteção 01 & 17)
 router.post('/auth/logout', clientAuthMiddleware, (req, res) => {
   if (req.clientUser?.id) {
-    db.prepare('UPDATE users SET magic_token = NULL, magic_token_expires_at = NULL WHERE id = ?').run(req.clientUser.id);
+    userService.revokeUserTokens(req.clientUser.id);
   }
   clearSessionCookie(res, 'client_auth_token', req);
   clearSessionCookie(res, 'auth_token', req);
+  clearSessionCookie(res, 'csrf_token', req);
   return res.json({ success: true, message: 'Sessão encerrada com sucesso.' });
 });
 
@@ -487,16 +483,18 @@ router.put('/profile/password', clientAuthMiddleware, async (req, res) => {
   }
 
   const { hash, salt } = clientAuth.hashPassword(newPassword);
-  // Proteção 01: Rotate session token upon password change
-  const newSessionToken = clientAuth.generateSecureToken ? clientAuth.generateSecureToken(24) : require('crypto').randomBytes(24).toString('hex');
+  // Proteção 01: Rotate session token upon password change and invalidate all other tokens
+  const newSessionToken = clientAuth.generateSecureToken ? clientAuth.generateSecureToken(32) : require('crypto').randomBytes(32).toString('hex');
   const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
   db.prepare(`
     UPDATE users
     SET password_hash = ?,
         password_salt = ?,
-        magic_token = ?,
-        magic_token_expires_at = ?,
+        session_token = ?,
+        session_expires_at = ?,
+        magic_token = NULL,
+        magic_token_expires_at = NULL,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(hash, salt, newSessionToken, sessionExpiresAt, req.clientUser.id);

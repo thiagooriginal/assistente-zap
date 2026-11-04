@@ -102,10 +102,19 @@ function activateAccount(token, password) {
   // Ensure salon entry exists
   ensureSalonForUser(user.id, user.name);
 
-  // Generate session token with 30-day expiration
-  const sessionToken = generateSecureToken(24);
+  // Generate session token with 30-day expiration (Proteção 01 & 17)
+  const sessionToken = generateSecureToken(32);
   const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-  db.prepare(`UPDATE users SET magic_token = ?, magic_token_expires_at = ? WHERE id = ?`).run(sessionToken, sessionExpiresAt, user.id);
+  db.prepare(`
+    UPDATE users 
+    SET session_token = ?, 
+        session_expires_at = ?,
+        magic_token = NULL,
+        magic_token_expires_at = NULL,
+        last_login_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(sessionToken, sessionExpiresAt, user.id);
 
   logSecurityEvent({
     eventType: AUDIT_EVENTS.ACTIVATION_SUCCESS,
@@ -213,14 +222,17 @@ function login(email, password) {
     warning = 'Identificamos uma pendência na renovação da sua assinatura. Regularize para não perder o atendimento da Jéssica.';
   }
 
-  // Update session with 30-day expiration & last login
-  const sessionToken = generateSecureToken(24);
+  // Update session with 30-day expiration & last login (Proteção 01 & 17)
+  const sessionToken = generateSecureToken(32);
   const sessionExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   db.prepare(`
     UPDATE users
-    SET magic_token = ?,
-        magic_token_expires_at = ?,
-        last_login_at = CURRENT_TIMESTAMP
+    SET session_token = ?,
+        session_expires_at = ?,
+        magic_token = NULL,
+        magic_token_expires_at = NULL,
+        last_login_at = CURRENT_TIMESTAMP,
+        updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(sessionToken, sessionExpiresAt, user.id);
 
@@ -333,6 +345,8 @@ function resetPassword(token, newPassword) {
         reset_expires_at = NULL,
         magic_token = NULL,
         magic_token_expires_at = NULL,
+        session_token = NULL,
+        session_expires_at = NULL,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(hash, salt, user.id);
@@ -577,14 +591,15 @@ function ensureDemoAccount() {
 }
 
 function verifyToken(token) {
-  if (!token) return null;
-  const user = db.prepare('SELECT * FROM users WHERE magic_token = ?').get(token);
-  if (!user) return null;
-  if (user.magic_token_expires_at) {
-    const expires = new Date(user.magic_token_expires_at);
-    if (expires < new Date()) return null;
-  }
-  return user;
+  if (!token || typeof token !== 'string') return null;
+  const clean = token.trim();
+  const user = db.prepare(`
+    SELECT * FROM users 
+    WHERE session_token = ? 
+      AND session_expires_at IS NOT NULL 
+      AND datetime(session_expires_at) >= datetime('now')
+  `).get(clean);
+  return user || null;
 }
 
 module.exports = {
