@@ -342,7 +342,14 @@ function setSessionCookie(res, name, value, req, maxAgeSeconds = 7 * 24 * 3600) 
   if (isHttps) {
     cookie += '; Secure';
   }
-  res.setHeader('Set-Cookie', cookie);
+  const existing = res.getHeader('Set-Cookie');
+  if (!existing) {
+    res.setHeader('Set-Cookie', cookie);
+  } else if (Array.isArray(existing)) {
+    res.setHeader('Set-Cookie', [...existing, cookie]);
+  } else {
+    res.setHeader('Set-Cookie', [existing, cookie]);
+  }
 }
 
 function clearSessionCookie(res, name, req) {
@@ -351,7 +358,14 @@ function clearSessionCookie(res, name, req) {
   if (isHttps) {
     cookie += '; Secure';
   }
-  res.setHeader('Set-Cookie', cookie);
+  const existing = res.getHeader('Set-Cookie');
+  if (!existing) {
+    res.setHeader('Set-Cookie', cookie);
+  } else if (Array.isArray(existing)) {
+    res.setHeader('Set-Cookie', [...existing, cookie]);
+  } else {
+    res.setHeader('Set-Cookie', [existing, cookie]);
+  }
 }
 
 // Staging Gate Middleware: Protects staging environment without conflicting with Authorization: Bearer
@@ -525,19 +539,8 @@ app.get(['/cliente', '/cliente/painel', '/cliente/dashboard'], (req, res) => {
   res.sendFile(path.resolve(__dirname, '../../public/cliente/painel.html'));
 });
 
-// Explicit SPA routes
+// Admin SPA routes: serves the admin interface (which includes the built-in adminAuthOverlay login form)
 app.get(['/admin', '/admin.html', '/dashboard', '/painel'], (req, res) => {
-  const host = (req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
-  const isTunnelOrExternal = host.includes('trycloudflare.com') || host.includes('loca.lt') || host.includes('ngrok') || (host && !host.includes('localhost') && !host.includes('127.0.0.1'));
-
-  if (isTunnelOrExternal) {
-    const cookieToken = getCookie(req, 'auth_token');
-    const existingAdmin = cookieToken ? userService.getUserBySessionToken(cookieToken) : null;
-    if (!existingAdmin || existingAdmin.role !== 'ADMIN') {
-      return res.redirect('/cliente/login');
-    }
-  }
-
   res.sendFile(path.resolve(__dirname, '../../public/admin.html'));
 });
 
@@ -1996,10 +1999,25 @@ app.post('/api/admin/mfa/disable', requireInteractiveAdmin, (req, res) => {
 // ==========================================
 // ADMIN LOGOUT (REVOKES TOKEN IN DB & CLEARS COOKIE)
 // ==========================================
-app.post('/api/auth/logout', authMiddleware, (req, res) => {
-  if (req.user?.id) {
-    userService.revokeUserTokens(req.user.id);
+app.post('/api/auth/logout', (req, res) => {
+  let token = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.slice(7).trim();
   }
+  if (!token) {
+    token = getCookie(req, 'auth_token') || getCookie(req, 'client_auth_token');
+  }
+
+  if (token) {
+    try {
+      const user = db.prepare('SELECT id FROM users WHERE session_token = ?').get(token);
+      if (user?.id) {
+        userService.revokeUserTokens(user.id);
+      }
+    } catch (_) {}
+  }
+
   clearSessionCookie(res, 'auth_token', req);
   clearSessionCookie(res, 'client_auth_token', req);
   clearSessionCookie(res, 'csrf_token', req);

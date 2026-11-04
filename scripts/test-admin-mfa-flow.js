@@ -814,6 +814,133 @@ async function runAllTests() {
       instanceA.reset();
     });
 
+    // -------------------------------------------------------------
+    // Test 24: Acesso sem Sessão a /admin em Domínio Externo Retorna 200 OK (Sem Redirecionar para /cliente/login)
+    // -------------------------------------------------------------
+    await test('24. Acesso sem sessão a /admin e /admin.html em domínio externo retorna 200 OK com interface de login de administrador', async () => {
+      // 1. Simula acesso via domínio de homologação/segurança sem cookies de sessão
+      const resAdminRoot = await request('GET', '/admin', null, {
+        Host: 'seguranca.raiaagentes.com.br',
+        'X-Forwarded-Host': 'seguranca.raiaagentes.com.br'
+      });
+      assert.strictEqual(resAdminRoot.status, 200, 'Acesso a /admin sem sessão deve retornar 200 OK');
+      assert.ok(
+        typeof resAdminRoot.body === 'string' && resAdminRoot.body.includes('adminAuthOverlay'),
+        'Resposta deve entregar a página admin.html contendo o formulário de login administrativo'
+      );
+      assert.ok(!resAdminRoot.headers.location, 'Não deve conter header Location de redirecionamento');
+
+      // 2. Acesso via /admin.html com domínio de staging
+      const resAdminHtml = await request('GET', '/admin.html', null, {
+        Host: 'staging.raiaagentes.com.br',
+        'X-Forwarded-Host': 'staging.raiaagentes.com.br'
+      });
+      assert.strictEqual(resAdminHtml.status, 200, 'Acesso a /admin.html deve retornar 200 OK');
+      assert.ok(
+        typeof resAdminHtml.body === 'string' && resAdminHtml.body.includes('adminAuthOverlay'),
+        'Resposta deve entregar a página admin.html'
+      );
+    });
+
+    // -------------------------------------------------------------
+    // Test 25: Tentativa de Acesso Administrativo por Cliente (ROLE=CLIENT) é Rejeitada com 403
+    // -------------------------------------------------------------
+    await test('25. Tentativa de acesso administrativo por cliente (ROLE=CLIENT) é rejeitada com 403 Forbidden', async () => {
+      const uniqueSuffix = Date.now().toString().slice(-8);
+      const clientEmail = `client.tester.${uniqueSuffix}@raiaagentes.com.br`;
+      const clientPhone = `55119${uniqueSuffix}`;
+      db.prepare(`
+        INSERT INTO users (name, phone_number, email, role, plan_tier, subscription_status, created_at)
+        VALUES ('Cliente Tester', ?, ?, 'CLIENT', 'JESSICA_PRO', 'ACTIVE', CURRENT_TIMESTAMP)
+      `).run(clientPhone, clientEmail);
+      const clientUser = db.prepare('SELECT id FROM users WHERE email = ?').get(clientEmail);
+      const userService = require('../src/services/userService');
+      const { sessionToken: clientSessionToken } = userService.createUserSession(clientUser.id, 1);
+
+      // Client token tenta acessar rota protegida de admin
+      const resAdminUsers = await request('GET', '/api/admin/users', null, {
+        Authorization: `Bearer ${clientSessionToken}`
+      });
+      assert.strictEqual(resAdminUsers.status, 403, 'Acesso de cliente a /api/admin/users deve retornar 403 Forbidden');
+      assert.strictEqual(resAdminUsers.body.error, 'Acesso negado. Recurso exclusivo para administradores.');
+
+      // Client token tenta acessar rota de status MFA
+      const resMfaStatus = await request('GET', '/api/admin/mfa/status', null, {
+        Authorization: `Bearer ${clientSessionToken}`
+      });
+      assert.strictEqual(resMfaStatus.status, 403, 'Acesso de cliente a /api/admin/mfa/status deve retornar 403');
+
+      // Cleanup
+      db.prepare('DELETE FROM users WHERE id = ?').run(clientUser.id);
+    });
+
+    // -------------------------------------------------------------
+    // Test 26: Sessão Expirada e Logout Resiliente sem Erro 401
+    // -------------------------------------------------------------
+    await test('26. Tratamento de sessão administrativa expirada e logout resiliente', async () => {
+      const userService = require('../src/services/userService');
+      const { sessionToken: expiredToken } = userService.createUserSession(adminId, -1); // expirou ontem!
+
+      // 1. Requisição com token expirado deve ser rejeitada com 401
+      const resExpired = await request('GET', '/api/admin/users', null, {
+        Authorization: `Bearer ${expiredToken}`
+      });
+      assert.strictEqual(resExpired.status, 401, 'Token expirado deve retornar 401 Unauthorized');
+
+      // 2. Logout com token expirado ou sem token deve limpar cookies com sucesso (200 OK)
+      const resLogout = await request('POST', '/api/auth/logout', null, {
+        Authorization: `Bearer ${expiredToken}`
+      });
+      assert.strictEqual(resLogout.status, 200, 'Logout deve retornar 200 OK mesmo com sessão expirada');
+      assert.strictEqual(resLogout.body.success, true);
+      const setCookies = resLogout.headers['set-cookie'] || [];
+      const clearedAuthCookie = setCookies.some(c => c.includes('auth_token=;') || c.includes('auth_token=; Path=/; Expires=Thu, 01 Jan 1970'));
+      assert.ok(clearedAuthCookie, 'Cookie auth_token deve ser expirado no logout');
+    });
+
+    // -------------------------------------------------------------
+    // Test 27: Setup de MFA pela Primeira Vez sem Bloqueio Circular
+    // -------------------------------------------------------------
+    await test('27. Setup de MFA pela primeira vez permite acesso às rotas de setup sem bloqueio circular', async () => {
+      // Cria novo admin temporário sem MFA ativado
+      const freshAdminEmail = `fresh.admin.${Date.now()}@raiaagentes.com.br`;
+      db.prepare(`
+        INSERT INTO users (name, phone_number, email, role, totp_enabled, totp_secret, created_at)
+        VALUES ('Fresh Admin Without MFA', '5511977770002', ?, 'ADMIN', 0, NULL, CURRENT_TIMESTAMP)
+      `).run(freshAdminEmail);
+      const freshAdmin = db.prepare('SELECT id FROM users WHERE email = ?').get(freshAdminEmail);
+      const userService = require('../src/services/userService');
+      const { sessionToken: freshAdminToken } = userService.createUserSession(freshAdmin.id, 1);
+
+      // Ativa exigência global de MFA
+      config.adminMfaEnabled = true;
+
+      // 1. Rota de status do MFA deve ser permitida mesmo com MFA pendente de setup
+      const resStatus = await request('GET', '/api/admin/mfa/status', null, {
+        Authorization: `Bearer ${freshAdminToken}`
+      });
+      assert.strictEqual(resStatus.status, 200, '/api/admin/mfa/status deve permitir acesso para visualização de status');
+      assert.strictEqual(resStatus.body.enabled, false);
+
+      // 2. Rota de setup do MFA deve ser permitida para iniciar o cadastro do 1º fator TOTP
+      const resSetup = await request('POST', '/api/admin/mfa/setup', null, {
+        Authorization: `Bearer ${freshAdminToken}`
+      });
+      assert.strictEqual(resSetup.status, 200, '/api/admin/mfa/setup deve permitir acesso para gerar segredo e QR code');
+      assert.ok(resSetup.body.secret, 'Deve retornar segredo TOTP em Base32');
+
+      // 3. Rota operacional comum DEVE ser bloqueada até que o MFA seja configurado
+      const resOperational = await request('DELETE', '/api/admin/users/999999', null, {
+        Authorization: `Bearer ${freshAdminToken}`
+      });
+      assert.strictEqual(resOperational.status, 403, 'Rota operacional deve ser bloqueada até MFA ser ativado');
+      assert.strictEqual(resOperational.body.code, 'FORBIDDEN_MFA_POLICY_ENFORCEMENT');
+
+      // Cleanup
+      db.prepare('DELETE FROM users WHERE id = ?').run(freshAdmin.id);
+      config.adminMfaEnabled = false;
+    });
+
   } finally {
     if (server) {
       await new Promise((resolve) => server.close(resolve));
