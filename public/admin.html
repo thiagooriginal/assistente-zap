@@ -218,6 +218,14 @@
               <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-cyan-600"></i>
               <span>Gerando chave de segurança segura...</span>
             </div>
+            <div id="mfaQrError" class="hidden text-xs text-rose-600 py-6 px-4 text-center space-y-2">
+              <i data-lucide="alert-triangle" class="w-6 h-6 mx-auto text-rose-500"></i>
+              <p id="mfaQrErrorText" class="font-medium text-[11px] leading-tight">Falha ao gerar o QR Code de autenticação.</p>
+              <button type="button" onclick="showMfaOnboardingStep()" class="mt-2 px-3 py-1.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-[11px] rounded-lg font-bold transition flex items-center gap-1 mx-auto cursor-pointer">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>Tentar novamente</span>
+              </button>
+            </div>
             <img id="mfaOnboardingQrImg" class="hidden w-44 h-44 rounded-lg object-contain" alt="QR Code MFA">
           </div>
 
@@ -2377,6 +2385,8 @@
       document.getElementById('mfaOnboardingStep').classList.remove('hidden');
 
       const qrLoading = document.getElementById('mfaQrLoading');
+      const qrError = document.getElementById('mfaQrError');
+      const qrErrorText = document.getElementById('mfaQrErrorText');
       const qrImg = document.getElementById('mfaOnboardingQrImg');
       const secretCode = document.getElementById('mfaOnboardingSecretCode');
       const tokenInp = document.getElementById('mfaOnboardingTokenInput');
@@ -2384,6 +2394,7 @@
       alertBox.classList.add('hidden');
 
       qrLoading.classList.remove('hidden');
+      if (qrError) qrError.classList.add('hidden');
       qrImg.classList.add('hidden');
       tokenInp.value = '';
 
@@ -2393,7 +2404,9 @@
           headers: { 'Content-Type': 'application/json' }
         });
         if (!res.ok) {
-          throw new Error('Falha ao obter credenciais de configuração do MFA.');
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData.error || (errData.code ? `Erro (${errData.code})` : `Erro ${res.status}: Falha ao gerar chave MFA.`);
+          throw new Error(errMsg);
         }
         const data = await res.json();
         if (data.success && data.secret) {
@@ -2403,6 +2416,7 @@
             qrImg.src = data.qrCodeDataUrl;
             qrImg.classList.remove('hidden');
             qrLoading.classList.add('hidden');
+            if (qrError) qrError.classList.add('hidden');
           }
           tokenInp.focus();
         } else {
@@ -2410,7 +2424,12 @@
         }
       } catch (err) {
         console.error('MFA onboarding setup error:', err);
-        alertBox.innerText = 'Erro ao inicializar configuração de MFA. Verifique sua conexão e recarregue.';
+        qrLoading.classList.add('hidden');
+        if (qrError) {
+          qrError.classList.remove('hidden');
+          if (qrErrorText) qrErrorText.innerText = err.message || 'Falha ao gerar o QR Code de autenticação.';
+        }
+        alertBox.innerText = err.message || 'Erro ao inicializar configuração de MFA. Verifique sua conexão e tente novamente.';
         alertBox.classList.remove('hidden');
       }
       lucide.createIcons();

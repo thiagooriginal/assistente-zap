@@ -26,7 +26,7 @@
     { "key": "ADMIN_MFA_ENABLED", "value": "true" },
     { "key": "MFA_ENCRYPTION_KEY", "value": "" },
     { "key": "ADMIN_API_KEY", "value": "" },
-    { "key": "CORS_ORIGIN", "value": "https://staging.raiaagentes.com.br" },
+    { "key": "CORS_ORIGIN", "value": "https://staging.raiaagentes.com.br,https://seguranca.raiaagentes.com.br" },
     { "key": "ASAAS_ENV", "value": "sandbox" },
     { "key": "ASAAS_API_URL", "value": "https://sandbox.asaas.com/api/v3" },
     { "key": "ASAAS_API_KEY", "value": "" },
@@ -56,6 +56,11 @@
   "domains": [
     {
       "host": "staging.raiaagentes.com.br",
+      "https": true,
+      "port": 3333
+    },
+    {
+      "host": "seguranca.raiaagentes.com.br",
       "https": true,
       "port": 3333
     }

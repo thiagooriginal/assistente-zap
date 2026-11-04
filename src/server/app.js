@@ -78,6 +78,7 @@ const EXACT_ALLOWED_HOSTS = new Set([
   'raiaagentes.com.br',
   'www.raiaagentes.com.br',
   'staging.raiaagentes.com.br',
+  'seguranca.raiaagentes.com.br',
   'localhost',
   'localhost:3000',
   'localhost:3333',
@@ -90,7 +91,21 @@ const EXACT_ALLOWED_HOSTS = new Set([
 function getValidatedRedirectHost(req, fallbackHost) {
   const rawHost = (req.get('x-forwarded-host') || req.get('host') || '').trim().toLowerCase();
   if (!rawHost) return fallbackHost;
-  return EXACT_ALLOWED_HOSTS.has(rawHost) ? rawHost : fallbackHost;
+  if (EXACT_ALLOWED_HOSTS.has(rawHost)) return rawHost;
+
+  // Check dynamically configured BASE_URL / CORS_ORIGIN hosts
+  const configuredHosts = [
+    process.env.BASE_URL,
+    ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []),
+  ].filter(Boolean).map(val => {
+    try { return new URL(val.trim()).host.toLowerCase(); } catch (_) { return null; }
+  }).filter(Boolean);
+
+  if (configuredHosts.includes(rawHost)) {
+    return rawHost;
+  }
+
+  return fallbackHost;
 }
 
 // Strict validator for legitimate browser origins (Proteção 13 & 16)
@@ -101,12 +116,37 @@ function isAllowedOrigin(origin) {
     const host = parsed.hostname.toLowerCase();
     const proto = parsed.protocol.toLowerCase();
 
-    // 1. Official RAIA production and staging domains (HTTPS only, exact host)
-    if (['raiaagentes.com.br', 'www.raiaagentes.com.br', 'staging.raiaagentes.com.br'].includes(host)) {
+    // 1. Official RAIA production and staging/homologation domains (HTTPS only, exact host)
+    const OFFICIAL_HOSTS = [
+      'raiaagentes.com.br',
+      'www.raiaagentes.com.br',
+      'staging.raiaagentes.com.br',
+      'seguranca.raiaagentes.com.br',
+    ];
+    if (OFFICIAL_HOSTS.includes(host)) {
       return proto === 'https:';
     }
 
-    // 2. Localhost and loopback development/test servers (HTTP only, exact loopback host)
+    // 2. Validate against explicitly configured environment origins (BASE_URL & CORS_ORIGIN)
+    // Supports comma-separated list of origins in CORS_ORIGIN
+    const configuredOrigins = [
+      process.env.BASE_URL,
+      ...(process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : []),
+    ].filter(Boolean).map(o => o.trim());
+
+    for (const conf of configuredOrigins) {
+      try {
+        const confUrl = new URL(conf);
+        if (confUrl.hostname.toLowerCase() === host) {
+          if (host === 'localhost' || host === '127.0.0.1') {
+            return proto === 'http:';
+          }
+          return proto === 'https:' && confUrl.protocol.toLowerCase() === 'https:';
+        }
+      } catch (_) {}
+    }
+
+    // 3. Localhost and loopback development/test servers (HTTP only, exact loopback host)
     if (host === 'localhost' || host === '127.0.0.1') {
       return proto === 'http:';
     }
@@ -128,7 +168,15 @@ app.use((req, res, next) => {
 
   // Enforce HTTPS redirection in staging / production if request arrived over plain HTTP
   if (isStagingOrProd && proto && proto.toLowerCase() === 'http') {
-    const defaultHost = isStaging ? 'staging.raiaagentes.com.br' : 'raiaagentes.com.br';
+    let defaultHost = 'raiaagentes.com.br';
+    if (isStaging) {
+      try {
+        const confHost = process.env.BASE_URL ? new URL(process.env.BASE_URL).host : null;
+        defaultHost = confHost || 'staging.raiaagentes.com.br';
+      } catch (_) {
+        defaultHost = 'staging.raiaagentes.com.br';
+      }
+    }
     const host = getValidatedRedirectHost(req, defaultHost);
     return res.redirect(301, `https://${host}${req.path || ''}`);
   }
@@ -151,12 +199,12 @@ app.use((req, res, next) => {
     // Enforced baseline CSP without unsafe-eval, allowlisting required CDNs & assets
     res.setHeader(
       'Content-Security-Policy',
-      "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' https://staging.raiaagentes.com.br https://raiaagentes.com.br; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests;"
+      "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' https://staging.raiaagentes.com.br https://seguranca.raiaagentes.com.br https://raiaagentes.com.br; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests;"
     );
     // Report-Only CSP preparing transition away from unsafe-inline
     res.setHeader(
       'Content-Security-Policy-Report-Only',
-      "default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://staging.raiaagentes.com.br https://raiaagentes.com.br; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; report-uri /api/security/csp-report;"
+      "default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://staging.raiaagentes.com.br https://seguranca.raiaagentes.com.br https://raiaagentes.com.br; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; report-uri /api/security/csp-report;"
     );
   }
 

@@ -24,7 +24,7 @@ services:
       - ADMIN_MFA_ENABLED=${ADMIN_MFA_ENABLED:-true}
       - MFA_ENCRYPTION_KEY=${MFA_ENCRYPTION_KEY:-}
       - ADMIN_API_KEY=${ADMIN_API_KEY:-}
-      - CORS_ORIGIN=https://staging.raiaagentes.com.br
+      - CORS_ORIGIN=https://staging.raiaagentes.com.br,https://seguranca.raiaagentes.com.br
       # Asaas Sandbox (Exclusivo para testes, NUNCA tokens de produção)
       - ASAAS_ENV=sandbox
       - ASAAS_API_URL=https://sandbox.asaas.com/api/v3

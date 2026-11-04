@@ -1127,6 +1127,155 @@ async function runAllTests() {
       process.env.ADMIN_MFA_ENABLED = 'false';
     });
 
+    // -------------------------------------------------------------
+    // Test 32: Origem Autorizada https://seguranca.raiaagentes.com.br no Setup de MFA
+    // -------------------------------------------------------------
+    await test('32. Origem https://seguranca.raiaagentes.com.br é autorizada no setup de MFA sem erro 403 Anti-CSRF', async () => {
+      config.adminMfaEnabled = true;
+      process.env.ADMIN_MFA_ENABLED = 'true';
+
+      // Cria sessão de admin com MFA pendente
+      db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?').run(adminId);
+      const userService = require('../src/services/userService');
+      const { sessionToken: stgSessionToken } = userService.createUserSession(adminId, 1);
+
+      // Simula requisição originada do browser no domínio seguranca.raiaagentes.com.br autenticada por cookie
+      const resSetup = await request('POST', '/api/admin/mfa/setup', null, {
+        Cookie: `auth_token=${stgSessionToken}`,
+        Origin: 'https://seguranca.raiaagentes.com.br',
+        Host: 'seguranca.raiaagentes.com.br',
+        'X-Forwarded-Host': 'seguranca.raiaagentes.com.br'
+      });
+
+      assert.strictEqual(resSetup.status, 200, 'POST /api/admin/mfa/setup deve retornar 200 OK para origem autorizada');
+      assert.strictEqual(resSetup.body.success, true);
+      assert.ok(resSetup.body.secret, 'Deve retornar secret Base32');
+      assert.ok(resSetup.body.qrCodeDataUrl, 'Deve retornar qrCodeDataUrl para renderizar na tela');
+
+      config.adminMfaEnabled = false;
+      process.env.ADMIN_MFA_ENABLED = 'false';
+    });
+
+    // -------------------------------------------------------------
+    // Test 33: Ativação de MFA e Logout sob Origem https://seguranca.raiaagentes.com.br
+    // -------------------------------------------------------------
+    await test('33. Ativação de MFA e Logout sob origem https://seguranca.raiaagentes.com.br passam pela validação Anti-CSRF', async () => {
+      config.adminMfaEnabled = true;
+      process.env.ADMIN_MFA_ENABLED = 'true';
+
+      const userService = require('../src/services/userService');
+      const { sessionToken: stgToken } = userService.createUserSession(adminId, 1);
+
+      // 1. Gera segredo
+      const resSetup = await request('POST', '/api/admin/mfa/setup', null, {
+        Cookie: `auth_token=${stgToken}`,
+        Origin: 'https://seguranca.raiaagentes.com.br'
+      });
+      assert.strictEqual(resSetup.status, 200);
+      const secret = resSetup.body.secret;
+      const validCode = totpService.generateToken(secret);
+
+      // 2. Conclui ativação com Origin seguranca.raiaagentes.com.br
+      const resEnable = await request('POST', '/api/admin/mfa/enable', {
+        password: TEST_ADMIN_PASSWORD,
+        secret,
+        code: validCode
+      }, {
+        Cookie: `auth_token=${stgToken}`,
+        Origin: 'https://seguranca.raiaagentes.com.br'
+      });
+      assert.strictEqual(resEnable.status, 200, 'Ativação com Origin seguranca.raiaagentes.com.br deve retornar 200');
+      assert.strictEqual(resEnable.body.success, true);
+
+      // 3. Executa logout sob Origin seguranca.raiaagentes.com.br
+      const resLogout = await request('POST', '/api/auth/logout', null, {
+        Cookie: `auth_token=${stgToken}`,
+        Origin: 'https://seguranca.raiaagentes.com.br'
+      });
+      assert.strictEqual(resLogout.status, 200, 'Logout com Origin seguranca.raiaagentes.com.br deve retornar 200');
+      assert.strictEqual(resLogout.body.success, true);
+
+      config.adminMfaEnabled = false;
+      process.env.ADMIN_MFA_ENABLED = 'false';
+    });
+
+    // -------------------------------------------------------------
+    // Test 34: Bloqueio Estrito de Origens Maliciosas com 403 CSRF_INVALID_ORIGIN
+    // -------------------------------------------------------------
+    await test('34. Origens maliciosas ou HTTP inseguro são sumariamente bloqueadas com 403 CSRF_INVALID_ORIGIN', async () => {
+      const userService = require('../src/services/userService');
+      const { sessionToken: attackToken } = userService.createUserSession(adminId, 1);
+
+      // 1. Origem maliciosa tentando se passar por seguranca (evil-seguranca)
+      const resEvil1 = await request('POST', '/api/admin/mfa/setup', null, {
+        Cookie: `auth_token=${attackToken}`,
+        Origin: 'https://evil-seguranca.raiaagentes.com.br'
+      });
+      assert.strictEqual(resEvil1.status, 403, 'evil-seguranca deve ser bloqueada com 403');
+      assert.strictEqual(resEvil1.body.code, 'CSRF_INVALID_ORIGIN');
+
+      // 2. Origem sob domínio externo com subdomain atacante
+      const resEvil2 = await request('POST', '/api/admin/mfa/setup', null, {
+        Cookie: `auth_token=${attackToken}`,
+        Origin: 'https://seguranca.raiaagentes.com.br.attacker.com'
+      });
+      assert.strictEqual(resEvil2.status, 403, 'seguranca.raiaagentes.com.br.attacker.com deve ser bloqueada com 403');
+      assert.strictEqual(resEvil2.body.code, 'CSRF_INVALID_ORIGIN');
+
+      // 3. Origem legítima mas enviada em plain HTTP (proibida em homologação/produção)
+      const resHttp = await request('POST', '/api/admin/mfa/setup', null, {
+        Cookie: `auth_token=${attackToken}`,
+        Origin: 'http://seguranca.raiaagentes.com.br'
+      });
+      assert.strictEqual(resHttp.status, 403, 'http:// (plain HTTP) deve ser bloqueado com 403');
+      assert.strictEqual(resHttp.body.code, 'CSRF_INVALID_ORIGIN');
+
+      // 4. Origem arbitrária externa
+      const resAttacker = await request('POST', '/api/admin/mfa/setup', null, {
+        Cookie: `auth_token=${attackToken}`,
+        Origin: 'https://attacker-website.com'
+      });
+      assert.strictEqual(resAttacker.status, 403, 'attacker-website.com deve ser bloqueado com 403');
+      assert.strictEqual(resAttacker.body.code, 'CSRF_INVALID_ORIGIN');
+    });
+
+    // -------------------------------------------------------------
+    // Test 35: Host Header e Redirecionamento HTTPS para seguranca.raiaagentes.com.br
+    // -------------------------------------------------------------
+    await test('35. Redirecionamento HTTPS preserva seguranca.raiaagentes.com.br e rejeita Host Header Injection', async () => {
+      process.env.APP_MODE = 'staging';
+      process.env.HOMOLOGACAO = 'true';
+
+      // 1. Requisição HTTP legítima para seguranca.raiaagentes.com.br deve redirecionar para https://seguranca.raiaagentes.com.br
+      const resRedirectLegit = await request('GET', '/admin', null, {
+        Host: 'seguranca.raiaagentes.com.br',
+        'X-Forwarded-Host': 'seguranca.raiaagentes.com.br',
+        'X-Forwarded-Proto': 'http'
+      });
+      assert.strictEqual(resRedirectLegit.status, 301, 'Deve redirecionar HTTP -> HTTPS com 301');
+      assert.strictEqual(
+        resRedirectLegit.headers.location,
+        'https://seguranca.raiaagentes.com.br/admin',
+        'Location deve preservar o host exato seguranca.raiaagentes.com.br'
+      );
+
+      // 2. Requisição com Host spoofado (ataque Host Header Injection) cai no fallback seguro
+      const resRedirectSpoof = await request('GET', '/admin', null, {
+        Host: 'evil-phishing-site.com',
+        'X-Forwarded-Host': 'evil-phishing-site.com',
+        'X-Forwarded-Proto': 'http'
+      });
+      assert.strictEqual(resRedirectSpoof.status, 301);
+      assert.ok(
+        resRedirectSpoof.headers.location.startsWith('https://staging.raiaagentes.com.br') ||
+        resRedirectSpoof.headers.location.startsWith('https://raiaagentes.com.br'),
+        'Host spoofado deve cair no fallback seguro e NUNCA redirecionar para evil-phishing-site.com'
+      );
+
+      delete process.env.APP_MODE;
+      delete process.env.HOMOLOGACAO;
+    });
+
   } finally {
     if (server) {
       await new Promise((resolve) => server.close(resolve));
