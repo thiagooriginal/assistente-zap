@@ -22,6 +22,8 @@ process.env.HOMOLOGACAO = 'true';
 process.env.APP_MODE = 'staging';
 process.env.NODE_ENV = 'test';
 process.env.STAGING_PROTECTION_ENABLED = 'false'; // Keep off in automated API test harness
+process.env.ASAAS_API_URL = 'https://sandbox.asaas.com/api/v3';
+process.env.ADMIN_PASSWORD = 'TestMasterAdmin#2026!SecOps';
 
 const config = require('../src/config');
 const db = require('../src/database/db');

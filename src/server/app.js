@@ -354,7 +354,10 @@ function setSessionCookie(res, name, value, req, maxAgeSeconds = 7 * 24 * 3600) 
 
 function clearSessionCookie(res, name, req) {
   const isHttps = req.secure || (req.headers['x-forwarded-proto'] || '').toLowerCase() === 'https';
-  let cookie = `${name}=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT; HttpOnly; SameSite=Lax`;
+  let cookie = `${name}=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Lax`;
+  if (name !== 'csrf_token') {
+    cookie += '; HttpOnly';
+  }
   if (isHttps) {
     cookie += '; Secure';
   }
@@ -643,6 +646,29 @@ function requireAdmin(req, res, next) {
         error: 'Acesso negado. Recurso exclusivo para administradores.',
       });
     }
+
+    // Enforce MFA Policy for Administrative Access
+    const isMfaMandatory = config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true';
+    const isUserMfaActive = Boolean(req.user.totp_enabled === 1 && req.user.totp_secret);
+    const isGlobalMfaActive = Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
+    const mfaConfigured = isUserMfaActive || isGlobalMfaActive;
+
+    // Setup routes allow configuring MFA for the first time without circular lockout
+    const isMfaSetupPath = req.path === '/api/admin/mfa/status' ||
+                           req.path === '/api/admin/mfa/setup' ||
+                           req.path === '/api/admin/mfa/enable' ||
+                           req.path === '/api/auth/logout' ||
+                           req.path === '/api/me';
+
+    if (isMfaMandatory && !mfaConfigured && !isMfaSetupPath) {
+      return res.status(403).json({
+        success: false,
+        error: 'Política de segurança: Acesso bloqueado pois o MFA não está configurado nesta conta de administrador. Configure o MFA para prosseguir.',
+        code: 'FORBIDDEN_MFA_POLICY_ENFORCEMENT',
+        mfaSetupRequired: true,
+      });
+    }
+
     return next();
   });
 }
@@ -686,14 +712,19 @@ function requireInteractiveAdmin(req, res, next) {
     const isGlobalMfaActive = Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
     const mfaConfigured = isUserMfaActive || isGlobalMfaActive;
 
-    // Setup routes allow configuring MFA for the first time
-    const isMfaSetupPath = req.path === '/api/admin/mfa/status' || req.path === '/api/admin/mfa/setup' || req.path === '/api/admin/mfa/enable';
+    // Setup routes allow configuring MFA for the first time without circular lockout
+    const isMfaSetupPath = req.path === '/api/admin/mfa/status' ||
+                           req.path === '/api/admin/mfa/setup' ||
+                           req.path === '/api/admin/mfa/enable' ||
+                           req.path === '/api/auth/logout' ||
+                           req.path === '/api/me';
 
     if (isMfaMandatory && !mfaConfigured && !isMfaSetupPath) {
       return res.status(403).json({
         success: false,
         error: 'Política de segurança: Acesso bloqueado pois o MFA não está configurado nesta conta de administrador. Configure o MFA para prosseguir.',
         code: 'FORBIDDEN_MFA_POLICY_ENFORCEMENT',
+        mfaSetupRequired: true,
       });
     }
 
@@ -1648,7 +1679,8 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
   }
 
   // Determine if MFA is active for this admin
-  const isGlobalMfa = (config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true') && Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
+  const isMfaMandatory = Boolean(config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true');
+  const isGlobalMfa = isMfaMandatory && Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
   const isUserMfa = Boolean(admin && admin.totp_enabled === 1 && admin.totp_secret);
   const isMfaActive = isGlobalMfa || isUserMfa;
   const totpSecret = (admin && admin.totp_enabled === 1 && admin.totp_secret) ? admin.totp_secret : (process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
@@ -1761,8 +1793,11 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
     details: { mfaVerified: Boolean(isMfaActive) },
   });
 
+  const mfaSetupRequired = Boolean(isMfaMandatory && !isMfaActive);
+
   return res.json({
     success: true,
+    mfaSetupRequired,
     token: sessionToken,
     csrfToken,
     user: {
@@ -1770,8 +1805,13 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
       name: admin.name || 'Administrador',
       phoneNumber: admin.phone_number,
       role: 'ADMIN',
-      plan: 'PRO'
-    }
+      plan: 'PRO',
+      mfaPending: mfaSetupRequired,
+      mfaSetupRequired,
+    },
+    message: mfaSetupRequired
+      ? 'Senha mestra validada. É obrigatório configurar a autenticação em duas etapas (MFA/TOTP) para acessar o painel.'
+      : 'Autenticação administrativa realizada com sucesso.',
   });
 });
 
@@ -1997,7 +2037,7 @@ app.post('/api/admin/mfa/disable', requireInteractiveAdmin, (req, res) => {
 });
 
 // ==========================================
-// ADMIN LOGOUT (REVOKES TOKEN IN DB & CLEARS COOKIE)
+// ADMIN & CLIENT LOGOUT (REVOKES TOKEN IN DB & CLEARS COOKIES)
 // ==========================================
 app.post('/api/auth/logout', (req, res) => {
   let token = null;
@@ -2015,7 +2055,13 @@ app.post('/api/auth/logout', (req, res) => {
       if (user?.id) {
         userService.revokeUserTokens(user.id);
       }
-    } catch (_) {}
+    } catch (err) {
+      console.error('[Logout] Erro ao revogar sessão no SQLite:', err);
+      return res.status(500).json({
+        success: false,
+        error: 'Erro ao revogar sessão no banco de dados. Tente novamente.',
+      });
+    }
   }
 
   clearSessionCookie(res, 'auth_token', req);
@@ -2044,6 +2090,12 @@ app.get(['/descubra', '/explore'], (req, res) => {
 // ==========================================
 app.get('/api/me', authMiddleware, (req, res) => {
   const status = userService.isUserActive(req.user);
+  const isMfaMandatory = config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true';
+  const isUserMfaActive = Boolean(req.user.totp_enabled === 1 && req.user.totp_secret);
+  const isGlobalMfaActive = Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
+  const mfaConfigured = isUserMfaActive || isGlobalMfaActive;
+  const mfaPending = Boolean(req.user.role === 'ADMIN' && isMfaMandatory && !mfaConfigured);
+
   const userObj = {
     id: req.user.id,
     phoneNumber: req.user.phone_number,
@@ -2053,6 +2105,8 @@ app.get('/api/me', authMiddleware, (req, res) => {
     plan: req.user.plan,
     trialEndsAt: req.user.trial_ends_at,
     status,
+    mfaPending,
+    mfaSetupRequired: mfaPending,
   };
   res.json({
     success: true,

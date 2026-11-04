@@ -941,6 +941,192 @@ async function runAllTests() {
       config.adminMfaEnabled = false;
     });
 
+    // -------------------------------------------------------------
+    // Test 28: Login com ADMIN_MFA_ENABLED=true em Conta sem MFA Requer Onboarding Obrigatório
+    // -------------------------------------------------------------
+    await test('28. Login com ADMIN_MFA_ENABLED=true em conta sem MFA retorna mfaSetupRequired: true e mfaPending', async () => {
+      config.adminMfaEnabled = true;
+      process.env.ADMIN_MFA_ENABLED = 'true';
+
+      // Garante admin com MFA desativado no banco
+      db.prepare(`
+        UPDATE users 
+        SET totp_enabled = 0, totp_secret = NULL, totp_recovery_codes = NULL 
+        WHERE id = ?
+      `).run(adminId);
+
+      const resLogin = await request('POST', '/api/auth/admin-login', { password: TEST_ADMIN_PASSWORD });
+      assert.strictEqual(resLogin.status, 200, 'Login deve retornar 200');
+      assert.strictEqual(resLogin.body.success, true);
+      assert.strictEqual(resLogin.body.mfaSetupRequired, true, 'Deve sinalizar mfaSetupRequired: true');
+      assert.strictEqual(resLogin.body.user.mfaPending, true, 'User deve conter mfaPending: true');
+      assert.ok(resLogin.body.token, 'Deve retornar token para fluxo de setup');
+
+      const tempToken = resLogin.body.token;
+
+      // Endpoint /api/me deve refletir mfaPending: true
+      const resMe = await request('GET', '/api/me', null, {
+        Authorization: `Bearer ${tempToken}`
+      });
+      assert.strictEqual(resMe.status, 200);
+      assert.strictEqual(resMe.body.user.mfaPending, true, '/api/me deve reportar mfaPending: true');
+      assert.strictEqual(resMe.body.user.mfaSetupRequired, true);
+
+      config.adminMfaEnabled = false;
+      process.env.ADMIN_MFA_ENABLED = 'false';
+    });
+
+    // -------------------------------------------------------------
+    // Test 29: Bloqueio Estrito de Operações Administrativas por requireAdmin Durante MFA Pendente
+    // -------------------------------------------------------------
+    await test('29. Bloqueio estrito de requireAdmin em métricas e produtos quando MFA estiver pendente', async () => {
+      config.adminMfaEnabled = true;
+      process.env.ADMIN_MFA_ENABLED = 'true';
+
+      // Admin sem MFA
+      db.prepare('UPDATE users SET totp_enabled = 0, totp_secret = NULL WHERE id = ?').run(adminId);
+      const userService = require('../src/services/userService');
+      const { sessionToken: pendingToken } = userService.createUserSession(adminId, 1);
+
+      // 1. /api/admin/users (GET protegido por requireAdmin) deve ser bloqueado com 403
+      const resUsers = await request('GET', '/api/admin/users', null, {
+        Authorization: `Bearer ${pendingToken}`
+      });
+      assert.strictEqual(resUsers.status, 403, 'requireAdmin deve bloquear /api/admin/users com 403');
+      assert.strictEqual(resUsers.body.code, 'FORBIDDEN_MFA_POLICY_ENFORCEMENT');
+      assert.strictEqual(resUsers.body.mfaSetupRequired, true);
+
+      // 2. /api/admin/multiproduct/metrics deve ser bloqueado com 403
+      const resMetrics = await request('GET', '/api/admin/multiproduct/metrics', null, {
+        Authorization: `Bearer ${pendingToken}`
+      });
+      assert.strictEqual(resMetrics.status, 403, 'requireAdmin deve bloquear /api/admin/multiproduct/metrics');
+      assert.strictEqual(resMetrics.body.code, 'FORBIDDEN_MFA_POLICY_ENFORCEMENT');
+
+      // 3. /api/admin/products deve ser bloqueado com 403
+      const resProducts = await request('GET', '/api/admin/products', null, {
+        Authorization: `Bearer ${pendingToken}`
+      });
+      assert.strictEqual(resProducts.status, 403, 'requireAdmin deve bloquear /api/admin/products');
+      assert.strictEqual(resProducts.body.code, 'FORBIDDEN_MFA_POLICY_ENFORCEMENT');
+
+      // 4. Rotas de onboarding (/api/admin/mfa/status e setup) continuam acessíveis (sem circular lock)
+      const resStatus = await request('GET', '/api/admin/mfa/status', null, {
+        Authorization: `Bearer ${pendingToken}`
+      });
+      assert.strictEqual(resStatus.status, 200, 'Onboarding não pode ter bloqueio circular');
+
+      config.adminMfaEnabled = false;
+      process.env.ADMIN_MFA_ENABLED = 'false';
+    });
+
+    // -------------------------------------------------------------
+    // Test 30: Conclusão do Onboarding via POST /api/admin/mfa/enable Ativa MFA e Libera Acesso Operacional
+    // -------------------------------------------------------------
+    await test('30. Ativação do MFA via onboarding libera imediatamente acesso às rotas operacionais de admin', async () => {
+      config.adminMfaEnabled = true;
+      process.env.ADMIN_MFA_ENABLED = 'true';
+
+      const userService = require('../src/services/userService');
+      const { sessionToken: onboardingToken } = userService.createUserSession(adminId, 1);
+
+      // 1. Inicia setup
+      const resSetup = await request('POST', '/api/admin/mfa/setup', null, {
+        Authorization: `Bearer ${onboardingToken}`
+      });
+      assert.strictEqual(resSetup.status, 200);
+      const generatedSecret = resSetup.body.secret;
+      assert.ok(generatedSecret, 'Secret gerado para onboarding');
+
+      // 2. Gera código TOTP válido
+      const validCode = totpService.generateToken(generatedSecret);
+
+      // 3. Conclui ativação
+      const resEnable = await request('POST', '/api/admin/mfa/enable', {
+        password: TEST_ADMIN_PASSWORD,
+        secret: generatedSecret,
+        code: validCode
+      }, {
+        Authorization: `Bearer ${onboardingToken}`
+      });
+      assert.strictEqual(resEnable.status, 200, 'Ativação deve retornar 200');
+      assert.strictEqual(resEnable.body.success, true);
+      assert.ok(resEnable.body.recoveryCodes.length === 8, 'Deve gerar 8 códigos de recuperação');
+
+      // 4. Confirma no banco que totp_enabled = 1
+      const updatedAdmin = db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(adminId);
+      assert.strictEqual(updatedAdmin.totp_enabled, 1, 'totp_enabled deve ser 1 no SQLite');
+
+      // 5. Agora as rotas operacionais (/api/admin/users) devem ser liberadas com 200 OK!
+      const resUsersNow = await request('GET', '/api/admin/users', null, {
+        Authorization: `Bearer ${onboardingToken}`
+      });
+      assert.strictEqual(resUsersNow.status, 200, 'Acesso operacional deve ser liberado após MFA ativo');
+      assert.strictEqual(resUsersNow.body.success, true);
+
+      config.adminMfaEnabled = false;
+      process.env.ADMIN_MFA_ENABLED = 'false';
+    });
+
+    // -------------------------------------------------------------
+    // Test 31: Revogação Completa de Sessão no SQLite Pós-Logout e Bloqueio de Reentrada
+    // -------------------------------------------------------------
+    await test('31. Logout revoga token no SQLite, expira cookies com Max-Age=0 e impede reentrada', async () => {
+      config.adminMfaEnabled = true;
+      process.env.ADMIN_MFA_ENABLED = 'true';
+
+      // 1. Obtém segredo do admin do teste 30 para login completo com TOTP
+      const adminData = db.prepare('SELECT totp_secret FROM users WHERE id = ?').get(adminId);
+      const decryptedSecret = totpService.decryptSecret(adminData.totp_secret);
+      const totpCode = totpService.generateToken(decryptedSecret);
+
+      const resLogin = await request('POST', '/api/auth/admin-login', {
+        password: TEST_ADMIN_PASSWORD,
+        mfaCode: totpCode
+      });
+      assert.strictEqual(resLogin.status, 200);
+      assert.strictEqual(resLogin.body.success, true);
+      const liveToken = resLogin.body.token;
+
+      // Confirma que a sessão é válida e tem acesso operacional
+      const resBefore = await request('GET', '/api/admin/users', null, {
+        Authorization: `Bearer ${liveToken}`
+      });
+      assert.strictEqual(resBefore.status, 200, 'Sessão ativa acessa dados operacionais');
+
+      // 2. Executa logout
+      const resLogout = await request('POST', '/api/auth/logout', null, {
+        Authorization: `Bearer ${liveToken}`
+      });
+      assert.strictEqual(resLogout.status, 200, 'Logout retorna 200 OK');
+      assert.strictEqual(resLogout.body.success, true);
+
+      // Verifica headers de cookie com Max-Age=0
+      const setCookies = resLogout.headers['set-cookie'] || [];
+      const hasExpiredAuthCookie = setCookies.some(c => c.includes('auth_token=') && c.includes('Max-Age=0'));
+      assert.ok(hasExpiredAuthCookie, 'auth_token deve conter Max-Age=0');
+
+      // 3. Verifica no SQLite se session_token foi revogado (NULL)
+      const userAfter = db.prepare('SELECT session_token, session_expires_at FROM users WHERE id = ?').get(adminId);
+      assert.strictEqual(userAfter.session_token, null, 'session_token deve ser NULL no banco após logout');
+      assert.strictEqual(userAfter.session_expires_at, null, 'session_expires_at deve ser NULL no banco após logout');
+
+      // 4. Tentativa de reentrada com o token antigo DEVE ser rejeitada com 401 Unauthorized
+      const resReentry = await request('GET', '/api/admin/users', null, {
+        Authorization: `Bearer ${liveToken}`
+      });
+      assert.strictEqual(resReentry.status, 401, 'Reentrada com token revogado deve retornar 401 Unauthorized');
+
+      // 5. Tentativa em /api/me também retorna 401
+      const resMeAfter = await request('GET', '/api/me', null, {
+        Authorization: `Bearer ${liveToken}`
+      });
+      assert.strictEqual(resMeAfter.status, 401, '/api/me deve retornar 401 para token revogado');
+
+      config.adminMfaEnabled = false;
+      process.env.ADMIN_MFA_ENABLED = 'false';
+    });
+
   } finally {
     if (server) {
       await new Promise((resolve) => server.close(resolve));

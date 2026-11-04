@@ -23,6 +23,7 @@ process.env.HOMOLOGACAO = 'true';
 process.env.APP_MODE = 'staging';
 process.env.NODE_ENV = 'test';
 process.env.STAGING_PROTECTION_ENABLED = 'false';
+process.env.ASAAS_API_URL = 'https://sandbox.asaas.com/api/v3';
 
 const config = require('../src/config');
 config.adminPassword = 'MasterAdminPassword#2026';

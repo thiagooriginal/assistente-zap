@@ -200,6 +200,68 @@
           </button>
         </div>
 
+        <!-- ETAPA 3: ONBOARDING OBRIGATÓRIO DE MFA (Quando MFA está ativado no servidor mas a conta ainda não configurou) -->
+        <div id="mfaOnboardingStep" class="hidden space-y-4 text-left">
+          <div class="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl space-y-1">
+            <div class="flex items-center gap-1.5 text-amber-300 font-bold text-xs">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400"></i>
+              <span>Configuração Obrigatória de MFA (TOTP)</span>
+            </div>
+            <p class="text-[11px] text-zinc-300 leading-relaxed">
+              A política de segurança exige autenticação em duas etapas para administradores. Escaneie o QR Code abaixo com seu aplicativo autenticador (Google Authenticator, Microsoft Authenticator, 1Password, etc.).
+            </p>
+          </div>
+
+          <!-- QR Code Container -->
+          <div class="flex flex-col items-center justify-center p-3 bg-white rounded-2xl shadow-inner min-h-[190px]">
+            <div id="mfaQrLoading" class="text-xs text-zinc-600 py-8 flex items-center gap-2">
+              <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-cyan-600"></i>
+              <span>Gerando chave de segurança segura...</span>
+            </div>
+            <img id="mfaOnboardingQrImg" class="hidden w-44 h-44 rounded-lg object-contain" alt="QR Code MFA">
+          </div>
+
+          <!-- Secret Manual Entry -->
+          <div class="space-y-1">
+            <label class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Chave Manual (se não puder escanear)</label>
+            <div class="flex items-center gap-2">
+              <code id="mfaOnboardingSecretCode" class="flex-1 px-3 py-2 bg-black/60 border border-zinc-700/80 rounded-xl text-cyan-300 font-mono text-xs select-all text-center tracking-wider overflow-x-auto">---</code>
+              <button type="button" onclick="copyOnboardingSecret()" id="btnCopyOnboardingSecret" title="Copiar chave" class="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs rounded-xl font-bold cursor-pointer transition shrink-0">
+                Copiar
+              </button>
+            </div>
+          </div>
+
+          <!-- Verification Code Input -->
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-zinc-300">Código de 6 dígitos gerado pelo aplicativo</label>
+            <input 
+              type="text" 
+              id="mfaOnboardingTokenInput" 
+              placeholder="000000" 
+              maxlength="6"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              class="w-full px-4 py-3 bg-black/60 border border-amber-500/50 rounded-2xl text-white font-mono text-center text-2xl tracking-[0.3em] focus:outline-none focus:border-[#00F59B] focus:ring-1 focus:ring-[#00F59B] transition"
+            >
+            <p class="text-[10px] text-zinc-400">
+              ⏱️ Digite o código de 6 dígitos para validar o pareamento e ativar a proteção.
+            </p>
+          </div>
+
+          <!-- Action Button -->
+          <button type="button" onclick="executeMfaOnboardingActivation()" id="btnActivateMfa" class="w-full py-3.5 rounded-2xl bg-gradient-to-r from-cyan-500 via-teal-500 to-[#00F59B] hover:opacity-95 text-black font-black text-sm shadow-lg shadow-cyan-500/30 active:scale-98 transition flex items-center justify-center gap-2 cursor-pointer">
+            <span id="btnActivateMfaText">Ativar MFA e Entrar</span>
+            <i data-lucide="check-circle" class="w-4 h-4 text-black"></i>
+          </button>
+
+          <div class="pt-1 text-center">
+            <button type="button" onclick="cancelMfaOnboarding()" class="text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer">
+              Cancelar e voltar ao início
+            </button>
+          </div>
+        </div>
+
         <div id="loginAlertBox" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs"></div>
 
         <div class="pt-2 text-center border-t border-zinc-800/80">
@@ -1969,6 +2031,7 @@
     let _mfaRecoveryMode = false;
     let _currentMfaSetupSecret = null;
     let _latestRecoveryCodes = [];
+    let _onboardingSecret = null;
 
     function getQueryParam(name) {
       const url = new URLSearchParams(window.location.search);
@@ -1981,25 +2044,25 @@
     }
 
     function initAuth() {
-      // 1. From URL (clean immediately to prevent leakage)
+      // 1. Clear any residual tokens from LocalStorage (Enforce zero-persistence in localStorage)
+      try {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('adminToken');
+      } catch (e) {}
+
+      // 2. Clean URL token if present (ephemeral transfer)
       const qToken = getQueryParam('token');
       if (qToken) {
         authToken = qToken;
-        try { localStorage.setItem('auth_token', qToken); } catch (e) {}
         if (window.history && window.history.replaceState) {
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       }
 
-      // 2. From LocalStorage
-      if (!authToken) {
-        try { authToken = localStorage.getItem('auth_token'); } catch (e) {}
-      }
-
       // 3. Always verify via server (HttpOnly cookie prioritized)
       verifyAuth();
 
-      // 4. Auto-advance and keyboard submission on MFA inputs (Proteção 01)
+      // 4. Auto-advance and keyboard submission on MFA inputs
       const mfaInput = document.getElementById('adminMfaInput');
       if (mfaInput) {
         mfaInput.addEventListener('input', () => {
@@ -2025,6 +2088,23 @@
           }
         });
       }
+
+      // 5. Auto-advance and keyboard submission on MFA Onboarding input
+      const onboardingInput = document.getElementById('mfaOnboardingTokenInput');
+      if (onboardingInput) {
+        onboardingInput.addEventListener('input', () => {
+          onboardingInput.value = onboardingInput.value.replace(/\D/g, '').slice(0, 6);
+          if (onboardingInput.value.length === 6) {
+            executeMfaOnboardingActivation();
+          }
+        });
+        onboardingInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            executeMfaOnboardingActivation();
+          }
+        });
+      }
     }
 
     async function authFetch(url, options = {}) {
@@ -2037,7 +2117,25 @@
       if (authToken) {
         options.headers['Authorization'] = `Bearer ${authToken}`;
       }
-      return fetch(url, options);
+      const response = await fetch(url, options);
+
+      // Handle session expiration
+      if (response.status === 401 && url !== '/api/auth/logout') {
+        showAuthOverlay('Sessão expirada. Autentique-se novamente com sua senha mestra.');
+      }
+
+      // Handle mandatory MFA policy enforcement
+      if (response.status === 403 && url !== '/api/auth/logout') {
+        try {
+          const clone = response.clone();
+          const errData = await clone.json();
+          if (errData.code === 'FORBIDDEN_MFA_POLICY_ENFORCEMENT' || errData.mfaSetupRequired) {
+            showMfaOnboardingStep();
+          }
+        } catch (_) {}
+      }
+
+      return response;
     }
 
     async function verifyAuth() {
@@ -2050,12 +2148,18 @@
         const json = await res.json();
         if (json.success && json.user) {
           currentUser = json.user;
-          if (currentUser.role === 'ADMIN' || currentUser.id === 1) {
-            hideAuthOverlay();
-            loadAllAdminData();
-          } else {
+          // STRICT ROLE CHECK: Only role ADMIN is permitted (never id === 1)
+          if (currentUser.role !== 'ADMIN') {
             showAuthOverlay('Acesso restrito ao Administrador.');
+            return;
           }
+          // Mandatory MFA Onboarding check
+          if (currentUser.mfaPending || currentUser.mfaSetupRequired) {
+            showMfaOnboardingStep();
+            return;
+          }
+          hideAuthOverlay();
+          loadAllAdminData();
         } else {
           showAuthOverlay();
         }
@@ -2113,14 +2217,16 @@
         const res = await fetch('/api/auth/admin-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ password: pass })
         });
         const json = await res.json();
 
-        // Desafio MFA Requerido pelo Backend
+        // 1. Desafio MFA Requerido (Conta já possui MFA configurado)
         if (json.mfaRequired) {
           _pendingAdminPassword = pass;
           document.getElementById('passwordStep').classList.add('hidden');
+          document.getElementById('mfaOnboardingStep').classList.add('hidden');
           document.getElementById('mfaStep').classList.remove('hidden');
           document.getElementById('adminMfaInput').value = '';
           document.getElementById('adminMfaInput').focus();
@@ -2128,10 +2234,18 @@
           return;
         }
 
-        // Login direto bem-sucedido (quando MFA não está ativo para a conta)
+        // 2. Onboarding MFA Obrigatório (Conta é ADMIN, MFA é exigido pelo servidor, mas ainda não configurado)
+        if (json.mfaSetupRequired || json.user?.mfaPending) {
+          _pendingAdminPassword = pass;
+          authToken = json.token;
+          currentUser = json.user;
+          showMfaOnboardingStep();
+          return;
+        }
+
+        // 3. Login direto bem-sucedido (MFA inativo ou não obrigatório)
         if (json.success && json.token) {
           authToken = json.token;
-          try { localStorage.setItem('auth_token', json.token); } catch (e) {}
           currentUser = json.user;
           hideAuthOverlay();
           loadAllAdminData();
@@ -2179,6 +2293,7 @@
         const res = await fetch('/api/auth/admin-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({
             password: _pendingAdminPassword,
             mfaCode: code
@@ -2188,7 +2303,6 @@
 
         if (json.success && json.token) {
           authToken = json.token;
-          try { localStorage.setItem('auth_token', json.token); } catch (e) {}
           currentUser = json.user;
           _pendingAdminPassword = null;
           cancelMfaStep();
@@ -2236,6 +2350,8 @@
       if (recInp) recInp.value = '';
       const mfaStep = document.getElementById('mfaStep');
       if (mfaStep) mfaStep.classList.add('hidden');
+      const onboardingStep = document.getElementById('mfaOnboardingStep');
+      if (onboardingStep) onboardingStep.classList.add('hidden');
       const passStep = document.getElementById('passwordStep');
       if (passStep) passStep.classList.remove('hidden');
       const totpCont = document.getElementById('mfaTotpContainer');
@@ -2250,21 +2366,192 @@
       if (passInp) passInp.focus();
     }
 
-    async function handleLogout() {
-      if (confirm('Deseja realmente sair do painel administrativo?')) {
-        try {
-          await fetch('/api/auth/logout', {
-            method: 'POST',
-            headers: authToken ? { 'Authorization': 'Bearer ' + authToken } : {}
-          });
-        } catch (e) {}
-        try {
-          localStorage.removeItem('auth_token');
-          document.cookie = 'auth_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-          document.cookie = 'csrf_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-        } catch (e) {}
-        window.location.href = '/';
+    // -------------------------------------------------------------
+    // ONBOARDING OBRIGATÓRIO DE MFA (TOTP)
+    // -------------------------------------------------------------
+    async function showMfaOnboardingStep() {
+      document.getElementById('adminAuthOverlay').classList.remove('hidden');
+      document.getElementById('adminMainContent').classList.add('hidden');
+      document.getElementById('passwordStep').classList.add('hidden');
+      document.getElementById('mfaStep').classList.add('hidden');
+      document.getElementById('mfaOnboardingStep').classList.remove('hidden');
+
+      const qrLoading = document.getElementById('mfaQrLoading');
+      const qrImg = document.getElementById('mfaOnboardingQrImg');
+      const secretCode = document.getElementById('mfaOnboardingSecretCode');
+      const tokenInp = document.getElementById('mfaOnboardingTokenInput');
+      const alertBox = document.getElementById('loginAlertBox');
+      alertBox.classList.add('hidden');
+
+      qrLoading.classList.remove('hidden');
+      qrImg.classList.add('hidden');
+      tokenInp.value = '';
+
+      try {
+        const res = await authFetch('/api/admin/mfa/setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!res.ok) {
+          throw new Error('Falha ao obter credenciais de configuração do MFA.');
+        }
+        const data = await res.json();
+        if (data.success && data.secret) {
+          _onboardingSecret = data.secret;
+          secretCode.innerText = data.secret;
+          if (data.qrCodeDataUrl) {
+            qrImg.src = data.qrCodeDataUrl;
+            qrImg.classList.remove('hidden');
+            qrLoading.classList.add('hidden');
+          }
+          tokenInp.focus();
+        } else {
+          throw new Error(data.error || 'Não foi possível gerar a chave de autenticação MFA.');
+        }
+      } catch (err) {
+        console.error('MFA onboarding setup error:', err);
+        alertBox.innerText = 'Erro ao inicializar configuração de MFA. Verifique sua conexão e recarregue.';
+        alertBox.classList.remove('hidden');
       }
+      lucide.createIcons();
+    }
+
+    async function executeMfaOnboardingActivation() {
+      const alertBox = document.getElementById('loginAlertBox');
+      const btnTxt = document.getElementById('btnActivateMfaText');
+      const tokenInp = document.getElementById('mfaOnboardingTokenInput');
+      const code = tokenInp?.value?.trim();
+
+      if (!code || code.length < 6) {
+        alertBox.innerText = 'Digite o código de 6 dígitos gerado pelo seu autenticador.';
+        alertBox.classList.remove('hidden');
+        return;
+      }
+
+      if (!_pendingAdminPassword) {
+        const passPrompt = prompt('Confirme a senha mestra de administrador para ativar o MFA:');
+        if (!passPrompt) {
+          alertBox.innerText = 'A senha mestra é obrigatória para autorizar a ativação do MFA.';
+          alertBox.classList.remove('hidden');
+          return;
+        }
+        _pendingAdminPassword = passPrompt;
+      }
+
+      alertBox.classList.add('hidden');
+      btnTxt.innerText = 'Ativando...';
+
+      try {
+        const res = await authFetch('/api/admin/mfa/enable', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            password: _pendingAdminPassword,
+            secret: _onboardingSecret,
+            code: code,
+          }),
+        });
+        const json = await res.json();
+        if (json.success) {
+          _pendingAdminPassword = null;
+          _onboardingSecret = null;
+          document.getElementById('mfaOnboardingStep').classList.add('hidden');
+
+          if (json.recoveryCodes && json.recoveryCodes.length > 0) {
+            alert('MFA ativado com sucesso!\n\nGuarde seus 8 códigos de recuperação em local seguro:\n\n' + json.recoveryCodes.join('\n'));
+          }
+
+          hideAuthOverlay();
+          loadAllAdminData();
+        } else {
+          alertBox.innerText = json.error || 'Código incorreto. Verifique o relógio do seu celular e tente novamente.';
+          alertBox.classList.remove('hidden');
+        }
+      } catch (err) {
+        console.error('MFA activation error:', err);
+        alertBox.innerText = 'Erro ao ativar MFA no servidor.';
+        alertBox.classList.remove('hidden');
+      } finally {
+        btnTxt.innerText = 'Ativar MFA e Entrar';
+      }
+    }
+
+    function copyOnboardingSecret() {
+      if (_onboardingSecret) {
+        navigator.clipboard.writeText(_onboardingSecret).then(() => {
+          const btn = document.getElementById('btnCopyOnboardingSecret');
+          if (btn) {
+            const old = btn.innerText;
+            btn.innerText = 'Copiado!';
+            setTimeout(() => { btn.innerText = old; }, 2000);
+          }
+        }).catch(() => {
+          prompt('Copie a chave manual:', _onboardingSecret);
+        });
+      }
+    }
+
+    async function cancelMfaOnboarding() {
+      try {
+        await authFetch('/api/auth/logout', { method: 'POST' });
+      } catch (_) {}
+      authToken = null;
+      currentUser = null;
+      _pendingAdminPassword = null;
+      _onboardingSecret = null;
+      try {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('adminToken');
+      } catch (_) {}
+      document.getElementById('mfaOnboardingStep').classList.add('hidden');
+      document.getElementById('mfaStep').classList.add('hidden');
+      document.getElementById('passwordStep').classList.remove('hidden');
+      document.getElementById('adminPassInput').value = '';
+      document.getElementById('adminPassInput').focus();
+    }
+
+    // -------------------------------------------------------------
+    // LOGOUT ADMINISTRATIVO RESILIENTE (Com Confirmação do Servidor)
+    // -------------------------------------------------------------
+    async function handleLogout() {
+      if (!confirm('Deseja realmente sair do painel administrativo?')) {
+        return;
+      }
+
+      try {
+        const res = await authFetch('/api/auth/logout', {
+          method: 'POST'
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData.error || 'Falha ao revogar sessão no servidor. O logout não pôde ser confirmado.';
+          alert(errMsg);
+          return;
+        }
+      } catch (netErr) {
+        console.error('Logout error:', netErr);
+        alert('Erro de conexão ao encerrar a sessão no servidor. Verifique sua rede e tente novamente.');
+        return;
+      }
+
+      // 1. Limpar tokens em memória
+      authToken = null;
+      currentUser = null;
+      _pendingAdminPassword = null;
+      _onboardingSecret = null;
+
+      // 2. Limpar qualquer resíduo em LocalStorage e Cookies client-side
+      try {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('adminToken');
+        document.cookie = 'auth_token=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Lax';
+        document.cookie = 'client_auth_token=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Lax';
+        document.cookie = 'csrf_token=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:01 GMT; SameSite=Lax';
+      } catch (e) {}
+
+      // 3. Redirecionar imediatamente para /admin com substituição de histórico
+      window.location.replace('/admin');
     }
 
     // -------------------------------------------------------------
