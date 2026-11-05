@@ -2161,6 +2161,11 @@
             showAuthOverlay('Acesso restrito ao Administrador.');
             return;
           }
+          // Mandatory MFA Challenge (Session is pre-auth / needs second factor code)
+          if (currentUser.mfaChallengeRequired) {
+            showMfaChallengeStep();
+            return;
+          }
           // Mandatory MFA Onboarding check
           if (currentUser.mfaPending || currentUser.mfaSetupRequired) {
             showMfaOnboardingStep();
@@ -2175,6 +2180,20 @@
         console.error('Auth verification error:', err);
         showAuthOverlay();
       }
+    }
+
+    function showMfaChallengeStep() {
+      document.getElementById('adminAuthOverlay').classList.remove('hidden');
+      document.getElementById('adminMainContent').classList.add('hidden');
+      document.getElementById('passwordStep').classList.add('hidden');
+      document.getElementById('mfaOnboardingStep').classList.add('hidden');
+      document.getElementById('mfaStep').classList.remove('hidden');
+      const mfaInput = document.getElementById('adminMfaInput');
+      if (mfaInput) {
+        mfaInput.value = '';
+        mfaInput.focus();
+      }
+      lucide.createIcons();
     }
 
     function showAuthOverlay(msg = '') {
@@ -2272,10 +2291,6 @@
     async function executeMfaVerification() {
       const alertBox = document.getElementById('loginAlertBox');
       const btnTxt = document.getElementById('btnConfirmMfaText');
-      if (!_pendingAdminPassword) {
-        cancelMfaStep();
-        return;
-      }
 
       let code = '';
       if (_mfaRecoveryMode) {
@@ -2298,20 +2313,32 @@
       btnTxt.innerText = 'Verificando...';
 
       try {
-        const res = await fetch('/api/auth/admin-login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({
-            password: _pendingAdminPassword,
-            mfaCode: code
-          })
-        });
+        let res;
+        if (_pendingAdminPassword) {
+          // Primary login flow (password + MFA)
+          res = await fetch('/api/auth/admin-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              password: _pendingAdminPassword,
+              mfaCode: code
+            })
+          });
+        } else {
+          // Pre-auth session / magic link MFA verification
+          res = await authFetch('/api/auth/mfa/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mfaCode: code })
+          });
+        }
+
         const json = await res.json();
 
-        if (json.success && json.token) {
-          authToken = json.token;
-          currentUser = json.user;
+        if (json.success) {
+          if (json.token) authToken = json.token;
+          if (json.user) currentUser = json.user;
           _pendingAdminPassword = null;
           cancelMfaStep();
           hideAuthOverlay();

@@ -680,9 +680,25 @@ runVersionedMigration('20261104_03_persistent_rate_limiting', 'Create rate_limit
   `);
 });
 
+// Versioned migration: Enforce Session MFA Verification & Invalidate Incompatible Admin Sessions (Proteção 01, 09, 17)
+runVersionedMigration('20261105_01_session_mfa_verification_and_revocation', 'Add session_mfa_verified column and revoke legacy admin sessions lacking explicit MFA verification', () => {
+  ensureColumnExists('users', 'session_mfa_verified', 'INTEGER DEFAULT 0');
+
+  // Invalidate any existing active sessions on ADMIN accounts so they are forced to authenticate cleanly with MFA
+  db.prepare(`
+    UPDATE users
+    SET session_token = NULL,
+        session_expires_at = NULL,
+        session_mfa_verified = 0,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE role = 'ADMIN'
+  `).run();
+});
+
 // User columns for Client Authentication & Hotmart Subscriptions
 ensureColumnExists('users', 'session_token', 'TEXT');
 ensureColumnExists('users', 'session_expires_at', 'TEXT');
+ensureColumnExists('users', 'session_mfa_verified', 'INTEGER DEFAULT 0');
 ensureColumnExists('users', 'totp_secret', 'TEXT');
 ensureColumnExists('users', 'totp_enabled', 'INTEGER DEFAULT 0');
 ensureColumnExists('users', 'totp_recovery_codes', 'TEXT');

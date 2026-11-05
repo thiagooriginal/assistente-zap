@@ -265,6 +265,7 @@ app.use((req, res, next) => {
     '/api/test-agent',
     '/api/security/csp-report',
     '/api/auth/admin-login',
+    '/api/auth/mfa/verify',
     '/api/cliente/auth/login',
     '/api/cliente/auth/request-reset',
     '/api/cliente/auth/reset-password',
@@ -647,6 +648,8 @@ function authMiddleware(req, res, next) {
     const keyBuf = Buffer.from(String(apiKeyHeader));
     const expectedBuf = Buffer.from(String(config.adminApiKey));
     if (keyBuf.length === expectedBuf.length && crypto.timingSafeEqual(keyBuf, expectedBuf)) {
+      const admin = db.prepare("SELECT * FROM users WHERE role = 'ADMIN' ORDER BY id ASC LIMIT 1").get() || userService.getUserById(1);
+
       // Least Privilege: Prohibit using ADMIN_API_KEY on client-specific tenant routes
       if (req.path.startsWith('/api/cliente/')) {
         return res.status(403).json({
@@ -656,7 +659,35 @@ function authMiddleware(req, res, next) {
         });
       }
 
-      const admin = db.prepare("SELECT * FROM users WHERE role = 'ADMIN' ORDER BY id ASC LIMIT 1").get() || userService.getUserById(1);
+      // Least Privilege: Explicitly prohibit using ADMIN_API_KEY on financial, subscription, direct sales, and catalog mutation routes
+      const prohibitedPrefixesForApiKey = [
+        '/api/asaas',
+        '/api/admin/direct-sales',
+        '/api/admin/multiproduct/subscriptions',
+        '/api/admin/security',
+        '/api/admin/system/backup',
+        '/api/admin/products',
+        '/api/admin/plans',
+        '/api/admin/segments',
+      ];
+      if (prohibitedPrefixesForApiKey.some(p => req.path.startsWith(p))) {
+        try {
+          const { logSecurityEvent, AUDIT_EVENTS } = require('../services/securityAuditService');
+          logSecurityEvent({
+            eventType: AUDIT_EVENTS.UNAUTHORIZED_ACCESS_BLOCKED,
+            userId: admin?.id,
+            req,
+            status: 'BLOCKED',
+            details: { reason: 'api_key_forbidden_on_financial_or_sensitive_route', path: req.path },
+          });
+        } catch (_) {}
+        return res.status(403).json({
+          success: false,
+          error: 'Acesso negado: ADMIN_API_KEY não possui permissão para acessar operações financeiras ou cadastrais sensíveis. Exige sessão interativa com MFA.',
+          code: 'FORBIDDEN_RESTRICTED_AUTOMATION_SCOPE',
+        });
+      }
+
       if (admin) {
         req.user = admin;
         req.authMethod = 'API_KEY';
@@ -695,26 +726,34 @@ function requireAdmin(req, res, next) {
       });
     }
 
-    // Enforce MFA Policy for Administrative Access
-    const isMfaMandatory = config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true';
-    const isUserMfaActive = Boolean(req.user.totp_enabled === 1 && req.user.totp_secret);
-    const isGlobalMfaActive = Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
-    const mfaConfigured = isUserMfaActive || isGlobalMfaActive;
-
-    // Setup routes allow configuring MFA for the first time without circular lockout
+    // Setup routes allow configuring or verifying MFA for the first time without circular lockout
     const isMfaSetupPath = req.path === '/api/admin/mfa/status' ||
                            req.path === '/api/admin/mfa/setup' ||
                            req.path === '/api/admin/mfa/enable' ||
+                           req.path === '/api/auth/mfa/verify' ||
                            req.path === '/api/auth/logout' ||
                            req.path === '/api/me';
 
-    if (isMfaMandatory && !mfaConfigured && !isMfaSetupPath) {
-      return res.status(403).json({
-        success: false,
-        error: 'Política de segurança: Acesso bloqueado pois o MFA não está configurado nesta conta de administrador. Configure o MFA para prosseguir.',
-        code: 'FORBIDDEN_MFA_POLICY_ENFORCEMENT',
-        mfaSetupRequired: true,
-      });
+    // Enforce Session MFA Policy for Interactive Sessions
+    if (req.authMethod === 'SESSION') {
+      const isMfaMandatory = config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true';
+      const isUserMfaActive = Boolean(req.user.totp_enabled === 1 && req.user.totp_secret);
+      const isGlobalMfaActive = Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
+      const mfaConfigured = isUserMfaActive || isGlobalMfaActive;
+      const isSessionVerified = Boolean(req.user.session_mfa_verified === 1);
+
+      if ((isMfaMandatory || mfaConfigured) && !isSessionVerified && !isMfaSetupPath) {
+        return res.status(403).json({
+          success: false,
+          error: !mfaConfigured
+            ? 'Política de segurança: Acesso bloqueado pois o segundo fator (MFA) ainda não foi configurado na conta administrativa.'
+            : 'Política de segurança: Acesso bloqueado pois a sessão administrativa atual não foi validada com MFA. Complete a verificação em duas etapas.',
+          code: !mfaConfigured ? 'FORBIDDEN_MFA_POLICY_ENFORCEMENT' : 'FORBIDDEN_MFA_SESSION_REQUIRED',
+          mfaPending: true,
+          mfaSetupRequired: !mfaConfigured,
+          mfaChallengeRequired: mfaConfigured,
+        });
+      }
     }
 
     return next();
@@ -754,25 +793,31 @@ function requireInteractiveAdmin(req, res, next) {
       });
     }
 
-    // 3. Enforce MFA Policy
+    // 3. Setup routes allow configuring or verifying MFA
+    const isMfaSetupPath = req.path === '/api/admin/mfa/status' ||
+                           req.path === '/api/admin/mfa/setup' ||
+                           req.path === '/api/admin/mfa/enable' ||
+                           req.path === '/api/auth/mfa/verify' ||
+                           req.path === '/api/auth/logout' ||
+                           req.path === '/api/me';
+
+    // 4. Enforce Session MFA Verification
     const isMfaMandatory = config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true';
     const isUserMfaActive = Boolean(req.user.totp_enabled === 1 && req.user.totp_secret);
     const isGlobalMfaActive = Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
     const mfaConfigured = isUserMfaActive || isGlobalMfaActive;
+    const isSessionVerified = Boolean(req.user.session_mfa_verified === 1);
 
-    // Setup routes allow configuring MFA for the first time without circular lockout
-    const isMfaSetupPath = req.path === '/api/admin/mfa/status' ||
-                           req.path === '/api/admin/mfa/setup' ||
-                           req.path === '/api/admin/mfa/enable' ||
-                           req.path === '/api/auth/logout' ||
-                           req.path === '/api/me';
-
-    if (isMfaMandatory && !mfaConfigured && !isMfaSetupPath) {
+    if ((isMfaMandatory || mfaConfigured) && !isSessionVerified && !isMfaSetupPath) {
       return res.status(403).json({
         success: false,
-        error: 'Política de segurança: Acesso bloqueado pois o MFA não está configurado nesta conta de administrador. Configure o MFA para prosseguir.',
-        code: 'FORBIDDEN_MFA_POLICY_ENFORCEMENT',
-        mfaSetupRequired: true,
+        error: !mfaConfigured
+          ? 'Política de segurança: Acesso restrito a administradores com segundo fator (MFA) configurado e validado.'
+          : 'Política de segurança: Acesso restrito a administradores com segundo fator (MFA) validado.',
+        code: !mfaConfigured ? 'FORBIDDEN_MFA_POLICY_ENFORCEMENT' : 'FORBIDDEN_MFA_SESSION_REQUIRED',
+        mfaPending: true,
+        mfaSetupRequired: !mfaConfigured,
+        mfaChallengeRequired: mfaConfigured,
       });
     }
 
@@ -904,7 +949,7 @@ app.post('/api/assistant/toggle-pause', requireAdmin, (req, res) => {
 // ==========================================
 // ASAAS PAYMENT GATEWAY INTEGRATION
 // ==========================================
-app.get('/api/asaas/status', requireAdmin, async (req, res) => {
+app.get('/api/asaas/status', requireInteractiveAdmin, async (req, res) => {
   try {
     if (!asaasService.isConfigured()) {
       return res.json({ success: false, configured: false, message: 'Asaas não configurado.' });
@@ -931,7 +976,7 @@ app.get('/api/asaas/status', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/api/asaas/create-pix', requireAdmin, async (req, res) => {
+app.post('/api/asaas/create-pix', requireInteractiveAdmin, async (req, res) => {
   try {
     const { name, phone, email, cpfCnpj, value, description } = req.body || {};
     if (!value || Number(value) <= 0) {
@@ -954,7 +999,7 @@ app.post('/api/asaas/create-pix', requireAdmin, async (req, res) => {
   }
 });
 
-app.post('/api/asaas/create-link', requireAdmin, async (req, res) => {
+app.post('/api/asaas/create-link', requireInteractiveAdmin, async (req, res) => {
   try {
     const { name, description, value, maxInstallmentCount } = req.body || {};
     const link = await asaasService.createPaymentLink({
@@ -1123,13 +1168,13 @@ app.get('/api/admin/analytics/affiliates', requireAdmin, (req, res) => {
 // Every operation requires an authenticated admin. No public payment approval.
 app.get('/api/admin/memberships/plans', requireAdmin, (_req, res) =>
   res.json({ success: true, plans: Object.values(PLANS) }));
-app.get('/admin/vendas-diretas', requireAdmin, (_req, res) =>
+app.get('/admin/vendas-diretas', requireInteractiveAdmin, (_req, res) =>
   res.sendFile(path.resolve(__dirname, '../../views/admin-direct-sales.html')));
-app.get('/api/admin/direct-sales', requireAdmin, (_req, res) => {
+app.get('/api/admin/direct-sales', requireInteractiveAdmin, (_req, res) => {
   try { return res.json({ success: true, contracts: directSales.listContracts() }); }
   catch (err) { console.error(err); return res.status(500).json({ success: false, error: 'Erro interno.' }); }
 });
-app.post('/api/admin/direct-sales', requireAdmin, async (req, res) => {
+app.post('/api/admin/direct-sales', requireInteractiveAdmin, async (req, res) => {
   try {
     const contract = await directSales.createDirectContract(req.body || {}, req.user.id);
     return res.status(201).json({ success: true, contract });
@@ -1137,21 +1182,21 @@ app.post('/api/admin/direct-sales', requireAdmin, async (req, res) => {
     return res.status(e.status || 500).json({ success: false, error: e.status ? e.message : 'Erro interno.' });
   }
 });
-app.post('/api/admin/direct-sales/:id/confirm', requireAdmin, (req, res) => {
+app.post('/api/admin/direct-sales/:id/confirm', requireInteractiveAdmin, (req, res) => {
   try { return res.json({ success: true, ...directSales.confirmPayment({
     contractId: req.params.id, paymentReference: req.body?.paymentReference,
     paidUntil: req.body?.paidUntil, adminId: req.user.id,
   }) }); }
   catch (e) { return res.status(e.status || 500).json({ success: false, error: e.status ? e.message : 'Erro interno.' }); }
 });
-app.post('/api/admin/direct-sales/:id/renew', requireAdmin, (req, res) => {
+app.post('/api/admin/direct-sales/:id/renew', requireInteractiveAdmin, (req, res) => {
   try { return res.json({ success: true, contract: directSales.renewContract({
     contractId: req.params.id, paymentReference: req.body?.paymentReference,
     paidUntil: req.body?.paidUntil, adminId: req.user.id,
   }) }); }
   catch (e) { return res.status(e.status || 500).json({ success: false, error: e.status ? e.message : 'Erro interno.' }); }
 });
-app.post('/api/admin/direct-sales/:id/cancel', requireAdmin, async (req, res) => {
+app.post('/api/admin/direct-sales/:id/cancel', requireInteractiveAdmin, async (req, res) => {
   try {
     const contract = await directSales.cancelContract({
       contractId: req.params.id,
@@ -1178,7 +1223,7 @@ app.get('/api/admin/segments', requireAdmin, (req, res) => {
   }
 });
 
-app.post('/api/admin/segments', requireAdmin, (req, res) => {
+app.post('/api/admin/segments', requireInteractiveAdmin, (req, res) => {
   try {
     const segment = productService.createSegment(req.body || {});
     return res.status(201).json({ success: true, segment });
@@ -1187,7 +1232,7 @@ app.post('/api/admin/segments', requireAdmin, (req, res) => {
   }
 });
 
-app.put('/api/admin/segments/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/segments/:id', requireInteractiveAdmin, (req, res) => {
   try {
     const segment = productService.updateSegment(Number(req.params.id), req.body || {});
     return res.json({ success: true, segment });
@@ -1196,7 +1241,7 @@ app.put('/api/admin/segments/:id', requireAdmin, (req, res) => {
   }
 });
 
-app.delete('/api/admin/segments/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/segments/:id', requireInteractiveAdmin, (req, res) => {
   try {
     const result = productService.deleteSegment(Number(req.params.id));
     return res.json({ success: true, result });
@@ -1205,7 +1250,7 @@ app.delete('/api/admin/segments/:id', requireAdmin, (req, res) => {
   }
 });
 
-app.post('/api/admin/products/:id/segments', requireAdmin, (req, res) => {
+app.post('/api/admin/products/:id/segments', requireInteractiveAdmin, (req, res) => {
   try {
     const segments = productService.setProductSegments(Number(req.params.id), req.body?.segments || []);
     return res.json({ success: true, segments });
@@ -1215,7 +1260,7 @@ app.post('/api/admin/products/:id/segments', requireAdmin, (req, res) => {
 });
 
 // 1. List all products and their plans (Catalog)
-app.get('/api/admin/products', requireAdmin, (req, res) => {
+app.get('/api/admin/products', requireInteractiveAdmin, (req, res) => {
   try {
     const products = productService.listProducts({ activeOnly: false, includePlans: true });
     return res.json({ success: true, products });
@@ -1226,7 +1271,7 @@ app.get('/api/admin/products', requireAdmin, (req, res) => {
 });
 
 // 2. Create new product in catalog
-app.post('/api/admin/products', requireAdmin, (req, res) => {
+app.post('/api/admin/products', requireInteractiveAdmin, (req, res) => {
   try {
     const product = productService.createProduct(req.body || {});
     return res.status(201).json({ success: true, product });
@@ -1236,7 +1281,7 @@ app.post('/api/admin/products', requireAdmin, (req, res) => {
 });
 
 // 3. Update existing product
-app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/products/:id', requireInteractiveAdmin, (req, res) => {
   try {
     const product = productService.updateProduct(Number(req.params.id), req.body || {});
     return res.json({ success: true, product });
@@ -1246,7 +1291,7 @@ app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
 });
 
 // 4. Create new plan for a product
-app.post('/api/admin/products/:id/plans', requireAdmin, (req, res) => {
+app.post('/api/admin/products/:id/plans', requireInteractiveAdmin, (req, res) => {
   try {
     const plan = productService.createPlan(Number(req.params.id), req.body || {});
     return res.status(201).json({ success: true, plan });
@@ -1256,7 +1301,7 @@ app.post('/api/admin/products/:id/plans', requireAdmin, (req, res) => {
 });
 
 // 5. Update existing plan
-app.put('/api/admin/plans/:id', requireAdmin, (req, res) => {
+app.put('/api/admin/plans/:id', requireInteractiveAdmin, (req, res) => {
   try {
     const plan = productService.updatePlan(Number(req.params.id), req.body || {});
     return res.json({ success: true, plan });
@@ -1277,7 +1322,7 @@ app.get('/api/admin/multiproduct/metrics', requireAdmin, (req, res) => {
 });
 
 // 7. List Subscriptions Across Products
-app.get('/api/admin/multiproduct/subscriptions', requireAdmin, (req, res) => {
+app.get('/api/admin/multiproduct/subscriptions', requireInteractiveAdmin, (req, res) => {
   try {
     const { productId, status, origin, limit } = req.query;
     const subscriptions = productService.listAllSubscriptions({
@@ -1294,7 +1339,7 @@ app.get('/api/admin/multiproduct/subscriptions', requireAdmin, (req, res) => {
 });
 
 // 8. Create Customer Subscription (Multi-Product Contract)
-app.post('/api/admin/multiproduct/subscriptions', requireAdmin, (req, res) => {
+app.post('/api/admin/multiproduct/subscriptions', requireInteractiveAdmin, (req, res) => {
   try {
     const sub = productService.createCustomerSubscription({
       ...req.body,
@@ -1307,7 +1352,7 @@ app.post('/api/admin/multiproduct/subscriptions', requireAdmin, (req, res) => {
 });
 
 // 9. Cancel Specific Product Subscription
-app.post('/api/admin/multiproduct/subscriptions/:id/cancel', requireAdmin, async (req, res) => {
+app.post('/api/admin/multiproduct/subscriptions/:id/cancel', requireInteractiveAdmin, async (req, res) => {
   try {
     const sub = await productService.cancelSubscription(Number(req.params.id), {
       reason: req.body?.reason,
@@ -1320,7 +1365,7 @@ app.post('/api/admin/multiproduct/subscriptions/:id/cancel', requireAdmin, async
 });
 
 // 10. Renew Specific Product Subscription
-app.post('/api/admin/multiproduct/subscriptions/:id/renew', requireAdmin, (req, res) => {
+app.post('/api/admin/multiproduct/subscriptions/:id/renew', requireInteractiveAdmin, (req, res) => {
   try {
     const { paidUntil, gatewayPaymentId, reason } = req.body || {};
     if (!paidUntil) {
@@ -1337,7 +1382,7 @@ app.post('/api/admin/multiproduct/subscriptions/:id/renew', requireAdmin, (req, 
   }
 });
 
-app.get('/api/asaas/payments', requireAdmin, async (req, res) => {
+app.get('/api/asaas/payments', requireInteractiveAdmin, async (req, res) => {
   try {
     const localPayments = db.prepare('SELECT * FROM asaas_payments ORDER BY created_at DESC LIMIT 50').all();
 
@@ -1652,7 +1697,9 @@ app.get('/auth/magic', (req, res) => {
   userService.consumeMagicToken(user.id);
 
   // Proteção 01 & 17: Issue a dedicated, persistent session token
-  const { sessionToken } = userService.createUserSession(user.id, 7);
+  // If user is ADMIN: Magic links CANNOT grant full MFA verified administrative access!
+  // It issues a pre-authentication session with session_mfa_verified = 0.
+  const { sessionToken } = userService.createUserSession(user.id, 7, { mfaVerified: false });
 
   // Set secure auth cookie with HttpOnly & SameSite=Lax (7 days)
   setSessionCookie(res, 'auth_token', sessionToken, req, 7 * 24 * 3600);
@@ -1733,6 +1780,9 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
   const isMfaActive = isGlobalMfa || isUserMfa;
   const totpSecret = (admin && admin.totp_enabled === 1 && admin.totp_secret) ? admin.totp_secret : (process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
 
+  let mfaValid = false;
+  let recoveryCodeUsed = false;
+
   if (isMfaActive && totpSecret) {
     if (!mfaCode) {
       logSecurityEvent({
@@ -1767,8 +1817,7 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
 
     // Verify TOTP token with ±1 window (±30s drift tolerance)
     const totpVerification = totpService.verifyToken(cleanMfaCode, totpSecret, { window: 1 });
-    let mfaValid = totpVerification.valid;
-    let recoveryCodeUsed = false;
+    mfaValid = totpVerification.valid;
 
     // Check single-use hashed recovery codes if TOTP verification failed
     if (!mfaValid && admin.totp_recovery_codes) {
@@ -1821,7 +1870,8 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
   }
 
   // Generate 7-day session token via dedicated session model (Proteção 01 & 17)
-  const { sessionToken } = userService.createUserSession(admin.id, 7);
+  const isMfaFullyVerified = isMfaActive ? (mfaValid === true) : !isMfaMandatory;
+  const { sessionToken } = userService.createUserSession(admin.id, 7, { mfaVerified: isMfaFullyVerified });
 
   // Set secure HttpOnly cookie
   setSessionCookie(res, 'auth_token', sessionToken, req, 7 * 24 * 3600);
@@ -1838,7 +1888,7 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
     userId: admin.id,
     req,
     status: 'SUCCESS',
-    details: { mfaVerified: Boolean(isMfaActive) },
+    details: { mfaVerified: isMfaFullyVerified },
   });
 
   const mfaSetupRequired = Boolean(isMfaMandatory && !isMfaActive);
@@ -1846,6 +1896,7 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
   return res.json({
     success: true,
     mfaSetupRequired,
+    mfaVerified: isMfaFullyVerified,
     token: sessionToken,
     csrfToken,
     user: {
@@ -1854,12 +1905,110 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
       phoneNumber: admin.phone_number,
       role: 'ADMIN',
       plan: 'PRO',
+      mfaVerified: isMfaFullyVerified,
       mfaPending: mfaSetupRequired,
       mfaSetupRequired,
     },
     message: mfaSetupRequired
       ? 'Senha mestra validada. É obrigatório configurar a autenticação em duas etapas (MFA/TOTP) para acessar o painel.'
       : 'Autenticação administrativa realizada com sucesso.',
+  });
+});
+
+// ==========================================
+// ADMIN MFA CHALLENGE VERIFICATION (FOR PRE-AUTH SESSIONS / MAGIC LINKS)
+// ==========================================
+app.post('/api/auth/mfa/verify', requireAdmin, (req, res) => {
+  if (req.authMethod !== 'SESSION' || !req.user || req.user.role !== 'ADMIN') {
+    return res.status(403).json({
+      success: false,
+      error: 'Operação restrita a administradores com sessão interativa ativa.',
+      code: 'FORBIDDEN_INTERACTIVE_ADMIN_REQUIRED',
+    });
+  }
+
+  const { mfaCode } = req.body || {};
+  const cleanMfaCode = typeof mfaCode === 'string' ? mfaCode.trim() : '';
+  if (!cleanMfaCode) {
+    return res.status(400).json({
+      success: false,
+      error: 'Informe o código de 6 dígitos do autenticador ou código de recuperação.',
+    });
+  }
+
+  const isMfaMandatory = Boolean(config.adminMfaEnabled || process.env.ADMIN_MFA_ENABLED === 'true');
+  const isGlobalMfa = isMfaMandatory && Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
+  const isUserMfa = Boolean(req.user.totp_enabled === 1 && req.user.totp_secret);
+  const totpSecret = (req.user.totp_enabled === 1 && req.user.totp_secret)
+    ? req.user.totp_secret
+    : (process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
+
+  if (!totpSecret) {
+    return res.status(400).json({
+      success: false,
+      error: 'MFA não está configurado nesta conta de administrador.',
+      mfaSetupRequired: true,
+    });
+  }
+
+  const totpVerification = totpService.verifyToken(cleanMfaCode, totpSecret, { window: 1 });
+  let mfaValid = totpVerification.valid;
+  let recoveryCodeUsed = false;
+
+  if (!mfaValid && req.user.totp_recovery_codes) {
+    try {
+      const storedCodes = JSON.parse(req.user.totp_recovery_codes);
+      if (Array.isArray(storedCodes) && storedCodes.length > 0) {
+        const recCheck = totpService.verifyRecoveryCode(cleanMfaCode, storedCodes);
+        if (recCheck.valid) {
+          mfaValid = true;
+          recoveryCodeUsed = true;
+          storedCodes.splice(recCheck.matchedIndex, 1);
+          db.prepare('UPDATE users SET totp_recovery_codes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+            .run(JSON.stringify(storedCodes), req.user.id);
+        } else {
+          const plainIdx = storedCodes.findIndex(c => typeof c === 'string' && c.toUpperCase().replace(/[\s-]/g, '') === cleanMfaCode.toUpperCase().replace(/[\s-]/g, ''));
+          if (plainIdx !== -1) {
+            mfaValid = true;
+            recoveryCodeUsed = true;
+            storedCodes.splice(plainIdx, 1);
+            const updatedHashes = storedCodes.map(c => c.length === 64 ? c : totpService.hashRecoveryCode(c));
+            db.prepare('UPDATE users SET totp_recovery_codes = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+              .run(JSON.stringify(updatedHashes), req.user.id);
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  if (!mfaValid) {
+    logSecurityEvent({
+      eventType: AUDIT_EVENTS.ADMIN_MFA_FAILED,
+      userId: req.user.id,
+      req,
+      status: 'FAILED',
+      details: { reason: totpVerification.reason || 'invalid_mfa_code' },
+    });
+    return res.status(401).json({
+      success: false,
+      error: 'Código MFA incorreto ou expirado. Verifique o relógio do seu dispositivo.',
+    });
+  }
+
+  userService.setSessionMfaVerified(req.user.id, true);
+
+  logSecurityEvent({
+    eventType: AUDIT_EVENTS.ADMIN_MFA_SUCCESS,
+    userId: req.user.id,
+    req,
+    status: 'SUCCESS',
+    details: { method: recoveryCodeUsed ? 'recovery_code' : 'totp', origin: 'mfa_verify_endpoint' },
+  });
+
+  return res.json({
+    success: true,
+    mfaVerified: true,
+    message: 'Segundo fator validado com sucesso.',
   });
 });
 
@@ -2001,6 +2150,7 @@ app.post('/api/admin/mfa/enable', requireInteractiveAdmin, (req, res) => {
     SET totp_secret = ?,
         totp_enabled = 1,
         totp_recovery_codes = ?,
+        session_mfa_verified = 1,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(encryptedSecret, JSON.stringify(hashedCodes), req.user.id);
@@ -2142,7 +2292,12 @@ app.get('/api/me', authMiddleware, (req, res) => {
   const isUserMfaActive = Boolean(req.user.totp_enabled === 1 && req.user.totp_secret);
   const isGlobalMfaActive = Boolean(process.env.ADMIN_TOTP_SECRET || config.adminTotpSecret);
   const mfaConfigured = isUserMfaActive || isGlobalMfaActive;
-  const mfaPending = Boolean(req.user.role === 'ADMIN' && isMfaMandatory && !mfaConfigured);
+  const isMfaVerified = Boolean(req.user.session_mfa_verified === 1);
+  const isMfaRequired = Boolean(req.user.role === 'ADMIN' && (isMfaMandatory || mfaConfigured));
+
+  const mfaPending = Boolean(req.user.role === 'ADMIN' && isMfaRequired && !isMfaVerified);
+  const mfaSetupRequired = Boolean(req.user.role === 'ADMIN' && isMfaMandatory && !mfaConfigured);
+  const mfaChallengeRequired = Boolean(req.user.role === 'ADMIN' && mfaConfigured && !isMfaVerified);
 
   const userObj = {
     id: req.user.id,
@@ -2153,8 +2308,11 @@ app.get('/api/me', authMiddleware, (req, res) => {
     plan: req.user.plan,
     trialEndsAt: req.user.trial_ends_at,
     status,
+    mfaVerified: isMfaVerified,
+    mfaRequired: isMfaRequired,
     mfaPending,
-    mfaSetupRequired: mfaPending,
+    mfaSetupRequired,
+    mfaChallengeRequired,
   };
   res.json({
     success: true,
@@ -2172,14 +2330,14 @@ app.get('/api/admin/users', requireAdmin, (req, res) => {
   res.json({ success: true, count: users.length, data: users });
 });
 
-app.put('/api/admin/users/:id/plan', requireAdmin, (req, res) => {
+app.put('/api/admin/users/:id/plan', requireInteractiveAdmin, (req, res) => {
   const { id } = req.params;
   const { plan, role } = req.body;
   const updated = userService.updateUser(id, { plan, role });
   res.json({ success: true, data: updated });
 });
 
-app.post('/api/admin/users/:id/extend-trial', requireAdmin, (req, res) => {
+app.post('/api/admin/users/:id/extend-trial', requireInteractiveAdmin, (req, res) => {
   const { id } = req.params;
   const { days } = req.body;
   try {
@@ -3143,7 +3301,7 @@ app.delete('/api/appointments/:id', authMiddleware, (req, res) => {
 // ==========================================
 // SECURITY AUDIT & SYSTEM INTEGRITY ENDPOINTS (PROTEÇÃO 03 & 08)
 // ==========================================
-app.get('/api/admin/security/audit-logs', requireAdmin, (req, res) => {
+app.get('/api/admin/security/audit-logs', requireInteractiveAdmin, (req, res) => {
   try {
     const limit = req.query.limit ? parseInt(req.query.limit, 10) : 50;
     const eventType = req.query.eventType || null;
@@ -3173,7 +3331,7 @@ app.get('/api/admin/system/integrity-check', requireAdmin, (req, res) => {
   }
 });
 
-app.post('/api/admin/system/backup', requireAdmin, (req, res) => {
+app.post('/api/admin/system/backup', requireInteractiveAdmin, (req, res) => {
   try {
     if (typeof db.backupDatabase !== 'function') {
       return res.status(500).json({ success: false, error: 'Função de backup não disponível no adaptador SQLite.' });

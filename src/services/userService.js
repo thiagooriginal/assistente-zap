@@ -185,19 +185,38 @@ function consumeMagicToken(userId) {
 
 /**
  * Create a dedicated persistent session for an authenticated user
+ * Supports explicit MFA verification tracking (Proteção 01, 09, 17)
  */
-function createUserSession(userId, durationDays = 7) {
+function createUserSession(userId, durationDays = 7, options = {}) {
   const sessionToken = crypto.randomBytes(32).toString('hex');
   const sessionExpiresAt = new Date(Date.now() + durationDays * 24 * 3600 * 1000).toISOString();
+  const mfaVerified = typeof options === 'boolean' ? options : Boolean(options?.mfaVerified);
+  const mfaVerifiedVal = mfaVerified ? 1 : 0;
+
   db.prepare(`
     UPDATE users
     SET session_token = ?,
         session_expires_at = ?,
+        session_mfa_verified = ?,
         last_login_at = CURRENT_TIMESTAMP,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
-  `).run(sessionToken, sessionExpiresAt, userId);
-  return { sessionToken, sessionExpiresAt };
+  `).run(sessionToken, sessionExpiresAt, mfaVerifiedVal, userId);
+  return { sessionToken, sessionExpiresAt, mfaVerified };
+}
+
+/**
+ * Promote or update session MFA verification state (Proteção 01, 09)
+ */
+function setSessionMfaVerified(userId, verified = true) {
+  if (!userId) return;
+  const val = verified ? 1 : 0;
+  return db.prepare(`
+    UPDATE users
+    SET session_mfa_verified = ?,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `).run(val, userId);
 }
 
 /**
@@ -211,6 +230,7 @@ function revokeUserTokens(userId) {
         magic_token_expires_at = NULL,
         session_token = NULL,
         session_expires_at = NULL,
+        session_mfa_verified = 0,
         reset_token = NULL,
         reset_expires_at = NULL,
         updated_at = CURRENT_TIMESTAMP
@@ -549,4 +569,5 @@ module.exports = {
   findUserByFlexiblePhone,
   extendUserTrial,
   revokeUserTokens,
+  setSessionMfaVerified,
 };

@@ -109,6 +109,7 @@ function activateAccount(token, password) {
     UPDATE users 
     SET session_token = ?, 
         session_expires_at = ?,
+        session_mfa_verified = 0,
         magic_token = NULL,
         magic_token_expires_at = NULL,
         last_login_at = CURRENT_TIMESTAMP,
@@ -229,6 +230,7 @@ function login(email, password) {
     UPDATE users
     SET session_token = ?,
         session_expires_at = ?,
+        session_mfa_verified = 0,
         magic_token = NULL,
         magic_token_expires_at = NULL,
         last_login_at = CURRENT_TIMESTAMP,
@@ -347,6 +349,7 @@ function resetPassword(token, newPassword) {
         magic_token_expires_at = NULL,
         session_token = NULL,
         session_expires_at = NULL,
+        session_mfa_verified = 0,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ?
   `).run(hash, salt, user.id);

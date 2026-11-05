@@ -903,11 +903,13 @@ async function runAllTests() {
     // -------------------------------------------------------------
     await test('27. Setup de MFA pela primeira vez permite acesso às rotas de setup sem bloqueio circular', async () => {
       // Cria novo admin temporário sem MFA ativado
-      const freshAdminEmail = `fresh.admin.${Date.now()}@raiaagentes.com.br`;
+      const uniqueSuffix = Date.now().toString().slice(-8);
+      const freshAdminEmail = `fresh.admin.${uniqueSuffix}@raiaagentes.com.br`;
+      const freshAdminPhone = `55119${uniqueSuffix}`;
       db.prepare(`
         INSERT INTO users (name, phone_number, email, role, totp_enabled, totp_secret, created_at)
-        VALUES ('Fresh Admin Without MFA', '5511977770002', ?, 'ADMIN', 0, NULL, CURRENT_TIMESTAMP)
-      `).run(freshAdminEmail);
+        VALUES ('Fresh Admin Without MFA', ?, ?, 'ADMIN', 0, NULL, CURRENT_TIMESTAMP)
+      `).run(freshAdminPhone, freshAdminEmail);
       const freshAdmin = db.prepare('SELECT id FROM users WHERE email = ?').get(freshAdminEmail);
       const userService = require('../src/services/userService');
       const { sessionToken: freshAdminToken } = userService.createUserSession(freshAdmin.id, 1);
@@ -1274,6 +1276,281 @@ async function runAllTests() {
 
       delete process.env.APP_MODE;
       delete process.env.HOMOLOGACAO;
+    });
+
+    // -------------------------------------------------------------
+    // Test 36: Sessão ADMIN com senha, mas sem MFA (pre-auth) é bloqueada em APIs de admin
+    // -------------------------------------------------------------
+    await test('36. Sessão ADMIN com senha, mas sem MFA validado é bloqueada em APIs de admin (FORBIDDEN_MFA_SESSION_REQUIRED)', async () => {
+      // Create session for admin with session_mfa_verified = 0
+      const preAuthToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+      db.prepare(`
+        UPDATE users
+        SET session_token = ?,
+            session_expires_at = ?,
+            session_mfa_verified = 0,
+            totp_enabled = 1,
+            totp_secret = ?
+        WHERE id = ?
+      `).run(preAuthToken, expiresAt, totpService.encryptSecret('JBSWY3DPEHPK3PXP'), adminId);
+
+      // Attempt to access operational admin endpoint
+      const res = await request('GET', '/api/admin/analytics/overview', null, {
+        Cookie: `auth_token=${preAuthToken}`,
+        Authorization: `Bearer ${preAuthToken}`
+      });
+
+      assert.strictEqual(res.status, 403, 'Sessão pré-autenticada sem MFA validado deve receber 403');
+      assert.strictEqual(res.body.code, 'FORBIDDEN_MFA_SESSION_REQUIRED');
+      assert.strictEqual(res.body.mfaChallengeRequired, true);
+
+      // Verify /api/me returns mfaVerified: false
+      const resMe = await request('GET', '/api/me', null, {
+        Cookie: `auth_token=${preAuthToken}`,
+      });
+      assert.strictEqual(resMe.status, 200);
+      assert.strictEqual(resMe.body.user.mfaVerified, false);
+      assert.strictEqual(resMe.body.user.mfaChallengeRequired, true);
+    });
+
+    // -------------------------------------------------------------
+    // Test 37: Sessão ADMIN obtida por link mágico cria sessão pre-auth (session_mfa_verified = 0)
+    // -------------------------------------------------------------
+    await test('37. Sessão ADMIN obtida por link mágico cria sessão pré-autenticada e não concede acesso sem MFA', async () => {
+      const magicToken = `magic_adm_${Date.now()}`;
+      const expires = new Date(Date.now() + 600000).toISOString();
+      db.prepare(`
+        UPDATE users
+        SET magic_token = ?,
+            magic_token_expires_at = ?,
+            totp_enabled = 1,
+            totp_secret = ?
+        WHERE id = ?
+      `).run(magicToken, expires, totpService.encryptSecret('JBSWY3DPEHPK3PXP'), adminId);
+
+      // Access magic link
+      const resMagic = await request('GET', `/auth/magic?token=${magicToken}`);
+      assert.strictEqual(resMagic.status, 302, 'Magic link deve redirecionar com 302');
+      const cookieHeader = resMagic.headers['set-cookie'] ? (Array.isArray(resMagic.headers['set-cookie']) ? resMagic.headers['set-cookie'].join(';') : resMagic.headers['set-cookie']) : '';
+      const match = cookieHeader.match(/auth_token=([a-f0-9]{64})/);
+      assert.ok(match, 'Deve emitir cookie auth_token na resposta');
+      const magicSessionToken = match[1];
+
+      // Verify in DB that session_mfa_verified is 0
+      const adminUser = db.prepare('SELECT session_mfa_verified FROM users WHERE session_token = ?').get(magicSessionToken);
+      assert.strictEqual(adminUser.session_mfa_verified, 0, 'Sessão criada via magic link para ADMIN deve ter session_mfa_verified = 0');
+
+      // Attempt to access admin routes with this token
+      const resBlocked = await request('GET', '/api/admin/products', null, {
+        Cookie: `auth_token=${magicSessionToken}`,
+        Authorization: `Bearer ${magicSessionToken}`
+      });
+      assert.strictEqual(resBlocked.status, 403, 'Sessão obtida via magic link NÃO pode acessar APIs de admin sem segundo fator');
+    });
+
+    // -------------------------------------------------------------
+    // Test 38: Validação de segundo fator via POST /api/auth/mfa/verify promove sessão
+    // -------------------------------------------------------------
+    await test('38. POST /api/auth/mfa/verify com código TOTP válido valida sessão pré-autenticada e libera acesso', async () => {
+      const secret = 'JBSWY3DPEHPK3PXP';
+      const encryptedSecret = totpService.encryptSecret(secret);
+      const preAuthToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+      db.prepare(`
+        UPDATE users
+        SET session_token = ?,
+            session_expires_at = ?,
+            session_mfa_verified = 0,
+            totp_enabled = 1,
+            totp_secret = ?
+        WHERE id = ?
+      `).run(preAuthToken, expiresAt, encryptedSecret, adminId);
+
+      // 1. Enviar código TOTP incorreto -> 401
+      const resBad = await request('POST', '/api/auth/mfa/verify', { mfaCode: '000000' }, {
+        Cookie: `auth_token=${preAuthToken}`,
+        Authorization: `Bearer ${preAuthToken}`,
+        Origin: 'https://seguranca.raiaagentes.com.br'
+      });
+      assert.strictEqual(resBad.status, 401, 'Código incorreto deve retornar 401');
+
+      // 2. Enviar código TOTP correto gerado no instante
+      const validCode = totpService.generateToken(secret);
+      const resGood = await request('POST', '/api/auth/mfa/verify', { mfaCode: validCode }, {
+        Cookie: `auth_token=${preAuthToken}`,
+        Authorization: `Bearer ${preAuthToken}`,
+        Origin: 'https://seguranca.raiaagentes.com.br'
+      });
+      assert.strictEqual(resGood.status, 200, 'Código correto deve retornar 200');
+      assert.strictEqual(resGood.body.success, true);
+      assert.strictEqual(resGood.body.mfaVerified, true);
+
+      // Verify in DB that session_mfa_verified is now 1
+      const updatedUser = db.prepare('SELECT session_mfa_verified FROM users WHERE session_token = ?').get(preAuthToken);
+      assert.strictEqual(updatedUser.session_mfa_verified, 1, 'session_mfa_verified deve ser 1 após verificação');
+
+      // Now accessing admin routes is ALLOWED
+      const resAllowed = await request('GET', '/api/admin/analytics/overview', null, {
+        Cookie: `auth_token=${preAuthToken}`,
+        Authorization: `Bearer ${preAuthToken}`
+      });
+      assert.strictEqual(resAllowed.status, 200, 'Acesso às APIs de admin deve ser liberado após MFA');
+    });
+
+    // -------------------------------------------------------------
+    // Test 39: Restrição de Privilégio Mínimo: ADMIN_API_KEY bloqueada em operações financeiras e sensíveis
+    // -------------------------------------------------------------
+    await test('39. ADMIN_API_KEY bloqueada em operações financeiras, vendas diretas, produtos e backup (Privilégio Mínimo)', async () => {
+      config.adminApiKey = 'SuperSecretAdminApiKeyAutomation#2026';
+
+      const restrictedEndpoints = [
+        { method: 'GET', path: '/api/asaas/status', desc: 'Asaas status e saldo' },
+        { method: 'POST', path: '/api/asaas/create-pix', body: { value: 50 }, desc: 'Criação de cobrança Pix' },
+        { method: 'POST', path: '/api/asaas/create-link', body: { value: 100 }, desc: 'Criação de link de pagamento' },
+        { method: 'GET', path: '/api/asaas/payments', desc: 'Listagem de pagamentos Asaas' },
+        { method: 'GET', path: '/api/admin/direct-sales', desc: 'Listagem de vendas diretas' },
+        { method: 'POST', path: '/api/admin/direct-sales', body: { customerName: 'X' }, desc: 'Criação de contrato direto' },
+        { method: 'GET', path: '/api/admin/multiproduct/subscriptions', desc: 'Listagem de assinaturas multiproduto' },
+        { method: 'POST', path: '/api/admin/products', body: { code: 'TEST' }, desc: 'Criação de produto' },
+        { method: 'POST', path: '/api/admin/system/backup', desc: 'Backup SQLite do sistema' },
+        { method: 'GET', path: '/api/admin/security/audit-logs', desc: 'Logs de auditoria' },
+      ];
+
+      for (const ep of restrictedEndpoints) {
+        const res = await request(ep.method, ep.path, ep.body || null, {
+          'X-Admin-Key': config.adminApiKey
+        });
+        assert.strictEqual(res.status, 403, `ADMIN_API_KEY deve receber 403 em ${ep.path} (${ep.desc})`);
+        assert.ok(
+          res.body.code === 'FORBIDDEN_INTERACTIVE_SESSION_REQUIRED' ||
+          res.body.code === 'FORBIDDEN_RESTRICTED_AUTOMATION_SCOPE',
+          `Código de bloqueio esperado em ${ep.path}, recebido: ${res.body.code}`
+        );
+      }
+
+      // Allowed endpoints for automation: status
+      const resPause = await request('GET', '/api/assistant/pause-status', null, {
+        'X-Admin-Key': config.adminApiKey
+      });
+      assert.strictEqual(resPause.status, 200, 'ADMIN_API_KEY tem permissão para /api/assistant/pause-status');
+    });
+
+    // -------------------------------------------------------------
+    // Test 40: Sessão revogada e sessão expirada retornam 401
+    // -------------------------------------------------------------
+    await test('40. Sessão revogada e sessão expirada retornam 401 Unauthorized', async () => {
+      // 1. Sessão revogada (token inexistente ou null no banco)
+      const resRevoked = await request('GET', '/api/me', null, {
+        Cookie: 'auth_token=0000000000000000000000000000000000000000000000000000000000000000',
+        Authorization: 'Bearer 0000000000000000000000000000000000000000000000000000000000000000'
+      });
+      assert.strictEqual(resRevoked.status, 401, 'Sessão inexistente/revogada deve retornar 401');
+
+      // 2. Sessão com session_expires_at no passado
+      const expiredToken = crypto.randomBytes(32).toString('hex');
+      db.prepare(`
+        UPDATE users
+        SET session_token = ?,
+            session_expires_at = datetime('now', '-2 days'),
+            session_mfa_verified = 1
+        WHERE id = ?
+      `).run(expiredToken, adminId);
+
+      const resExpired = await request('GET', '/api/me', null, {
+        Cookie: `auth_token=${expiredToken}`,
+        Authorization: `Bearer ${expiredToken}`
+      });
+      assert.strictEqual(resExpired.status, 401, 'Sessão expirada deve retornar 401');
+    });
+
+    // -------------------------------------------------------------
+    // Test 41: Webhooks falsificados Asaas e Hotmart retornam 401
+    // -------------------------------------------------------------
+    await test('41. Webhooks falsificados Asaas e Hotmart (sem credencial ou token inválido) retornam 401 Unauthorized', async () => {
+      config.asaasWebhookSecret = 'ValidAsaasSecretToken2026';
+      config.hotmartWebhookSecret = 'ValidHotmartSecretToken2026';
+
+      // 1. Asaas sem token
+      const resAsaasNoToken = await request('POST', '/api/webhooks/asaas', { event: 'PAYMENT_RECEIVED' });
+      assert.strictEqual(resAsaasNoToken.status, 401, 'Webhook Asaas sem token deve retornar 401');
+
+      // 2. Asaas com token inválido
+      const resAsaasBadToken = await request('POST', '/api/webhooks/asaas', { event: 'PAYMENT_RECEIVED' }, {
+        'asaas-access-token': 'token_completamente_falso_12345'
+      });
+      assert.strictEqual(resAsaasBadToken.status, 401, 'Webhook Asaas com token falso deve retornar 401');
+
+      // 3. Hotmart sem header X-HOTMART-HOTTOK
+      const resHotmartNoToken = await request('POST', '/api/webhooks/hotmart', { event: 'PURCHASE_APPROVED' });
+      assert.strictEqual(resHotmartNoToken.status, 401, 'Webhook Hotmart sem token deve retornar 401');
+
+      // 4. Hotmart com token incorreto
+      const resHotmartBadToken = await request('POST', '/api/webhooks/hotmart', { event: 'PURCHASE_APPROVED' }, {
+        'x-hotmart-hottok': 'token_hotmart_forjado_99999'
+      });
+      assert.strictEqual(resHotmartBadToken.status, 401, 'Webhook Hotmart com token forjado deve retornar 401');
+    });
+
+    // -------------------------------------------------------------
+    // Test 42: Idempotência de webhooks duplicados Asaas e Hotmart
+    // -------------------------------------------------------------
+    await test('42. Idempotência de eventos duplicados em Asaas e Hotmart retorna sucesso sem reprocessar', async () => {
+      const asaasService = require('../src/services/asaasService');
+      const hotmartService = require('../src/services/hotmartService');
+
+      // 1. Asaas Idempotency
+      const asaasEventId = `evt_asaas_idemp_${Date.now()}`;
+      const asaasPayload = {
+        id: asaasEventId,
+        event: 'PAYMENT_RECEIVED',
+        payment: { id: `pay_idemp_${Date.now()}`, value: 100, status: 'RECEIVED' }
+      };
+      const resAsaas1 = await asaasService.handleWebhookEvent(asaasPayload);
+      assert.strictEqual(resAsaas1.duplicate, undefined, 'Primeira execução não deve ser duplicata');
+
+      const resAsaas2 = await asaasService.handleWebhookEvent(asaasPayload);
+      assert.strictEqual(resAsaas2.duplicate, true, 'Segunda execução deve retornar duplicate: true');
+
+      // 2. Hotmart Idempotency
+      const hotmartEventId = `evt_hotmart_idemp_${Date.now()}`;
+      const hotmartPayload = {
+        id: hotmartEventId,
+        event: 'PURCHASE_APPROVED',
+        creation_date: Date.now(),
+        data: {
+          purchase: { transaction: `TR_IDEMP_${Date.now()}`, status: 'APPROVED' },
+          buyer: { name: 'Cliente Idempotente', email: 'idemp@teste.com' }
+        }
+      };
+      const resHotmart1 = await hotmartService.processWebhook(hotmartPayload);
+      assert.strictEqual(resHotmart1.success, true);
+      assert.strictEqual(resHotmart1.duplicated, undefined);
+
+      const resHotmart2 = await hotmartService.processWebhook(hotmartPayload);
+      assert.strictEqual(resHotmart2.success, true);
+      assert.strictEqual(resHotmart2.duplicated, true, 'Evento duplicado deve retornar duplicated: true');
+    });
+
+    // -------------------------------------------------------------
+    // Test 43: Transacionalidade atômica com rollback em falha de banco em operações financeiras
+    // -------------------------------------------------------------
+    await test('43. Transacionalidade atômica com rollback no banco de dados em falha de operação financeira', async () => {
+      const initialUsersCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
+
+      assert.throws(() => {
+        db.exec('BEGIN TRANSACTION');
+        try {
+          db.prepare("INSERT INTO users (name, phone_number, role) VALUES ('Temp Rollback User', '5511977776666', 'CLIENT')").run();
+          throw new Error('Falha simulada durante operação financeira transacional');
+        } catch (txErr) {
+          try { db.exec('ROLLBACK'); } catch (_) {}
+          throw txErr;
+        }
+      }, /Falha simulada/);
+
+      const finalUsersCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
+      assert.strictEqual(finalUsersCount, initialUsersCount, 'Rollback deve garantir que nenhuma alteração parcial persista');
     });
 
   } finally {

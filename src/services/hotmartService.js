@@ -10,22 +10,17 @@ const hotmartReconciliation = require('./hotmartReconciliationService');
 function validateHotmartHeader(req, customSecret = null) {
   const secret = (customSecret || config.hotmartWebhookSecret || '').trim();
   if (!secret) {
-    if (process.env.NODE_ENV === 'production') {
-      console.warn('[Hotmart Webhook] ALERTA CRÍTICO: HOTMART_WEBHOOK_SECRET não configurado em ambiente de produção!');
-      return false;
-    }
-    const headerToken = req?.headers?.['x-hotmart-hottok'] || req?.headers?.['hottok'] || req?.body?.hottok;
-    return Boolean(headerToken);
+    console.warn('[Hotmart Webhook] ALERTA DE SEGURANÇA: HOTMART_WEBHOOK_SECRET não configurado. Bloqueio fail-closed ativo.');
+    return false;
   }
 
   if (!req || !req.headers) return false;
 
-  // Official Hotmart webhook token header
+  // Official Hotmart webhook token header (or request body; query parameters are strictly forbidden)
   const headerToken = (
     req.headers['x-hotmart-hottok'] ||
     req.headers['hottok'] ||
     req.body?.hottok ||
-    req.query?.hottok ||
     ''
   ).trim();
 
@@ -37,7 +32,7 @@ function validateHotmartHeader(req, customSecret = null) {
     if (a.length !== b.length) return false;
     return crypto.timingSafeEqual(a, b);
   } catch (e) {
-    return headerToken === secret;
+    return false;
   }
 }
 
