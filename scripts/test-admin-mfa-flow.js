@@ -21,7 +21,7 @@ const config = require('../src/config');
 const { app } = require('../src/server/app');
 const db = require('../src/database/db');
 const totpService = require('../src/services/totpService');
-const { adminLoginLimiter } = require('../src/middlewares/rateLimiter');
+const { adminLoginLimiter, adminMfaLimiter } = require('../src/middlewares/rateLimiter');
 
 console.log('================================================================');
 console.log('   RAIA AGENTES — SUITE DE TESTES: CICLO DE VIDA DO MFA ADMIN   ');
@@ -123,6 +123,7 @@ async function runAllTests() {
 
   // Clean persistent rate limit entries from prior test runs
   adminLoginLimiter.reset();
+  adminMfaLimiter.reset();
   db.prepare("DELETE FROM rate_limit_entries").run();
 
   let adminAuthToken = null;
@@ -1551,6 +1552,302 @@ async function runAllTests() {
 
       const finalUsersCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
       assert.strictEqual(finalUsersCount, initialUsersCount, 'Rollback deve garantir que nenhuma alteração parcial persista');
+    });
+
+    // -------------------------------------------------------------
+    // Test 44: Rate Limiting estrito em POST /api/auth/mfa/verify
+    // -------------------------------------------------------------
+    await test('44. Rate limiting em POST /api/auth/mfa/verify bloqueia tentativas repetidas com 429 RATE_LIMIT_EXCEEDED', async () => {
+      adminMfaLimiter.reset();
+
+      const preAuthToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+      db.prepare(`
+        UPDATE users
+        SET session_token = ?,
+            session_expires_at = ?,
+            session_mfa_verified = 0,
+            totp_enabled = 1,
+            totp_secret = ?
+        WHERE id = ?
+      `).run(preAuthToken, expiresAt, totpService.encryptSecret('JBSWY3DPEHPK3PXP'), adminId);
+
+      // 5 tentativas incorretas devem retornar 401
+      for (let i = 0; i < 5; i++) {
+        const resBad = await request('POST', '/api/auth/mfa/verify', { mfaCode: '000000' }, {
+          Authorization: `Bearer ${preAuthToken}`,
+          Origin: 'https://seguranca.raiaagentes.com.br'
+        });
+        assert.strictEqual(resBad.status, 401, `Tentativa ${i+1} deve retornar 401`);
+      }
+
+      // A 6ª tentativa deve ser sumariamente bloqueada com HTTP 429
+      const resBlocked = await request('POST', '/api/auth/mfa/verify', { mfaCode: '000000' }, {
+        Authorization: `Bearer ${preAuthToken}`,
+        Origin: 'https://seguranca.raiaagentes.com.br'
+      });
+      assert.strictEqual(resBlocked.status, 429, '6ª tentativa deve retornar HTTP 429');
+      assert.strictEqual(resBlocked.body.code, 'RATE_LIMIT_EXCEEDED');
+
+      // Garantir que a sessão jamais foi promovida a verified = 1
+      const adminRow = db.prepare('SELECT session_mfa_verified FROM users WHERE id = ?').get(adminId);
+      assert.strictEqual(adminRow.session_mfa_verified, 0, 'Sessão NÃO pode ser promovida com tentativas inválidas');
+
+      adminMfaLimiter.reset();
+    });
+
+    // -------------------------------------------------------------
+    // Test 45: Anti-CSRF ativo em POST /api/auth/mfa/verify
+    // -------------------------------------------------------------
+    await test('45. Anti-CSRF em POST /api/auth/mfa/verify rejeita origens não autorizadas e permite seguranca.raiaagentes.com.br', async () => {
+      adminMfaLimiter.reset();
+
+      const preAuthToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 7 * 86400000).toISOString();
+      db.prepare(`
+        UPDATE users
+        SET session_token = ?,
+            session_expires_at = ?,
+            session_mfa_verified = 0,
+            totp_enabled = 1,
+            totp_secret = ?
+        WHERE id = ?
+      `).run(preAuthToken, expiresAt, totpService.encryptSecret('JBSWY3DPEHPK3PXP'), adminId);
+
+      // 1. Requisição autenticada por Cookie com Origin forjada/maliciosa -> 403 CSRF_INVALID_ORIGIN
+      const resSpoofed = await request('POST', '/api/auth/mfa/verify', { mfaCode: '123456' }, {
+        Cookie: `auth_token=${preAuthToken}`,
+        Origin: 'https://evil-cross-site-phishing.com'
+      });
+      assert.strictEqual(resSpoofed.status, 403, 'Origem maliciosa deve ser bloqueada por Anti-CSRF');
+      assert.strictEqual(resSpoofed.body.code, 'CSRF_INVALID_ORIGIN');
+
+      // 2. Requisição autenticada por Cookie com Origin oficial de homologação -> Não é bloqueada por Anti-CSRF
+      const resAllowed = await request('POST', '/api/auth/mfa/verify', { mfaCode: '000000' }, {
+        Cookie: `auth_token=${preAuthToken}`,
+        Origin: 'https://seguranca.raiaagentes.com.br'
+      });
+      // Recebe 401 por código TOTP errado, e NÃO 403 por CSRF!
+      assert.strictEqual(resAllowed.status, 401, 'Origem oficial passa pela validação CSRF (recebe 401 por código incorreto)');
+
+      adminMfaLimiter.reset();
+    });
+
+    // -------------------------------------------------------------
+    // Test 46: Webhook Asaas Fail-Closed em Erro de Idempotência
+    // -------------------------------------------------------------
+    await test('46. Webhook Asaas falha de persistência de evento aborta com erro e não executa mutação financeira', async () => {
+      const asaasService = require('../src/services/asaasService');
+      const initialUsersCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
+      const initialPaymentsCount = db.prepare('SELECT COUNT(*) AS c FROM asaas_payments').get().c;
+
+      // Criar trigger temporário em asaas_webhook_events para simular falha de gravação
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS trg_test_fail_closed_asaas
+        BEFORE INSERT ON asaas_webhook_events
+        WHEN NEW.event_id LIKE 'evt_fail_closed_test_%'
+        BEGIN
+          SELECT RAISE(FAIL, 'Erro simulado de persistência de idempotência');
+        END;
+      `);
+
+      let threw = false;
+      try {
+        await asaasService.handleWebhookEvent({
+          id: `evt_fail_closed_test_${Date.now()}`,
+          event: 'PAYMENT_RECEIVED',
+          payment: { id: `pay_fail_closed_${Date.now()}`, value: 500, status: 'RECEIVED' }
+        });
+      } catch (err) {
+        threw = true;
+        assert.ok(err.message.includes('Erro simulado de persistência'), 'Deve propagar erro crítico');
+      } finally {
+        db.exec('DROP TRIGGER IF EXISTS trg_test_fail_closed_asaas');
+      }
+
+      assert.ok(threw, 'Deve falhar e abortar imediatamente');
+
+      // Verificar que nenhum registro financeiro foi persistido
+      const finalUsersCount = db.prepare('SELECT COUNT(*) AS c FROM users').get().c;
+      const finalPaymentsCount = db.prepare('SELECT COUNT(*) AS c FROM asaas_payments').get().c;
+      assert.strictEqual(finalUsersCount, initialUsersCount, 'Nenhum usuário deve ter sido modificado');
+      assert.strictEqual(finalPaymentsCount, initialPaymentsCount, 'Nenhum pagamento deve ter sido inserido');
+    });
+
+    // -------------------------------------------------------------
+    // Test 47: Webhook Asaas Transacionalidade Atômica e Recuperação de Erro
+    // -------------------------------------------------------------
+    await test('47. Webhook Asaas transacional com rollback e recuperação controlada (status ERROR -> PROCESSED)', async () => {
+      const asaasService = require('../src/services/asaasService');
+      const testAsaasId = `evt_recovery_asaas_${Date.now()}`;
+      const testPayId = `pay_rec_${Date.now()}`;
+
+      // Criar usuário e contrato de teste
+      const testUserPhone = '55119' + Math.floor(10000000 + Math.random() * 90000000);
+      const testUserEmail = `asaas.rec.${Date.now()}.${Math.floor(Math.random() * 10000)}@raiaagentes.com.br`;
+      db.prepare(`
+        INSERT INTO users (name, phone_number, email, role, subscription_status, subscription_origin)
+        VALUES ('Asaas Recovery User', ?, ?, 'CLIENT', 'PENDING', 'ASAAS')
+      `).run(testUserPhone, testUserEmail);
+      const testUser = db.prepare('SELECT id FROM users WHERE email = ?').get(testUserEmail);
+
+      db.prepare(`
+        INSERT INTO direct_sales_contracts (user_id, plan_tier, promotion, monthly_cents, setup_cents, payment_method, payment_status, created_by, asaas_payment_id)
+        VALUES (?, 'JESSICA_PRO', 'STANDARD', 8900, 0, 'PIX', 'AWAITING_PAYMENT', 1, ?)
+      `).run(testUser.id, testPayId);
+
+      const asaasPayload = {
+        id: testAsaasId,
+        event: 'PAYMENT_RECEIVED',
+        payment: { id: testPayId, value: 89, status: 'RECEIVED' }
+      };
+
+      // 1. Simular falha durante a transação
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS trg_test_fail_tx_asaas
+        BEFORE INSERT ON direct_sales_events
+        WHEN NEW.notes LIKE '%Pagamento Asaas confirmado: R$ 89%'
+        BEGIN
+          SELECT RAISE(FAIL, 'Falha simulada na transação financeira');
+        END;
+      `);
+
+      let threw = false;
+      try {
+        await asaasService.handleWebhookEvent(asaasPayload);
+      } catch (err) {
+        threw = true;
+        assert.ok(err.message.includes('Falha simulada na transação'), 'Erro deve ser propagado');
+      } finally {
+        db.exec('DROP TRIGGER IF EXISTS trg_test_fail_tx_asaas');
+      }
+
+      assert.ok(threw, 'Transação deve falhar');
+
+      // Status no asaas_webhook_events deve ser 'ERROR'
+      const eventRow = db.prepare('SELECT status FROM asaas_webhook_events WHERE event_id = ?').get(testAsaasId);
+      assert.strictEqual(eventRow.status, 'ERROR', 'Evento deve estar marcado como ERROR após falha na transação');
+
+      // Contrato não deve ter sido alterado (Rollback)
+      const uncommittedContract = db.prepare('SELECT payment_status FROM direct_sales_contracts WHERE asaas_payment_id = ?').get(testPayId);
+      assert.strictEqual(uncommittedContract.payment_status, 'AWAITING_PAYMENT', 'Rollback deve garantir que contrato permaneça AWAITING_PAYMENT');
+
+      // 2. Repetir o evento (recuperação)
+      const resRetry = await asaasService.handleWebhookEvent(asaasPayload);
+      assert.strictEqual(resRetry.received, true);
+      assert.strictEqual(resRetry.duplicate, undefined, 'Retry não deve ser considerado duplicata');
+
+      // Contrato e usuário agora devem estar pagos/ativos
+      const updatedContract = db.prepare('SELECT payment_status FROM direct_sales_contracts WHERE asaas_payment_id = ?').get(testPayId);
+      assert.strictEqual(updatedContract.payment_status, 'PAID', 'Contrato deve ser atualizado para PAID após recuperação');
+
+      // Evento agora deve ter status 'PROCESSED'
+      const eventRowSuccess = db.prepare('SELECT status FROM asaas_webhook_events WHERE event_id = ?').get(testAsaasId);
+      assert.strictEqual(eventRowSuccess.status, 'PROCESSED', 'Evento deve estar marcado como PROCESSED após retry bem-sucedido');
+
+      // 3. Terceira execução (duplicata real): deve retornar duplicate: true
+      const resDuplicate = await asaasService.handleWebhookEvent(asaasPayload);
+      assert.strictEqual(resDuplicate.duplicate, true, 'Chamada subsequente após PROCESSED deve retornar duplicate: true');
+
+      // Limpeza
+      db.prepare('DELETE FROM direct_sales_payments WHERE contract_id IN (SELECT id FROM direct_sales_contracts WHERE asaas_payment_id = ?)').run(testPayId);
+      db.prepare('DELETE FROM direct_sales_events WHERE contract_id IN (SELECT id FROM direct_sales_contracts WHERE asaas_payment_id = ?)').run(testPayId);
+      db.prepare('DELETE FROM subscription_audit_logs WHERE user_id = ?').run(testUser.id);
+      db.prepare('DELETE FROM customer_subscriptions WHERE user_id = ?').run(testUser.id);
+      db.prepare('DELETE FROM direct_sales_contracts WHERE asaas_payment_id = ?').run(testPayId);
+      db.prepare('DELETE FROM asaas_payments WHERE asaas_id = ?').run(testPayId);
+      db.prepare('DELETE FROM users WHERE id = ?').run(testUser.id);
+    });
+
+    // -------------------------------------------------------------
+    // Test 48: Webhook Hotmart Recuperação de Eventos e Transacionalidade
+    // -------------------------------------------------------------
+    await test('48. Webhook Hotmart recuperação de eventos falhos (ERROR) e idempotência pós-sucesso', async () => {
+      const hotmartService = require('../src/services/hotmartService');
+      const testHotmartId = `evt_recovery_hotmart_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      const testTx = `TR_REC_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+      const testEmail = `hotmart.rec.${Date.now()}.${Math.floor(Math.random() * 10000)}@raiaagentes.com.br`;
+      const testPhone = '55119' + Math.floor(10000000 + Math.random() * 90000000);
+
+      const hotmartPayload = {
+        id: testHotmartId,
+        event: 'PURCHASE_APPROVED',
+        creation_date: Date.now(),
+        data: {
+          purchase: { transaction: testTx, status: 'APPROVED' },
+          buyer: { name: 'Hotmart Recovery Test', email: testEmail, checkout_phone: testPhone }
+        }
+      };
+
+      // 1. Simular falha na transação Hotmart
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS trg_test_fail_tx_hotmart
+        BEFORE INSERT ON customer_subscriptions
+        WHEN NEW.gateway_payment_id = '${testTx}'
+        BEGIN
+          SELECT RAISE(FAIL, 'Falha simulada na sincronização de assinatura Hotmart');
+        END;
+      `);
+
+      const resFail = await hotmartService.processWebhook(hotmartPayload);
+      db.exec('DROP TRIGGER IF EXISTS trg_test_fail_tx_hotmart');
+
+      assert.strictEqual(resFail.success, false, 'Deve retornar success: false');
+
+      // Status no hotmart_webhook_events deve ser 'ERROR'
+      const eventRowErr = db.prepare('SELECT status FROM hotmart_webhook_events WHERE event_id = ?').get(testHotmartId);
+      assert.strictEqual(eventRowErr.status, 'ERROR', 'Evento deve ter status ERROR');
+
+      // Rollback deve ter desfeito qualquer inserção de usuário com esta transação
+      const userAfterFail = db.prepare('SELECT id FROM users WHERE hotmart_transaction = ?').get(testTx);
+      assert.strictEqual(userAfterFail, undefined, 'Rollback deve garantir que nenhum usuário parcial persista');
+
+      // 2. Retry do evento: NÃO pode ser descartado como duplicata, deve ser processado
+      const resRetry = await hotmartService.processWebhook(hotmartPayload);
+      assert.strictEqual(resRetry.success, true, 'Retry de evento anteriormente em ERROR deve ser executado com sucesso');
+      assert.strictEqual(resRetry.duplicated, undefined, 'Retry não pode ser descartado como duplicata');
+
+      // Status no hotmart_webhook_events deve ser promovido a 'PROCESSED'
+      const eventRowProcessed = db.prepare('SELECT status FROM hotmart_webhook_events WHERE event_id = ?').get(testHotmartId);
+      assert.strictEqual(eventRowProcessed.status, 'PROCESSED', 'Evento deve ser promovido a PROCESSED');
+
+      // Usuário agora deve existir
+      const userSuccess = db.prepare('SELECT id, subscription_status FROM users WHERE email = ?').get(testEmail);
+      assert.ok(userSuccess, 'Usuário deve ser criado após recuperação');
+
+      // 3. Terceira execução: agora sim deve ser duplicata ignorada
+      const resDup = await hotmartService.processWebhook(hotmartPayload);
+      assert.strictEqual(resDup.success, true);
+      assert.strictEqual(resDup.duplicated, true, 'Após PROCESSED, deve retornar duplicated: true');
+
+      // Limpeza segura respeitando foreign keys
+      db.prepare('DELETE FROM subscription_audit_logs WHERE user_id = ?').run(userSuccess.id);
+      db.prepare('DELETE FROM customer_subscriptions WHERE user_id = ?').run(userSuccess.id);
+      db.prepare('DELETE FROM users WHERE id = ?').run(userSuccess.id);
+    });
+
+    // -------------------------------------------------------------
+    // Test 49: Validação de Token Hotmart (Header vs Body vs Query Params)
+    // -------------------------------------------------------------
+    await test('49. Validação de token Hotmart aceita header e body payload, e rejeita query string', async () => {
+      const hotmartService = require('../src/services/hotmartService');
+      const validSecret = 'SecretHotmartToken2026';
+
+      // 1. Header oficial X-HOTMART-HOTTOK -> Válido
+      const reqHeader = { headers: { 'x-hotmart-hottok': validSecret }, body: {} };
+      assert.strictEqual(hotmartService.validateHotmartHeader(reqHeader, validSecret), true);
+
+      // 2. Body payload hottok -> Válido (especificação oficial de payload Hotmart)
+      const reqBody = { headers: {}, body: { hottok: validSecret } };
+      assert.strictEqual(hotmartService.validateHotmartHeader(reqBody, validSecret), true);
+
+      // 3. Query string (?hottok=...) -> REJEITADO (prevenção contra vazamento em logs)
+      const reqQuery = { headers: {}, body: {}, query: { hottok: validSecret } };
+      assert.strictEqual(hotmartService.validateHotmartHeader(reqQuery, validSecret), false);
+
+      // 4. Token ausente ou divergente -> REJEITADO
+      const reqBad = { headers: { 'x-hotmart-hottok': 'token_errado' }, body: {} };
+      assert.strictEqual(hotmartService.validateHotmartHeader(reqBad, validSecret), false);
     });
 
   } finally {

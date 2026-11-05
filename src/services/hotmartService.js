@@ -5,7 +5,10 @@ const clientAuth = require('./clientAuthService');
 const hotmartReconciliation = require('./hotmartReconciliationService');
 
 /**
- * Validate Hotmart Webhook authenticity via official X-HOTMART-HOTTOK header
+ * Validate Hotmart Webhook authenticity
+ * Hotmart Webhooks 2.0 delivers the validation token in the official header X-HOTMART-HOTTOK,
+ * or within the JSON body payload (req.body.hottok) in standard v1/v2 webhook transmissions.
+ * Query string parameters (?hottok=...) are strictly forbidden to prevent token leaks in access logs.
  */
 function validateHotmartHeader(req, customSecret = null) {
   const secret = (customSecret || config.hotmartWebhookSecret || '').trim();
@@ -16,7 +19,7 @@ function validateHotmartHeader(req, customSecret = null) {
 
   if (!req || !req.headers) return false;
 
-  // Official Hotmart webhook token header (or request body; query parameters are strictly forbidden)
+  // Primary: Official X-HOTMART-HOTTOK header. Fallback: JSON body payload parameter. Query parameters strictly forbidden.
   const headerToken = (
     req.headers['x-hotmart-hottok'] ||
     req.headers['hottok'] ||
@@ -176,11 +179,64 @@ async function processWebhook(payload, whatsappSender = null) {
   const planId = String(subscription.plan?.id || data.plan?.id || purchase.offer?.code || '');
   const planTier = resolvePlanTier(data);
 
-  // 2. Strict Idempotency Check
+  // Sanitize audit payload (without tokens or passwords)
+  const auditPayload = JSON.stringify({
+    eventId,
+    eventName,
+    eventCreationDate,
+    transactionCode,
+    subscriberCode,
+    productId,
+    planTier,
+    buyerEmailMasked: buyerEmail ? buyerEmail.replace(/^(.{2})(.*)(@.*)$/, '$1***$3') : null,
+    buyerPhoneSuffix: buyerPhone ? buyerPhone.slice(-4) : null,
+    orderDate: purchase.order_date || purchase.approved_date || new Date().toISOString(),
+  });
+
+  // 2. Strict Idempotency Check with Error Recovery (Proteção 19)
   const existingEvent = db.prepare('SELECT id, status FROM hotmart_webhook_events WHERE event_id = ?').get(eventId);
   if (existingEvent) {
-    console.log(`[Hotmart Webhook] Evento duplicado ignorado (ID: ${eventId}, Evento: ${eventName})`);
-    return { success: true, duplicated: true, status: 'ignored', message: 'Evento já processado anteriormente.' };
+    if (existingEvent.status === 'PROCESSED' || existingEvent.status === 'IGNORED_OUT_OF_ORDER') {
+      console.log(`[Hotmart Webhook] Evento já concluído anteriormente ignorado (ID: ${eventId}, Evento: ${eventName})`);
+      return { success: true, duplicated: true, status: 'ignored', message: 'Evento já processado anteriormente.' };
+    }
+    console.warn(`[Hotmart Webhook] Re-tentativa recebida para evento com status anterior '${existingEvent.status}' (ID: ${eventId}). Retomando processamento com recuperação segura.`);
+    try {
+      db.prepare("UPDATE hotmart_webhook_events SET status = 'PROCESSING', updated_at = CURRENT_TIMESTAMP WHERE event_id = ?").run(eventId);
+    } catch (updErr) {
+      console.error('[Hotmart Webhook] Falha ao atualizar status de evento para reprocessamento:', updErr.message);
+      return { success: false, error: updErr.message };
+    }
+  } else {
+    try {
+      db.prepare(`
+        INSERT INTO hotmart_webhook_events (
+          event_id, event_name, creation_date, transaction_code, subscriber_code,
+          buyer_email, buyer_phone, product_id, plan_id, raw_payload, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PROCESSING')
+      `).run(
+        eventId,
+        eventName,
+        eventCreationDate,
+        transactionCode,
+        subscriberCode,
+        buyerEmail,
+        buyerPhone,
+        productId,
+        planId,
+        auditPayload
+      );
+    } catch (insErr) {
+      if (insErr.message && insErr.message.includes('UNIQUE')) {
+        const raceEvt = db.prepare('SELECT id, status FROM hotmart_webhook_events WHERE event_id = ?').get(eventId);
+        if (raceEvt && (raceEvt.status === 'PROCESSED' || raceEvt.status === 'IGNORED_OUT_OF_ORDER')) {
+          console.log(`[Hotmart Webhook] Evento ${eventId} já registrado e concluído em concorrência.`);
+          return { success: true, duplicated: true, status: 'ignored', message: 'Evento já processado anteriormente.' };
+        }
+      }
+      console.error('[Hotmart Webhook] Falha crítica ao persistir evento de idempotência:', insErr.message);
+      return { success: false, error: insErr.message };
+    }
   }
 
   // 3. Find target user if already exists in database
@@ -205,7 +261,7 @@ async function processWebhook(payload, whatsappSender = null) {
     if (terminalStatuses.includes(existingUser.subscription_status)) {
       console.warn(`[Hotmart Webhook] Evento fora de ordem descartado: ${eventName} (creation_date: ${eventCreationDate}) recebido após evento mais recente (${existingUser.hotmart_last_event_at}) do usuário #${existingUser.id} em status terminal ${existingUser.subscription_status}.`);
 
-      const auditPayload = JSON.stringify({
+      const outOfOrderPayload = JSON.stringify({
         eventId,
         eventName,
         eventCreationDate,
@@ -215,14 +271,10 @@ async function processWebhook(payload, whatsappSender = null) {
       });
 
       db.prepare(`
-        INSERT INTO hotmart_webhook_events (
-          event_id, event_name, creation_date, transaction_code, subscriber_code,
-          buyer_email, buyer_phone, product_id, plan_id, raw_payload, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'IGNORED_OUT_OF_ORDER')
-      `).run(
-        eventId, eventName, eventCreationDate, transactionCode, subscriberCode,
-        buyerEmail, buyerPhone, productId, planId, auditPayload
-      );
+        UPDATE hotmart_webhook_events
+        SET status = 'IGNORED_OUT_OF_ORDER', raw_payload = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE event_id = ?
+      `).run(outOfOrderPayload, eventId);
 
       return {
         success: true,
@@ -234,41 +286,10 @@ async function processWebhook(payload, whatsappSender = null) {
     }
   }
 
-  // Sanitize audit payload (without tokens or passwords)
-  const auditPayload = JSON.stringify({
-    eventId,
-    eventName,
-    eventCreationDate,
-    transactionCode,
-    subscriberCode,
-    productId,
-    planTier,
-    buyerEmailMasked: buyerEmail ? buyerEmail.replace(/^(.{2})(.*)(@.*)$/, '$1***$3') : null,
-    buyerPhoneSuffix: buyerPhone ? buyerPhone.slice(-4) : null,
-    orderDate: purchase.order_date || purchase.approved_date || new Date().toISOString(),
-  });
-
-  // Record event in log with creation_date
-  db.prepare(`
-    INSERT INTO hotmart_webhook_events (
-      event_id, event_name, creation_date, transaction_code, subscriber_code,
-      buyer_email, buyer_phone, product_id, plan_id, raw_payload, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PROCESSING')
-  `).run(
-    eventId,
-    eventName,
-    eventCreationDate,
-    transactionCode,
-    subscriberCode,
-    buyerEmail,
-    buyerPhone,
-    productId,
-    planId,
-    auditPayload
-  );
-
   let processingResult = { success: true };
+  let pendingWhatsApp = null;
 
+  db.exec('BEGIN IMMEDIATE');
   try {
     // 5. Handle Affiliate Attribution if present
     if (affiliate.code || affiliate.affiliate_code) {
@@ -408,29 +429,24 @@ async function processWebhook(payload, whatsappSender = null) {
         // Ensure salon record exists
         clientAuth.ensureSalonForUser(existingUser.id, buyerName);
 
-        // Send activation WhatsApp message if telephone is available
-        if (buyerPhone && buyerPhone.length >= 10 && whatsappSender) {
-          try {
-            const targetJid = `${buyerPhone}@s.whatsapp.net`;
-            const activationUrl = activationToken
-              ? `${config.baseUrl}/cliente/ativar?token=${activationToken}`
-              : `${config.baseUrl}/cliente/login`;
+        // Schedule activation WhatsApp message for delivery after atomic DB commit
+        if (buyerPhone && buyerPhone.length >= 10 && typeof whatsappSender === 'function') {
+          const targetJid = `${buyerPhone}@s.whatsapp.net`;
+          const activationUrl = activationToken
+            ? `${config.baseUrl}/cliente/ativar?token=${activationToken}`
+            : `${config.baseUrl}/cliente/login`;
 
-            const planLabel = planTier === 'JESSICA_PRO' ? 'Jéssica Pro 🌟' : 'Jéssica Start ✂️';
+          const planLabel = planTier === 'JESSICA_PRO' ? 'Jéssica Pro 🌟' : 'Jéssica Start ✂️';
 
-            const welcomeMsg =
-              `🎉 *PAGAMENTO APROVADO! SEJA BEM-VINDO(A)!* 🚀\n\n` +
-              `Olá, *${buyerName.split(' ')[0]}*! Confirmamos a sua assinatura do plano *${planLabel}* na Hotmart!\n\n` +
-              `O seu Assistente Inteligente já está reservado e pronto para ser configurado.\n\n` +
-              `👉 *Clique no link abaixo para criar sua senha e acessar o painel do seu salão:*\n` +
-              `${activationUrl}\n\n` +
-              `_Precisa de ajuda no primeiro acesso? Basta responder esta mensagem!_ 💇‍♀️✨`;
+          const welcomeMsg =
+            `🎉 *PAGAMENTO APROVADO! SEJA BEM-VINDO(A)!* 🚀\n\n` +
+            `Olá, *${buyerName.split(' ')[0]}*! Confirmamos a sua assinatura do plano *${planLabel}* na Hotmart!\n\n` +
+            `O seu Assistente Inteligente já está reservado e pronto para ser configurado.\n\n` +
+            `👉 *Clique no link abaixo para criar sua senha e acessar o painel do seu salão:*\n` +
+            `${activationUrl}\n\n` +
+            `_Precisa de ajuda no primeiro acesso? Basta responder esta mensagem!_ 💇‍♀️✨`;
 
-            await whatsappSender(targetJid, welcomeMsg);
-            console.log(`[Hotmart Webhook] Mensagem de boas-vindas enviada para WhatsApp ${buyerPhone}`);
-          } catch (waErr) {
-            console.warn('[Hotmart Webhook] Erro ao enviar WhatsApp de boas-vindas:', waErr.message);
-          }
+          pendingWhatsApp = { targetJid, welcomeMsg, phone: buyerPhone };
         }
 
         processingResult = {
@@ -709,8 +725,7 @@ async function processWebhook(payload, whatsappSender = null) {
     }
 
     // Sync customer_subscriptions for multiproduct
-    try {
-      const targetUser = existingUser?.id ? db.prepare('SELECT * FROM users WHERE id = ?').get(existingUser.id) : null;
+    const targetUser = existingUser?.id ? db.prepare('SELECT * FROM users WHERE id = ?').get(existingUser.id) : null;
       if (targetUser) {
         const jessica = db.prepare("SELECT id FROM products WHERE code = 'JESSICA'").get();
         if (jessica) {
@@ -781,19 +796,30 @@ async function processWebhook(payload, whatsappSender = null) {
           }
         }
       }
-    } catch (csErr) {
-      console.warn('[Hotmart Webhook] Aviso ao sincronizar customer_subscriptions:', csErr.message);
-    }
 
-    // Mark event as processed in audit table
-    db.prepare("UPDATE hotmart_webhook_events SET status = 'PROCESSED' WHERE event_id = ?").run(eventId);
-
-    return processingResult;
+    // Mark event as processed in audit table and commit atomic transaction
+    db.prepare("UPDATE hotmart_webhook_events SET status = 'PROCESSED', updated_at = CURRENT_TIMESTAMP WHERE event_id = ?").run(eventId);
+    db.exec('COMMIT');
   } catch (err) {
-    db.prepare("UPDATE hotmart_webhook_events SET status = 'ERROR' WHERE event_id = ?").run(eventId);
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    try {
+      db.prepare("UPDATE hotmart_webhook_events SET status = 'ERROR', updated_at = CURRENT_TIMESTAMP WHERE event_id = ?").run(eventId);
+    } catch (_) {}
     console.error(`[Hotmart Webhook] Erro ao processar evento ${eventName} (ID: ${eventId}):`, err);
     return { success: false, error: err.message };
   }
+
+  // After successful atomic DB commit, dispatch welcome WhatsApp message if scheduled
+  if (pendingWhatsApp && typeof whatsappSender === 'function') {
+    try {
+      await whatsappSender(pendingWhatsApp.targetJid, pendingWhatsApp.welcomeMsg);
+      console.log(`[Hotmart Webhook] Mensagem de boas-vindas enviada para WhatsApp ${pendingWhatsApp.phone}`);
+    } catch (waErr) {
+      console.warn('[Hotmart Webhook] Erro ao enviar WhatsApp de boas-vindas:', waErr.message);
+    }
+  }
+
+  return processingResult;
 }
 
 function getIntegrationStatus() {

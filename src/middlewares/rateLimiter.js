@@ -12,6 +12,8 @@
  * Uses strictly validated client IP via trusted reverse proxy (req.ip).
  */
 
+const crypto = require('crypto');
+
 let dbInstance = null;
 function getDb() {
   if (!dbInstance) {
@@ -247,9 +249,25 @@ const cspReportLimiter = createRateLimiter({
   message: 'Limite de relatórios CSP excedido.',
 });
 
+// Dedicated persistent rate limiter for MFA verification & activation (Proteção 01 & 12)
+const adminMfaLimiter = createRateLimiter({
+  name: 'admin_mfa',
+  windowMs: 15 * 60 * 1000,
+  maxAttempts: 5,
+  message: 'Limite de tentativas de autenticação multifator excedido. Tente novamente em 15 minutos.',
+  keyGenerator: (req) => {
+    const ip = req.ip || req.socket?.remoteAddress || '127.0.0.1';
+    const userIdentifier = req.user?.id
+      ? `uid_${req.user.id}`
+      : (req.headers.authorization ? `auth_${crypto.createHash('sha256').update(req.headers.authorization).digest('hex').slice(0, 16)}` : 'anon');
+    return `${ip}:${userIdentifier}:${req.baseUrl || ''}${req.path || ''}`;
+  },
+});
+
 module.exports = {
   createRateLimiter,
   adminLoginLimiter,
+  adminMfaLimiter,
   clientLoginLimiter,
   activationLimiter,
   passwordResetRequestLimiter,

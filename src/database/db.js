@@ -370,7 +370,9 @@ db.exec(`
     subscription_id TEXT,
     customer_id TEXT,
     payload TEXT,
-    processed_at TEXT DEFAULT CURRENT_TIMESTAMP
+    status TEXT DEFAULT 'PROCESSED',
+    processed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
   CREATE INDEX IF NOT EXISTS idx_asaas_events_event_id ON asaas_webhook_events(event_id);
 
@@ -737,7 +739,10 @@ ensureColumnExists('customer_subscriptions', 'contract_id', 'INTEGER');
 ensureColumnExists('asaas_payments', 'subscription_id', 'TEXT');
 ensureColumnExists('asaas_payments', 'user_id', 'INTEGER');
 ensureColumnExists('asaas_payments', 'event_type', 'TEXT');
+ensureColumnExists('asaas_webhook_events', 'status', "TEXT DEFAULT 'PROCESSED'");
+ensureColumnExists('asaas_webhook_events', 'updated_at', 'TEXT');
 ensureColumnExists('hotmart_webhook_events', 'creation_date', 'INTEGER');
+ensureColumnExists('hotmart_webhook_events', 'updated_at', 'TEXT');
 
 ensureColumnExists('expenses', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumnExists('incomes', 'user_id', 'INTEGER NOT NULL DEFAULT 1');

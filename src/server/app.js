@@ -25,6 +25,7 @@ const productService = require('../services/productService');
 const { PLANS } = require('../services/planCatalog');
 const {
   adminLoginLimiter,
+  adminMfaLimiter,
   leadTestLimiter,
   ttsLimiter,
   analyticsLimiter,
@@ -265,7 +266,6 @@ app.use((req, res, next) => {
     '/api/test-agent',
     '/api/security/csp-report',
     '/api/auth/admin-login',
-    '/api/auth/mfa/verify',
     '/api/cliente/auth/login',
     '/api/cliente/auth/request-reset',
     '/api/cliente/auth/reset-password',
@@ -1087,6 +1087,10 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
 
     const payload = req.body || {};
     const result = await hotmartService.processWebhook(payload, whatsappClient.sendWhatsAppMessage);
+
+    if (!result.success) {
+      return res.status(500).json(result);
+    }
 
     // If purchase was approved, dispatch Meta CAPI server-side event (Strictly suppressed in Staging)
     const isStagingHotmart = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging' || process.env.APP_MODE === 'homologacao';
@@ -1918,7 +1922,7 @@ app.post('/api/auth/admin-login', adminLoginLimiter, (req, res) => {
 // ==========================================
 // ADMIN MFA CHALLENGE VERIFICATION (FOR PRE-AUTH SESSIONS / MAGIC LINKS)
 // ==========================================
-app.post('/api/auth/mfa/verify', requireAdmin, (req, res) => {
+app.post('/api/auth/mfa/verify', adminMfaLimiter, requireAdmin, (req, res) => {
   if (req.authMethod !== 'SESSION' || !req.user || req.user.role !== 'ADMIN') {
     return res.status(403).json({
       success: false,
@@ -2039,7 +2043,7 @@ app.get('/api/admin/mfa/status', requireInteractiveAdmin, (req, res) => {
 });
 
 // Admin MFA: Secure Regeneration of Recovery Codes by Authenticated Admin
-app.post('/api/admin/mfa/regenerate-recovery-codes', requireInteractiveAdmin, (req, res) => {
+app.post('/api/admin/mfa/regenerate-recovery-codes', adminMfaLimiter, requireInteractiveAdmin, (req, res) => {
   const { password } = req.body || {};
   const configuredPass = (config.adminPassword || '').trim();
   const timingSafeMatch = (candidate, expected) => {
@@ -2116,7 +2120,7 @@ app.post('/api/admin/mfa/setup', requireInteractiveAdmin, async (req, res) => {
 });
 
 // Admin MFA Enable: Reinforced Authentication & Server-Generated Hashed Recovery Codes (Proteção 01)
-app.post('/api/admin/mfa/enable', requireInteractiveAdmin, (req, res) => {
+app.post('/api/admin/mfa/enable', adminMfaLimiter, requireInteractiveAdmin, (req, res) => {
   const { password, secret, code } = req.body || {};
   if (!secret || !code) {
     return res.status(400).json({ success: false, error: 'Secret e código TOTP são obrigatórios para ativação.' });
@@ -2170,7 +2174,7 @@ app.post('/api/admin/mfa/enable', requireInteractiveAdmin, (req, res) => {
 });
 
 // Admin MFA Disable: Reinforced Authentication (Requires admin password + current MFA verification) (Proteção 01)
-app.post('/api/admin/mfa/disable', requireInteractiveAdmin, (req, res) => {
+app.post('/api/admin/mfa/disable', adminMfaLimiter, requireInteractiveAdmin, (req, res) => {
   const { password, code } = req.body || {};
   const configuredPass = (config.adminPassword || '').trim();
 
