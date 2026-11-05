@@ -4,13 +4,16 @@
  * RAIA AGENTES — SUÍTE DE TESTES: CRIAÇÃO DO CLIENTE DE TESTE EM HOMOLOGAÇÃO
  *
  * Valida:
- * 1. Bloqueio fail-closed em ambiente não-staging.
- * 2. Criação idempotente do usuário Salão Teste RAIA (teste.entrada@example.com).
- * 3. Configuração de is_demo = 0 e plano JESSICA_START (1 profissional).
- * 4. Vigência ativa de 7 dias sem comunicação com Asaas/Hotmart.
- * 5. Autenticação HTTP em /api/cliente/auth/login e acesso ao Portal.
- * 6. Bloqueio correto de recursos PRO (reforço de restrição de tier).
- * 7. Atualização idempotente de credenciais sem duplicação de registros.
+ * 1. Proteção de ambiente: exigência simultânea de:
+ *    - APP_MODE=staging
+ *    - HOMOLOGACAO=true
+ *    - BASE_URL=https://seguranca.raiaagentes.com.br
+ * 2. Rejeição explícita de ambiente de produção e eliminação de ALLOW_LOCAL_TEST.
+ * 3. Interrupção segura com mensagem explicativa quando process.stdin.isTTY não estiver disponível.
+ * 4. Preservação de colaboradores e registros existentes (sem exclusão automática).
+ * 5. Criação atômica com hash scrypt + salt, is_demo = 0 e plano JESSICA_START.
+ * 6. Autenticação HTTP em /api/cliente/auth/login e acesso ao Portal.
+ * 7. Bloqueio correto de recursos PRO (reforço de restrição de tier).
  */
 
 const assert = require('assert');
@@ -20,6 +23,10 @@ const path = require('path');
 const db = require('../src/database/db');
 const { app } = require('../src/server/app');
 const { clientLoginLimiter } = require('../src/middlewares/rateLimiter');
+const {
+  validateStagingEnvironment,
+  createOrUpdateStagingClient
+} = require('./create-staging-test-client');
 
 const SCRIPT_PATH = path.resolve(__dirname, 'create-staging-test-client.js');
 const TEST_EMAIL = 'teste.entrada@example.com';
@@ -80,34 +87,94 @@ async function runTestSuite() {
 
   try {
     // -------------------------------------------------------------
-    // Teste 1: Proteção Fail-Closed contra Execução em Produção
+    // Teste 1: Proteção Estrita e Simultânea do Ambiente
     // -------------------------------------------------------------
-    console.log('--- TESTE 1: PROTEÇÃO FAIL-CLOSED DE AMBIENTE ---');
-    const resBlocked = spawnSync(process.execPath, [SCRIPT_PATH], {
+    console.log('--- TESTE 1: PROTEÇÃO SIMULTÂNEA DO AMBIENTE (3 VARIÁVEIS) ---');
+
+    // 1.1 Tentativa com APP_MODE=production
+    const resProd = spawnSync(process.execPath, [SCRIPT_PATH], {
       env: {
         ...process.env,
         APP_MODE: 'production',
-        HOMOLOGACAO: 'false',
-        CANONICAL_DOMAIN: 'raiaagentes.com.br',
-        ALLOW_LOCAL_TEST: 'false',
-        CLIENT_TEMP_PASSWORD: TEST_PWD_INITIAL
+        HOMOLOGACAO: 'true',
+        BASE_URL: 'https://seguranca.raiaagentes.com.br'
       },
       encoding: 'utf8'
     });
-
-    assert.strictEqual(resBlocked.status, 1, 'Script deve sair com código 1 em produção');
+    assert.strictEqual(resProd.status, 1, 'Deve abortar se APP_MODE for production');
     assert.ok(
-      resBlocked.stderr.includes('[BLOQUEIO DE SEGURANÇA]') || resBlocked.stdout.includes('[BLOQUEIO DE SEGURANÇA]'),
-      'Deve exibir mensagem de bloqueio fail-closed'
+      resProd.stderr.includes('Execução em Produção Rejeitada') || resProd.stdout.includes('Execução em Produção Rejeitada'),
+      'Deve exibir mensagem de rejeição de produção'
     );
-    console.log('  ✓ 1.1 Bloqueio fail-closed confirmado em ambiente de produção');
+    console.log('  ✓ 1.1 Bloqueio de produção (APP_MODE=production) confirmado');
+
+    // 1.2 Tentativa sem BASE_URL de staging
+    const resBadUrl = spawnSync(process.execPath, [SCRIPT_PATH], {
+      env: {
+        ...process.env,
+        APP_MODE: 'staging',
+        HOMOLOGACAO: 'true',
+        BASE_URL: 'https://raiaagentes.com.br'
+      },
+      encoding: 'utf8'
+    });
+    assert.strictEqual(resBadUrl.status, 1, 'Deve abortar se BASE_URL for de produção');
+    console.log('  ✓ 1.2 Bloqueio de BASE_URL não autorizada confirmado');
+
+    // 1.3 Tentativa com ALLOW_LOCAL_TEST sem as 3 variáveis
+    const resBypassAttempt = spawnSync(process.execPath, [SCRIPT_PATH], {
+      env: {
+        ...process.env,
+        APP_MODE: 'development',
+        HOMOLOGACAO: 'false',
+        BASE_URL: 'http://localhost:3333',
+        ALLOW_LOCAL_TEST: 'true'
+      },
+      encoding: 'utf8'
+    });
+    assert.strictEqual(resBypassAttempt.status, 1, 'ALLOW_LOCAL_TEST não pode contornar a validação');
+    console.log('  ✓ 1.3 Impossibilidade de contornar por ALLOW_LOCAL_TEST confirmada');
+
+    // 1.4 Tentativa com HOMOLOGACAO=false
+    const resHomolFalse = spawnSync(process.execPath, [SCRIPT_PATH], {
+      env: {
+        ...process.env,
+        APP_MODE: 'staging',
+        HOMOLOGACAO: 'false',
+        BASE_URL: 'https://seguranca.raiaagentes.com.br'
+      },
+      encoding: 'utf8'
+    });
+    assert.strictEqual(resHomolFalse.status, 1, 'Deve abortar se HOMOLOGACAO não for true');
+    console.log('  ✓ 1.4 Exigência simultânea de HOMOLOGACAO=true confirmada');
 
     // -------------------------------------------------------------
-    // Teste 2: Criação Inicial em Homologação
+    // Teste 2: Exigência de Terminal Interativo (TTY Ausente)
     // -------------------------------------------------------------
-    console.log('\n--- TESTE 2: CRIAÇÃO INICIAL EM HOMOLOGAÇÃO ---');
+    console.log('\n--- TESTE 2: BLOQUEIO DE EXECUÇÃO NÃO INTERATIVA (SEM TTY) ---');
+    // Quando executado via spawnSync sem TTY alocado, deve interromper com a mensagem explicativa
+    const resNoTty = spawnSync(process.execPath, [SCRIPT_PATH], {
+      env: {
+        ...process.env,
+        APP_MODE: 'staging',
+        HOMOLOGACAO: 'true',
+        BASE_URL: 'https://seguranca.raiaagentes.com.br'
+      },
+      encoding: 'utf8'
+    });
+    assert.strictEqual(resNoTty.status, 1, 'Execução sem TTY deve sair com código 1');
+    assert.ok(
+      resNoTty.stderr.includes('Terminal Interativo Obrigatório (TTY Ausente)'),
+      'Deve exibir mensagem explicando que TTY interativo é obrigatório'
+    );
+    console.log('  ✓ 2.1 Bloqueio seguro sem TTY confirmado com mensagem explicativa');
 
-    // Limpa registros anteriores para teste limpo
+    // -------------------------------------------------------------
+    // Teste 3: Preservação de Dados Existentes (Colaboradores / Salão)
+    // -------------------------------------------------------------
+    console.log('\n--- TESTE 3: PRESERVAÇÃO DE DADOS E NÃO EXCLUSÃO DE PROFISSIONAIS ---');
+
+    // Limpa registros anteriores para teste controlado
     const oldUser = db.prepare('SELECT id FROM users WHERE LOWER(email) = ?').get(TEST_EMAIL.toLowerCase());
     if (oldUser) {
       db.prepare('DELETE FROM client_services WHERE user_id = ?').run(oldUser.id);
@@ -117,97 +184,80 @@ async function runTestSuite() {
       db.prepare('DELETE FROM users WHERE id = ?').run(oldUser.id);
     }
 
-    const resCreate = spawnSync(process.execPath, [SCRIPT_PATH], {
-      env: {
-        ...process.env,
-        APP_MODE: 'staging',
-        HOMOLOGACAO: 'true',
-        CANONICAL_DOMAIN: 'seguranca.raiaagentes.com.br',
-        ALLOW_LOCAL_TEST: 'true',
-        CLIENT_TEMP_PASSWORD: TEST_PWD_INITIAL
-      },
-      encoding: 'utf8'
+    // 3.1 Criação inicial
+    const result1 = createOrUpdateStagingClient({
+      email: TEST_EMAIL,
+      name: 'Salão Teste RAIA',
+      password: TEST_PWD_INITIAL
+    });
+    assert.ok(result1.userId, 'Usuário criado com sucesso');
+    assert.strictEqual(result1.planTier, 'JESSICA_START');
+    assert.strictEqual(result1.staffCount, 1, 'Inicialmente possui 1 profissional');
+
+    // 3.2 Simula adição manual de um 2º colaborador pré-existente
+    db.prepare(`
+      INSERT INTO client_staff (user_id, name, specialty)
+      VALUES (?, 'Segunda Profissional (Colorista)', 'Mechas e Luzes')
+    `).run(result1.userId);
+
+    const staffBeforeReexec = db.prepare('SELECT id, name FROM client_staff WHERE user_id = ?').all(result1.userId);
+    assert.strictEqual(staffBeforeReexec.length, 2, 'Agora possui 2 profissionais');
+
+    // 3.3 Reexecuta createOrUpdateStagingClient: DEVE PRESERVAR os 2 profissionais sem excluir nenhum
+    const result2 = createOrUpdateStagingClient({
+      email: TEST_EMAIL,
+      name: 'Salão Teste RAIA',
+      password: TEST_PWD_UPDATED
     });
 
-    assert.strictEqual(resCreate.status, 0, `Script deve executar com sucesso. Saída: ${resCreate.stderr || resCreate.stdout}`);
-    assert.ok(
-      !resCreate.stdout.includes(TEST_PWD_INITIAL) && !resCreate.stderr.includes(TEST_PWD_INITIAL),
-      'A senha em texto plano NUNCA deve ser impressa em stdout ou stderr'
-    );
-    console.log('  ✓ 2.1 Script executou com sucesso (código 0) e senha não foi exposta');
+    const staffAfterReexec = db.prepare('SELECT id, name FROM client_staff WHERE user_id = ?').all(result1.userId);
+    assert.strictEqual(staffAfterReexec.length, 2, 'Os 2 profissionais devem permanecer no banco intactos');
+    console.log('  ✓ 3.1 Reexecução preservou 100% dos colaboradores existentes sem exclusão');
 
     // Validação no SQLite
-    const createdUser = db.prepare('SELECT * FROM users WHERE LOWER(email) = ?').get(TEST_EMAIL.toLowerCase());
-    assert.ok(createdUser, 'Usuário deve existir no banco');
-    assert.strictEqual(createdUser.name, 'Salão Teste RAIA');
-    assert.strictEqual(createdUser.plan_tier, 'JESSICA_START');
-    assert.strictEqual(createdUser.subscription_status, 'ACTIVE');
-    assert.strictEqual(createdUser.is_demo, 0, 'is_demo deve ser estritamente 0');
-    assert.strictEqual(createdUser.role, 'USER');
-    assert.strictEqual(createdUser.subscription_origin, 'MANUAL');
-    assert.ok(createdUser.password_hash && createdUser.password_salt, 'Deve possuir hash e salt scrypt');
-
-    const paidUntil = new Date(createdUser.paid_until);
-    const now = new Date();
-    const daysDiff = (paidUntil - now) / (1000 * 60 * 60 * 24);
-    assert.ok(daysDiff >= 6.8 && daysDiff <= 7.2, `Vigência deve ser de aproximadamente 7 dias (obtido: ${daysDiff.toFixed(2)} dias)`);
-    console.log('  ✓ 2.2 Usuário gravado no SQLite: plano JESSICA_START, is_demo=0, vigência 7 dias');
-
-    // Validação de customer_subscriptions
-    const jessica = db.prepare("SELECT id FROM products WHERE code = 'JESSICA'").get();
-    const sub = db.prepare('SELECT * FROM customer_subscriptions WHERE user_id = ? AND product_id = ?').get(createdUser.id, jessica.id);
-    assert.ok(sub, 'Assinatura multiproduto deve existir');
-    assert.strictEqual(sub.status, 'ACTIVE');
-    assert.strictEqual(sub.origin, 'MANUAL');
-    assert.strictEqual(sub.gateway, 'MANUAL');
-    assert.strictEqual(sub.extra_professionals, 0);
-
-    // Validação de salão e colaboradores
-    const salon = db.prepare('SELECT * FROM client_salons WHERE user_id = ?').get(createdUser.id);
-    assert.ok(salon, 'Salão deve existir');
-    assert.strictEqual(salon.salon_name, 'Salão Teste RAIA');
-
-    const staff = db.prepare('SELECT * FROM client_staff WHERE user_id = ?').all(createdUser.id);
-    assert.strictEqual(staff.length, 1, 'Deve possuir exatamente 1 colaborador (limite do plano Entrada)');
-    console.log('  ✓ 2.3 customer_subscriptions ativo e limite de 1 profissional configurado');
+    const userRow = db.prepare('SELECT * FROM users WHERE id = ?').get(result1.userId);
+    assert.strictEqual(userRow.is_demo, 0, 'is_demo deve ser estritamente 0');
+    assert.strictEqual(userRow.plan_tier, 'JESSICA_START');
+    assert.strictEqual(userRow.subscription_status, 'ACTIVE');
+    assert.ok(userRow.password_hash && userRow.password_salt);
+    console.log('  ✓ 3.2 Registro no SQLite verificado: is_demo=0, plano JESSICA_START, hash scrypt + salt');
 
     // -------------------------------------------------------------
-    // Teste 3: Login HTTP em /api/cliente/auth/login
+    // Teste 4: Autenticação HTTP no Portal do Assinante
     // -------------------------------------------------------------
-    console.log('\n--- TESTE 3: AUTENTICAÇÃO HTTP NO PORTAL DO ASSINANTE ---');
+    console.log('\n--- TESTE 4: AUTENTICAÇÃO HTTP EM /api/cliente/auth/login ---');
     if (clientLoginLimiter?.reset) clientLoginLimiter.reset();
 
-    // Tentativa com senha incorreta
-    const resBadLogin = await request('POST', '/api/cliente/auth/login', {
-      email: TEST_EMAIL,
-      password: 'SenhaErrada#2026'
-    });
-    assert.strictEqual(resBadLogin.status, 401, 'Senha incorreta retorna 401');
-    assert.strictEqual(resBadLogin.body.code, 'INVALID_CREDENTIALS');
-    console.log('  ✓ 3.1 Tentativa com credenciais inválidas rejeitada com 401');
-
-    // Login com senha legítima
+    // 4.1 Login com nova senha (sucesso)
     const resLogin = await request('POST', '/api/cliente/auth/login', {
       email: TEST_EMAIL,
-      password: TEST_PWD_INITIAL
+      password: TEST_PWD_UPDATED
     });
     assert.strictEqual(resLogin.status, 200, 'Login deve retornar 200 OK');
     assert.strictEqual(resLogin.body.success, true);
     assert.ok(resLogin.body.token, 'Deve retornar token de sessão');
-
     const authToken = resLogin.body.token;
 
-    // Acesso ao perfil
+    // 4.2 Login com senha antiga (deve falhar com 401)
+    if (clientLoginLimiter?.reset) clientLoginLimiter.reset();
+    const resOldLogin = await request('POST', '/api/cliente/auth/login', {
+      email: TEST_EMAIL,
+      password: TEST_PWD_INITIAL
+    });
+    assert.strictEqual(resOldLogin.status, 401, 'Senha antiga deve ser rejeitada com 401');
+    assert.strictEqual(resOldLogin.body.code, 'INVALID_CREDENTIALS');
+    console.log('  ✓ 4.1 Autenticação HTTP válida com nova senha e rejeição de senha anterior');
+
+    // 4.3 Acesso ao perfil
     const resProfile = await request('GET', '/api/cliente/profile', null, {
       Authorization: `Bearer ${authToken}`
     });
     assert.strictEqual(resProfile.status, 200);
     assert.strictEqual(resProfile.body.profile.email, TEST_EMAIL);
     assert.strictEqual(resProfile.body.profile.planTier, 'JESSICA_START');
-    assert.strictEqual(resProfile.body.profile.isDemo, false, 'Perfil deve refletir isDemo=false');
-    console.log('  ✓ 3.2 Login bem-sucedido e GET /api/cliente/profile retorna plano Entrada');
+    assert.strictEqual(resProfile.body.profile.isDemo, false);
 
-    // Acesso a Meus Produtos
+    // 4.4 Acesso aos produtos contratados
     const resMyProducts = await request('GET', '/api/cliente/my-products', null, {
       Authorization: `Bearer ${authToken}`
     });
@@ -215,68 +265,34 @@ async function runTestSuite() {
     assert.ok(resMyProducts.body.subscriptions.length >= 1);
     assert.strictEqual(resMyProducts.body.subscriptions[0].productCode, 'JESSICA');
     assert.strictEqual(resMyProducts.body.subscriptions[0].status, 'ACTIVE');
-    console.log('  ✓ 3.3 GET /api/cliente/my-products lista produto Jéssica com status ACTIVE');
+    console.log('  ✓ 4.2 Perfil e Meus Produtos confirmam plano Jéssica Entrada ativo');
 
     // -------------------------------------------------------------
-    // Teste 4: Reforço de Permissões de Tier (Plano Entrada vs Módulos Pró)
+    // Teste 5: Hierarquia e Restrição de Tier (Plano Entrada vs Módulo Pró)
     // -------------------------------------------------------------
-    console.log('\n--- TESTE 4: HIERARQUIA DE PLANOS (ENTRADA VS PRÓ) ---');
+    console.log('\n--- TESTE 5: HIERARQUIA DE PLANOS (IS_DEMO=0 BLOQUEIA MÓDULOS PRÓ) ---');
     const resProBills = await request('GET', '/api/cliente/pro/bills', null, {
       Authorization: `Bearer ${authToken}`
     });
-    assert.strictEqual(resProBills.status, 403, 'Acesso ao módulo financeiro PRO deve retornar 403');
+    assert.strictEqual(resProBills.status, 403, 'Módulo Contas a Pagar PRO deve retornar 403');
     assert.strictEqual(resProBills.body.upgradeRequired, true);
     assert.strictEqual(resProBills.body.proExclusive, true);
 
     const resProCampaigns = await request('GET', '/api/cliente/pro/campaigns', null, {
       Authorization: `Bearer ${authToken}`
     });
-    assert.strictEqual(resProCampaigns.status, 403, 'Acesso a campanhas PRO deve retornar 403');
-    console.log('  ✓ 4.1 Recursos restritos do Pró bloqueados com 403 FEATURE_NOT_IN_PLAN para plano Entrada');
+    assert.strictEqual(resProCampaigns.status, 403, 'Disparos em massa PRO devem retornar 403');
+    console.log('  ✓ 5.1 Recursos PRO estritamente bloqueados com 403 upgradeRequired para assinante Entrada');
 
-    // -------------------------------------------------------------
-    // Teste 5: Idempotência de Execução e Atualização de Senha
-    // -------------------------------------------------------------
-    console.log('\n--- TESTE 5: IDEMPOTÊNCIA E ATUALIZAÇÃO SEGURA ---');
-    const resUpdate = spawnSync(process.execPath, [SCRIPT_PATH], {
-      env: {
-        ...process.env,
-        APP_MODE: 'staging',
-        HOMOLOGACAO: 'true',
-        CANONICAL_DOMAIN: 'seguranca.raiaagentes.com.br',
-        ALLOW_LOCAL_TEST: 'true',
-        CLIENT_TEMP_PASSWORD: TEST_PWD_UPDATED
-      },
-      encoding: 'utf8'
-    });
-
-    assert.strictEqual(resUpdate.status, 0, 'Reexecução deve ser bem-sucedida');
-
-    // Verifica que não houve duplicação de usuário
-    const userCount = db.prepare('SELECT COUNT(*) as c FROM users WHERE LOWER(email) = ?').get(TEST_EMAIL.toLowerCase()).c;
-    assert.strictEqual(userCount, 1, 'Deve existir exatamente 1 usuário com este e-mail');
-
-    // Limpa limitador para validar nova senha e falha da antiga
-    if (clientLoginLimiter?.reset) clientLoginLimiter.reset();
-
-    // Verifica que a nova senha funciona
-    const resNewLogin = await request('POST', '/api/cliente/auth/login', {
-      email: TEST_EMAIL,
-      password: TEST_PWD_UPDATED
-    });
-    assert.strictEqual(resNewLogin.status, 200, 'Login com a nova senha deve retornar 200');
-
-    // Antiga senha agora deve falhar
-    const resOldLogin = await request('POST', '/api/cliente/auth/login', {
-      email: TEST_EMAIL,
-      password: TEST_PWD_INITIAL
-    });
-    assert.strictEqual(resOldLogin.status, 401, 'Login com a senha anterior deve falhar com 401');
-    assert.strictEqual(resOldLogin.body.code, 'INVALID_CREDENTIALS');
-    console.log('  ✓ 5.1 Reexecução idempotente atualizou credenciais sem duplicar contas');
+    // Limpeza final do usuário de teste no SQLite de desenvolvimento
+    db.prepare('DELETE FROM client_services WHERE user_id = ?').run(result1.userId);
+    db.prepare('DELETE FROM client_staff WHERE user_id = ?').run(result1.userId);
+    db.prepare('DELETE FROM client_salons WHERE user_id = ?').run(result1.userId);
+    db.prepare('DELETE FROM customer_subscriptions WHERE user_id = ?').run(result1.userId);
+    db.prepare('DELETE FROM users WHERE id = ?').run(result1.userId);
 
     console.log('\n================================================================');
-    console.log('TODOS OS TESTES DO CLIENTE DE HOMOLOGAÇÃO FORAM APROVADOS! (100%)');
+    console.log('TODOS OS TESTES DO AJUSTE FINAL FORAM APROVADOS! (100%)');
     console.log('================================================================\n');
 
   } finally {

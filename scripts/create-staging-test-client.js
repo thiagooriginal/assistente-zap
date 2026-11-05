@@ -14,61 +14,68 @@
  *  - Plano: JESSICA_START (Entrada) com 1 profissional incluso
  *  - Vigência: 7 dias (status ACTIVE)
  *  - Modo: is_demo = 0 (ambiente real de assinante Entrada)
- *  - Senha: Lido com segurança via console mascarado (sem exibição em tela/logs)
- *  - Isolamento: Verificação fail-closed de ambiente de homologação
+ *  - Senha: Leitura estrita com mascaramento via TTY (hash scrypt + salt)
+ *  - Isolamento: Verificação simultânea de APP_MODE, HOMOLOGACAO e BASE_URL
+ *  - Preservação: Não exclui colaboradores nem dados existentes em reexecuções
  */
 
 const readline = require('readline');
 const crypto = require('crypto');
-const path = require('path');
 
-// 1. Verificação fail-closed do ambiente de execução
+// 1. Verificação fail-closed do ambiente de execução (Executado antes de carregar o DB)
 function validateStagingEnvironment() {
-  const appMode = (process.env.APP_MODE || '').toLowerCase();
-  const isHomologacao = process.env.HOMOLOGACAO === 'true';
-  const canonicalDomain = (process.env.CANONICAL_DOMAIN || '').toLowerCase();
-  const allowLocalTest = process.env.ALLOW_LOCAL_TEST === 'true';
+  const appMode = (process.env.APP_MODE || '').trim().toLowerCase();
+  const isHomologacao = (process.env.HOMOLOGACAO || '').trim().toLowerCase();
+  const rawBaseUrl = (process.env.BASE_URL || '').trim();
+  const normalizedBaseUrl = rawBaseUrl.replace(/\/+$/, '');
 
-  const isStaging =
-    appMode === 'staging' ||
-    appMode === 'homologacao' ||
-    isHomologacao ||
-    canonicalDomain.includes('seguranca.raiaagentes.com.br') ||
-    canonicalDomain.includes('staging');
+  // Rejeição explícita de qualquer configuração de produção
+  const hasProductionIndicator =
+    appMode === 'production' ||
+    (process.env.NODE_ENV || '').trim().toLowerCase() === 'production' ||
+    (process.env.PRODUCAO || '').trim().toLowerCase() === 'true' ||
+    normalizedBaseUrl === 'https://raiaagentes.com.br' ||
+    normalizedBaseUrl === 'http://raiaagentes.com.br';
 
-  if (!isStaging && !allowLocalTest) {
-    console.error('\n❌ [BLOQUEIO DE SEGURANÇA] Execução Não Permitida!');
-    console.error('Este script é exclusivo para o ambiente de homologação (raia-staging).');
-    console.error('Ambiente atual:');
-    console.error(`  - APP_MODE: ${process.env.APP_MODE || '(não configurado)'}`);
-    console.error(`  - HOMOLOGACAO: ${process.env.HOMOLOGACAO || '(não configurado)'}`);
-    console.error(`  - CANONICAL_DOMAIN: ${process.env.CANONICAL_DOMAIN || '(não configurado)'}`);
-    console.error('\nOperação abortada imediatamente para proteger os demais ambientes.');
+  if (hasProductionIndicator) {
+    console.error('\n❌ [BLOQUEIO DE SEGURANÇA] Execução em Produção Rejeitada!');
+    console.error('Este script é estritamente proibido de ser executado no ambiente de produção.');
+    console.error('Operação abortada imediatamente para proteger a base de dados de produção.');
+    process.exit(1);
+  }
+
+  // Validação simultânea e obrigatória das 3 variáveis de homologação
+  const isAppModeStaging = appMode === 'staging';
+  const isHomologacaoTrue = isHomologacao === 'true';
+  const isBaseUrlStaging = normalizedBaseUrl === 'https://seguranca.raiaagentes.com.br';
+
+  if (!isAppModeStaging || !isHomologacaoTrue || !isBaseUrlStaging) {
+    console.error('\n❌ [BLOQUEIO DE SEGURANÇA] Ambiente Não Autorizado!');
+    console.error('Este script exige SIMULTANEAMENTE a presença das seguintes 3 configurações de homologação:');
+    console.error(`  1. APP_MODE=staging                          (Atual: "${process.env.APP_MODE || ''}") -> ${isAppModeStaging ? 'OK' : 'FALHA'}`);
+    console.error(`  2. HOMOLOGACAO=true                          (Atual: "${process.env.HOMOLOGACAO || ''}") -> ${isHomologacaoTrue ? 'OK' : 'FALHA'}`);
+    console.error(`  3. BASE_URL=https://seguranca.raiaagentes.com.br (Atual: "${rawBaseUrl}") -> ${isBaseUrlStaging ? 'OK' : 'FALHA'}`);
+    console.error('\nTodas as 3 condições devem ser satisfeitas em conjunto para autorizar a execução.');
+    console.error('Operação abortada imediatamente.');
     process.exit(1);
   }
 }
 
-// 2. Leitura segura de senha (sem eco/logs)
+// 2. Leitura segura de senha (exige TTY obrigatório e caracteres mascarados)
 async function promptSecurePassword(query) {
-  if (process.env.CLIENT_TEMP_PASSWORD) {
-    const p = process.env.CLIENT_TEMP_PASSWORD.trim();
-    delete process.env.CLIENT_TEMP_PASSWORD;
-    if (p.length < 8) {
-      throw new Error('A senha fornecida via variável de ambiente deve ter no mínimo 8 caracteres.');
-    }
-    return p;
+  if (!process.stdin.isTTY) {
+    console.error('\n❌ [ERRO DE SEGURANÇA] Terminal Interativo Obrigatório (TTY Ausente)!');
+    console.error('Este script exige entrada segura em um terminal interativo com TTY ativo.');
+    console.error('A execução via redirecionamento de entrada, pipes, background ou automação não interativa foi interrompida para impedir a exposição ou captura indevida de senhas.');
+    console.error('Como executar com segurança:');
+    console.error('  1. Acesse o Easypanel no serviço raia-staging.');
+    console.error('  2. Abra a aba Terminal / Console.');
+    console.error('  3. Execute interativamente:');
+    console.error('     node scripts/create-staging-test-client.js\n');
+    process.exit(1);
   }
 
   return new Promise((resolve) => {
-    if (!process.stdin.isTTY) {
-      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-      rl.question(query, (answer) => {
-        rl.close();
-        resolve(answer.trim());
-      });
-      return;
-    }
-
     process.stdout.write(query);
     const stdin = process.stdin;
     stdin.setRawMode(true);
@@ -80,7 +87,7 @@ async function promptSecurePassword(query) {
       switch (char) {
         case '\n':
         case '\r':
-        case '\u0004':
+        case '\u0004': // Ctrl+D
           stdin.setRawMode(false);
           stdin.pause();
           stdin.removeListener('data', onData);
@@ -94,7 +101,7 @@ async function promptSecurePassword(query) {
           process.stdout.write('\nOperação cancelada pelo operador.\n');
           process.exit(130);
           break;
-        case '\u0008':
+        case '\u0008': // Backspace
         case '\x7f':
           if (password.length > 0) {
             password = password.slice(0, -1);
@@ -111,59 +118,31 @@ async function promptSecurePassword(query) {
   });
 }
 
-async function main() {
-  console.log('================================================================');
-  console.log('   RAIA AGENTES — CADASTRO DE CLIENTE DE TESTE EM HOMOLOGAÇÃO   ');
-  console.log('================================================================\n');
-
-  // Validação estrita do ambiente
-  validateStagingEnvironment();
-
-  // Dependências internas (carregadas somente após validação de ambiente)
+// 3. Função atômica de criação/atualização com preservação de dados
+function createOrUpdateStagingClient(options = {}) {
   const db = require('../src/database/db');
   const clientAuth = require('../src/services/clientAuthService');
   const productService = require('../src/services/productService');
   const salonDashboardService = require('../src/services/salonDashboardService');
 
-  const clientEmail = 'teste.entrada@example.com';
-  const clientName = 'Salão Teste RAIA';
-  const testPhone = '5511999990002';
+  const clientEmail = (options.email || 'teste.entrada@example.com').trim().toLowerCase();
+  const clientName = options.name || 'Salão Teste RAIA';
+  const testPhone = options.phone || '5511999990002';
   const planTier = 'JESSICA_START';
-  const paidUntilDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const rawPassword = options.password;
 
-  console.log('Parâmetros da Conta:');
-  console.log(`  - Nome: ${clientName}`);
-  console.log(`  - E-mail: ${clientEmail}`);
-  console.log(`  - Produto: Jéssica`);
-  console.log(`  - Plano: Jéssica Entrada (${planTier})`);
-  console.log(`  - Profissionais Inclusos: 1`);
-  console.log(`  - Vigência: 7 dias (até ${new Date(paidUntilDate).toLocaleString('pt-BR')})`);
-  console.log(`  - Status: ACTIVE (is_demo = 0)`);
-  console.log(`  - Pagamento: Simulado / Manual (sem comunicação externa com Asaas/Hotmart)\n`);
-
-  let rawPassword = await promptSecurePassword('Digite a senha temporária para o cliente (mínimo 8 caracteres): ');
   if (!rawPassword || rawPassword.length < 8) {
-    console.error('\n❌ Erro: A senha deve conter pelo menos 8 caracteres.');
-    process.exit(1);
+    throw new Error('A senha deve conter no mínimo 8 caracteres.');
   }
 
-  if (process.stdin.isTTY) {
-    const confirmPassword = await promptSecurePassword('Confirme a senha temporária: ');
-    if (rawPassword !== confirmPassword) {
-      console.error('\n❌ Erro: As senhas digitadas não coincidem.');
-      process.exit(1);
-    }
-  }
-
-  // Gera hash scrypt com salt seguro
+  const paidUntilDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   const { hash, salt } = clientAuth.hashPassword(rawPassword);
 
   let userId = null;
 
-  // Bloco transacional atômico no SQLite
   db.exec('BEGIN IMMEDIATE');
   try {
-    const existingUser = db.prepare('SELECT id, phone_number FROM users WHERE LOWER(email) = ?').get(clientEmail.toLowerCase());
+    const existingUser = db.prepare('SELECT id, phone_number FROM users WHERE LOWER(email) = ?').get(clientEmail);
 
     if (existingUser) {
       userId = existingUser.id;
@@ -184,9 +163,8 @@ async function main() {
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(clientName, hash, salt, planTier, paidUntilDate, userId);
-      console.log(`\n[SQLite] Usuário existente atualizado com sucesso (ID #${userId}).`);
+      console.log(`[SQLite] Conta existente atualizada com segurança (ID #${userId}).`);
     } else {
-      // Garante que o telefone de teste não colida
       const phoneTaken = db.prepare('SELECT id FROM users WHERE phone_number = ?').get(testPhone);
       const safePhone = phoneTaken ? `551199999${Date.now().toString().slice(-4)}` : testPhone;
 
@@ -199,7 +177,7 @@ async function main() {
       `).run(clientName, clientEmail, safePhone, hash, salt, planTier, paidUntilDate);
 
       userId = Number(userInsert.lastInsertRowid);
-      console.log(`\n[SQLite] Novo usuário cadastrado com sucesso (ID #${userId}).`);
+      console.log(`[SQLite] Nova conta cadastrada com sucesso (ID #${userId}).`);
     }
 
     // Vincula produto JESSICA na arquitetura multiproduto (customer_subscriptions)
@@ -227,7 +205,7 @@ async function main() {
             updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(planId, priceCents, paidUntilDate, paidUntilDate, existingSub.id);
-      console.log(`[SQLite] Assinatura multiproduto existente atualizada para Plano Entrada (ID #${existingSub.id}).`);
+      console.log(`[SQLite] Assinatura multiproduto mantida e renovada para 7 dias (ID #${existingSub.id}).`);
     } else {
       const subInsert = db.prepare(`
         INSERT INTO customer_subscriptions (
@@ -245,69 +223,132 @@ async function main() {
       console.log(`[SQLite] Assinatura criada em customer_subscriptions (ID #${subInsert.lastInsertRowid}).`);
     }
 
-    // Configura o salão
+    // Configura o salão preservando dados existentes
     clientAuth.ensureSalonForUser(userId, clientName);
     db.prepare('UPDATE client_salons SET salon_name = ? WHERE user_id = ?').run(clientName, userId);
 
-    // Garante exatamente 1 colaborador (respeitando o limite do plano Entrada)
-    const staffList = db.prepare('SELECT id FROM client_staff WHERE user_id = ?').all(userId);
+    // Preservação estrita de colaboradores (NÃO exclui profissionais existentes)
+    const staffList = db.prepare('SELECT id, name, specialty FROM client_staff WHERE user_id = ?').all(userId);
     if (staffList.length === 0) {
       db.prepare(`
         INSERT INTO client_staff (user_id, name, specialty)
         VALUES (?, 'Profissional Principal', 'Cortes & Atendimento')
       `).run(userId);
-    } else if (staffList.length > 1) {
-      for (let i = 1; i < staffList.length; i++) {
-        db.prepare('DELETE FROM client_staff WHERE id = ?').run(staffList[i].id);
-      }
+      console.log('[Colaboradores] 1 profissional padrão configurado (Profissional Principal).');
+    } else if (staffList.length === 1) {
+      console.log(`[Colaboradores] 1 profissional existente preservado intacto: "${staffList[0].name}".`);
+    } else {
+      console.warn(`⚠️ [Preservação de Dados] Inconsistência identificada: a conta possui ${staffList.length} profissionais cadastrados no banco.`);
+      console.warn('   O limite padrão do plano Jéssica Entrada é de 1 profissional.');
+      console.warn('   Conforme política de preservação de dados, NENHUM colaborador foi excluído. Todos os registros permanecem preservados.');
     }
 
     db.exec('COMMIT');
   } catch (dbErr) {
     try { db.exec('ROLLBACK'); } catch (_) {}
-    console.error('\n❌ Erro durante a persistência:', dbErr.message);
-    process.exit(1);
+    throw dbErr;
   }
 
-  // 3. Validação funcional pós-cadastro com a senha informada
+  // Validação funcional do login
   const loginTest = clientAuth.login(clientEmail, rawPassword);
-  // Limpeza imediata da variável em memória
-  rawPassword = null;
-
   if (!loginTest.success) {
-    console.error('\n❌ Falha na verificação pós-cadastro de login:', loginTest.error);
-    process.exit(1);
+    throw new Error(`Falha na verificação de login pós-cadastro: ${loginTest.error}`);
   }
 
   const accessCheck = productService.hasProductAccess(userId, 'JESSICA');
   if (!accessCheck.hasAccess || accessCheck.status !== 'ACTIVE') {
-    console.error('\n❌ Falha na verificação de acesso ao produto:', accessCheck);
-    process.exit(1);
+    throw new Error(`Falha no acesso ao produto Jéssica: status=${accessCheck.status}`);
   }
 
   const resolvedTier = salonDashboardService.getEffectiveJessicaTier(userId);
   if (resolvedTier !== 'JESSICA_START') {
-    console.error(`\n❌ Inconsistência de Tier: esperado JESSICA_START, obtido ${resolvedTier}`);
-    process.exit(1);
+    throw new Error(`Inconsistência de Tier: esperado JESSICA_START, obtido ${resolvedTier}`);
   }
 
   const staffCount = db.prepare('SELECT COUNT(*) as c FROM client_staff WHERE user_id = ?').get(userId)?.c || 0;
 
+  return {
+    userId,
+    clientEmail,
+    clientName,
+    planTier: resolvedTier,
+    staffCount,
+    paidUntilDate,
+    token: loginTest.token
+  };
+}
+
+async function main() {
+  console.log('================================================================');
+  console.log('   RAIA AGENTES — CADASTRO DE CLIENTE DE TESTE EM HOMOLOGAÇÃO   ');
+  console.log('================================================================\n');
+
+  // 1. Validação obrigatória e simultânea do ambiente (fail-closed)
+  validateStagingEnvironment();
+
+  // 2. Parâmetros visuais
+  const clientEmail = 'teste.entrada@example.com';
+  const clientName = 'Salão Teste RAIA';
+
+  console.log('Parâmetros da Conta de Teste:');
+  console.log(`  - Nome: ${clientName}`);
+  console.log(`  - E-mail: ${clientEmail}`);
+  console.log(`  - Produto: Jéssica (Assistente Virtual para Salões e Barbearias)`);
+  console.log(`  - Plano: Jéssica Entrada (JESSICA_START) — 1 profissional incluso`);
+  console.log(`  - Vigência: 7 dias (status ACTIVE)`);
+  console.log(`  - Modo: is_demo = 0 (perfil real de cliente assinante)`);
+  console.log(`  - Pagamento: Simulado / Manual (sem comunicação externa com Asaas/Hotmart)\n`);
+
+  // 3. Leitura segura de senha com mascaramento no TTY
+  let rawPassword = await promptSecurePassword('Digite a senha temporária para o cliente (mínimo 8 caracteres): ');
+  if (!rawPassword || rawPassword.length < 8) {
+    console.error('\n❌ Erro: A senha deve conter pelo menos 8 caracteres.');
+    process.exit(1);
+  }
+
+  if (rawPassword.length < 12) {
+    console.log('ℹ️ [Recomendação de Segurança] A senha digitada possui menos de 12 caracteres. Recomenda-se preferencialmente 12 ou mais caracteres.');
+  }
+
+  const confirmPassword = await promptSecurePassword('Confirme a senha temporária: ');
+  if (rawPassword !== confirmPassword) {
+    console.error('\n❌ Erro: As senhas digitadas não coincidem.');
+    process.exit(1);
+  }
+
+  // 4. Execução da criação/atualização preservando dados existentes
+  const result = createOrUpdateStagingClient({
+    email: clientEmail,
+    name: clientName,
+    password: rawPassword
+  });
+
+  // Limpeza imediata da senha em memória
+  rawPassword = null;
+
   console.log('\n================================================================');
   console.log('✅ CLIENTE DE TESTE CONFIGURADO E VALIDADO COM SUCESSO!');
   console.log('================================================================');
-  console.log(`ID no banco de dados: #${userId}`);
-  console.log(`E-mail de login:      ${clientEmail}`);
+  console.log(`ID no banco de dados: #${result.userId}`);
+  console.log(`E-mail de login:      ${result.clientEmail}`);
   console.log(`Produto ativo:        Jéssica (Assistente Virtual)`);
-  console.log(`Plano verificado:     ${resolvedTier} (Entrada)`);
-  console.log(`Profissionais:        ${staffCount} configurado(s)`);
-  console.log(`Flag is_demo:         0 (acesso real de cliente)`);
-  console.log(`Validação de login:   APROVADO (login funcional com token gerado)`);
+  console.log(`Plano verificado:     ${result.planTier} (Entrada)`);
+  console.log(`Profissionais:        ${result.staffCount} cadastrado(s) (preservados)`);
+  console.log(`Flag is_demo:         0 (perfil de assinante real)`);
+  console.log(`Vigência:             Válido até ${new Date(result.paidUntilDate).toLocaleString('pt-BR')}`);
+  console.log(`Validação de login:   APROVADO (login funcional)`);
   console.log(`URL do Portal:        https://seguranca.raiaagentes.com.br/cliente/login`);
   console.log('================================================================\n');
 }
 
-main().catch((err) => {
-  console.error('\n❌ Erro fatal:', err.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('\n❌ Erro fatal:', err.message);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  validateStagingEnvironment,
+  createOrUpdateStagingClient
+};
