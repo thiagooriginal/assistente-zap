@@ -16,11 +16,19 @@
  *  - Modo: is_demo = 0 (ambiente real de assinante Entrada)
  *  - Senha: Leitura estrita com mascaramento via TTY (hash scrypt + salt)
  *  - Isolamento: Verificação simultânea de APP_MODE, HOMOLOGACAO e BASE_URL
+ *  - Compatibilidade: Aceita NODE_ENV=production sob as flags obrigatórias de staging
  *  - Preservação: Não exclui colaboradores nem dados existentes em reexecuções
+ *
+ * Requisito de Volume SQLite Exclusivo no Easypanel:
+ * O serviço 'raia-staging' DEVE montar um volume persistente independente
+ * montado em /app/data (ex: 'raia-staging-sqlite:/app/data'), garantindo
+ * que a base de dados de homologação jamais compartilhe o mesmo arquivo
+ * ou volume com o serviço 'bot' de produção.
  */
 
 const readline = require('readline');
 const crypto = require('crypto');
+const path = require('path');
 
 // 1. Verificação fail-closed do ambiente de execução (Executado antes de carregar o DB)
 function validateStagingEnvironment() {
@@ -28,23 +36,28 @@ function validateStagingEnvironment() {
   const isHomologacao = (process.env.HOMOLOGACAO || '').trim().toLowerCase();
   const rawBaseUrl = (process.env.BASE_URL || '').trim();
   const normalizedBaseUrl = rawBaseUrl.replace(/\/+$/, '');
+  const rawDbPath = (process.env.DB_PATH || '').trim();
 
-  // Rejeição explícita de qualquer configuração de produção
-  const hasProductionIndicator =
-    appMode === 'production' ||
-    (process.env.NODE_ENV || '').trim().toLowerCase() === 'production' ||
-    (process.env.PRODUCAO || '').trim().toLowerCase() === 'true' ||
+  // Rejeição explícita de parâmetros de produção (sem vetar NODE_ENV=production do container Docker)
+  const isProductionAppMode = appMode === 'production';
+  const isProducaoFlagTrue = (process.env.PRODUCAO || '').trim().toLowerCase() === 'true';
+  const isProductionDomain =
     normalizedBaseUrl === 'https://raiaagentes.com.br' ||
-    normalizedBaseUrl === 'http://raiaagentes.com.br';
+    normalizedBaseUrl === 'http://raiaagentes.com.br' ||
+    (normalizedBaseUrl.includes('raiaagentes.com.br') && !normalizedBaseUrl.includes('seguranca.') && !normalizedBaseUrl.includes('staging.'));
 
-  if (hasProductionIndicator) {
+  if (isProductionAppMode || isProducaoFlagTrue || isProductionDomain) {
     console.error('\n❌ [BLOQUEIO DE SEGURANÇA] Execução em Produção Rejeitada!');
+    console.error('Configuração de produção detectada no ambiente:');
+    if (isProductionAppMode) console.error('  - APP_MODE=production não é permitido.');
+    if (isProducaoFlagTrue) console.error('  - PRODUCAO=true não é permitido.');
+    if (isProductionDomain) console.error(`  - Domínio principal (${normalizedBaseUrl}) não é permitido.`);
     console.error('Este script é estritamente proibido de ser executado no ambiente de produção.');
     console.error('Operação abortada imediatamente para proteger a base de dados de produção.');
     process.exit(1);
   }
 
-  // Validação simultânea e obrigatória das 3 variáveis de homologação
+  // Validação simultânea e obrigatória das 3 variáveis fundamentais de homologação
   const isAppModeStaging = appMode === 'staging';
   const isHomologacaoTrue = isHomologacao === 'true';
   const isBaseUrlStaging = normalizedBaseUrl === 'https://seguranca.raiaagentes.com.br';
@@ -58,6 +71,24 @@ function validateStagingEnvironment() {
     console.error('\nTodas as 3 condições devem ser satisfeitas em conjunto para autorizar a execução.');
     console.error('Operação abortada imediatamente.');
     process.exit(1);
+  }
+
+  // Validação do caminho do banco de dados (DB_PATH) e salvaguarda do volume
+  if (rawDbPath) {
+    const normalizedDb = path.normalize(rawDbPath).replace(/\\/g, '/');
+    const isExpectedExtension = normalizedDb.endsWith('.db') || normalizedDb.endsWith('.sqlite');
+    if (!isExpectedExtension) {
+      console.error('\n❌ [BLOQUEIO DE SEGURANÇA] DB_PATH Inválido!');
+      console.error(`O caminho DB_PATH="${rawDbPath}" não aponta para um arquivo SQLite válido (.db/.sqlite).`);
+      process.exit(1);
+    }
+    // Salvaguarda: Rejeita caminhos que façam referência explícita ao serviço bot ou produção
+    if (normalizedDb.includes('production') || normalizedDb.includes('/bot/') || normalizedDb.includes('bot-sqlite')) {
+      console.error('\n❌ [BLOQUEIO DE SEGURANÇA] DB_PATH Conflitante com Produção!');
+      console.error(`O caminho configurado (${rawDbPath}) parece apontar para o diretório ou volume do serviço de produção (bot).`);
+      console.error('O serviço raia-staging deve apontar exclusivamente para o volume isolado (ex: /app/data/assistant.db).');
+      process.exit(1);
+    }
   }
 }
 
@@ -120,6 +151,9 @@ async function promptSecurePassword(query) {
 
 // 3. Função atômica de criação/atualização com preservação de dados
 function createOrUpdateStagingClient(options = {}) {
+  // Validação fail-closed antes de qualquer carregamento de banco de dados
+  validateStagingEnvironment();
+
   const db = require('../src/database/db');
   const clientAuth = require('../src/services/clientAuthService');
   const productService = require('../src/services/productService');
@@ -297,7 +331,8 @@ async function main() {
   console.log(`  - Plano: Jéssica Entrada (JESSICA_START) — 1 profissional incluso`);
   console.log(`  - Vigência: 7 dias (status ACTIVE)`);
   console.log(`  - Modo: is_demo = 0 (perfil real de cliente assinante)`);
-  console.log(`  - Pagamento: Simulado / Manual (sem comunicação externa com Asaas/Hotmart)\n`);
+  console.log(`  - Pagamento: Simulado / Manual (sem comunicação externa com Asaas/Hotmart)`);
+  console.log(`  - Volume DB: Isolado para homologação (ex: /app/data/assistant.db)\n`);
 
   // 3. Leitura segura de senha com mascaramento no TTY
   let rawPassword = await promptSecurePassword('Digite a senha temporária para o cliente (mínimo 8 caracteres): ');
