@@ -2082,6 +2082,12 @@ async function handleIncomingMessage(sock, msg) {
         await sock.sendMessage(targetJid, { text: responseText });
       } catch (err) {
         console.error('Erro ao agendar compromisso:', err);
+        if (err.code === 'SLOT_CONFLICT') {
+          await sock.sendMessage(targetJid, {
+            text: `⚠️ *Horário Indisponível!*\n\nNão foi possível agendar para este horário pois já existe outro compromisso marcado.\n\nPor favor, escolha outro horário ou dia! 😊`,
+          });
+          return;
+        }
         await sock.sendMessage(targetJid, {
           text: `❌ Não consegui agendar este compromisso: ${err.message}`,
         });

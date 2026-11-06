@@ -802,6 +802,138 @@ try {
   `);
 } catch (e) {}
 
+// =========================================================================
+// AGENDA INTELIGENTE JÉSSICA: MULTI-TENANT, GOOGLE CALENDAR & WHATSAPP
+// =========================================================================
+ensureColumnExists('appointments', 'duration_min', 'INTEGER DEFAULT 45');
+ensureColumnExists('appointments', 'origin', "TEXT DEFAULT 'painel'");
+ensureColumnExists('appointments', 'google_calendar_id', 'TEXT');
+ensureColumnExists('appointments', 'google_sync_status', "TEXT DEFAULT 'NOT_CONNECTED'");
+ensureColumnExists('appointments', 'google_sync_error', 'TEXT');
+ensureColumnExists('appointments', 'has_conflict', 'INTEGER DEFAULT 0');
+ensureColumnExists('appointments', 'whatsapp_notified', 'INTEGER DEFAULT 0');
+ensureColumnExists('appointments', 'updated_at', 'TEXT');
+
+ensureColumnExists('client_staff', 'google_calendar_id', 'TEXT');
+ensureColumnExists('client_staff', 'days_off', 'TEXT');
+ensureColumnExists('client_staff', 'custom_hours', 'TEXT');
+
+ensureColumnExists('client_salons', 'whatsapp_notification_phone', 'TEXT');
+ensureColumnExists('client_salons', 'whatsapp_notifications_enabled', 'INTEGER DEFAULT 1');
+ensureColumnExists('client_salons', 'notify_new_appointment', 'INTEGER DEFAULT 1');
+ensureColumnExists('client_salons', 'notify_cancellation', 'INTEGER DEFAULT 1');
+ensureColumnExists('client_salons', 'notify_reschedule', 'INTEGER DEFAULT 1');
+ensureColumnExists('client_salons', 'notify_sync_failure', 'INTEGER DEFAULT 1');
+ensureColumnExists('client_salons', 'google_calendar_mode', "TEXT DEFAULT 'SINGLE'");
+ensureColumnExists('client_salons', 'google_selected_calendar_id', "TEXT DEFAULT 'primary'");
+ensureColumnExists('client_salons', 'google_require_sync_availability', 'INTEGER DEFAULT 0');
+
+try {
+  db.exec(`
+    -- Multi-tenant Encrypted Google Calendar OAuth Tokens
+    CREATE TABLE IF NOT EXISTS google_calendar_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL UNIQUE,
+      account_email TEXT,
+      encrypted_tokens TEXT,
+      scope TEXT,
+      selected_calendar_id TEXT DEFAULT 'primary',
+      selected_calendar_name TEXT,
+      sync_mode TEXT DEFAULT 'SINGLE',
+      is_connected INTEGER DEFAULT 1,
+      last_sync_at TEXT,
+      last_error TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_google_tokens_user ON google_calendar_tokens(user_id);
+
+    -- Persistent Google Calendar Outbox for Idempotent Sync & Retries
+    CREATE TABLE IF NOT EXISTS google_sync_outbox (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      appointment_id INTEGER NOT NULL,
+      action TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      payload_json TEXT,
+      attempts INTEGER DEFAULT 0,
+      last_error TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      processed_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_google_sync_outbox_status ON google_sync_outbox(status);
+    CREATE INDEX IF NOT EXISTS idx_google_sync_outbox_apt ON google_sync_outbox(appointment_id);
+
+    -- Persistent WhatsApp Notification Outbox for Salon Owner/Manager
+    CREATE TABLE IF NOT EXISTS whatsapp_notification_outbox (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      appointment_id INTEGER NOT NULL,
+      event_type TEXT NOT NULL,
+      recipient_phone TEXT NOT NULL,
+      message_text TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      attempts INTEGER DEFAULT 0,
+      last_error TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      sent_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_wa_outbox_status ON whatsapp_notification_outbox(status);
+    CREATE INDEX IF NOT EXISTS idx_wa_outbox_apt ON whatsapp_notification_outbox(appointment_id);
+
+    -- Appointment Lifecycle Audit History
+    CREATE TABLE IF NOT EXISTS appointment_status_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      appointment_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      previous_status TEXT,
+      new_status TEXT NOT NULL,
+      changed_by TEXT DEFAULT 'SYSTEM',
+      reason TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_apt_history_apt ON appointment_status_history(appointment_id);
+
+    -- Anti-CSRF OAuth States
+    CREATE TABLE IF NOT EXISTS oauth_states (
+      state TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      provider TEXT NOT NULL DEFAULT 'google',
+      expires_at INTEGER NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_appointments_user_staff_dates ON appointments(user_id, staff_id, start_datetime, end_datetime);
+    CREATE INDEX IF NOT EXISTS idx_appointments_google_sync ON appointments(google_sync_status);
+  `);
+} catch (e) {
+  console.warn('[Database] Aviso ao inicializar tabelas da Agenda Inteligente:', e.message);
+}
+
+// Detecção e sinalização não-destrutiva de conflitos históricos em agendamentos existentes
+try {
+  const conflictResult = db.prepare(`
+    UPDATE appointments
+    SET has_conflict = 1
+    WHERE id IN (
+      SELECT a1.id
+      FROM appointments a1
+      JOIN appointments a2 ON a1.user_id = a2.user_id
+        AND a1.id != a2.id
+        AND (a1.staff_id IS NULL OR a2.staff_id IS NULL OR a1.staff_id = a2.staff_id)
+        AND a1.status NOT IN ('CANCELADO', 'CANCELLED')
+        AND a2.status NOT IN ('CANCELADO', 'CANCELLED')
+        AND a1.start_datetime < a2.end_datetime
+        AND a1.end_datetime > a2.start_datetime
+    ) AND has_conflict = 0;
+  `).run();
+  if (conflictResult && conflictResult.changes > 0) {
+    console.log(`[Database Migration] Sinalizados ${conflictResult.changes} agendamento(s) com conflito histórico para revisão no painel.`);
+  }
+} catch (e) {
+  console.warn('[Database] Aviso ao verificar conflitos históricos de agendamentos:', e.message);
+}
+
 // 3. Ensure Master Admin user exists (phone: 5511951364159)
 try {
   const masterPhone = '5511951364159';

@@ -24,15 +24,43 @@ function createAppointment({
   endDateTime,
   location,
   sourceType = 'whatsapp',
+  staffId = null,
+  serviceId = null,
+  price = null,
+  clientName = null,
+  clientPhone = null,
+  durationMin = 45,
 }) {
   if (!title || !startDateTime) {
     throw new Error('Título e data/horário são obrigatórios para agendar um compromisso.');
   }
 
+  const finalDuration = Number(durationMin) || 45;
+  const calculatedEnd = endDateTime || new Date(new Date(startDateTime).getTime() + finalDuration * 60000).toISOString();
+
+  // Regra de Sobreposição sem conflitos: inicio_novo < fim_existente AND fim_novo > inicio_existente
+  const conflict = db.prepare(`
+    SELECT id, title, client_name, start_datetime, end_datetime
+    FROM appointments
+    WHERE user_id = ?
+      AND status NOT IN ('CANCELADO', 'CANCELLED')
+      AND (? IS NULL OR staff_id IS NULL OR staff_id = ?)
+      AND start_datetime < ?
+      AND end_datetime > ?
+    LIMIT 1
+  `).get(userId, staffId, staffId, calculatedEnd, startDateTime);
+
+  if (conflict) {
+    const err = new Error(`Conflito de horário detectado com compromisso existente: "${conflict.client_name || conflict.title}".`);
+    err.code = 'SLOT_CONFLICT';
+    throw err;
+  }
+
   const stmt = db.prepare(`
     INSERT INTO appointments (
-      user_id, title, description, start_datetime, end_datetime, location, source_type, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'SCHEDULED')
+      user_id, title, description, start_datetime, end_datetime, location, source_type,
+      service_id, staff_id, price, client_name, client_phone, duration_min, status
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED')
   `);
 
   const result = stmt.run(
@@ -40,9 +68,15 @@ function createAppointment({
     title.trim(),
     description || null,
     startDateTime,
-    endDateTime || null,
+    calculatedEnd,
     location || null,
-    sourceType
+    sourceType,
+    serviceId || null,
+    staffId || null,
+    price || null,
+    clientName || null,
+    clientPhone || null,
+    finalDuration
   );
 
   return {
@@ -51,8 +85,14 @@ function createAppointment({
     title: title.trim(),
     description,
     startDateTime,
-    endDateTime,
+    endDateTime: calculatedEnd,
     location,
+    serviceId,
+    staffId,
+    price,
+    clientName,
+    clientPhone,
+    durationMin: finalDuration,
     status: 'SCHEDULED',
   };
 }

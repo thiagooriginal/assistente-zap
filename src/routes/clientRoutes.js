@@ -8,6 +8,9 @@ const config = require('../config');
 const productService = require('../services/productService');
 const salonDashboardService = require('../services/salonDashboardService');
 const serviceCatalog = require('../services/serviceCatalog');
+const googleCalendarService = require('../services/googleCalendarService');
+const salonNotificationService = require('../services/salonNotificationService');
+const salonAppointmentService = require('../services/salonAppointmentService');
 const { getPlan } = require('../services/planCatalog');
 const whatsappClient = require('../whatsapp/client');
 const {
@@ -1028,12 +1031,12 @@ router.delete('/services/:id', clientAuthMiddleware, requireProductAccess('JESSI
 });
 
 // ==========================================
-// STAFF & TEAM MEMBERS
+// STAFF & TEAM MEMBERS (COM AGENDA INDIVIDUAL)
 // ==========================================
 
 router.get('/staff', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const rows = db.prepare(`
-    SELECT id, name, specialty, active
+    SELECT id, name, specialty, active, google_calendar_id, days_off, custom_hours
     FROM client_staff
     WHERE user_id = ?
     ORDER BY id ASC
@@ -1043,10 +1046,11 @@ router.get('/staff', clientAuthMiddleware, requireProductAccess('JESSICA'), (req
 });
 
 router.post('/staff', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
-  const { name, specialty } = req.body || {};
+  const { name, specialty, googleCalendarId, daysOff, customHours } = req.body || {};
   if (!name || !name.trim()) {
     return res.status(400).json({ success: false, error: 'Nome do profissional é obrigatório.' });
   }
+
   const jessicaSub = productService.getUserSubscriptionForProduct(req.clientUser.id, 'JESSICA');
   const plan = getPlan(req.clientUser.plan_tier);
   const baseProfessionals = jessicaSub?.maxProfessionals !== undefined ? jessicaSub.maxProfessionals : (plan?.includedProfessionals || 1);
@@ -1054,123 +1058,401 @@ router.post('/staff', clientAuthMiddleware, requireProductAccess('JESSICA'), (re
   const available = baseProfessionals + extraProfessionals;
   const total = db.prepare('SELECT COUNT(*) AS n FROM client_staff WHERE user_id = ? AND active = 1')
     .get(req.clientUser.id)?.n || 0;
+
   if (!req.isDemo && total >= available) {
-    return res.status(403).json({ success: false,
-      error: 'Limite de profissionais atingido. Contrate mais um profissional para ampliar seu plano.' });
+    return res.status(403).json({
+      success: false,
+      error: 'Limite de profissionais atingido. Contrate mais um profissional para ampliar seu plano.',
+    });
   }
+
+  const daysOffStr = typeof daysOff === 'object' ? JSON.stringify(daysOff) : daysOff;
+  const customHoursStr = typeof customHours === 'object' ? JSON.stringify(customHours) : customHours;
 
   const info = db.prepare(`
-    INSERT INTO client_staff (user_id, name, specialty)
-    VALUES (?, ?, ?)
-  `).run(req.clientUser.id, name.trim(), specialty ? specialty.trim() : 'Atendimento Geral');
-
-  res.json({
-    success: true,
-    staff: { id: info.lastInsertRowid, name: name.trim(), specialty: specialty || 'Atendimento Geral', active: 1 },
-    message: 'Profissional adicionado à equipe!',
-  });
-});
-
-router.delete('/staff/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
-  const { id } = req.params;
-  const result = db.prepare('DELETE FROM client_staff WHERE id = ? AND user_id = ?').run(id, req.clientUser.id);
-
-  if (result.changes === 0) {
-    return res.status(404).json({ success: false, error: 'Profissional não encontrado.' });
-  }
-
-  res.json({ success: true, message: 'Profissional removido com sucesso.' });
-});
-
-// ==========================================
-// APPOINTMENTS & SCHEDULE
-// ==========================================
-
-router.get('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
-  const rows = db.prepare(`
-    SELECT id, title, description, start_datetime, end_datetime, service_id, price, client_name, status
-    FROM appointments
-    WHERE user_id = ?
-    ORDER BY start_datetime DESC
-    LIMIT 100
-  `).all(req.clientUser.id);
-
-  res.json({ success: true, appointments: rows });
-});
-
-router.post('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
-  const { clientName, serviceName, serviceId, date, time } = req.body || {};
-
-  if (!clientName || !date || !time) {
-    return res.status(400).json({ success: false, error: 'Cliente, data e horário são obrigatórios.' });
-  }
-
-  // Look up service and its configured duration for this user
-  let matchedService = null;
-  if (serviceId) {
-    matchedService = db.prepare('SELECT id, name, price, duration_min, active FROM client_services WHERE id = ? AND user_id = ?').get(serviceId, req.clientUser.id);
-  }
-  if (!matchedService && serviceName) {
-    matchedService = db.prepare('SELECT id, name, price, duration_min, active FROM client_services WHERE LOWER(name) = LOWER(?) AND user_id = ?').get(serviceName.trim(), req.clientUser.id);
-  }
-
-  if (matchedService && matchedService.active === 0) {
-    return res.status(400).json({ success: false, error: 'Este serviço está inativo e não aceita novos agendamentos.' });
-  }
-
-  const durationMin = matchedService?.duration_min
-    || parseInt(req.body?.duration_min || req.body?.durationMin || req.body?.durationMinutes || req.body?.duration, 10)
-    || 45;
-
-  const startDt = `${date}T${time}:00`;
-  let endDt = null;
-  const startDate = new Date(startDt);
-  if (!isNaN(startDate.getTime())) {
-    const endDate = new Date(startDate.getTime() + durationMin * 60 * 1000);
-    const pad = (n) => String(n).padStart(2, '0');
-    endDt = `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}T${pad(endDate.getHours())}:${pad(endDate.getMinutes())}:${pad(endDate.getSeconds())}`;
-  }
-
-  const finalServiceName = matchedService?.name || (serviceName ? serviceName.trim() : 'Atendimento');
-  const title = `${clientName.trim()} - ${finalServiceName}`;
-
-  const info = db.prepare(`
-    INSERT INTO appointments (user_id, title, description, start_datetime, end_datetime, service_id, price, client_name, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED')
+    INSERT INTO client_staff (user_id, name, specialty, google_calendar_id, days_off, custom_hours)
+    VALUES (?, ?, ?, ?, ?, ?)
   `).run(
     req.clientUser.id,
-    title,
-    `Agendado via Painel por ${req.clientUser.name || 'Salão'} (Duração: ${durationMin} min)`,
-    startDt,
-    endDt,
-    matchedService?.id || null,
-    matchedService?.price || null,
-    clientName.trim()
+    name.trim(),
+    specialty ? specialty.trim() : 'Atendimento Geral',
+    googleCalendarId || null,
+    daysOffStr || null,
+    customHoursStr || null
   );
 
   res.json({
     success: true,
-    id: info.lastInsertRowid,
-    appointment: {
+    staff: {
       id: info.lastInsertRowid,
-      title,
-      start_datetime: startDt,
-      end_datetime: endDt,
-      duration_minutes: durationMin,
+      name: name.trim(),
+      specialty: specialty || 'Atendimento Geral',
+      google_calendar_id: googleCalendarId || null,
+      days_off: daysOffStr || null,
+      active: 1,
     },
-    message: 'Agendamento registrado com sucesso!',
+    message: 'Profissional adicionado à equipe com sucesso!',
   });
 });
 
-router.delete('/appointments/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+router.put('/staff/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { id } = req.params;
-  const result = db.prepare('DELETE FROM appointments WHERE id = ? AND user_id = ?').run(id, req.clientUser.id);
+  const { name, specialty, active, googleCalendarId, daysOff, customHours } = req.body || {};
 
-  if (result.changes === 0) {
-    return res.status(404).json({ success: false, error: 'Agendamento não encontrado.' });
+  const existing = db.prepare('SELECT id FROM client_staff WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
+  if (!existing) {
+    return res.status(404).json({ success: false, error: 'Profissional não encontrado.' });
   }
 
-  res.json({ success: true, message: 'Agendamento cancelado com sucesso.' });
+  const daysOffStr = typeof daysOff === 'object' ? JSON.stringify(daysOff) : daysOff;
+  const customHoursStr = typeof customHours === 'object' ? JSON.stringify(customHours) : customHours;
+
+  db.prepare(`
+    UPDATE client_staff
+    SET name = COALESCE(?, name),
+        specialty = COALESCE(?, specialty),
+        active = COALESCE(?, active),
+        google_calendar_id = COALESCE(?, google_calendar_id),
+        days_off = COALESCE(?, days_off),
+        custom_hours = COALESCE(?, custom_hours)
+    WHERE id = ? AND user_id = ?
+  `).run(
+    name ? name.trim() : null,
+    specialty ? specialty.trim() : null,
+    active !== undefined ? (active ? 1 : 0) : null,
+    googleCalendarId !== undefined ? googleCalendarId : null,
+    daysOffStr !== undefined ? daysOffStr : null,
+    customHoursStr !== undefined ? customHoursStr : null,
+    id,
+    req.clientUser.id
+  );
+
+  res.json({ success: true, message: 'Dados do profissional atualizados com sucesso.' });
+});
+
+router.delete('/staff/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const { id } = req.params;
+  const existing = db.prepare('SELECT id, name FROM client_staff WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
+  if (!existing) {
+    return res.status(404).json({ success: false, error: 'Profissional não encontrado.' });
+  }
+
+  // Preservação de dados históricos: se possuir agendamentos vinculados, desativa em vez de deletar
+  const aptCount = db.prepare('SELECT COUNT(*) AS count FROM appointments WHERE staff_id = ? AND user_id = ?').get(id, req.clientUser.id)?.count || 0;
+
+  if (aptCount > 0 && req.query.force !== 'true') {
+    db.prepare('UPDATE client_staff SET active = 0 WHERE id = ? AND user_id = ?').run(id, req.clientUser.id);
+    return res.json({
+      success: true,
+      deactivated: true,
+      message: `O profissional "${existing.name}" possui ${aptCount} agendamento(s) histórico(s) e foi desativado com segurança para preservar relatórios.`,
+    });
+  }
+
+  db.prepare('DELETE FROM client_staff WHERE id = ? AND user_id = ?').run(id, req.clientUser.id);
+  res.json({ success: true, message: 'Profissional removido com sucesso.' });
+});
+
+// ==========================================
+// SALON OPERATING HOURS & EXCEPTIONS
+// ==========================================
+
+router.get('/salon/hours', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const salon = db.prepare('SELECT opening_hours FROM client_salons WHERE user_id = ?').get(req.clientUser.id);
+  const parsed = salonAppointmentService.parseOpeningHours(salon?.opening_hours);
+  res.json({ success: true, hours: parsed });
+});
+
+router.put('/salon/hours', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const { days, pauses, exceptions, timezone } = req.body || {};
+  clientAuth.ensureSalonForUser(req.clientUser.id, req.clientUser.name);
+
+  const hoursObj = {
+    timezone: timezone || 'America/Sao_Paulo',
+    days: days || {},
+    pauses: pauses || [],
+    exceptions: exceptions || [],
+  };
+
+  db.prepare(`
+    UPDATE client_salons
+    SET opening_hours = ?, updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ?
+  `).run(JSON.stringify(hoursObj), req.clientUser.id);
+
+  res.json({ success: true, hours: hoursObj, message: 'Horários de funcionamento atualizados com sucesso!' });
+});
+
+// ==========================================
+// APPOINTMENTS & SMART SCHEDULE (JÉSSICA)
+// ==========================================
+
+router.get('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const { staff_id, status, start_date, end_date, search } = req.query || {};
+  const appointments = salonAppointmentService.listAppointments(req.clientUser.id, {
+    staffId: staff_id ? Number(staff_id) : null,
+    status: status || null,
+    startDate: start_date || null,
+    endDate: end_date || null,
+    search: search || null,
+  });
+
+  res.json({ success: true, appointments });
+});
+
+router.get('/appointments/available-slots', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+  const { date, service_id, staff_id } = req.query || {};
+  if (!date) {
+    return res.status(400).json({ success: false, error: 'A data é obrigatória (formato YYYY-MM-DD).' });
+  }
+
+  let durationMin = 45;
+  if (service_id) {
+    const svc = db.prepare('SELECT duration_min FROM client_services WHERE id = ? AND user_id = ?').get(service_id, req.clientUser.id);
+    if (svc && svc.duration_min) durationMin = svc.duration_min;
+  }
+
+  const slots = await salonAppointmentService.findAlternativeSlots(req.clientUser.id, {
+    date,
+    serviceDurationMin: durationMin,
+    staffId: staff_id ? Number(staff_id) : null,
+  });
+
+  res.json({ success: true, date, slots });
+});
+
+router.get('/appointments/conflicts', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const result = salonAppointmentService.detectAndFlagHistoricalConflicts(req.clientUser.id);
+  res.json({ success: true, ...result });
+});
+
+router.post('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+  try {
+    const rawDuration = req.body?.duration_min !== undefined
+      ? req.body.duration_min
+      : (req.body?.durationMin !== undefined
+        ? req.body.durationMin
+        : (req.body?.durationMinutes !== undefined
+          ? req.body.durationMinutes
+          : req.body?.duration));
+
+    const appointment = await salonAppointmentService.bookAppointment(req.clientUser.id, {
+      clientName: req.body?.clientName || req.body?.client_name,
+      clientPhone: req.body?.clientPhone || req.body?.client_phone,
+      serviceId: req.body?.serviceId || req.body?.service_id,
+      serviceName: req.body?.serviceName || req.body?.service_name,
+      staffId: req.body?.staffId || req.body?.staff_id,
+      date: req.body?.date,
+      time: req.body?.time,
+      durationMin: rawDuration,
+      origin: req.body?.origin || 'painel',
+      status: req.body?.status || 'AGENDADO',
+    });
+
+    res.json({
+      success: true,
+      id: appointment.id,
+      appointment,
+      message: 'Agendamento registrado com sucesso!',
+    });
+  } catch (err) {
+    if (err.code === 'SLOT_CONFLICT' || err.code === 'GOOGLE_CALENDAR_BUSY') {
+      return res.status(409).json({
+        success: false,
+        code: 'SLOT_CONFLICT',
+        error: err.message,
+        suggestedSlots: err.suggestedSlots || [],
+      });
+    }
+
+    const isBadRequest = [
+      'SALON_CLOSED_DAY',
+      'BEFORE_OPENING',
+      'EXCEEDS_CLOSING',
+      'LUNCH_BREAK',
+      'STAFF_DAY_OFF',
+      'PAST_DATETIME',
+      'SERVICE_INACTIVE',
+      'STAFF_NOT_FOUND',
+      'INVALID_DATES',
+    ].includes(err.code);
+
+    res.status(isBadRequest ? 400 : 500).json({
+      success: false,
+      code: err.code || 'BOOKING_ERROR',
+      error: err.message,
+      suggestedSlots: err.suggestedSlots || [],
+    });
+  }
+});
+
+router.put('/appointments/:id/reschedule', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newDate, newTime, newStaffId, reason } = req.body || {};
+
+    const updated = await salonAppointmentService.rescheduleAppointment(id, req.clientUser.id, {
+      newDate,
+      newTime,
+      newStaffId,
+      reason,
+    });
+
+    res.json({
+      success: true,
+      appointment: updated,
+      message: 'Agendamento remarcado com sucesso!',
+    });
+  } catch (err) {
+    if (err.code === 'SLOT_CONFLICT' || err.code === 'GOOGLE_CALENDAR_BUSY') {
+      return res.status(409).json({
+        success: false,
+        code: 'SLOT_CONFLICT',
+        error: err.message,
+        suggestedSlots: err.suggestedSlots || [],
+      });
+    }
+
+    const status = err.code === 'NOT_FOUND' ? 404 : 400;
+    res.status(status).json({
+      success: false,
+      code: err.code || 'RESCHEDULE_ERROR',
+      error: err.message,
+      suggestedSlots: err.suggestedSlots || [],
+    });
+  }
+});
+
+router.patch('/appointments/:id/status', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reason } = req.body || {};
+    const result = salonAppointmentService.updateAppointmentStatus(id, req.clientUser.id, status, reason, 'SALON_USER');
+    res.json({ success: true, ...result, message: `Status alterado para ${result.status} com sucesso!` });
+  } catch (err) {
+    res.status(err.code === 'NOT_FOUND' ? 404 : 400).json({ success: false, error: err.message });
+  }
+});
+
+router.delete('/appointments/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await salonAppointmentService.cancelAppointment(id, req.clientUser.id, {
+      reason: req.body?.reason || req.query?.reason || 'Cancelado pelo salão',
+      cancelledBy: 'SALON_USER',
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(err.code === 'NOT_FOUND' ? 404 : 500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// GOOGLE CALENDAR INTEGRATIONS (POR SALÃO)
+// ==========================================
+
+router.get('/integrations/google/status', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const status = googleCalendarService.getConnectionStatus(req.clientUser.id);
+  const salon = db.prepare('SELECT google_calendar_mode, google_selected_calendar_id FROM client_salons WHERE user_id = ?').get(req.clientUser.id);
+
+  res.json({
+    success: true,
+    ...status,
+    calendarMode: salon?.google_calendar_mode || 'SINGLE',
+    selectedCalendarId: salon?.google_selected_calendar_id || status.selectedCalendarId || 'primary',
+  });
+});
+
+router.get('/integrations/google/auth-url', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  try {
+    const { authUrl, state } = googleCalendarService.generateAuthUrl(req.clientUser.id);
+    res.json({ success: true, authUrl, state });
+  } catch (err) {
+    res.status(500).json({ success: false, error: 'Falha ao gerar link de autorização Google: ' + err.message });
+  }
+});
+
+router.get('/integrations/google/callback', async (req, res) => {
+  const { code, state, error } = req.query || {};
+
+  if (error) {
+    return res.redirect(`/cliente/painel.html?google_error=${encodeURIComponent(error)}#tab-integrations-google`);
+  }
+
+  if (!code || !state) {
+    return res.status(400).send('Parâmetros de autenticação incompletos.');
+  }
+
+  try {
+    const result = await googleCalendarService.handleOAuthCallback(code, state);
+    res.redirect(`/cliente/painel.html?google_connected=true&email=${encodeURIComponent(result.email || '')}#tab-integrations-google`);
+  } catch (err) {
+    res.redirect(`/cliente/painel.html?google_error=${encodeURIComponent(err.message)}#tab-integrations-google`);
+  }
+});
+
+router.post('/integrations/google/disconnect', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+  try {
+    const result = await googleCalendarService.disconnectUserCalendar(req.clientUser.id);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/integrations/google/calendars', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+  try {
+    const calendars = await googleCalendarService.listUserCalendars(req.clientUser.id);
+    res.json({ success: true, calendars });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/integrations/google/select-calendar', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  try {
+    const { calendarId, calendarName, syncMode } = req.body || {};
+    const result = googleCalendarService.selectCalendar(req.clientUser.id, {
+      calendarId,
+      calendarName,
+      syncMode,
+    });
+    res.json({ success: true, ...result, message: 'Configuração de calendário salva com sucesso!' });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/integrations/google/test', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+  const result = await googleCalendarService.testConnection(req.clientUser.id);
+  res.json(result);
+});
+
+// ==========================================
+// WHATSAPP NOTIFICATIONS INTEGRATIONS
+// ==========================================
+
+router.get('/integrations/whatsapp/settings', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const settings = salonNotificationService.getNotificationSettings(req.clientUser.id);
+  res.json({ success: true, settings });
+});
+
+router.put('/integrations/whatsapp/settings', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  try {
+    const updated = salonNotificationService.updateNotificationSettings(req.clientUser.id, req.body || {});
+    res.json({ success: true, settings: updated, message: 'Configurações de notificações WhatsApp atualizadas!' });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/integrations/whatsapp/test', whatsappTestLimiter, clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+  try {
+    const result = await salonNotificationService.sendTestNotification(req.clientUser.id, req.body?.phone);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
 });
 
 // =======================================================

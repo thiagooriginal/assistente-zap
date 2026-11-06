@@ -166,6 +166,27 @@
             <span>Agenda de Atendimentos</span>
           </button>
 
+          <!-- Integrações Jéssica -->
+          <div class="pt-2 pb-1 px-3">
+            <span class="text-[9px] font-bold uppercase tracking-wider text-slate-500">Integrações</span>
+          </div>
+
+          <button data-tab="integrations-google" class="nav-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="calendar-days" class="w-3.5 h-3.5 text-blue-400"></i>
+              <span>Google Calendar</span>
+            </div>
+            <span id="navGoogleStatusBadge" class="w-2 h-2 rounded-full bg-slate-600"></span>
+          </button>
+
+          <button data-tab="integrations-whatsapp" class="nav-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="message-square" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>Notificações WhatsApp</span>
+            </div>
+            <span id="navWaStatusBadge" class="w-2 h-2 rounded-full bg-slate-600"></span>
+          </button>
+
           <button data-tab="dashboard-pro" class="nav-btn w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all">
             <div class="flex items-center gap-2">
               <i data-lucide="bar-chart-3" class="w-3.5 h-3.5 text-[#00F59B]"></i>
@@ -985,30 +1006,91 @@
       </section>
 
       <!-- ============================================== -->
-      <!-- TAB 5: AGENDA DE ATENDIMENTOS                   -->
+      <!-- TAB 5: AGENDA DE ATENDIMENTOS PROFISSIONAL      -->
       <!-- ============================================== -->
       <section id="tab-appointments" class="tab-content hidden space-y-6">
+        <!-- Banner de Conflitos Históricos (se detectados) -->
+        <div id="historicalConflictsBanner" class="hidden p-4 rounded-2xl bg-amber-950/40 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0">
+              <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <p class="font-bold text-amber-200">Conflitos de horários identificados para revisão</p>
+              <p class="text-amber-400/80 text-[11px] mt-0.5">Existem agendamentos sobrepostos no mesmo profissional. Os registros foram preservados para não apagar dados históricos.</p>
+            </div>
+          </div>
+          <button type="button" id="btnOpenConflictsModal" class="px-3.5 py-1.5 rounded-xl bg-amber-500 text-black font-bold text-xs hover:brightness-110 shrink-0">
+            Revisar Conflitos
+          </button>
+        </div>
+
         <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-6">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+          <!-- Top Bar: Title, Views & New Appointment -->
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/5 pb-4">
             <div>
               <h3 class="text-sm font-bold text-white flex items-center gap-2">
                 <i data-lucide="calendar" class="w-4 h-4 text-[#00F59B]"></i>
-                <span>Histórico de Agendamentos</span>
+                <span>Agenda Inteligente da Jéssica</span>
               </h3>
-              <p class="text-xs text-slate-400 mt-0.5">Visualização de marcações feitas pelos clientes via Jéssica ou registradas no painel.</p>
+              <p class="text-xs text-slate-400 mt-0.5">Gestão de horários, profissionais, concorrência e sincronização com Google Calendar.</p>
             </div>
-            <button type="button" id="btnOpenNewAppointmentModal" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2 shadow-sm">
-              <i data-lucide="plus" class="w-4 h-4"></i>
-              <span>Novo Agendamento</span>
-            </button>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <!-- View Switchers -->
+              <div class="flex items-center bg-[#07080c] p-1 rounded-xl border border-white/10 text-xs">
+                <button type="button" data-view="list" class="apt-view-btn active px-3 py-1.5 rounded-lg font-bold bg-[#00F59B]/15 text-[#00F59B]">Lista</button>
+                <button type="button" data-view="day" class="apt-view-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white">Dia</button>
+                <button type="button" data-view="week" class="apt-view-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white">Semana</button>
+                <button type="button" data-view="month" class="apt-view-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white">Mês</button>
+              </div>
+
+              <button type="button" id="btnOpenNewAppointmentModal" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2 shadow-sm">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Novo Agendamento</span>
+              </button>
+            </div>
           </div>
 
-          <div id="appointmentsList" class="space-y-2"></div>
+          <!-- Filters Bar: Search, Staff & Statuses -->
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
+            <div class="sm:col-span-5 relative">
+              <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
+              <input type="text" id="aptSearchInput" placeholder="Buscar por cliente ou serviço..."
+                class="w-full pl-9 pr-3.5 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+            </div>
+
+            <div class="sm:col-span-4">
+              <select id="aptStaffFilter" class="w-full px-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                <option value="">Todos os profissionais</option>
+              </select>
+            </div>
+
+            <div class="sm:col-span-3 flex items-center justify-end">
+              <button type="button" id="btnAptRefresh" class="w-full px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 flex items-center justify-center gap-1.5 transition-all">
+                <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+                <span>Atualizar</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Status Filter Tabs -->
+          <div class="flex flex-wrap items-center gap-1.5 border-b border-white/5 pb-3" id="aptStatusFilterGroup">
+            <button type="button" data-status="TODOS" class="apt-status-pill active px-3 py-1 rounded-lg text-xs font-bold bg-[#00F59B]/15 text-[#00F59B] border border-[#00F59B]/30">Todos</button>
+            <button type="button" data-status="AGENDADO" class="apt-status-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Agendados</button>
+            <button type="button" data-status="CONFIRMADO" class="apt-status-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Confirmados</button>
+            <button type="button" data-status="CONCLUÍDO" class="apt-status-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Concluídos</button>
+            <button type="button" data-status="CANCELADO" class="apt-status-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Cancelados</button>
+            <button type="button" data-status="NÃO COMPARECEU" class="apt-status-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Não Compareceu</button>
+          </div>
+
+          <!-- Appointments List Container -->
+          <div id="appointmentsList" class="space-y-2.5"></div>
         </div>
 
-        <!-- MODAL: NOVO AGENDAMENTO -->
+        <!-- MODAL: NOVO AGENDAMENTO COM VALIDAÇÃO DE CONFLITO E SUGESTÃO -->
         <div id="modalNewAppointment" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl">
+          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-4 text-xs shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 class="text-sm font-bold text-white flex items-center gap-2">
                 <i data-lucide="calendar-plus" class="w-4 h-4 text-[#00F59B]"></i>
@@ -1019,20 +1101,45 @@
               </button>
             </div>
 
+            <!-- Sugestões de Horários Alternativos (aparece em caso de conflito) -->
+            <div id="aptSuggestedSlotsContainer" class="hidden p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/30 space-y-2">
+              <p class="font-bold text-amber-200 text-xs flex items-center gap-1.5">
+                <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400"></i>
+                <span id="aptConflictAlertMessage">Horário em conflito com outro agendamento.</span>
+              </p>
+              <p class="text-[11px] text-slate-300">Horários disponíveis para este dia:</p>
+              <div id="aptSuggestedSlotsPills" class="flex flex-wrap gap-1.5 pt-1"></div>
+            </div>
+
             <form id="formNewAppointment" class="space-y-3.5">
-              <div>
-                <label for="aptClientName" class="block text-slate-300 font-semibold mb-1">Nome do(a) Cliente *</label>
-                <input type="text" id="aptClientName" placeholder="Ex: Mariana Silva" required
-                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label for="aptClientName" class="block text-slate-300 font-semibold mb-1">Nome do(a) Cliente *</label>
+                  <input type="text" id="aptClientName" placeholder="Ex: Mariana Silva" required
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+                </div>
+                <div>
+                  <label for="aptClientPhone" class="block text-slate-300 font-semibold mb-1">WhatsApp do(a) Cliente</label>
+                  <input type="tel" id="aptClientPhone" placeholder="(11) 99999-9999"
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+                </div>
               </div>
 
-              <div>
-                <label for="aptServiceSelect" class="block text-slate-300 font-semibold mb-1">Serviço *</label>
-                <select id="aptServiceSelect" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
-                  <option value="">Selecione um serviço ativo...</option>
-                </select>
-                <p id="aptServiceDurationHint" class="text-[11px] text-slate-500 mt-1"></p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label for="aptServiceSelect" class="block text-slate-300 font-semibold mb-1">Serviço *</label>
+                  <select id="aptServiceSelect" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                    <option value="">Selecione um serviço...</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="aptStaffSelect" class="block text-slate-300 font-semibold mb-1">Profissional *</label>
+                  <select id="aptStaffSelect" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                    <option value="">Automático (primeiro livre)</option>
+                  </select>
+                </div>
               </div>
+              <p id="aptServiceDurationHint" class="text-[11px] text-slate-400"></p>
 
               <div class="grid grid-cols-2 gap-3">
                 <div>
@@ -1047,12 +1154,350 @@
                 </div>
               </div>
 
+              <div>
+                <label for="aptStatusSelect" class="block text-slate-300 font-semibold mb-1">Status Inicial</label>
+                <select id="aptStatusSelect" class="w-full px-3.5 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                  <option value="AGENDADO">AGENDADO</option>
+                  <option value="CONFIRMADO" selected>CONFIRMADO</option>
+                </select>
+              </div>
+
               <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
                 <button type="button" id="btnCancelNewAppointment" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-medium">Cancelar</button>
-                <button type="submit" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 shadow-sm">Confirmar Agendamento</button>
+                <button type="submit" id="btnSubmitNewAppointment" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 shadow-sm flex items-center gap-1.5">
+                  <span>Confirmar Agendamento</span>
+                </button>
               </div>
             </form>
           </div>
+        </div>
+
+        <!-- MODAL: REMARCAR AGENDAMENTO -->
+        <div id="modalRescheduleAppointment" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="calendar-clock" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>Remarcar Horário</span>
+              </h3>
+              <button type="button" id="btnCloseRescheduleModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <div id="rescheduleAptInfo" class="p-3 rounded-xl bg-[#07080c] border border-white/5 text-slate-300 text-xs"></div>
+
+            <div id="rescheduleSuggestedSlotsContainer" class="hidden p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 space-y-1.5">
+              <p class="font-bold text-amber-200 text-xs">Horário solicitado em conflito. Alternativas disponíveis:</p>
+              <div id="rescheduleSuggestedPills" class="flex flex-wrap gap-1.5"></div>
+            </div>
+
+            <form id="formRescheduleAppointment" class="space-y-3.5">
+              <input type="hidden" id="rescheduleAptId">
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label for="rescheduleDate" class="block text-slate-300 font-semibold mb-1">Nova Data *</label>
+                  <input type="date" id="rescheduleDate" required
+                    class="w-full px-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                </div>
+                <div>
+                  <label for="rescheduleTime" class="block text-slate-300 font-semibold mb-1">Novo Horário *</label>
+                  <input type="time" id="rescheduleTime" required
+                    class="w-full px-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                </div>
+              </div>
+
+              <div>
+                <label for="rescheduleStaffSelect" class="block text-slate-300 font-semibold mb-1">Profissional</label>
+                <select id="rescheduleStaffSelect" class="w-full px-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]"></select>
+              </div>
+
+              <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
+                <button type="button" id="btnCancelRescheduleModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">Cancelar</button>
+                <button type="submit" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110">Salvar Remarcação</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- MODAL: ALTERAR STATUS DO AGENDAMENTO -->
+        <div id="modalStatusAppointment" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-sm p-6 space-y-4 text-xs shadow-2xl">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="check-circle" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>Atualizar Status</span>
+              </h3>
+              <button type="button" id="btnCloseStatusModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <form id="formStatusAppointment" class="space-y-3.5">
+              <input type="hidden" id="statusAptId">
+              <div>
+                <label for="statusTargetSelect" class="block text-slate-300 font-semibold mb-1">Novo Status *</label>
+                <select id="statusTargetSelect" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                  <option value="AGENDADO">AGENDADO (Aguardando)</option>
+                  <option value="CONFIRMADO">CONFIRMADO (Cliente confirmou)</option>
+                  <option value="CONCLUÍDO">CONCLUÍDO (Atendimento realizado)</option>
+                  <option value="NÃO COMPARECEU">NÃO COMPARECEU (Ausência)</option>
+                  <option value="CANCELADO">CANCELADO (Horário liberado)</option>
+                </select>
+              </div>
+
+              <div>
+                <label for="statusReasonInput" class="block text-slate-300 font-semibold mb-1">Observação / Motivo</label>
+                <input type="text" id="statusReasonInput" placeholder="Ex: Cliente confirmou via WhatsApp"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+              </div>
+
+              <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
+                <button type="button" id="btnCancelStatusModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">Fechar</button>
+                <button type="submit" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110">Salvar Status</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- MODAL: CANCELAR AGENDAMENTO COM SEGURANÇA -->
+        <div id="modalCancelAppointment" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="x-circle" class="w-4 h-4 text-rose-400"></i>
+                <span>Cancelar Agendamento</span>
+              </h3>
+              <button type="button" id="btnCloseCancelModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <p class="text-slate-300">Tem certeza que deseja cancelar este agendamento? O horário será liberado na agenda e o evento correspondente no Google Calendar será removido.</p>
+            <div id="cancelAptInfo" class="p-3 rounded-xl bg-[#07080c] border border-white/5 text-slate-400 text-xs"></div>
+
+            <form id="formCancelAppointment" class="space-y-3.5">
+              <input type="hidden" id="cancelAptId">
+              <div>
+                <label for="cancelReasonInput" class="block text-slate-300 font-semibold mb-1">Motivo do Cancelamento</label>
+                <input type="text" id="cancelReasonInput" placeholder="Ex: Pedido da cliente"
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+              </div>
+
+              <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
+                <button type="button" id="btnAbortCancelModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">Não, manter</button>
+                <button type="submit" class="px-5 py-2 rounded-xl bg-rose-500 text-white font-bold hover:brightness-110">Sim, Cancelar Horário</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- MODAL: REVISÃO DE CONFLITOS HISTÓRICOS -->
+        <div id="modalHistoricalConflicts" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+          <div class="bg-[#11131a] border border-amber-500/30 rounded-2xl w-full max-w-2xl p-6 space-y-4 text-xs shadow-2xl max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i>
+                <span>Conflitos Históricos Identificados</span>
+              </h3>
+              <button type="button" id="btnCloseHistoricalConflictsModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <p class="text-slate-300 text-xs">
+              Estes agendamentos foram identificados com sobreposição de horários para o mesmo profissional. Conforme as diretrizes de preservação de dados da RAIA, nenhum agendamento foi excluído automaticamente. Você pode remarcar ou cancelar um dos horários abaixo:
+            </p>
+
+            <div id="conflictsListContainer" class="space-y-3"></div>
+
+            <div class="flex justify-end pt-3 border-t border-white/10">
+              <button type="button" id="btnDismissConflictsModal" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110">Entendido</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- TAB: INTEGRAÇÃO GOOGLE CALENDAR (POR SALÃO)    -->
+      <!-- ============================================== -->
+      <section id="tab-integrations-google" class="tab-content hidden space-y-6">
+        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+            <div>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="calendar-days" class="w-4 h-4 text-blue-400"></i>
+                <span>Integração Google Calendar</span>
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">Conecte sua própria conta Google Calendar para sincronizar agendamentos e evitar horários ocupados.</p>
+            </div>
+
+            <div id="googleConnectionStatusBadge" class="flex items-center gap-2">
+              <!-- Preenchido via JS -->
+            </div>
+          </div>
+
+          <!-- Card de Conexão da Conta -->
+          <div class="p-5 rounded-xl bg-[#07080c] border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+              <div class="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0">
+                <i data-lucide="calendar" class="w-6 h-6"></i>
+              </div>
+              <div>
+                <p id="googleAccountEmailText" class="font-bold text-white text-sm">Nenhuma conta Google conectada</p>
+                <p id="googleLastSyncText" class="text-xs text-slate-400 mt-0.5">Conecte sua conta para que os agendamentos da Jéssica entrem no seu calendário.</p>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" id="btnConnectGoogle" class="px-4 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2 shadow-sm">
+                <i data-lucide="link" class="w-4 h-4"></i>
+                <span>Conectar minha Agenda Google</span>
+              </button>
+              <button type="button" id="btnTestGoogleConnection" class="hidden px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold text-xs transition-all flex items-center gap-2">
+                <i data-lucide="activity" class="w-4 h-4"></i>
+                <span>Testar Conexão</span>
+              </button>
+              <button type="button" id="btnDisconnectGoogle" class="hidden px-4 py-2.5 rounded-xl bg-rose-500/15 text-rose-400 hover:bg-rose-500/25 font-semibold text-xs transition-all flex items-center gap-2">
+                <i data-lucide="unlink" class="w-4 h-4"></i>
+                <span>Desconectar Conta</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Configurações de Modalidade e Calendários -->
+          <div id="googleSettingsSection" class="hidden space-y-5 pt-2">
+            <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Modalidade de Sincronização</h4>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <!-- Modalidade A: Agenda Única do Salão -->
+              <label class="p-4 rounded-xl bg-[#07080c] border border-white/10 hover:border-[#00F59B]/50 transition-all cursor-pointer flex items-start gap-3">
+                <input type="radio" name="googleSyncMode" value="SINGLE" class="mt-1 accent-[#00F59B]" checked>
+                <div>
+                  <span class="font-bold text-white text-sm block">Agenda Única do Salão</span>
+                  <span class="text-slate-400 text-xs mt-1 block">Todos os agendamentos entram em um único calendário Google selecionado pelo estabelecimento, respeitando a equipe internamente.</span>
+                </div>
+              </label>
+
+              <!-- Modalidade B: Agenda Individual por Profissional -->
+              <label class="p-4 rounded-xl bg-[#07080c] border border-white/10 hover:border-[#00F59B]/50 transition-all cursor-pointer flex items-start gap-3">
+                <input type="radio" name="googleSyncMode" value="STAFF" class="mt-1 accent-[#00F59B]">
+                <div>
+                  <span class="font-bold text-white text-sm block">Agenda por Profissional</span>
+                  <span class="text-slate-400 text-xs mt-1 block">Cada profissional pode ter seu próprio calendário Google mapeado, separando os compromissos de cada integrante da equipe.</span>
+                </div>
+              </label>
+            </div>
+
+            <!-- Seleção de Calendário Padrão -->
+            <div class="p-4 rounded-xl bg-[#07080c] border border-white/10 space-y-3 text-xs">
+              <label for="googleCalendarSelect" class="block font-bold text-white">Calendário Padrão do Salão:</label>
+              <select id="googleCalendarSelect" class="w-full px-3.5 py-2.5 rounded-xl bg-[#11131a] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                <option value="primary">Carregando calendários da conta...</option>
+              </select>
+              <p class="text-[11px] text-slate-400">Os agendamentos confirmados serão criados e sincronizados neste calendário.</p>
+            </div>
+
+            <div class="flex justify-end">
+              <button type="button" id="btnSaveGoogleSettings" class="px-5 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 shadow-sm flex items-center gap-2">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                <span>Salvar Configuração do Google Calendar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================================== -->
+      <!-- TAB: NOTIFICAÇÕES WHATSAPP DO SALÃO            -->
+      <!-- ============================================== -->
+      <section id="tab-integrations-whatsapp" class="tab-content hidden space-y-6">
+        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+            <div>
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="message-square" class="w-4 h-4 text-emerald-400"></i>
+                <span>Notificações Automáticas no WhatsApp do Salão</span>
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">Receba alertas instantâneos no WhatsApp da dona ou responsável sempre que houver um novo agendamento, cancelamento ou remarcação.</p>
+            </div>
+
+            <span class="px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+              Notificações Rápidas
+            </span>
+          </div>
+
+          <form id="formWhatsAppNotificationSettings" class="space-y-6 text-xs">
+            <!-- Número de Destino -->
+            <div class="p-5 rounded-xl bg-[#07080c] border border-white/10 space-y-3">
+              <label for="waNotificationPhoneInput" class="block text-sm font-bold text-white">Número do WhatsApp para Receber Notificações:</label>
+              <div class="max-w-md relative">
+                <input type="tel" id="waNotificationPhoneInput" placeholder="Ex: (11) 95136-4159" required
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#11131a] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+              </div>
+              <p class="text-[11px] text-slate-400">Insira o número completo com DDD (ex: 11951364159). As notificações operacionais do salão serão enviadas exclusivamente para este destinatário.</p>
+            </div>
+
+            <!-- Toggles de Eventos -->
+            <div class="p-5 rounded-xl bg-[#07080c] border border-white/10 space-y-4">
+              <div class="flex items-center justify-between border-b border-white/5 pb-3">
+                <div>
+                  <span class="font-bold text-white text-sm block">Ativar Notificações no WhatsApp</span>
+                  <span class="text-slate-400 text-xs">Habilita o envio automático de mensagens para a responsável.</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="waNotificationsMasterToggle" class="sr-only peer" checked>
+                  <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#00F59B]"></div>
+                </label>
+              </div>
+
+              <div class="space-y-3 pt-1">
+                <label class="flex items-center gap-3 cursor-pointer text-slate-300">
+                  <input type="checkbox" id="toggleNotifyNew" class="accent-[#00F59B] w-4 h-4 rounded" checked>
+                  <span>Notificar novos agendamentos confirmados</span>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer text-slate-300">
+                  <input type="checkbox" id="toggleNotifyCancel" class="accent-[#00F59B] w-4 h-4 rounded" checked>
+                  <span>Notificar cancelamentos de horários</span>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer text-slate-300">
+                  <input type="checkbox" id="toggleNotifyReschedule" class="accent-[#00F59B] w-4 h-4 rounded" checked>
+                  <span>Notificar remarcações de data ou horário</span>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer text-slate-300">
+                  <input type="checkbox" id="toggleNotifySyncFail" class="accent-[#00F59B] w-4 h-4 rounded" checked>
+                  <span>Alertas de falhas de sincronização na agenda Google</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Modelo da Mensagem Enviada -->
+            <div class="p-5 rounded-xl bg-[#07080c] border border-white/10 space-y-3">
+              <h4 class="font-bold text-white text-xs uppercase tracking-wider">Prévia da Mensagem de Novo Agendamento</h4>
+              <div class="max-w-md p-4 rounded-2xl bg-[#11131a] border border-white/5 font-mono text-[11px] text-slate-300 leading-relaxed">
+                ✂️ *Novo agendamento confirmado!*<br><br>
+                Cliente: Mariana Silva<br>
+                Serviço: Corte Feminino com Escova<br>
+                Data: 10/11/2026<br>
+                Horário: 14:00 às 15:00<br>
+                Profissional: Jéssica Santos<br><br>
+                ✅ Agendamento registrado pela Jéssica.
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+              <button type="button" id="btnTestWhatsAppNotification" class="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold text-xs transition-all flex items-center gap-2">
+                <i data-lucide="send" class="w-4 h-4 text-emerald-400"></i>
+                <span>Testar Notificação no meu WhatsApp</span>
+              </button>
+
+              <button type="submit" class="px-6 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 shadow-sm flex items-center gap-2">
+                <i data-lucide="check" class="w-4 h-4"></i>
+                <span>Salvar Configurações de Notificações</span>
+              </button>
+            </div>
+          </form>
         </div>
       </section>
 
@@ -1764,12 +2209,14 @@
       'salon': { title: 'Módulo Jéssica • Meu Salão & Horários', subtitle: 'Personalize horários e informações do estabelecimento' },
       'services': { title: 'Módulo Jéssica • Serviços & Preços', subtitle: 'Procedimentos conhecidos e informados pela Jéssica' },
       'staff': { title: 'Módulo Jéssica • Equipe & Profissionais', subtitle: 'Profissionais habilitados para agendamento automático' },
-      'appointments': { title: 'Módulo Jéssica • Agenda de Atendimentos', subtitle: 'Histórico e novos agendamentos confirmados' },
+      'appointments': { title: 'Módulo Jéssica • Agenda de Atendimentos', subtitle: 'Gestão completa de horários, profissionais, concorrência e Google Calendar' },
+      'integrations-google': { title: 'Módulo Jéssica • Integração Google Calendar', subtitle: 'Sincronização bidirecional e prevenção de horários ocupados' },
+      'integrations-whatsapp': { title: 'Módulo Jéssica • Notificações WhatsApp', subtitle: 'Alertas automáticos para a dona ou responsável pelo salão' },
       'dashboard-pro': { title: 'Módulo Jéssica • Dashboard Gerencial & Financeiro', subtitle: 'Acompanhe o desempenho do seu salão em um só lugar.' },
       'campaigns-pro': { title: 'Módulo Jéssica • Campanhas Promocionais', subtitle: 'Disparo de novidades com consentimento e opt-out' },
     };
 
-    const isSalonTab = (tabId) => ['overview', 'salon', 'services', 'staff', 'appointments', 'dashboard-pro', 'campaigns-pro'].includes(tabId);
+    const isSalonTab = (tabId) => ['overview', 'salon', 'services', 'staff', 'appointments', 'integrations-google', 'integrations-whatsapp', 'dashboard-pro', 'campaigns-pro'].includes(tabId);
 
     function switchTab(tabId) {
       const navButtons = document.querySelectorAll('.nav-btn');
@@ -1818,6 +2265,8 @@
       else if (tabId === 'services') loadServices();
       else if (tabId === 'staff') loadStaff();
       else if (tabId === 'appointments') loadAppointments();
+      else if (tabId === 'integrations-google') loadGoogleCalendarSettings();
+      else if (tabId === 'integrations-whatsapp') loadWhatsAppNotificationSettings();
       else if (tabId === 'dashboard-pro') loadProDashboard();
       else if (tabId === 'campaigns-pro') loadProCampaigns();
     }
@@ -3661,48 +4110,291 @@
       loadStaff();
     }
 
-    // Appointments History
+    // ========================================================
+    // AGENDA INTELIGENTE JÉSSICA & HISTÓRICO MULTI-PROFISSIONAL
+    // ========================================================
+    let appointmentsState = {
+      view: 'list',
+      status: 'TODOS',
+      staffId: '',
+      search: '',
+      appointments: [],
+      conflicts: [],
+    };
+
+    function getStatusBadgeHtml(status) {
+      const s = String(status || 'AGENDADO').toUpperCase();
+      switch (s) {
+        case 'CONFIRMADO':
+          return '<span class="px-2.5 py-1 rounded-full font-bold text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">CONFIRMADO</span>';
+        case 'CONCLUÍDO':
+        case 'COMPLETED':
+        case 'DONE':
+          return '<span class="px-2.5 py-1 rounded-full font-bold text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">CONCLUÍDO</span>';
+        case 'CANCELADO':
+        case 'CANCELLED':
+          return '<span class="px-2.5 py-1 rounded-full font-bold text-[10px] bg-slate-500/10 text-slate-400 border border-slate-500/30">CANCELADO</span>';
+        case 'NÃO COMPARECEU':
+        case 'NO_SHOW':
+          return '<span class="px-2.5 py-1 rounded-full font-bold text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30">NÃO COMPARECEU</span>';
+        case 'AGENDADO':
+        case 'SCHEDULED':
+        default:
+          return '<span class="px-2.5 py-1 rounded-full font-bold text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/30">AGENDADO</span>';
+      }
+    }
+
+    function getGoogleSyncBadgeHtml(syncStatus) {
+      if (!syncStatus || syncStatus === 'NOT_CONNECTED') return '';
+      if (syncStatus === 'SYNCED') {
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20" title="Sincronizado no Google Calendar"><i data-lucide="check" class="w-2.5 h-2.5"></i> Google Calendar</span>';
+      }
+      if (syncStatus === 'PENDING') {
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20" title="Sincronização pendente"><i data-lucide="clock" class="w-2.5 h-2.5"></i> Sincronizando</span>';
+      }
+      if (syncStatus === 'FAILED') {
+        return '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20" title="Falha ao sincronizar com Google"><i data-lucide="alert-circle" class="w-2.5 h-2.5"></i> Falha Google</span>';
+      }
+      return '';
+    }
+
     async function loadAppointments() {
       try {
-        const res = await fetch('/api/cliente/appointments');
-        const data = await res.json();
+        const params = new URLSearchParams();
+        if (appointmentsState.staffId) params.append('staff_id', appointmentsState.staffId);
+        if (appointmentsState.status && appointmentsState.status !== 'TODOS') params.append('status', appointmentsState.status);
+        if (appointmentsState.search) params.append('search', appointmentsState.search);
+
+        const [aptRes, conflictRes] = await Promise.all([
+          fetch(`/api/cliente/appointments?${params.toString()}`),
+          fetch('/api/cliente/appointments/conflicts'),
+        ]);
+
+        const data = await aptRes.json();
+        const conflictData = await conflictRes.json();
+
+        // 1. Atualizar Banner de Conflitos Históricos
+        const banner = document.getElementById('historicalConflictsBanner');
+        if (conflictData.success && conflictData.flaggedCount > 0) {
+          banner.classList.remove('hidden');
+          appointmentsState.conflicts = conflictData.conflicts || [];
+        } else {
+          banner.classList.add('hidden');
+          appointmentsState.conflicts = [];
+        }
+
+        // 2. Renderizar Lista de Agendamentos
         const list = document.getElementById('appointmentsList');
         list.innerHTML = '';
+        appointmentsState.appointments = data.appointments || [];
 
         if (!data.appointments || data.appointments.length === 0) {
-          list.innerHTML = '<div class="p-8 text-center text-slate-400 text-xs">Nenhum atendimento agendado no momento.</div>';
+          list.innerHTML = '<div class="p-8 text-center text-slate-400 text-xs bg-[#07080c] rounded-xl border border-white/5">Nenhum atendimento encontrado para os filtros selecionados.</div>';
           return;
         }
 
         data.appointments.forEach(a => {
           const dt = new Date(a.start_datetime);
-          const dtFormatted = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-          let durationInfo = '';
-          if (a.start_datetime && a.end_datetime) {
-            const startMs = new Date(a.start_datetime).getTime();
-            const endMs = new Date(a.end_datetime).getTime();
-            if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
-              const diffMin = Math.round((endMs - startMs) / 60000);
-              const endFormatted = new Date(a.end_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-              durationInfo = ` • Até ${endFormatted} (${diffMin} min)`;
-            }
+          const dtFormatted = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+          const startFormatted = dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          let endFormatted = '';
+          if (a.end_datetime) {
+            endFormatted = ' às ' + new Date(a.end_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
           }
+
           const card = document.createElement('div');
-          card.className = 'p-4 rounded-xl bg-[#07080c] border border-white/5 flex items-center justify-between text-xs';
+          card.className = `p-4 rounded-xl bg-[#07080c] border ${a.has_conflict ? 'border-amber-500/50 bg-amber-950/10' : 'border-white/5'} flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs transition-all hover:border-white/20`;
+
+          const conflictTag = a.has_conflict
+            ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⚠️ Conflito Detectado</span>'
+            : '';
+
+          const originTag = a.origin === 'whatsapp'
+            ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><i data-lucide="message-circle" class="w-2.5 h-2.5"></i> WhatsApp</span>'
+            : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-slate-400 border border-white/10">Painel</span>';
+
           card.innerHTML = `
-            <div>
-              <span class="font-bold text-white text-sm">${a.title}</span>
-              <div class="text-slate-400 mt-0.5">${dtFormatted}${durationInfo} • Cliente: ${a.description || 'WhatsApp'}</div>
+            <div class="space-y-1.5 min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-bold text-white text-sm">${escapeHtml(a.client_name)}</span>
+                <span class="text-slate-400 font-semibold">• ${escapeHtml(a.service_name)}</span>
+                ${getStatusBadgeHtml(a.status)}
+                ${conflictTag}
+                ${getGoogleSyncBadgeHtml(a.google_sync_status)}
+                ${originTag}
+              </div>
+
+              <div class="flex flex-wrap items-center gap-y-1 gap-x-3 text-slate-400 text-xs">
+                <span class="flex items-center gap-1 text-slate-300">
+                  <i data-lucide="calendar" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+                  <span>${dtFormatted} (${startFormatted}${endFormatted})</span>
+                </span>
+                <span class="flex items-center gap-1">
+                  <i data-lucide="user" class="w-3.5 h-3.5 text-blue-400"></i>
+                  <span>Profissional: <strong class="text-white">${escapeHtml(a.staff_name)}</strong></span>
+                </span>
+                <span class="flex items-center gap-1">
+                  <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-400"></i>
+                  <span>${a.duration_formatted}</span>
+                </span>
+                <span class="flex items-center gap-1">
+                  <i data-lucide="tag" class="w-3.5 h-3.5 text-emerald-400"></i>
+                  <span>${a.price_formatted}</span>
+                </span>
+              </div>
             </div>
-            <span class="px-2.5 py-1 rounded-full font-bold text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">CONFIRMADO</span>
+
+            <div class="flex items-center gap-1.5 shrink-0 self-end md:self-center">
+              <button type="button" class="btn-apt-reschedule px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-semibold hover:text-white transition-all flex items-center gap-1" data-id="${a.id}">
+                <i data-lucide="calendar-clock" class="w-3.5 h-3.5 text-blue-400"></i>
+                <span>Remarcar</span>
+              </button>
+
+              <button type="button" class="btn-apt-status px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-semibold hover:text-white transition-all flex items-center gap-1" data-id="${a.id}" data-status="${a.status}">
+                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span>Status</span>
+              </button>
+
+              <button type="button" class="btn-apt-cancel px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-semibold transition-all flex items-center gap-1" data-id="${a.id}">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                <span>Cancelar</span>
+              </button>
+            </div>
           `;
           list.appendChild(card);
         });
+
+        bindAppointmentActions();
         lucide.createIcons();
       } catch (e) {
-        showToast('Erro ao carregar agenda.', 'error');
+        showToast('Erro ao carregar agenda de atendimentos.', 'error');
       }
     }
+
+    function bindAppointmentActions() {
+      // Remarcar
+      document.querySelectorAll('.btn-apt-reschedule').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = Number(btn.dataset.id);
+          const apt = appointmentsState.appointments.find(a => a.id === id);
+          if (!apt) return;
+
+          document.getElementById('rescheduleAptId').value = apt.id;
+          document.getElementById('rescheduleAptInfo').innerHTML = `
+            <strong>${escapeHtml(apt.client_name)}</strong> • ${escapeHtml(apt.service_name)} (${apt.duration_formatted})<br>
+            <span class="text-slate-400">Horário Atual: ${new Date(apt.start_datetime).toLocaleDateString('pt-BR')} às ${new Date(apt.start_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • ${escapeHtml(apt.staff_name)}</span>
+          `;
+          document.getElementById('rescheduleDate').value = apt.start_datetime.split('T')[0];
+          document.getElementById('rescheduleTime').value = apt.start_datetime.split('T')[1].slice(0, 5);
+          document.getElementById('rescheduleSuggestedSlotsContainer').classList.add('hidden');
+
+          populateStaffSelect(document.getElementById('rescheduleStaffSelect'), apt.staff_id);
+
+          const modal = document.getElementById('modalRescheduleAppointment');
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
+          lucide.createIcons();
+        });
+      });
+
+      // Alterar Status
+      document.querySelectorAll('.btn-apt-status').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = Number(btn.dataset.id);
+          const status = btn.dataset.status;
+          document.getElementById('statusAptId').value = id;
+          document.getElementById('statusTargetSelect').value = status;
+          document.getElementById('statusReasonInput').value = '';
+
+          const modal = document.getElementById('modalStatusAppointment');
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
+          lucide.createIcons();
+        });
+      });
+
+      // Cancelar
+      document.querySelectorAll('.btn-apt-cancel').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = Number(btn.dataset.id);
+          const apt = appointmentsState.appointments.find(a => a.id === id);
+          if (!apt) return;
+
+          document.getElementById('cancelAptId').value = apt.id;
+          document.getElementById('cancelAptInfo').innerHTML = `
+            <strong>${escapeHtml(apt.client_name)}</strong> — ${escapeHtml(apt.service_name)}<br>
+            Data: ${new Date(apt.start_datetime).toLocaleDateString('pt-BR')} às ${new Date(apt.start_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}<br>
+            Profissional: ${escapeHtml(apt.staff_name)}
+          `;
+          document.getElementById('cancelReasonInput').value = '';
+
+          const modal = document.getElementById('modalCancelAppointment');
+          modal.classList.remove('hidden');
+          modal.classList.add('flex');
+          lucide.createIcons();
+        });
+      });
+    }
+
+    async function populateStaffSelect(selectEl, selectedId = null) {
+      if (!selectEl) return;
+      try {
+        const res = await fetch('/api/cliente/staff');
+        const data = await res.json();
+        selectEl.innerHTML = '<option value="">Todos / Automático</option>';
+        if (data.success && Array.isArray(data.staff)) {
+          data.staff.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.innerText = `${s.name} (${s.specialty || 'Atendimento'})`;
+            if (selectedId && Number(s.id) === Number(selectedId)) opt.selected = true;
+            selectEl.appendChild(opt);
+          });
+        }
+      } catch (_) {}
+    }
+
+    // Modal de Conflitos Históricos
+    document.getElementById('btnOpenConflictsModal')?.addEventListener('click', () => {
+      const container = document.getElementById('conflictsListContainer');
+      container.innerHTML = '';
+
+      if (appointmentsState.conflicts.length === 0) {
+        container.innerHTML = '<p class="text-slate-400">Nenhum conflito restante.</p>';
+      } else {
+        appointmentsState.conflicts.forEach((c, idx) => {
+          const item = document.createElement('div');
+          item.className = 'p-3.5 rounded-xl bg-[#07080c] border border-amber-500/30 text-xs space-y-2';
+          item.innerHTML = `
+            <div class="font-bold text-amber-300">Conflito #${idx + 1}</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-300">
+              <div class="p-2.5 rounded-lg bg-white/5">
+                <span class="font-semibold block text-white">${escapeHtml(c.client1 || 'Agendamento ' + c.id1)}</span>
+                <span class="text-slate-400 text-[11px]">${new Date(c.start1).toLocaleTimeString('pt-BR')} às ${new Date(c.end1).toLocaleTimeString('pt-BR')}</span>
+              </div>
+              <div class="p-2.5 rounded-lg bg-white/5">
+                <span class="font-semibold block text-white">${escapeHtml(c.client2 || 'Agendamento ' + c.id2)}</span>
+                <span class="text-slate-400 text-[11px]">${new Date(c.start2).toLocaleTimeString('pt-BR')} às ${new Date(c.end2).toLocaleTimeString('pt-BR')}</span>
+              </div>
+            </div>
+          `;
+          container.appendChild(item);
+        });
+      }
+
+      const modal = document.getElementById('modalHistoricalConflicts');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    });
+
+    const closeHistoricalConflictsModal = () => {
+      const modal = document.getElementById('modalHistoricalConflicts');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    };
+    document.getElementById('btnCloseHistoricalConflictsModal')?.addEventListener('click', closeHistoricalConflictsModal);
+    document.getElementById('btnDismissConflictsModal')?.addEventListener('click', closeHistoricalConflictsModal);
 
     // Modal Novo Agendamento
     async function populateAppointmentServices() {
@@ -3728,7 +4420,12 @@
     }
 
     document.getElementById('btnOpenNewAppointmentModal')?.addEventListener('click', async () => {
-      await populateAppointmentServices();
+      await Promise.all([
+        populateAppointmentServices(),
+        populateStaffSelect(document.getElementById('aptStaffSelect')),
+      ]);
+
+      document.getElementById('aptSuggestedSlotsContainer').classList.add('hidden');
       const modal = document.getElementById('modalNewAppointment');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -3743,37 +4440,117 @@
     document.getElementById('btnCloseNewAppointmentModal')?.addEventListener('click', closeNewAppointmentModal);
     document.getElementById('btnCancelNewAppointment')?.addEventListener('click', closeNewAppointmentModal);
 
+    // Close Reschedule Modal
+    const closeRescheduleModal = () => {
+      const modal = document.getElementById('modalRescheduleAppointment');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    };
+    document.getElementById('btnCloseRescheduleModal')?.addEventListener('click', closeRescheduleModal);
+    document.getElementById('btnCancelRescheduleModal')?.addEventListener('click', closeRescheduleModal);
+
+    // Close Status Modal
+    const closeStatusModal = () => {
+      const modal = document.getElementById('modalStatusAppointment');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    };
+    document.getElementById('btnCloseStatusModal')?.addEventListener('click', closeStatusModal);
+    document.getElementById('btnCancelStatusModal')?.addEventListener('click', closeStatusModal);
+
+    // Close Cancel Modal
+    const closeCancelModal = () => {
+      const modal = document.getElementById('modalCancelAppointment');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    };
+    document.getElementById('btnCloseCancelModal')?.addEventListener('click', closeCancelModal);
+    document.getElementById('btnAbortCancelModal')?.addEventListener('click', closeCancelModal);
+
+    // Serviço selecionado no Novo Agendamento
     document.getElementById('aptServiceSelect')?.addEventListener('change', (e) => {
       const opt = e.target.selectedOptions[0];
       const hint = document.getElementById('aptServiceDurationHint');
       if (opt && opt.dataset.duration) {
-        hint.innerText = `⏱ Tempo previsto de atendimento: ${opt.dataset.duration} minutos`;
+        hint.innerText = `⏱ Duração cadastrada: ${opt.dataset.duration} minutos • Valor: R$ ${Number(opt.dataset.price).toFixed(2).replace('.', ',')}`;
       } else {
         hint.innerText = '';
       }
     });
 
+    // Submissão do Novo Agendamento com Conflito e Sugestão
     document.getElementById('formNewAppointment')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const clientName = document.getElementById('aptClientName').value.trim();
+      const clientPhone = document.getElementById('aptClientPhone').value.trim();
       const serviceId = document.getElementById('aptServiceSelect').value;
+      const staffId = document.getElementById('aptStaffSelect').value;
       const date = document.getElementById('aptDate').value;
       const time = document.getElementById('aptTime').value;
+      const status = document.getElementById('aptStatusSelect').value;
 
       if (!clientName || !serviceId || !date || !time) {
-        showToast('Preencha todos os campos do agendamento.', 'error');
+        showToast('Preencha os campos obrigatórios.', 'error');
         return;
       }
+
+      const submitBtn = document.getElementById('btnSubmitNewAppointment');
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Verificando...</span>';
+      lucide.createIcons();
 
       try {
         const res = await fetch('/api/cliente/appointments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ clientName, serviceId: Number(serviceId), date, time }),
+          body: JSON.stringify({
+            clientName,
+            clientPhone,
+            serviceId: Number(serviceId),
+            staffId: staffId ? Number(staffId) : null,
+            date,
+            time,
+            status,
+          }),
         });
+
         const data = await res.json();
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Confirmar Agendamento</span>';
+
+        if (res.status === 409) {
+          // Conflito de Horário! Exibir Sugestões Alternativas
+          const container = document.getElementById('aptSuggestedSlotsContainer');
+          const pills = document.getElementById('aptSuggestedSlotsPills');
+          const alertMsg = document.getElementById('aptConflictAlertMessage');
+
+          alertMsg.innerText = data.error || 'Horário solicitado já ocupado para este profissional.';
+          pills.innerHTML = '';
+
+          if (Array.isArray(data.suggestedSlots) && data.suggestedSlots.length > 0) {
+            data.suggestedSlots.forEach(slot => {
+              const pill = document.createElement('button');
+              pill.type = 'button';
+              pill.className = 'px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 font-bold text-xs transition-all flex items-center gap-1';
+              pill.innerHTML = `<i data-lucide="clock" class="w-3 h-3"></i><span>${slot}</span>`;
+              pill.addEventListener('click', () => {
+                document.getElementById('aptTime').value = slot;
+                container.classList.add('hidden');
+                showToast(`Horário ${slot} selecionado! Clique em confirmar.`);
+              });
+              pills.appendChild(pill);
+            });
+            container.classList.remove('hidden');
+            lucide.createIcons();
+          } else {
+            container.classList.remove('hidden');
+            pills.innerHTML = '<span class="text-slate-400 text-xs">Não há outros horários livres nesta data. Tente outro dia.</span>';
+          }
+          return;
+        }
+
         if (data.success) {
-          showToast(data.message || 'Agendamento registrado!');
+          showToast('Agendamento registrado com sucesso!');
           document.getElementById('formNewAppointment').reset();
           closeNewAppointmentModal();
           loadAppointments();
@@ -3781,7 +4558,400 @@
           showToast(data.error || 'Erro ao registrar agendamento.', 'error');
         }
       } catch (err) {
-        showToast('Erro de conexão ao agendar.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>Confirmar Agendamento</span>';
+        showToast('Erro de conexão ao processar agendamento.', 'error');
+      }
+    });
+
+    // Submissão da Remarcação
+    document.getElementById('formRescheduleAppointment')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('rescheduleAptId').value;
+      const newDate = document.getElementById('rescheduleDate').value;
+      const newTime = document.getElementById('rescheduleTime').value;
+      const newStaffId = document.getElementById('rescheduleStaffSelect').value;
+
+      try {
+        const res = await fetch(`/api/cliente/appointments/${id}/reschedule`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            newDate,
+            newTime,
+            newStaffId: newStaffId ? Number(newStaffId) : null,
+          }),
+        });
+
+        const data = await res.json();
+        if (res.status === 409) {
+          const container = document.getElementById('rescheduleSuggestedSlotsContainer');
+          const pills = document.getElementById('rescheduleSuggestedPills');
+          pills.innerHTML = '';
+
+          if (Array.isArray(data.suggestedSlots) && data.suggestedSlots.length > 0) {
+            data.suggestedSlots.forEach(slot => {
+              const pill = document.createElement('button');
+              pill.type = 'button';
+              pill.className = 'px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 font-bold text-xs transition-all';
+              pill.innerText = slot;
+              pill.addEventListener('click', () => {
+                document.getElementById('rescheduleTime').value = slot;
+                container.classList.add('hidden');
+              });
+              pills.appendChild(pill);
+            });
+            container.classList.remove('hidden');
+          }
+          showToast(data.error || 'Conflito de horário detectado.', 'error');
+          return;
+        }
+
+        if (data.success) {
+          showToast('Agendamento remarcado com sucesso!');
+          closeRescheduleModal();
+          loadAppointments();
+        } else {
+          showToast(data.error || 'Erro ao remarcar.', 'error');
+        }
+      } catch (_) {
+        showToast('Erro de conexão ao remarcar.', 'error');
+      }
+    });
+
+    // Submissão da Atualização de Status
+    document.getElementById('formStatusAppointment')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('statusAptId').value;
+      const status = document.getElementById('statusTargetSelect').value;
+      const reason = document.getElementById('statusReasonInput').value.trim();
+
+      try {
+        const res = await fetch(`/api/cliente/appointments/${id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status, reason }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message || 'Status atualizado com sucesso!');
+          closeStatusModal();
+          loadAppointments();
+        } else {
+          showToast(data.error || 'Erro ao atualizar status.', 'error');
+        }
+      } catch (_) {
+        showToast('Erro de conexão ao atualizar status.', 'error');
+      }
+    });
+
+    // Submissão do Cancelamento
+    document.getElementById('formCancelAppointment')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('cancelAptId').value;
+      const reason = document.getElementById('cancelReasonInput').value.trim();
+
+      try {
+        const res = await fetch(`/api/cliente/appointments/${id}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reason }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message || 'Agendamento cancelado com sucesso.');
+          closeCancelModal();
+          loadAppointments();
+        } else {
+          showToast(data.error || 'Erro ao cancelar agendamento.', 'error');
+        }
+      } catch (_) {
+        showToast('Erro de conexão ao cancelar agendamento.', 'error');
+      }
+    });
+
+    // Filtros da Agenda
+    document.getElementById('aptSearchInput')?.addEventListener('input', (e) => {
+      appointmentsState.search = e.target.value;
+      loadAppointments();
+    });
+
+    document.getElementById('aptStaffFilter')?.addEventListener('change', (e) => {
+      appointmentsState.staffId = e.target.value;
+      loadAppointments();
+    });
+
+    document.getElementById('btnAptRefresh')?.addEventListener('click', () => {
+      loadAppointments();
+      showToast('Agenda atualizada.');
+    });
+
+    document.querySelectorAll('.apt-status-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.apt-status-pill').forEach(b => {
+          b.className = 'apt-status-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5';
+        });
+        btn.className = 'apt-status-pill active px-3 py-1 rounded-lg text-xs font-bold bg-[#00F59B]/15 text-[#00F59B] border border-[#00F59B]/30';
+        appointmentsState.status = btn.dataset.status;
+        loadAppointments();
+      });
+    });
+
+    document.querySelectorAll('.apt-view-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.apt-view-btn').forEach(b => {
+          b.className = 'apt-view-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white';
+        });
+        btn.className = 'apt-view-btn active px-3 py-1.5 rounded-lg font-bold bg-[#00F59B]/15 text-[#00F59B]';
+        appointmentsState.view = btn.dataset.view;
+        loadAppointments();
+      });
+    });
+
+    // ========================================================
+    // INTEGRAÇÃO GOOGLE CALENDAR (CLIENT-SIDE)
+    // ========================================================
+    async function loadGoogleCalendarSettings() {
+      try {
+        const res = await fetch('/api/cliente/integrations/google/status');
+        const data = await res.json();
+
+        const badge = document.getElementById('googleConnectionStatusBadge');
+        const navBadge = document.getElementById('navGoogleStatusBadge');
+        const emailText = document.getElementById('googleAccountEmailText');
+        const lastSyncText = document.getElementById('googleLastSyncText');
+        const btnConnect = document.getElementById('btnConnectGoogle');
+        const btnTest = document.getElementById('btnTestGoogleConnection');
+        const btnDisconnect = document.getElementById('btnDisconnectGoogle');
+        const settingsSection = document.getElementById('googleSettingsSection');
+
+        if (data.isConnected) {
+          badge.innerHTML = '<span class="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30 flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> Conectado</span>';
+          if (navBadge) navBadge.className = 'w-2 h-2 rounded-full bg-blue-400';
+          emailText.innerText = data.accountEmail || 'Conta Google Conectada';
+          lastSyncText.innerText = `Última sincronização: ${data.lastSyncAt ? new Date(data.lastSyncAt).toLocaleString('pt-BR') : 'Ativa'}`;
+          btnConnect.innerText = 'Reconectar Conta';
+          btnTest.classList.remove('hidden');
+          btnDisconnect.classList.remove('hidden');
+          settingsSection.classList.remove('hidden');
+
+          // Modalidade
+          const modeRadios = document.querySelectorAll('input[name="googleSyncMode"]');
+          modeRadios.forEach(r => {
+            if (r.value === (data.calendarMode || 'SINGLE')) r.checked = true;
+          });
+
+          // Carregar Calendários da Conta Google
+          loadUserGoogleCalendars(data.selectedCalendarId);
+        } else {
+          badge.innerHTML = '<span class="px-3 py-1 rounded-full text-xs font-bold bg-slate-500/10 text-slate-400 border border-slate-500/30 flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5"></i> Desconectado</span>';
+          if (navBadge) navBadge.className = 'w-2 h-2 rounded-full bg-slate-600';
+          emailText.innerText = 'Nenhuma conta Google conectada';
+          lastSyncText.innerText = data.lastError ? `Aviso: ${data.lastError}` : 'Conecte sua conta para sincronizar agendamentos.';
+          btnConnect.innerText = 'Conectar minha Agenda Google';
+          btnTest.classList.add('hidden');
+          btnDisconnect.classList.add('hidden');
+          settingsSection.classList.add('hidden');
+        }
+        lucide.createIcons();
+      } catch (err) {
+        showToast('Erro ao carregar status do Google Calendar.', 'error');
+      }
+    }
+
+    async function loadUserGoogleCalendars(selectedId = 'primary') {
+      try {
+        const res = await fetch('/api/cliente/integrations/google/calendars');
+        const data = await res.json();
+        const select = document.getElementById('googleCalendarSelect');
+        if (!select) return;
+
+        select.innerHTML = '';
+        if (data.success && Array.isArray(data.calendars)) {
+          data.calendars.forEach(cal => {
+            const opt = document.createElement('option');
+            opt.value = cal.id;
+            opt.innerText = `${cal.summary} ${cal.primary ? '(Principal)' : ''}`;
+            if (cal.id === selectedId) opt.selected = true;
+            select.appendChild(opt);
+          });
+        } else {
+          select.innerHTML = '<option value="primary">Principal (Padrão)</option>';
+        }
+      } catch (_) {
+        const select = document.getElementById('googleCalendarSelect');
+        if (select) select.innerHTML = '<option value="primary">Principal (Padrão)</option>';
+      }
+    }
+
+    // Botão Conectar Google
+    document.getElementById('btnConnectGoogle')?.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/cliente/integrations/google/auth-url');
+        const data = await res.json();
+        if (data.success && data.authUrl) {
+          window.location.href = data.authUrl;
+        } else {
+          showToast(data.error || 'Não foi possível iniciar o login Google.', 'error');
+        }
+      } catch (err) {
+        showToast('Erro de conexão ao contactar o servidor.', 'error');
+      }
+    });
+
+    // Botão Testar Conexão Google
+    document.getElementById('btnTestGoogleConnection')?.addEventListener('click', async () => {
+      try {
+        const res = await fetch('/api/cliente/integrations/google/test', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message || 'Conexão válida com Google Calendar!');
+        } else {
+          showToast(data.error || 'Falha ao testar conexão Google.', 'error');
+        }
+      } catch (_) {
+        showToast('Erro ao testar conexão.', 'error');
+      }
+    });
+
+    // Botão Desconectar Google
+    document.getElementById('btnDisconnectGoogle')?.addEventListener('click', async () => {
+      if (!confirm('Deseja realmente desconectar sua conta Google Calendar? Os novos agendamentos não serão mais sincronizados.')) return;
+      try {
+        const res = await fetch('/api/cliente/integrations/google/disconnect', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Google Calendar desconectado.');
+          loadGoogleCalendarSettings();
+        } else {
+          showToast(data.error || 'Erro ao desconectar.', 'error');
+        }
+      } catch (_) {
+        showToast('Erro ao desconectar.', 'error');
+      }
+    });
+
+    // Salvar Configurações de Calendário
+    document.getElementById('btnSaveGoogleSettings')?.addEventListener('click', async () => {
+      const calendarId = document.getElementById('googleCalendarSelect').value;
+      const selectedOption = document.getElementById('googleCalendarSelect').selectedOptions[0];
+      const calendarName = selectedOption ? selectedOption.innerText : 'Principal';
+      const syncModeRadio = document.querySelector('input[name="googleSyncMode"]:checked');
+      const syncMode = syncModeRadio ? syncModeRadio.value : 'SINGLE';
+
+      try {
+        const res = await fetch('/api/cliente/integrations/google/select-calendar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ calendarId, calendarName, syncMode }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Configurações de calendário salvas com sucesso!');
+        } else {
+          showToast(data.error || 'Erro ao salvar configuração.', 'error');
+        }
+      } catch (_) {
+        showToast('Erro ao salvar.', 'error');
+      }
+    });
+
+    // ========================================================
+    // INTEGRAÇÃO NOTIFICAÇÕES WHATSAPP (CLIENT-SIDE)
+    // ========================================================
+    async function loadWhatsAppNotificationSettings() {
+      try {
+        const res = await fetch('/api/cliente/integrations/whatsapp/settings');
+        const data = await res.json();
+        if (data.success && data.settings) {
+          const s = data.settings;
+          const phoneInput = document.getElementById('waNotificationPhoneInput');
+          const masterToggle = document.getElementById('waNotificationsMasterToggle');
+          const tNew = document.getElementById('toggleNotifyNew');
+          const tCancel = document.getElementById('toggleNotifyCancel');
+          const tReschedule = document.getElementById('toggleNotifyReschedule');
+          const tSyncFail = document.getElementById('toggleNotifySyncFail');
+          const navBadge = document.getElementById('navWaStatusBadge');
+
+          if (phoneInput) phoneInput.value = s.notificationPhone || '';
+          if (masterToggle) masterToggle.checked = !!s.notificationsEnabled;
+          if (tNew) tNew.checked = !!s.notifyNewAppointment;
+          if (tCancel) tCancel.checked = !!s.notifyCancellation;
+          if (tReschedule) tReschedule.checked = !!s.notifyReschedule;
+          if (tSyncFail) tSyncFail.checked = !!s.notifySyncFailure;
+
+          if (navBadge) {
+            navBadge.className = s.notificationsEnabled && s.notificationPhone
+              ? 'w-2 h-2 rounded-full bg-emerald-400'
+              : 'w-2 h-2 rounded-full bg-slate-600';
+          }
+        }
+      } catch (_) {
+        showToast('Erro ao carregar configurações de notificações.', 'error');
+      }
+    }
+
+    // Submissão das Configurações de Notificações WhatsApp
+    document.getElementById('formWhatsAppNotificationSettings')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const notificationPhone = document.getElementById('waNotificationPhoneInput').value.trim();
+      const notificationsEnabled = document.getElementById('waNotificationsMasterToggle').checked;
+      const notifyNewAppointment = document.getElementById('toggleNotifyNew').checked;
+      const notifyCancellation = document.getElementById('toggleNotifyCancel').checked;
+      const notifyReschedule = document.getElementById('toggleNotifyReschedule').checked;
+      const notifySyncFailure = document.getElementById('toggleNotifySyncFail').checked;
+
+      try {
+        const res = await fetch('/api/cliente/integrations/whatsapp/settings', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            notificationPhone,
+            notificationsEnabled,
+            notifyNewAppointment,
+            notifyCancellation,
+            notifyReschedule,
+            notifySyncFailure,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          showToast('Configurações de notificações WhatsApp salvas!');
+          loadWhatsAppNotificationSettings();
+        } else {
+          showToast(data.error || 'Erro ao salvar configurações.', 'error');
+        }
+      } catch (_) {
+        showToast('Erro ao salvar configurações.', 'error');
+      }
+    });
+
+    // Testar Notificação WhatsApp
+    document.getElementById('btnTestWhatsAppNotification')?.addEventListener('click', async () => {
+      const phoneInput = document.getElementById('waNotificationPhoneInput');
+      const phone = phoneInput ? phoneInput.value.trim() : '';
+      if (!phone) {
+        showToast('Preencha o número do WhatsApp antes de testar.', 'error');
+        return;
+      }
+
+      if (!confirm(`Deseja enviar uma notificação de teste para o número ${phone}?`)) return;
+
+      try {
+        const res = await fetch('/api/cliente/integrations/whatsapp/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('Notificação de teste processada com sucesso!');
+        } else {
+          showToast(data.error || 'Erro no envio do teste.', 'error');
+        }
+      } catch (_) {
+        showToast('Erro ao disparar teste.', 'error');
       }
     });
 
