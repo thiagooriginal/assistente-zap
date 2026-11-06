@@ -201,18 +201,24 @@ async function handleOAuthCallback(code, state, authenticatedUserId = null) {
   // 1. Validar Anti-CSRF State
   const stateRow = db.prepare('SELECT * FROM oauth_states WHERE state = ?').get(state);
   if (!stateRow) {
-    throw new Error('Estado de autenticação OAuth inválido ou expirado (CSRF_INVALID_STATE).');
+    const err = new Error('Estado de autenticação OAuth inválido ou expirado (CSRF_INVALID_STATE).');
+    err.code = 'CSRF_INVALID_STATE';
+    throw err;
   }
 
   if (Date.now() > stateRow.expires_at) {
     db.prepare('DELETE FROM oauth_states WHERE state = ?').run(state);
-    throw new Error('A solicitação de autorização expirou. Por favor, tente novamente.');
+    const err = new Error('A solicitação de autorização expirou. Por favor, tente novamente.');
+    err.code = 'STATE_EXPIRED';
+    throw err;
   }
 
   const userId = stateRow.user_id;
   if (authenticatedUserId && Number(authenticatedUserId) !== Number(userId)) {
     db.prepare('DELETE FROM oauth_states WHERE state = ?').run(state);
-    throw new Error('Tentativa de vinculação cruzada entre contas de salões rejeitada por segurança.');
+    const err = new Error('Tentativa de vinculação cruzada entre contas de salões rejeitada por segurança.');
+    err.code = 'CROSS_SALON_LINKING_REJECTED';
+    throw err;
   }
   db.prepare('DELETE FROM oauth_states WHERE state = ?').run(state);
 
@@ -511,6 +517,11 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
       `💰 Valor: R$ ${(appointment.price || 0).toFixed(2).replace('.', ',')}\n` +
       `📌 ID do Agendamento: #${appointment.id}\n` +
       `✅ Registrado pela Jéssica.`,
+    extendedProperties: {
+      private: {
+        raia_appointment_id: String(appointment.id),
+      },
+    },
     start: {
       dateTime: new Date(appointment.start_datetime).toISOString(),
       timeZone: 'America/Sao_Paulo',
@@ -520,6 +531,34 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
       timeZone: 'America/Sao_Paulo',
     },
   };
+
+  // Reconciliação determinística: verificar se o evento já existe no Google antes de criar novo
+  try {
+    const listRes = await calendar.events.list({
+      calendarId: calId,
+      q: `#${appointment.id}`,
+      maxResults: 5,
+    });
+    const found = (listRes.data.items || []).find((ev) => 
+      (ev.description && ev.description.includes(`ID do Agendamento: #${appointment.id}`)) ||
+      (ev.extendedProperties?.private?.raia_appointment_id === String(appointment.id))
+    );
+    if (found) {
+      db.prepare(`
+        UPDATE appointments
+        SET google_event_id = ?,
+            google_calendar_id = ?,
+            google_sync_status = 'SYNCED',
+            google_sync_error = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND user_id = ?
+      `).run(found.id, calId, appointment.id, userId);
+
+      return { success: true, googleEventId: found.id, calendarId: calId, reconciled: true };
+    }
+  } catch (reconcileErr) {
+    console.warn(`[GoogleCalendarService] Aviso na busca determinística por evento existente:`, reconcileErr.message);
+  }
 
   try {
     const res = await calendar.events.insert({

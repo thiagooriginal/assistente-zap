@@ -197,11 +197,13 @@ function buildSyncFailureMessage({ clientName, serviceName, staffName, startDt, 
 }
 
 /**
- * Enqueues a notification into the persistent outbox and triggers safe dispatch
+ * Enqueues a notification into the persistent outbox within an open SQLite transaction
  */
-async function queueNotification(userId, appointmentId, eventType, data = {}) {
+function enqueueNotificationTx(userId, appointmentId, eventType, data = {}) {
   if (mockHandler?.queueNotification) {
-    return mockHandler.queueNotification(userId, appointmentId, eventType, data);
+    try {
+      mockHandler.queueNotification(userId, appointmentId, eventType, data);
+    } catch (_) {}
   }
 
   const settings = getNotificationSettings(userId);
@@ -252,15 +254,29 @@ async function queueNotification(userId, appointmentId, eventType, data = {}) {
     VALUES (?, ?, ?, ?, ?, 'PENDING')
   `).run(userId, appointmentId, eventType, settings.notificationPhone, messageText);
 
-  const outboxId = info.lastInsertRowid;
+  return { success: true, outboxId: info.lastInsertRowid, messageText };
+}
 
-  try {
-    await dispatchOutboxItem(outboxId);
-  } catch (err) {
-    console.warn(`[SalonNotificationService] Aviso no envio assíncrono do outbox #${outboxId}:`, err.message);
+/**
+ * Enqueues a notification into the persistent outbox and triggers safe dispatch
+ */
+async function queueNotification(userId, appointmentId, eventType, data = {}) {
+  if (mockHandler?.queueNotification) {
+    return mockHandler.queueNotification(userId, appointmentId, eventType, data);
   }
 
-  return { success: true, outboxId, messageText };
+  const enq = enqueueNotificationTx(userId, appointmentId, eventType, data);
+  if (!enq.success || enq.deduplicated || !enq.outboxId) {
+    return enq;
+  }
+
+  try {
+    await dispatchOutboxItem(enq.outboxId);
+  } catch (err) {
+    console.warn(`[SalonNotificationService] Aviso no envio assíncrono do outbox #${enq.outboxId}:`, err.message);
+  }
+
+  return enq;
 }
 
 /**
@@ -408,6 +424,7 @@ module.exports = {
   buildRescheduleMessage,
   buildSyncFailureMessage,
   queueNotification,
+  enqueueNotificationTx,
   dispatchOutboxItem,
   recordMockNotification,
   sendTestNotification,

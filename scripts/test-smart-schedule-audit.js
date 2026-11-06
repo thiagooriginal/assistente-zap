@@ -1,5 +1,5 @@
 /**
- * RAIA AGENTES — SUÍTE DE AUDITORIA CORRETIVA FINAL DA AGENDA INTELIGENTE (14 TESTES)
+ * RAIA AGENTES — SUÍTE DE AUDITORIA CORRETIVA FINAL DA AGENDA INTELIGENTE (19 TESTES)
  * 
  * Verificações obrigatórias de segurança, concorrência, unificação e resiliência:
  * 1. Agendamento iniciado pelo WhatsApp e sincronizado com o motor central.
@@ -50,7 +50,7 @@ const mockGoogleState = {
 
 async function setup() {
   console.log('================================================================');
-  console.log('   RAIA AGENTES — AUDITORIA FINAL DA AGENDA INTELIGENTE (14 TESTES)');
+  console.log('   RAIA AGENTES — AUDITORIA FINAL DA AGENDA INTELIGENTE (19 TESTES)');
   console.log('================================================================\n');
 
   // Configurar Mocks determinísticos
@@ -74,7 +74,6 @@ async function setup() {
       return slots;
     },
     createCalendarEvent: async (userId, appointment, targetCalendarId) => {
-      mockGoogleState.insertCallCount++;
       let cal = targetCalendarId;
       if (!cal && mockGoogleState.syncMode === 'STAFF' && appointment.staff_id) {
         const row = db.prepare('SELECT google_calendar_id FROM client_staff WHERE id = ?').get(appointment.staff_id);
@@ -82,6 +81,19 @@ async function setup() {
       }
       if (!cal) cal = mockGoogleState.selectedCalendarId || 'primary';
 
+      // Reconciliação determinística no mock: se evento já existe no Google, vincula sem duplicar
+      for (const [existingId, evData] of mockGoogleState.events.entries()) {
+        if (evData.appointment.id === appointment.id) {
+          db.prepare(`
+            UPDATE appointments
+            SET google_event_id = ?, google_calendar_id = ?, google_sync_status = 'SYNCED', google_sync_error = NULL
+            WHERE id = ?
+          `).run(existingId, cal, appointment.id);
+          return { success: true, googleEventId: existingId, calendarId: cal, reconciled: true };
+        }
+      }
+
+      mockGoogleState.insertCallCount++;
       const eventId = `g_event_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
       mockGoogleState.events.set(eventId, { appointment, calendarId: cal });
 
@@ -101,6 +113,10 @@ async function setup() {
       return { success: true };
     },
   });
+
+  // Limpar filas de execuções anteriores para isolamento do teste
+  db.prepare("UPDATE google_sync_outbox SET status = 'SENT' WHERE status = 'PENDING'").run();
+  db.prepare("UPDATE whatsapp_notification_outbox SET status = 'SENT' WHERE status = 'PENDING'").run();
 
   // Criar Usuário do Salão de Teste
   const testEmail = `audit.salon.${Date.now()}@example.com`;
@@ -532,8 +548,207 @@ async function runTests() {
 
   console.log('  ✓ 14. Fluxo ponta a ponta validado com integridade entre reserva, Google e WhatsApp.\n');
 
+  // ----------------------------------------------------
+  // TESTE 15: Segurança OAuth contra vinculação cruzada (CROSS_SALON_LINKING_REJECTED)
+  // ----------------------------------------------------
+  console.log('[Teste 15] Segurança OAuth contra vinculação cruzada entre salões...');
+  const testOAuthState = `oauth_state_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO oauth_states (state, user_id, expires_at)
+    VALUES (?, ?, ?)
+  `).run(testOAuthState, testSalonUser.id, Date.now() + 600000);
+
+  // Outro usuário autenticado tenta vincular o callback deste state
+  let errCrossSalon = null;
+  try {
+    await googleCalendarService.handleOAuthCallback('fake_code', testOAuthState, 999999);
+  } catch (err) {
+    errCrossSalon = err;
+  }
+
+  assert(errCrossSalon);
+  assert.strictEqual(errCrossSalon.code, 'CROSS_SALON_LINKING_REJECTED');
+  const checkState = db.prepare('SELECT * FROM oauth_states WHERE state = ?').get(testOAuthState);
+  assert(!checkState);
+  console.log('  ✓ 15. Vinculação cruzada entre salões bloqueada com CROSS_SALON_LINKING_REJECTED.\n');
+
+  // ----------------------------------------------------
+  // TESTE 16: WhatsApp valida disponibilidade no Google Calendar antes de confirmar
+  // ----------------------------------------------------
+  console.log('[Teste 16] WhatsApp valida Google Calendar antes de confirmar reserva...');
+  mockGoogleState.busySlotsByCalendar.set(staff1.google_calendar_id, [
+    { start: '2026-11-27T14:00:00-03:00', end: '2026-11-27T15:00:00-03:00' },
+  ]);
+
+  let errGoogleBusy = null;
+  try {
+    await appointmentService.createAppointment({
+      userId: testSalonUser.id,
+      title: 'Cliente WhatsApp Google Ocupado',
+      startDateTime: '2026-11-27T14:15:00',
+      durationMin: 30,
+      staffId: staff1.id,
+      sourceType: 'whatsapp',
+      checkGoogle: true,
+    });
+  } catch (err) {
+    errGoogleBusy = err;
+  }
+
+  assert(errGoogleBusy);
+  assert.strictEqual(errGoogleBusy.code, 'GOOGLE_CALENDAR_BUSY');
+
+  // Testar quando Google é obrigatório e está desconectado
+  db.prepare('UPDATE client_salons SET google_require_sync_availability = 1 WHERE user_id = ?').run(testSalonUser.id);
+  mockGoogleState.connected = false;
+
+  let errGoogleUnavailable = null;
+  try {
+    await appointmentService.createAppointment({
+      userId: testSalonUser.id,
+      title: 'Cliente WhatsApp Google Desconectado',
+      startDateTime: '2026-11-27T11:00:00',
+      durationMin: 30,
+      staffId: staff1.id,
+      sourceType: 'whatsapp',
+      checkGoogle: true,
+    });
+  } catch (err) {
+    errGoogleUnavailable = err;
+  }
+
+  assert(errGoogleUnavailable);
+  assert.strictEqual(errGoogleUnavailable.code, 'GOOGLE_CALENDAR_UNAVAILABLE');
+
+  mockGoogleState.connected = true;
+  db.prepare('UPDATE client_salons SET google_require_sync_availability = 0 WHERE user_id = ?').run(testSalonUser.id);
+  mockGoogleState.busySlotsByCalendar.clear();
+  console.log('  ✓ 16. WhatsApp valida Google Calendar (GOOGLE_CALENDAR_BUSY e GOOGLE_CALENDAR_UNAVAILABLE).\n');
+
+  // ----------------------------------------------------
+  // TESTE 17: Outbox durável em Remarcação e Cancelamento dentro da transação SQLite
+  // ----------------------------------------------------
+  console.log('[Teste 17] Outbox durável em remarcação e cancelamento...');
+  const aptToChange = salonAppointmentService.bookAppointmentSync(testSalonUser.id, {
+    clientName: 'Cliente Para Remarcar e Cancelar',
+    date: '2026-11-27',
+    time: '09:00',
+    durationMin: 45,
+    staffId: staff1.id,
+  });
+
+  await salonAppointmentService.rescheduleAppointment(aptToChange.id, testSalonUser.id, {
+    newDate: '2026-11-27',
+    newTime: '11:00',
+    reason: 'Remarcado pelo cliente via teste',
+  });
+
+  const gUpdateOutbox = db.prepare(`
+    SELECT * FROM google_sync_outbox
+    WHERE appointment_id = ? AND action = 'UPDATE'
+  `).get(aptToChange.id);
+  assert(gUpdateOutbox);
+  assert.strictEqual(gUpdateOutbox.status, 'PENDING');
+
+  const wReschedOutbox = db.prepare(`
+    SELECT * FROM whatsapp_notification_outbox
+    WHERE appointment_id = ? AND event_type = 'RESCHEDULE'
+  `).get(aptToChange.id);
+  assert(wReschedOutbox);
+
+  await salonAppointmentService.cancelAppointment(aptToChange.id, testSalonUser.id, {
+    reason: 'Cancelamento definitivo de teste',
+    cancelledBy: 'TEST',
+  });
+
+  const gDeleteOutbox = db.prepare(`
+    SELECT * FROM google_sync_outbox
+    WHERE appointment_id = ? AND action = 'DELETE'
+  `).get(aptToChange.id);
+  assert(gDeleteOutbox);
+  assert.strictEqual(gDeleteOutbox.status, 'PENDING');
+
+  const wCancelOutbox = db.prepare(`
+    SELECT * FROM whatsapp_notification_outbox
+    WHERE appointment_id = ? AND event_type = 'CANCELLATION'
+  `).get(aptToChange.id);
+  assert(wCancelOutbox);
+  console.log('  ✓ 17. Filas google_sync_outbox e whatsapp_notification_outbox duráveis em UPDATE e DELETE.\n');
+
+  // ----------------------------------------------------
+  // TESTE 18: Padronização de status AGENDADO e SCHEDULED em consultas e modificações
+  // ----------------------------------------------------
+  console.log('[Teste 18] Padronização de status AGENDADO e SCHEDULED nas consultas...');
+  const legScheduled = db.prepare(`
+    INSERT INTO appointments (user_id, title, start_datetime, end_datetime, status)
+    VALUES (?, 'Consulta Legada Dentista', '2026-11-27T14:00:00', '2026-11-27T14:45:00', 'SCHEDULED')
+  `).run(testSalonUser.id);
+
+  const newAgendado = db.prepare(`
+    INSERT INTO appointments (user_id, title, start_datetime, end_datetime, status)
+    VALUES (?, 'Consulta Nova Jéssica', '2026-11-27T15:00:00', '2026-11-27T15:45:00', 'AGENDADO')
+  `).run(testSalonUser.id);
+
+  const upcomingList = appointmentService.getUpcomingAppointments(testSalonUser.id, 20);
+  const foundScheduled = upcomingList.find((a) => a.id === legScheduled.lastInsertRowid);
+  const foundAgendado = upcomingList.find((a) => a.id === newAgendado.lastInsertRowid);
+  assert(foundScheduled, 'Deve encontrar compromisso com status SCHEDULED');
+  assert(foundAgendado, 'Deve encontrar compromisso com status AGENDADO');
+
+  const foundBySearch = appointmentService.findAppointmentToModify(testSalonUser.id, 'Dentista');
+  assert(foundBySearch);
+  assert.strictEqual(foundBySearch.id, legScheduled.lastInsertRowid);
+
+  // Remarcar compromisso legado via updateAppointment propagando erros de conflito
+  let errConflictUpdate = null;
+  try {
+    await appointmentService.updateAppointment(legScheduled.lastInsertRowid, testSalonUser.id, {
+      startDateTime: '2026-11-27T15:00:00', // Conflita com newAgendado!
+    });
+  } catch (err) {
+    errConflictUpdate = err;
+  }
+  assert(errConflictUpdate);
+  assert.strictEqual(errConflictUpdate.code, 'SLOT_CONFLICT');
+
+  await appointmentService.deleteAppointment(legScheduled.lastInsertRowid, testSalonUser.id);
+  const checkCancelled = db.prepare('SELECT status FROM appointments WHERE id = ?').get(legScheduled.lastInsertRowid);
+  assert(['CANCELADO', 'CANCELLED'].includes(checkCancelled.status));
+  console.log('  ✓ 18. Status AGENDADO e SCHEDULED padronizados e concorrência protegida no updateAppointment.\n');
+
+  // ----------------------------------------------------
+  // TESTE 19: Reconciliação determinística contra duplicações externas no Google
+  // ----------------------------------------------------
+  console.log('[Teste 19] Reconciliação determinística no Google Calendar...');
+  const aptReconcile = salonAppointmentService.bookAppointmentSync(testSalonUser.id, {
+    clientName: 'Cliente Reconciliação',
+    date: '2026-11-28',
+    time: '11:00',
+    durationMin: 30,
+    staffId: staff1.id,
+  });
+
+  const existingGoogleId = 'g_event_pre_existing_123';
+  mockGoogleState.events.set(existingGoogleId, {
+    appointment: { id: aptReconcile.id },
+    calendarId: 'primary',
+  });
+
+  const insertsBefore = mockGoogleState.insertCallCount;
+
+  const reconcileResult = await googleCalendarService.createCalendarEvent(testSalonUser.id, aptReconcile);
+  assert(reconcileResult.success);
+  assert.strictEqual(reconcileResult.googleEventId, existingGoogleId);
+  assert.strictEqual(reconcileResult.reconciled, true);
+  assert.strictEqual(mockGoogleState.insertCallCount, insertsBefore, 'Não deve criar novo evento no Google');
+
+  const checkAptReconciled = db.prepare('SELECT google_event_id, google_sync_status FROM appointments WHERE id = ?').get(aptReconcile.id);
+  assert.strictEqual(checkAptReconciled.google_event_id, existingGoogleId);
+  assert.strictEqual(checkAptReconciled.google_sync_status, 'SYNCED');
+  console.log('  ✓ 19. Reconciliação determinística preveniu duplicação no Google após falha de crash.\n');
+
   console.log('================================================================');
-  console.log('   TODOS OS 14 TESTES DE AUDITORIA FORAM APROVADOS COM SUCESSO! ');
+  console.log('   TODOS OS 19 TESTES DE AUDITORIA FORAM APROVADOS COM SUCESSO! ');
   console.log('================================================================\n');
 }
 

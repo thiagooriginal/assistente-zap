@@ -173,7 +173,7 @@ async function handleCalendarDelete(calendarDeleteReq, user, sock, targetJid) {
     const targetApt = appointmentService.findAppointmentToModify(user.id, searchTerm);
 
     if (targetApt) {
-      appointmentService.deleteAppointment(targetApt.id, user.id);
+      await appointmentService.deleteAppointment(targetApt.id, user.id);
     }
 
     // If User 1 (Admin/Owner) and Google Calendar is connected, also delete in Google Calendar
@@ -2040,8 +2040,8 @@ async function handleIncomingMessage(sock, msg) {
     // 4. CRIAR COMPROMISSO / EVENTO DE AGENDA
     if (intent === 'CALENDAR_CREATE' && calendarEvent) {
       try {
-        // Save in internal SQLite appointments database (100% tenant-isolated)
-        const createdApt = appointmentService.createAppointment({
+        // Save in internal SQLite appointments database (100% tenant-isolated) with full Google Calendar availability check
+        const createdApt = await appointmentService.createAppointment({
           userId: user.id,
           title: calendarEvent.summary,
           description: calendarEvent.description,
@@ -2049,6 +2049,7 @@ async function handleIncomingMessage(sock, msg) {
           endDateTime: calendarEvent.endDateTime,
           location: calendarEvent.location,
           sourceType: audioBuffer ? 'audio' : 'text',
+          checkGoogle: true,
         });
 
         // If User 1 (Admin/Owner) and Google Calendar is connected, also mirror to personal Google Calendar
@@ -2085,6 +2086,12 @@ async function handleIncomingMessage(sock, msg) {
         if (err.code === 'SLOT_CONFLICT' || err.code === 'GOOGLE_CALENDAR_BUSY') {
           await sock.sendMessage(targetJid, {
             text: `⚠️ *Horário Indisponível!*\n\nNão foi possível agendar para este horário pois já existe outro compromisso marcado.\n\nPor favor, escolha outro horário ou dia! 😊`,
+          });
+          return;
+        }
+        if (err.code === 'GOOGLE_CALENDAR_UNAVAILABLE') {
+          await sock.sendMessage(targetJid, {
+            text: `⚠️ *Sincronização Indisponível!*\n\nNão foi possível validar a disponibilidade da sua agenda no momento (Google Calendar obrigatório e inacessível). Por favor, tente novamente em alguns instantes.`,
           });
           return;
         }
@@ -2200,7 +2207,7 @@ async function handleIncomingMessage(sock, msg) {
         let updatedDesc = newDescription;
 
         if (targetApt) {
-          const updated = appointmentService.updateAppointment(targetApt.id, user.id, {
+          const updated = await appointmentService.updateAppointment(targetApt.id, user.id, {
             title: calendarUpdate.newSummary,
             description: newDescription !== null ? newDescription : undefined,
             startDateTime: finalStartDateTime,
@@ -2254,6 +2261,18 @@ async function handleIncomingMessage(sock, msg) {
         await sock.sendMessage(targetJid, { text: responseText });
       } catch (err) {
         console.error('Erro ao atualizar compromisso:', err);
+        if (err.code === 'SLOT_CONFLICT' || err.code === 'GOOGLE_CALENDAR_BUSY') {
+          await sock.sendMessage(targetJid, {
+            text: `⚠️ *Horário Indisponível!*\n\nNão foi possível reagendar para este horário pois já existe outro compromisso marcado.\n\nPor favor, escolha outro horário ou dia! 😊`,
+          });
+          return;
+        }
+        if (err.code === 'ALREADY_CANCELLED') {
+          await sock.sendMessage(targetJid, {
+            text: `⚠️ Este compromisso já se encontra cancelado e não pode ser remarcado.`,
+          });
+          return;
+        }
         await sock.sendMessage(targetJid, {
           text: `❌ Não consegui alterar o compromisso: ${err.message}`,
         });

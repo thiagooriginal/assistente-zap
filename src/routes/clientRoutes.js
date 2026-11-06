@@ -1389,11 +1389,27 @@ router.get('/integrations/google/callback', async (req, res) => {
     return res.status(400).send('Parâmetros de autenticação incompletos.');
   }
 
+  // Obter sessão do usuário autenticado no cookie ou header
+  let token = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.slice(7).trim();
+  }
+  if (!token && req.headers['x-auth-token']) {
+    token = req.headers['x-auth-token'];
+  }
+  if (!token) {
+    token = getCookie(req, 'client_auth_token') || getCookie(req, 'auth_token');
+  }
+
+  const sessionUser = token ? userService.getUserBySessionToken(token) : null;
+  const sessionUserId = sessionUser?.id || null;
+
   try {
-    const result = await googleCalendarService.handleOAuthCallback(code, state);
+    const result = await googleCalendarService.handleOAuthCallback(code, state, sessionUserId);
     res.redirect(`/cliente/painel.html?google_connected=true&email=${encodeURIComponent(result.email || '')}#tab-integrations-google`);
   } catch (err) {
-    res.redirect(`/cliente/painel.html?google_error=${encodeURIComponent(err.message)}#tab-integrations-google`);
+    res.redirect(`/cliente/painel.html?google_error=${encodeURIComponent(err.code || err.message)}#tab-integrations-google`);
   }
 });
 

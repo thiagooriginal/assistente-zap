@@ -3287,7 +3287,7 @@ app.post('/api/appointments', authMiddleware, (req, res) => {
 });
 
 // 13. Cancel/Delete an appointment (ownership checked)
-app.delete('/api/appointments/:id', authMiddleware, (req, res) => {
+app.delete('/api/appointments/:id', authMiddleware, async (req, res) => {
   try {
     const { id } = req.params;
     const existing = db.prepare('SELECT * FROM appointments WHERE id = ? AND user_id = ?').get(id, req.user.id);
@@ -3295,7 +3295,7 @@ app.delete('/api/appointments/:id', authMiddleware, (req, res) => {
       return res.status(404).json({ success: false, error: 'Compromisso não encontrado' });
     }
 
-    appointmentService.deleteAppointment(id, req.user.id);
+    await appointmentService.deleteAppointment(id, req.user.id);
     res.json({ success: true, message: 'Compromisso desmarcado com sucesso' });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

@@ -17,6 +17,25 @@ function norm(s) {
     .trim();
 }
 
+function formatAppointmentResponse(booked, location, description) {
+  return {
+    id: booked.id,
+    userId: booked.user_id,
+    title: booked.title,
+    description: booked.description || description || null,
+    startDateTime: booked.start_datetime,
+    endDateTime: booked.end_datetime,
+    location: location || null,
+    serviceId: booked.service_id,
+    staffId: booked.staff_id,
+    price: booked.price,
+    clientName: booked.client_name,
+    clientPhone: booked.client_phone,
+    durationMin: booked.duration_min,
+    status: booked.status,
+  };
+}
+
 /**
  * Create a new appointment / reminder delegating to unified salon appointment core
  */
@@ -34,6 +53,7 @@ function createAppointment({
   clientName = null,
   clientPhone = null,
   durationMin = 45,
+  checkGoogle = false,
 }) {
   if (!title || !startDateTime) {
     throw new Error('Título e data/horário são obrigatórios para agendar um compromisso.');
@@ -72,7 +92,7 @@ function createAppointment({
     }
   }
 
-  const booked = getSalonAppointmentService().bookAppointmentSync(userId, {
+  const bookPayload = {
     clientName: resolvedClientName,
     clientPhone: clientPhone || null,
     serviceId: serviceId || null,
@@ -82,24 +102,17 @@ function createAppointment({
     time: timeStr,
     durationMin: finalDuration,
     origin: sourceType || 'whatsapp',
-  });
-
-  return {
-    id: booked.id,
-    userId: booked.user_id,
-    title: booked.title,
-    description: booked.description || description || null,
-    startDateTime: booked.start_datetime,
-    endDateTime: booked.end_datetime,
-    location: location || null,
-    serviceId: booked.service_id,
-    staffId: booked.staff_id,
-    price: booked.price,
-    clientName: booked.client_name,
-    clientPhone: booked.client_phone,
-    durationMin: booked.duration_min,
-    status: booked.status,
   };
+
+  if (checkGoogle) {
+    return (async () => {
+      const booked = await getSalonAppointmentService().bookAppointment(userId, bookPayload);
+      return formatAppointmentResponse(booked, location, description);
+    })();
+  }
+
+  const booked = getSalonAppointmentService().bookAppointmentSync(userId, bookPayload);
+  return formatAppointmentResponse(booked, location, description);
 }
 
 /**
@@ -110,8 +123,14 @@ function getAppointments({ userId = 1, status = 'SCHEDULED', limit = 50 } = {}) 
   const params = [userId];
 
   if (status && status !== 'ALL') {
-    sql += ' AND status = ?';
-    params.push(status);
+    if (['SCHEDULED', 'AGENDADO', 'CONFIRMED', 'CONFIRMADO'].includes(status)) {
+      sql += " AND status IN ('SCHEDULED', 'AGENDADO', 'CONFIRMED', 'CONFIRMADO')";
+    } else if (['CANCELLED', 'CANCELADO'].includes(status)) {
+      sql += " AND status IN ('CANCELLED', 'CANCELADO')";
+    } else {
+      sql += ' AND status = ?';
+      params.push(status);
+    }
   }
 
   sql += ' ORDER BY start_datetime ASC LIMIT ?';
@@ -130,7 +149,7 @@ function getUpcomingAppointments(userId = 1, limit = 10) {
 
   return db.prepare(`
     SELECT * FROM appointments
-    WHERE user_id = ? AND status = 'SCHEDULED' AND start_datetime >= ?
+    WHERE user_id = ? AND status IN ('SCHEDULED', 'AGENDADO', 'CONFIRMED', 'CONFIRMADO') AND start_datetime >= ?
     ORDER BY start_datetime ASC
     LIMIT ?
   `).all(userId, pastOneHour, limit);
@@ -153,14 +172,14 @@ function findAppointmentToModify(userId = 1, searchTerm) {
     // 1. Fetch appointments: upcoming and recent from the last 72 hours forward
     const allRecentAndUpcoming = db.prepare(`
       SELECT * FROM appointments
-      WHERE user_id = ? AND status = 'SCHEDULED' AND datetime(start_datetime) >= datetime('now', '-72 hours')
+      WHERE user_id = ? AND status IN ('SCHEDULED', 'AGENDADO', 'CONFIRMED', 'CONFIRMADO') AND datetime(start_datetime) >= datetime('now', '-72 hours')
       ORDER BY ABS(strftime('%s', start_datetime) - strftime('%s', 'now')) ASC
       LIMIT 50
     `).all(userId);
 
     const allScheduled = db.prepare(`
       SELECT * FROM appointments
-      WHERE user_id = ? AND status = 'SCHEDULED'
+      WHERE user_id = ? AND status IN ('SCHEDULED', 'AGENDADO', 'CONFIRMED', 'CONFIRMADO')
       ORDER BY id DESC
       LIMIT 50
     `).all(userId);
@@ -221,7 +240,7 @@ function findAppointmentToModify(userId = 1, searchTerm) {
 /**
  * Update an appointment
  */
-function updateAppointment(id, userId, { title, description, startDateTime, endDateTime, location }) {
+async function updateAppointment(id, userId, { title, description, startDateTime, endDateTime, location }) {
   const existing = db.prepare('SELECT * FROM appointments WHERE id = ? AND user_id = ?').get(id, userId);
   if (!existing) {
     throw new Error('Compromisso não encontrado para atualização.');
@@ -240,14 +259,14 @@ function updateAppointment(id, userId, { title, description, startDateTime, endD
       timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
     }
 
-    getSalonAppointmentService().rescheduleAppointment(id, userId, {
+    await getSalonAppointmentService().rescheduleAppointment(id, userId, {
       newDate: dateStr,
       newTime: timeStr,
       reason: 'Remarcado via WhatsApp',
-    }).catch?.(() => {});
+    });
   }
 
-  const newTitle = (title && typeof title === 'string' && title.trim()) ? title.trim() : existing.title;
+  const newTitle = (title && typeof title === 'string' && title.trim()) ? title.trim() : (existing.title || 'Compromisso');
   const newLoc = (location !== undefined && location !== null && typeof location === 'string' && location.trim()) 
     ? location.trim() 
     : (location === null ? null : existing.location);
@@ -267,19 +286,18 @@ function updateAppointment(id, userId, { title, description, startDateTime, endD
 /**
  * Cancel or delete an appointment
  */
-function deleteAppointment(id, userId) {
+async function deleteAppointment(id, userId) {
   const existing = db.prepare('SELECT * FROM appointments WHERE id = ? AND user_id = ?').get(id, userId);
   if (!existing) {
     throw new Error('Compromisso não encontrado para cancelamento.');
   }
 
-  getSalonAppointmentService().cancelAppointment(id, userId, {
+  await getSalonAppointmentService().cancelAppointment(id, userId, {
     reason: 'Cancelado pelo usuário',
     cancelledBy: 'WHATSAPP',
-  }).catch?.(() => {});
+  });
 
-  db.prepare(`UPDATE appointments SET status = 'CANCELADO' WHERE id = ? AND user_id = ?`).run(id, userId);
-  return existing;
+  return db.prepare('SELECT * FROM appointments WHERE id = ?').get(id) || existing;
 }
 
 /**
@@ -338,7 +356,7 @@ async function syncPendingAdminAppointmentsToGoogle() {
       SELECT a.* FROM appointments a
       JOIN users u ON a.user_id = u.id
       WHERE (u.role = 'ADMIN' OR u.id = 1 OR u.phone_number LIKE '%951364159')
-        AND a.status = 'SCHEDULED'
+        AND a.status IN ('SCHEDULED', 'AGENDADO', 'CONFIRMED', 'CONFIRMADO')
         AND a.start_datetime >= ?
         AND (a.google_event_id IS NULL OR a.google_event_id = '')
       ORDER BY a.start_datetime ASC

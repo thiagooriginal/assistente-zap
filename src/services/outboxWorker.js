@@ -50,17 +50,23 @@ function recoverStalledTasks() {
 /**
  * Processes pending items in the Google Calendar sync outbox
  */
-async function processGoogleSyncOutbox() {
+async function processGoogleSyncOutbox(filterUserId = null) {
   const googleCalendarService = require('./googleCalendarService');
 
-  const items = db.prepare(`
+  let sql = `
     SELECT * FROM google_sync_outbox
     WHERE status = 'PENDING'
       AND (next_retry_at IS NULL OR datetime(next_retry_at) <= datetime('now'))
       AND attempts < COALESCE(max_attempts, 5)
-    ORDER BY id ASC
-    LIMIT 20
-  `).all();
+  `;
+  const params = [];
+  if (filterUserId) {
+    sql += ' AND user_id = ?';
+    params.push(filterUserId);
+  }
+  sql += ' ORDER BY id ASC LIMIT 20';
+
+  const items = db.prepare(sql).all(...params);
 
   let processedCount = 0;
 
@@ -162,18 +168,24 @@ async function processGoogleSyncOutbox() {
 /**
  * Processes pending items in the WhatsApp notification outbox
  */
-async function processWhatsAppOutbox() {
+async function processWhatsAppOutbox(filterUserId = null) {
   const salonNotificationService = require('./salonNotificationService');
   const whatsappClient = require('../whatsapp/client');
 
-  const items = db.prepare(`
+  let sql = `
     SELECT * FROM whatsapp_notification_outbox
     WHERE status = 'PENDING'
       AND (next_retry_at IS NULL OR datetime(next_retry_at) <= datetime('now'))
       AND attempts < COALESCE(max_attempts, 5)
-    ORDER BY id ASC
-    LIMIT 20
-  `).all();
+  `;
+  const params = [];
+  if (filterUserId) {
+    sql += ' AND user_id = ?';
+    params.push(filterUserId);
+  }
+  sql += ' ORDER BY id ASC LIMIT 20';
+
+  const items = db.prepare(sql).all(...params);
 
   let processedCount = 0;
 
@@ -276,7 +288,7 @@ async function processWhatsAppOutbox() {
 /**
  * Runs recovery and processes all pending outbox tasks
  */
-async function processAllPending() {
+async function processAllPending(filterUserId = null) {
   if (isProcessing) {
     pendingTrigger = true;
     return { skipped: true, isProcessing: true };
@@ -285,8 +297,8 @@ async function processAllPending() {
   isProcessing = true;
   try {
     recoverStalledTasks();
-    const gCount = await processGoogleSyncOutbox();
-    const wCount = await processWhatsAppOutbox();
+    const gCount = await processGoogleSyncOutbox(filterUserId);
+    const wCount = await processWhatsAppOutbox(filterUserId);
     return { success: true, googleProcessed: gCount, whatsappProcessed: wCount };
   } finally {
     isProcessing = false;

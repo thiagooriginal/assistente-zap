@@ -557,11 +557,20 @@ function bookAppointmentSync(userId, {
       VALUES (?, ?, NULL, ?, ?, 'Novo agendamento criado')
     `).run(appointmentId, userId, status, origin.toUpperCase());
 
-    // Enfileirar sincronização com Google Calendar no Outbox
+    // Enfileirar sincronização com Google Calendar no Outbox durável
     db.prepare(`
       INSERT INTO google_sync_outbox (user_id, appointment_id, action, status, payload_json)
       VALUES (?, ?, 'CREATE', 'PENDING', ?)
     `).run(userId, appointmentId, JSON.stringify({ startDt, endDt, finalServiceName, clientName: clientName.trim(), resolvedStaffName }));
+
+    // Enfileirar notificação WhatsApp no Outbox durável dentro da transação
+    salonNotificationService.enqueueNotificationTx(userId, appointmentId, 'NEW_APPOINTMENT', {
+      clientName: clientName.trim(),
+      serviceName: finalServiceName,
+      staffName: resolvedStaffName,
+      startDt,
+      endDt,
+    });
 
     db.exec('COMMIT');
 
@@ -587,15 +596,7 @@ function bookAppointmentSync(userId, {
       google_sync_status: 'PENDING',
     };
 
-    // Enfileirar notificação WhatsApp e notificar o worker
-    salonNotificationService.queueNotification(userId, appointmentId, 'NEW_APPOINTMENT', {
-      clientName: clientName.trim(),
-      serviceName: finalServiceName,
-      staffName: resolvedStaffName,
-      startDt,
-      endDt,
-    }).catch?.(() => {});
-
+    // Notificar o outbox worker para processamento resiliente imediato
     const outboxWorker = require('./outboxWorker');
     outboxWorker.notify();
 
@@ -737,10 +738,27 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
       VALUES (?, ?, ?, 'AGENDADO', 'SALON_USER', ?)
     `).run(appointmentId, userId, existing.status, reason);
 
-    db.exec('COMMIT');
+    // Enfileirar sincronização durável com Google Calendar (UPDATE) no SQLite
+    db.prepare(`
+      INSERT INTO google_sync_outbox (user_id, appointment_id, action, status, payload_json)
+      VALUES (?, ?, 'UPDATE', 'PENDING', ?)
+    `).run(userId, appointmentId, JSON.stringify({ startDt, endDt, targetStaffId, newDate, newTime, reason }));
 
+    // Obter dados complementares e enfileirar notificação WhatsApp durável (RESCHEDULE) no SQLite
     const staffRow = targetStaffId ? db.prepare('SELECT name FROM client_staff WHERE id = ?').get(targetStaffId) : null;
     const svcRow = existing.service_id ? db.prepare('SELECT name FROM client_services WHERE id = ?').get(existing.service_id) : null;
+
+    salonNotificationService.enqueueNotificationTx(userId, appointmentId, 'RESCHEDULE', {
+      clientName: existing.client_name,
+      serviceName: svcRow?.name || existing.title,
+      staffName: staffRow?.name || 'Profissional',
+      newStartDt: startDt,
+      newEndDt: endDt,
+      oldStartDt: oldStart,
+      oldEndDt: oldEnd,
+    });
+
+    db.exec('COMMIT');
 
     const updatedAppointment = {
       ...existing,
@@ -751,25 +769,9 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
       service_name: svcRow?.name || existing.title,
     };
 
-    setImmediate(async () => {
-      try {
-        if (existing.google_event_id) {
-          await googleCalendarService.updateCalendarEvent(userId, existing.google_event_id, updatedAppointment);
-        }
-
-        await salonNotificationService.queueNotification(userId, appointmentId, 'RESCHEDULE', {
-          clientName: existing.client_name,
-          serviceName: updatedAppointment.service_name,
-          staffName: updatedAppointment.staff_name,
-          newStartDt: startDt,
-          newEndDt: endDt,
-          oldStartDt: oldStart,
-          oldEndDt: oldEnd,
-        });
-      } catch (err) {
-        console.warn(`[SalonAppointmentService] Aviso no pós-remarcamento #${appointmentId}:`, err.message);
-      }
-    });
+    // Disparar worker resiliente após commit
+    const outboxWorker = require('./outboxWorker');
+    outboxWorker.notify();
 
     return updatedAppointment;
   } catch (err) {
@@ -808,29 +810,30 @@ async function cancelAppointment(appointmentId, userId, { reason = 'Cancelado pe
       VALUES (?, ?, ?, 'CANCELADO', ?, ?)
     `).run(appointmentId, userId, existing.status, cancelledBy, reason);
 
-    db.exec('COMMIT');
+    // Enfileirar sincronização durável com Google Calendar (DELETE) no SQLite
+    db.prepare(`
+      INSERT INTO google_sync_outbox (user_id, appointment_id, action, status, payload_json)
+      VALUES (?, ?, 'DELETE', 'PENDING', ?)
+    `).run(userId, appointmentId, JSON.stringify({ reason, cancelledBy }));
 
+    // Obter dados complementares e enfileirar notificação WhatsApp durável (CANCELLATION) no SQLite
     const staffRow = existing.staff_id ? db.prepare('SELECT name FROM client_staff WHERE id = ?').get(existing.staff_id) : null;
     const svcRow = existing.service_id ? db.prepare('SELECT name FROM client_services WHERE id = ?').get(existing.service_id) : null;
 
-    setImmediate(async () => {
-      try {
-        if (existing.google_event_id) {
-          await googleCalendarService.deleteCalendarEvent(userId, existing.google_event_id);
-        }
-
-        await salonNotificationService.queueNotification(userId, appointmentId, 'CANCELLATION', {
-          clientName: existing.client_name,
-          serviceName: svcRow?.name || existing.title,
-          staffName: staffRow?.name || 'Profissional',
-          startDt: existing.start_datetime,
-          endDt: existing.end_datetime,
-          reason,
-        });
-      } catch (err) {
-        console.warn(`[SalonAppointmentService] Aviso no cancelamento pós-gravação #${appointmentId}:`, err.message);
-      }
+    salonNotificationService.enqueueNotificationTx(userId, appointmentId, 'CANCELLATION', {
+      clientName: existing.client_name,
+      serviceName: svcRow?.name || existing.title,
+      staffName: staffRow?.name || 'Profissional',
+      startDt: existing.start_datetime,
+      endDt: existing.end_datetime,
+      reason,
     });
+
+    db.exec('COMMIT');
+
+    // Disparar worker resiliente após commit
+    const outboxWorker = require('./outboxWorker');
+    outboxWorker.notify();
 
     return { success: true, message: 'Agendamento cancelado com sucesso e horário liberado.' };
   } catch (err) {
