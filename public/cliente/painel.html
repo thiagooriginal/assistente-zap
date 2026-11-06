@@ -627,45 +627,319 @@
       <!-- ============================================== -->
       <!-- TAB 3: SERVIÇOS & PREÇOS                        -->
       <!-- ============================================== -->
+      <!-- ============================================== -->
+      <!-- TAB 3: SERVIÇOS & PREÇOS (CADASTRO INTELIGENTE) -->
+      <!-- ============================================== -->
       <section id="tab-services" class="tab-content hidden space-y-6">
         <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-6">
+          <!-- Header and Action Buttons -->
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
             <div>
               <h3 class="text-sm font-bold text-white flex items-center gap-2">
                 <i data-lucide="scissors" class="w-4 h-4 text-[#00F59B]"></i>
                 <span>Tabela de Procedimentos e Valores</span>
               </h3>
-              <p class="text-xs text-slate-400 mt-0.5">A Jéssica informa preços e durações cadastradas aqui.</p>
+              <p class="text-xs text-slate-400 mt-0.5">A Jéssica informa preços e durações cadastradas aqui para seus clientes no WhatsApp.</p>
             </div>
-            <button id="btnNewService" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2">
-              <i data-lucide="plus" class="w-4 h-4"></i>
-              <span>Novo Serviço</span>
-            </button>
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" id="btnOpenBatchModal" class="px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 hover:text-white border border-white/10 text-xs font-semibold transition-all flex items-center gap-2">
+                <i data-lucide="layers" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>Adicionar vários serviços</span>
+              </button>
+              <button type="button" id="btnNewService" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2 shadow-sm">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                <span>Novo Serviço</span>
+              </button>
+            </div>
           </div>
 
-          <!-- New Service Form (Hidden initially) -->
-          <form id="newServiceForm" class="hidden p-5 rounded-xl bg-[#07080c] border border-white/10 space-y-4 text-xs">
-            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              <div class="sm:col-span-2 space-y-1">
-                <label for="svcName" class="block text-slate-400 text-xs font-medium">Nome do Serviço</label>
-                <input type="text" id="svcName" placeholder="Ex: Corte Feminino" required class="w-full px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
-              </div>
-              <div class="space-y-1">
-                <label for="svcPrice" class="block text-slate-400 text-xs font-medium">Valor (R$)</label>
-                <input type="number" id="svcPrice" placeholder="Ex: 80.00" step="0.5" min="0" required class="w-full px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
-              </div>
-              <div class="space-y-1">
-                <label for="svcDuration" class="block text-slate-400 text-xs font-medium">Duração (minutos)</label>
-                <input type="number" id="svcDuration" placeholder="Ex: 45" min="1" step="1" required class="w-full px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
-              </div>
+          <!-- Controls Bar: Search & Status Filters -->
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#07080c] border border-white/5 text-xs">
+            <!-- Search bar -->
+            <div class="relative flex-1">
+              <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
+              <input type="text" id="serviceSearchFilter" placeholder="Buscar nos seus serviços cadastrados..." class="w-full pl-9 pr-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
             </div>
-            <div class="flex justify-end gap-2 pt-1 border-t border-white/5">
-              <button type="button" id="btnCancelService" class="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all font-medium">Cancelar</button>
-              <button type="submit" class="px-4 py-1.5 rounded-lg bg-[#00F59B] hover:brightness-110 text-[#07080c] font-bold transition-all shadow-sm">Adicionar</button>
+            <!-- Status & Category Filters -->
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="flex items-center gap-1 bg-[#11131a] p-1 rounded-lg border border-white/10" id="serviceStatusBtnGroup">
+                <button type="button" data-filter="all" class="svc-status-filter active px-2.5 py-1 rounded text-xs font-semibold bg-[#00F59B]/15 text-[#00F59B]">Todos</button>
+                <button type="button" data-filter="active" class="svc-status-filter px-2.5 py-1 rounded text-xs font-semibold text-slate-400 hover:text-white">Ativos</button>
+                <button type="button" data-filter="inactive" class="svc-status-filter px-2.5 py-1 rounded text-xs font-semibold text-slate-400 hover:text-white">Inativos</button>
+              </div>
+              <select id="serviceCategoryFilter" class="px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                <option value="">Todas Categorias</option>
+                <option value="Cabelos">Cabelos</option>
+                <option value="Barbearia">Barbearia</option>
+                <option value="Unhas">Unhas</option>
+                <option value="Sobrancelhas e cílios">Sobrancelhas e cílios</option>
+                <option value="Estética e maquiagem">Estética e maquiagem</option>
+                <option value="Outros">Outros</option>
+              </select>
             </div>
-          </form>
+          </div>
 
+          <!-- Summary Badges -->
+          <div class="flex items-center justify-between text-xs text-slate-400 px-1">
+            <span id="servicesCountBadge">Carregando serviços...</span>
+            <span class="text-[11px] text-slate-500 flex items-center gap-1">
+              <i data-lucide="info" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+              <span>Serviços inativos não são ofertados para novos agendamentos</span>
+            </span>
+          </div>
+
+          <!-- Services List Container -->
           <div id="servicesList" class="space-y-2"></div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- MODAL: NOVO / EDITAR SERVIÇO INDIVIDUAL        -->
+        <!-- ============================================== -->
+        <div id="modalSingleService" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-4 text-xs shadow-2xl relative">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 id="modalSingleServiceTitle" class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="scissors" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>Cadastrar Novo Serviço</span>
+              </h3>
+              <button type="button" id="btnCloseSingleServiceModal" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <form id="formSingleService" class="space-y-4">
+              <input type="hidden" id="singleServiceId" value="">
+
+              <!-- Nome do Serviço com Autocomplete do Catálogo -->
+              <div class="space-y-1 relative">
+                <label for="singleServiceName" class="block text-slate-300 font-semibold">Nome do Serviço *</label>
+                <div class="relative">
+                  <input type="text" id="singleServiceName" placeholder="Ex: Corte Feminino, Manicure, Barba..." required autocomplete="off"
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+                  <button type="button" id="btnToggleCatalogDropdown" class="absolute right-2.5 top-2.5 px-2 py-0.5 rounded text-[11px] bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10">
+                    Sugestões
+                  </button>
+                </div>
+                <!-- Dropdown de Sugestões do Catálogo -->
+                <div id="catalogSuggestionsDropdown" class="hidden absolute left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto bg-[#07080c] border border-white/10 rounded-xl shadow-2xl z-30 divide-y divide-white/5">
+                </div>
+                <p class="text-[11px] text-slate-500">Dica: Escolha do catálogo de sugestões ou digite seu serviço personalizado.</p>
+              </div>
+
+              <!-- Categoria & Preço -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="space-y-1">
+                  <label for="singleServiceCategory" class="block text-slate-300 font-semibold">Categoria *</label>
+                  <select id="singleServiceCategory" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                    <option value="Cabelos">Cabelos</option>
+                    <option value="Barbearia">Barbearia</option>
+                    <option value="Unhas">Unhas</option>
+                    <option value="Sobrancelhas e cílios">Sobrancelhas e cílios</option>
+                    <option value="Estética e maquiagem">Estética e maquiagem</option>
+                    <option value="Outros">Outros</option>
+                  </select>
+                </div>
+                <div class="space-y-1">
+                  <label for="singleServicePrice" class="block text-slate-300 font-semibold">Valor (R$) *</label>
+                  <input type="number" id="singleServicePrice" step="0.50" min="0" placeholder="0.00" required
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white font-bold placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+                </div>
+              </div>
+
+              <!-- Duração com Atalhos Rápidos -->
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between">
+                  <label for="singleServiceDuration" class="block text-slate-300 font-semibold">Duração (minutos) *</label>
+                  <span class="text-[11px] text-slate-500">Atalhos rápidos:</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="singleServiceDuration" min="1" max="1440" step="1" placeholder="Ex: 45" required
+                    class="w-28 px-3.5 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                  <div class="flex flex-wrap items-center gap-1">
+                    <button type="button" data-duration="15" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">15m</button>
+                    <button type="button" data-duration="30" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">30m</button>
+                    <button type="button" data-duration="45" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">45m</button>
+                    <button type="button" data-duration="60" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">60m</button>
+                    <button type="button" data-duration="90" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">90m</button>
+                    <button type="button" data-duration="120" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">120m</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Status Ativo / Inativo -->
+              <div class="flex items-center justify-between p-3 rounded-xl bg-[#07080c] border border-white/5">
+                <div>
+                  <span class="font-semibold text-white block">Serviço Ativo</span>
+                  <span class="text-slate-400 text-[11px]">Disponível para a Jéssica agendar novos horários</span>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="singleServiceActive" checked class="sr-only peer">
+                  <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#00F59B]"></div>
+                </label>
+              </div>
+
+              <!-- Alerta de Agendamentos Históricos -->
+              <div id="singleServiceAppointmentsAlert" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-2">
+                <i data-lucide="info" class="w-4 h-4 shrink-0 mt-0.5"></i>
+                <span id="singleServiceAppointmentsAlertText">Este serviço possui agendamentos no histórico. Alterações de duração afetarão apenas novos agendamentos.</span>
+              </div>
+
+              <!-- Botões de Ação -->
+              <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
+                <button type="button" id="btnCancelSingleService" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all font-medium">Cancelar</button>
+                <button type="submit" id="btnSaveSingleService" class="px-5 py-2 rounded-xl bg-[#00F59B] hover:brightness-110 text-[#07080c] font-bold transition-all shadow-sm flex items-center gap-2">
+                  <i data-lucide="check" class="w-4 h-4"></i>
+                  <span id="btnSaveSingleServiceText">Salvar Serviço</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- MODAL: CADASTRO EM LOTE DE SERVIÇOS            -->
+        <!-- ============================================== -->
+        <div id="modalBatchServices" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-3 md:p-6">
+          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col text-xs shadow-2xl overflow-hidden">
+            <!-- Modal Header -->
+            <div class="p-4 md:p-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#11131a]">
+              <div>
+                <h3 class="text-sm md:text-base font-bold text-white flex items-center gap-2">
+                  <i data-lucide="layers" class="w-4 h-4 text-[#00F59B]"></i>
+                  <span id="batchModalStepTitle">Adicionar Vários Serviços (Catálogo Inteligente)</span>
+                </h3>
+                <p id="batchModalStepSubtitle" class="text-xs text-slate-400 mt-0.5">Selecione os procedimentos que seu salão realiza para configurá-los rapidamente.</p>
+              </div>
+              <button type="button" id="btnCloseBatchModal" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5">
+                <i data-lucide="x" class="w-5 h-5"></i>
+              </button>
+            </div>
+
+            <!-- PASSO 1: SELEÇÃO DE PROCEDIMENTOS -->
+            <div id="batchStep1" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+              <!-- Controls: Category Filter & Search -->
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="relative flex-1">
+                  <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
+                  <input type="text" id="batchCatalogSearch" placeholder="Pesquisar procedimentos (ex: corte, escova, barba, unhas)..."
+                    class="w-full pl-9 pr-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" id="btnBatchSelectAllCategory" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-semibold border border-white/10">
+                    Selecionar Todos da Categoria
+                  </button>
+                  <button type="button" id="btnBatchClearSelection" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">
+                    Limpar
+                  </button>
+                </div>
+              </div>
+
+              <!-- Category Tabs -->
+              <div class="flex flex-wrap gap-1.5 border-b border-white/5 pb-2" id="batchCategoryTabs">
+                <button type="button" data-cat="all" class="batch-cat-tab active px-3 py-1 rounded-lg text-xs font-semibold bg-[#00F59B]/15 text-[#00F59B] border border-[#00F59B]/30">Todos</button>
+                <button type="button" data-cat="Cabelos" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Cabelos</button>
+                <button type="button" data-cat="Barbearia" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Barbearia</button>
+                <button type="button" data-cat="Unhas" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Unhas</button>
+                <button type="button" data-cat="Sobrancelhas e cílios" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Sobrancelhas e cílios</button>
+                <button type="button" data-cat="Estética e maquiagem" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Estética e maquiagem</button>
+              </div>
+
+              <!-- Grid of Catalog Items -->
+              <div id="batchCatalogGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[50vh] overflow-y-auto p-1">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+
+            <!-- PASSO 2: CONFIGURAÇÃO DE VALORES E DURAÇÕES -->
+            <div id="batchStep2" class="hidden flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+              <!-- Quick tool: Apply duration to all -->
+              <div class="p-3.5 rounded-xl bg-[#07080c] border border-white/5 flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2 text-slate-300">
+                  <i data-lucide="clock" class="w-4 h-4 text-[#00F59B]"></i>
+                  <span class="font-semibold">Aplicar mesma duração a todos:</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-1">
+                  <button type="button" data-duration="15" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">15 min</button>
+                  <button type="button" data-duration="30" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">30 min</button>
+                  <button type="button" data-duration="45" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">45 min</button>
+                  <button type="button" data-duration="60" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">60 min</button>
+                  <button type="button" data-duration="90" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">90 min</button>
+                  <button type="button" data-duration="120" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">120 min</button>
+                </div>
+              </div>
+
+              <!-- Batch Table -->
+              <div class="overflow-x-auto border border-white/10 rounded-xl bg-[#07080c]">
+                <table class="w-full text-left text-xs">
+                  <thead>
+                    <tr class="border-b border-white/10 text-slate-400 bg-white/[0.02]">
+                      <th class="py-3 px-4 font-semibold">Procedimento</th>
+                      <th class="py-3 px-3 font-semibold w-36">Valor (R$) *</th>
+                      <th class="py-3 px-3 font-semibold w-56">Duração (min) *</th>
+                      <th class="py-3 px-3 font-semibold text-center w-16">Remover</th>
+                    </tr>
+                  </thead>
+                  <tbody id="batchTableBody" class="divide-y divide-white/5 text-slate-200">
+                    <!-- Rows generated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 md:p-5 border-t border-white/10 flex items-center justify-between bg-[#11131a] shrink-0">
+              <div class="flex items-center gap-2">
+                <span id="batchSelectedCounterBadge" class="px-3 py-1 rounded-full bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/20 font-bold">
+                  0 selecionados
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" id="btnBatchBack" class="hidden px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold">
+                  Voltar
+                </button>
+                <button type="button" id="btnBatchCancel" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-medium">
+                  Cancelar
+                </button>
+                <button type="button" id="btnBatchNext" disabled class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all flex items-center gap-2">
+                  <span>Continuar com 0 serviços</span>
+                  <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </button>
+                <button type="button" id="btnBatchSaveAll" class="hidden px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 transition-all flex items-center gap-2">
+                  <i data-lucide="save" class="w-4 h-4"></i>
+                  <span id="btnBatchSaveAllText">Salvar Todos os Serviços</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- MODAL: CONFIRMAÇÃO DE EXCLUSÃO / DESATIVAÇÃO   -->
+        <!-- ============================================== -->
+        <div id="modalDeleteConfirm" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i>
+                <span id="deleteModalTitle">Gerenciar Serviço</span>
+              </h3>
+              <button type="button" id="btnCloseDeleteModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <input type="hidden" id="deleteServiceId" value="">
+
+            <div id="deleteModalBody" class="space-y-3 text-slate-300">
+              <!-- Dynamically populated -->
+            </div>
+
+            <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-white/5">
+              <button type="button" id="btnCancelDeleteModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-medium order-2 sm:order-1">Cancelar</button>
+              <button type="button" id="btnDeactivateServiceRecommended" class="hidden px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 order-1 sm:order-2">Desativar Serviço (Recomendado)</button>
+              <button type="button" id="btnConfirmDeleteService" class="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold order-3">Excluir Definitivamente</button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -721,11 +995,64 @@
                 <i data-lucide="calendar" class="w-4 h-4 text-[#00F59B]"></i>
                 <span>Histórico de Agendamentos</span>
               </h3>
-              <p class="text-xs text-slate-400 mt-0.5">Visualização de marcações feitas pelos clientes via Jéssica.</p>
+              <p class="text-xs text-slate-400 mt-0.5">Visualização de marcações feitas pelos clientes via Jéssica ou registradas no painel.</p>
             </div>
+            <button type="button" id="btnOpenNewAppointmentModal" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2 shadow-sm">
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>Novo Agendamento</span>
+            </button>
           </div>
 
           <div id="appointmentsList" class="space-y-2"></div>
+        </div>
+
+        <!-- MODAL: NOVO AGENDAMENTO -->
+        <div id="modalNewAppointment" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="calendar-plus" class="w-4 h-4 text-[#00F59B]"></i>
+                <span>Registrar Novo Agendamento</span>
+              </h3>
+              <button type="button" id="btnCloseNewAppointmentModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <form id="formNewAppointment" class="space-y-3.5">
+              <div>
+                <label for="aptClientName" class="block text-slate-300 font-semibold mb-1">Nome do(a) Cliente *</label>
+                <input type="text" id="aptClientName" placeholder="Ex: Mariana Silva" required
+                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+              </div>
+
+              <div>
+                <label for="aptServiceSelect" class="block text-slate-300 font-semibold mb-1">Serviço *</label>
+                <select id="aptServiceSelect" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                  <option value="">Selecione um serviço ativo...</option>
+                </select>
+                <p id="aptServiceDurationHint" class="text-[11px] text-slate-500 mt-1"></p>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label for="aptDate" class="block text-slate-300 font-semibold mb-1">Data *</label>
+                  <input type="date" id="aptDate" required
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                </div>
+                <div>
+                  <label for="aptTime" class="block text-slate-300 font-semibold mb-1">Horário de Início *</label>
+                  <input type="time" id="aptTime" required
+                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                </div>
+              </div>
+
+              <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
+                <button type="button" id="btnCancelNewAppointment" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-medium">Cancelar</button>
+                <button type="submit" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 shadow-sm">Confirmar Agendamento</button>
+              </div>
+            </form>
+          </div>
         </div>
       </section>
 
@@ -2403,7 +2730,41 @@
       }
     });
 
-    // Services CRUD
+    // ==========================================
+    // SERVICES & PRICING (CADASTRO INTELIGENTE)
+    // ==========================================
+    let cachedServices = [];
+    let cachedCatalog = [];
+    let batchSelectedMap = new Map();
+    let currentBatchCategory = 'all';
+    let currentServiceStatusFilter = 'all';
+
+    // Normalizador de texto para busca sem acentos e sem case-sensitivity
+    function normalizeSearchText(str) {
+      if (!str || typeof str !== 'string') return '';
+      return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    // Carregar catálogo de sugestões da API
+    async function loadServiceCatalog() {
+      try {
+        const res = await fetch('/api/cliente/services/catalog');
+        const data = await res.json();
+        if (data.success && Array.isArray(data.catalog)) {
+          cachedCatalog = data.catalog;
+        }
+      } catch (err) {
+        console.warn('Usando catálogo pré-carregado de fallback:', err.message);
+      }
+    }
+
+    // Carregar e renderizar serviços do salão
     async function loadServices() {
       try {
         const res = await fetch('/api/cliente/services');
@@ -2411,115 +2772,818 @@
         const list = document.getElementById('servicesList');
         list.innerHTML = '';
 
-        if (!data.services || data.services.length === 0) {
-          list.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">Nenhum serviço cadastrado ainda.</div>';
+        if (!data.success || !data.services) {
+          list.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">Erro ao carregar serviços.</div>';
           return;
         }
 
-        data.services.forEach(svc => {
-          const duration = (svc.duration_min !== undefined && svc.duration_min !== null && !isNaN(svc.duration_min))
-            ? Number(svc.duration_min)
-            : ((svc.duration_minutes !== undefined && svc.duration_minutes !== null && !isNaN(svc.duration_minutes))
-              ? Number(svc.duration_minutes)
-              : 45);
-
-          const numPrice = (svc.price !== undefined && svc.price !== null && !isNaN(Number(svc.price)))
-            ? Number(svc.price)
-            : 0;
-
-          const formattedPrice = numPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-          const safeName = (svc.name && typeof svc.name === 'string') ? svc.name : 'Serviço';
-
-          const item = document.createElement('div');
-          item.className = 'flex items-center justify-between p-3.5 rounded-xl bg-[#07080c] border border-white/5 text-xs';
-          item.innerHTML = `
-            <div>
-              <span class="font-bold text-white text-sm">${safeName}</span>
-              <div class="text-slate-400 mt-0.5">Duração: ${duration} minutos • Valor: ${formattedPrice}</div>
-            </div>
-            <button onclick="deleteService(${svc.id})" title="Excluir serviço" aria-label="Excluir serviço" class="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
-              <i data-lucide="trash-2" class="w-4 h-4"></i>
-            </button>
-          `;
-          list.appendChild(item);
-        });
-        lucide.createIcons();
+        cachedServices = data.services;
+        renderServicesList();
       } catch (e) {
         showToast('Erro ao carregar serviços.', 'error');
       }
     }
 
-    document.getElementById('btnNewService').addEventListener('click', () => {
-      document.getElementById('newServiceForm').classList.toggle('hidden');
-    });
-    document.getElementById('btnCancelService').addEventListener('click', () => {
-      document.getElementById('newServiceForm').classList.add('hidden');
+    function renderServicesList() {
+      const list = document.getElementById('servicesList');
+      list.innerHTML = '';
+
+      const searchVal = normalizeSearchText(document.getElementById('serviceSearchFilter')?.value || '');
+      const catVal = document.getElementById('serviceCategoryFilter')?.value || '';
+
+      const filtered = cachedServices.filter(svc => {
+        // Filtro de status
+        if (currentServiceStatusFilter === 'active' && !svc.active) return false;
+        if (currentServiceStatusFilter === 'inactive' && svc.active) return false;
+
+        // Filtro de categoria
+        if (catVal && svc.category !== catVal) return false;
+
+        // Filtro de busca textual
+        if (searchVal) {
+          const normName = normalizeSearchText(svc.name);
+          const normCat = normalizeSearchText(svc.category);
+          if (!normName.includes(searchVal) && !normCat.includes(searchVal)) return false;
+        }
+        return true;
+      });
+
+      // Atualiza badge de contagem
+      const totalCount = cachedServices.length;
+      const activeCount = cachedServices.filter(s => s.active).length;
+      const countBadge = document.getElementById('servicesCountBadge');
+      if (countBadge) {
+        countBadge.innerText = `Exibindo ${filtered.length} de ${totalCount} serviços (${activeCount} ativos)`;
+      }
+
+      if (filtered.length === 0) {
+        list.innerHTML = `
+          <div class="p-8 text-center rounded-2xl bg-[#07080c] border border-white/5 space-y-3">
+            <div class="w-10 h-10 rounded-xl bg-white/5 text-slate-400 flex items-center justify-center mx-auto">
+              <i data-lucide="scissors" class="w-5 h-5"></i>
+            </div>
+            <p class="text-xs text-slate-300 font-semibold">Nenhum serviço encontrado com os filtros atuais.</p>
+            <p class="text-[11px] text-slate-500">Cadastre procedimentos individualmente ou utilize a seleção rápida em lote.</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      filtered.forEach(svc => {
+        const duration = svc.duration_min || svc.duration_minutes || 45;
+        const numPrice = Number(svc.price || 0);
+        const formattedPrice = numPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const safeName = svc.name || 'Serviço';
+        const isActive = Boolean(svc.active);
+        const aptCount = Number(svc.appointment_count || 0);
+
+        const card = document.createElement('div');
+        card.className = `flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-all gap-3 ${
+          isActive
+            ? 'bg-[#07080c] border-white/5 hover:border-white/10'
+            : 'bg-[#07080c]/60 border-white/5 opacity-75'
+        }`;
+
+        card.innerHTML = `
+          <div class="space-y-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-bold text-white text-sm">${escapeHtml(safeName)}</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                isActive
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-slate-500/10 text-slate-400 border border-slate-500/30'
+              }">
+                ${isActive ? 'ATIVO' : 'INATIVO'}
+              </span>
+              <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white/5 text-slate-300 border border-white/10">
+                ${escapeHtml(svc.category || 'Cabelos')}
+              </span>
+              ${aptCount > 0 ? `
+                <span class="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20" title="${aptCount} atendimentos vinculados no histórico">
+                  📅 ${aptCount} agendamento(s)
+                </span>
+              ` : ''}
+            </div>
+            <div class="text-slate-400 text-xs">
+              <span class="font-medium">Duração:</span> ${duration} minutos &nbsp;•&nbsp; <span class="font-medium">Valor:</span> ${formattedPrice}
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5 self-end sm:self-center">
+            <button type="button" onclick="openEditServiceModalById(${svc.id})" class="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-all flex items-center gap-1 text-xs font-semibold" title="Editar dados do serviço">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+              <span>Editar</span>
+            </button>
+            <button type="button" onclick="toggleServiceActive(${svc.id})" class="p-2 rounded-lg bg-white/5 hover:bg-white/10 ${isActive ? 'text-amber-400 hover:text-amber-300' : 'text-emerald-400 hover:text-emerald-300'} transition-all flex items-center gap-1 text-xs font-semibold" title="${isActive ? 'Desativar temporariamente' : 'Ativar serviço'}">
+              <i data-lucide="${isActive ? 'pause-circle' : 'play-circle'}" class="w-3.5 h-3.5"></i>
+              <span>${isActive ? 'Desativar' : 'Ativar'}</span>
+            </button>
+            <button type="button" onclick="promptDeleteServiceById(${svc.id})" class="p-2 rounded-lg bg-white/5 hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-all text-xs" title="Excluir serviço">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+      lucide.createIcons();
+    }
+
+    // Filtros de Status (Todos, Ativos, Inativos)
+    document.querySelectorAll('.svc-status-filter').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.svc-status-filter').forEach(b => {
+          b.classList.remove('active', 'bg-[#00F59B]/15', 'text-[#00F59B]');
+          b.classList.add('text-slate-400');
+        });
+        btn.classList.add('active', 'bg-[#00F59B]/15', 'text-[#00F59B]');
+        btn.classList.remove('text-slate-400');
+        currentServiceStatusFilter = btn.dataset.filter;
+        renderServicesList();
+      });
     });
 
-    document.getElementById('newServiceForm').addEventListener('submit', async (e) => {
+    document.getElementById('serviceSearchFilter')?.addEventListener('input', () => {
+      renderServicesList();
+    });
+
+    document.getElementById('serviceCategoryFilter')?.addEventListener('change', () => {
+      renderServicesList();
+    });
+
+    // ==========================================
+    // MODAL DE CADASTRO / EDIÇÃO INDIVIDUAL
+    // ==========================================
+    function openNewServiceModal() {
+      document.getElementById('singleServiceId').value = '';
+      document.getElementById('modalSingleServiceTitle').innerHTML = `
+        <i data-lucide="scissors" class="w-4 h-4 text-[#00F59B]"></i>
+        <span>Cadastrar Novo Serviço</span>
+      `;
+      document.getElementById('btnSaveSingleServiceText').innerText = 'Cadastrar Serviço';
+      document.getElementById('singleServiceName').value = '';
+      document.getElementById('singleServicePrice').value = '';
+      document.getElementById('singleServiceDuration').value = '45';
+      document.getElementById('singleServiceCategory').value = 'Cabelos';
+      document.getElementById('singleServiceActive').checked = true;
+      document.getElementById('singleServiceAppointmentsAlert').classList.add('hidden');
+      closeCatalogDropdown();
+
+      const modal = document.getElementById('modalSingleService');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+      document.getElementById('singleServiceName').focus();
+    }
+
+    function openEditServiceModalById(id) {
+      const svc = cachedServices.find(s => s.id === Number(id));
+      if (!svc) return;
+
+      document.getElementById('singleServiceId').value = svc.id;
+      document.getElementById('modalSingleServiceTitle').innerHTML = `
+        <i data-lucide="edit-3" class="w-4 h-4 text-[#00F59B]"></i>
+        <span>Editar Serviço</span>
+      `;
+      document.getElementById('btnSaveSingleServiceText').innerText = 'Salvar Alterações';
+      document.getElementById('singleServiceName').value = svc.name;
+      document.getElementById('singleServicePrice').value = Number(svc.price).toFixed(2);
+      document.getElementById('singleServiceDuration').value = svc.duration_min || svc.duration_minutes || 45;
+      document.getElementById('singleServiceCategory').value = svc.category || 'Cabelos';
+      document.getElementById('singleServiceActive').checked = Boolean(svc.active);
+      closeCatalogDropdown();
+
+      const aptCount = Number(svc.appointment_count || 0);
+      const alertBox = document.getElementById('singleServiceAppointmentsAlert');
+      if (aptCount > 0) {
+        document.getElementById('singleServiceAppointmentsAlertText').innerText =
+          `Este serviço possui ${aptCount} atendimento(s) no histórico. Alterações de duração afetarão apenas novos agendamentos da Jéssica.`;
+        alertBox.classList.remove('hidden');
+      } else {
+        alertBox.classList.add('hidden');
+      }
+
+      const modal = document.getElementById('modalSingleService');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeSingleServiceModal() {
+      const modal = document.getElementById('modalSingleService');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      closeCatalogDropdown();
+    }
+
+    document.getElementById('btnNewService')?.addEventListener('click', openNewServiceModal);
+    document.getElementById('btnCloseSingleServiceModal')?.addEventListener('click', closeSingleServiceModal);
+    document.getElementById('btnCancelSingleService')?.addEventListener('click', closeSingleServiceModal);
+
+    // Atalhos de duração no modal individual
+    document.querySelectorAll('.btn-duration-shortcut').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('singleServiceDuration').value = btn.dataset.duration;
+      });
+    });
+
+    // Autocomplete do Catálogo Inteligente
+    function closeCatalogDropdown() {
+      const dd = document.getElementById('catalogSuggestionsDropdown');
+      if (dd) dd.classList.add('hidden');
+    }
+
+    function renderCatalogSuggestions(query = '') {
+      const dd = document.getElementById('catalogSuggestionsDropdown');
+      if (!dd) return;
+
+      const normQ = normalizeSearchText(query);
+      const matches = cachedCatalog.filter(item => {
+        if (!normQ) return true;
+        return normalizeSearchText(item.name).includes(normQ) || normalizeSearchText(item.category).includes(normQ);
+      });
+
+      if (matches.length === 0) {
+        dd.innerHTML = `
+          <div class="p-3 text-slate-400 text-xs">
+            Nenhuma sugestão exata no catálogo. Continue digitando para criar um serviço personalizado.
+          </div>
+        `;
+        dd.classList.remove('hidden');
+        return;
+      }
+
+      dd.innerHTML = matches.map(m => `
+        <button type="button" class="w-full text-left p-2.5 hover:bg-white/10 transition-all flex items-center justify-between text-xs"
+          onclick="selectCatalogSuggestion('${escapeHtml(m.name)}', '${escapeHtml(m.category)}', ${m.suggestedDuration})">
+          <div>
+            <span class="font-bold text-white">${escapeHtml(m.name)}</span>
+            <span class="text-slate-400 text-[10px] ml-1.5 px-1.5 py-0.5 rounded bg-white/5">${escapeHtml(m.category)}</span>
+          </div>
+          <span class="text-slate-400 text-[11px] font-medium">⏱ ${m.suggestedDuration} min</span>
+        </button>
+      `).join('');
+      dd.classList.remove('hidden');
+    }
+
+    window.selectCatalogSuggestion = function(name, category, suggestedDuration) {
+      document.getElementById('singleServiceName').value = name;
+      if (category && document.getElementById('singleServiceCategory')) {
+        document.getElementById('singleServiceCategory').value = category;
+      }
+      if (suggestedDuration) {
+        document.getElementById('singleServiceDuration').value = suggestedDuration;
+      }
+      closeCatalogDropdown();
+      document.getElementById('singleServicePrice').focus();
+    };
+
+    document.getElementById('singleServiceName')?.addEventListener('input', (e) => {
+      renderCatalogSuggestions(e.target.value);
+    });
+
+    document.getElementById('btnToggleCatalogDropdown')?.addEventListener('click', () => {
+      const dd = document.getElementById('catalogSuggestionsDropdown');
+      if (dd.classList.contains('hidden')) {
+        renderCatalogSuggestions(document.getElementById('singleServiceName').value);
+      } else {
+        closeCatalogDropdown();
+      }
+    });
+
+    // Fechar autocomplete ao clicar fora
+    document.addEventListener('click', (e) => {
+      const dd = document.getElementById('catalogSuggestionsDropdown');
+      const input = document.getElementById('singleServiceName');
+      const btn = document.getElementById('btnToggleCatalogDropdown');
+      if (dd && !dd.contains(e.target) && e.target !== input && e.target !== btn) {
+        closeCatalogDropdown();
+      }
+    });
+
+    // Submissão do Formulário Individual (Criação / Atualização)
+    document.getElementById('formSingleService')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const nameInput = document.getElementById('svcName').value.trim();
-      const priceVal = parseFloat(document.getElementById('svcPrice').value);
-      const durationInput = document.getElementById('svcDuration').value.trim();
+      const id = document.getElementById('singleServiceId').value;
+      const name = document.getElementById('singleServiceName').value.trim();
+      const price = parseFloat(document.getElementById('singleServicePrice').value);
+      const duration = parseInt(document.getElementById('singleServiceDuration').value, 10);
+      const category = document.getElementById('singleServiceCategory').value;
+      const active = document.getElementById('singleServiceActive').checked ? 1 : 0;
 
-      if (!nameInput) {
+      if (!name) {
         showToast('Informe o nome do serviço.', 'error');
         return;
       }
-      if (isNaN(priceVal) || priceVal < 0) {
-        showToast('Informe um valor válido para o serviço.', 'error');
+      if (isNaN(price) || price < 0) {
+        showToast('Informe um valor válido em reais.', 'error');
         return;
       }
-      if (!durationInput) {
-        showToast('Informe a duração do serviço em minutos.', 'error');
-        return;
-      }
-      const duration = Number(durationInput);
-      if (!Number.isInteger(duration) || duration <= 0) {
-        showToast('A duração do serviço deve ser um número inteiro positivo em minutos (mínimo 1 minuto).', 'error');
+      if (!duration || duration <= 0 || duration > 1440) {
+        showToast('A duração deve ser um número inteiro entre 1 e 1440 minutos.', 'error');
         return;
       }
 
+      const isEdit = Boolean(id);
+      const method = isEdit ? 'PUT' : 'POST';
+      const endpoint = isEdit ? `/api/cliente/services/${id}` : '/api/cliente/services';
+
+      const payload = {
+        name,
+        price,
+        duration_min: duration,
+        durationMinutes: duration,
+        category,
+        active,
+      };
+
       try {
-        const res = await fetch('/api/cliente/services', {
-          method: 'POST',
+        let res = await fetch(endpoint, {
+          method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: nameInput,
-            price: priceVal,
-            duration_min: duration,
-            durationMinutes: duration,
-          }),
+          body: JSON.stringify(payload),
         });
-        const data = await res.json();
+        let data = await res.json();
+
+        // Tratamento de aviso de similaridade
+        if (res.status === 409 && data.code === 'SERVICE_SIMILAR' && data.requiresConfirmation) {
+          const confirmOk = confirm(`${data.warning}\n\nClique em OK para cadastrar mesmo assim ou Cancelar para revisar o nome.`);
+          if (confirmOk) {
+            payload.confirmSimilar = true;
+            res = await fetch(endpoint, {
+              method,
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            data = await res.json();
+          } else {
+            return;
+          }
+        }
+
         if (data.success) {
-          showToast('Serviço adicionado com sucesso!');
-          document.getElementById('newServiceForm').reset();
-          document.getElementById('newServiceForm').classList.add('hidden');
+          showToast(data.message || (isEdit ? 'Serviço atualizado com sucesso!' : 'Serviço cadastrado com sucesso!'));
+          closeSingleServiceModal();
           loadServices();
         } else {
-          showToast(data.error || 'Erro ao adicionar serviço.', 'error');
+          showToast(data.error || 'Erro ao salvar serviço.', 'error');
         }
-      } catch (e) {
-        showToast('Erro de conexão ao adicionar serviço.', 'error');
+      } catch (err) {
+        showToast('Erro de conexão ao salvar serviço.', 'error');
       }
     });
 
-    async function deleteService(id) {
-      if (!confirm('Deseja excluir este serviço?')) return;
+    // ==========================================
+    // ATIVAÇÃO / DESATIVAÇÃO RÁPIDA
+    // ==========================================
+    async function toggleServiceActive(id) {
       try {
-        const res = await fetch(`/api/cliente/services/${id}`, { method: 'DELETE' });
+        const res = await fetch(`/api/cliente/services/${id}/toggle`, { method: 'PATCH' });
         const data = await res.json();
         if (data.success) {
-          showToast(data.message || 'Serviço excluído com sucesso.');
+          showToast(data.message);
+          loadServices();
+        } else {
+          showToast(data.error || 'Erro ao alterar status do serviço.', 'error');
+        }
+      } catch (err) {
+        showToast('Erro de conexão.', 'error');
+      }
+    }
+
+    // ==========================================
+    // EXCLUSÃO / DESATIVAÇÃO COM PROTEÇÃO
+    // ==========================================
+    function promptDeleteServiceById(id) {
+      const svc = cachedServices.find(s => s.id === Number(id));
+      if (!svc) return;
+
+      document.getElementById('deleteServiceId').value = svc.id;
+      const aptCount = Number(svc.appointment_count || 0);
+      const body = document.getElementById('deleteModalBody');
+      const btnDeactivate = document.getElementById('btnDeactivateServiceRecommended');
+      const btnConfirm = document.getElementById('btnConfirmDeleteService');
+
+      if (aptCount > 0) {
+        document.getElementById('deleteModalTitle').innerText = 'Preservação de Histórico';
+        body.innerHTML = `
+          <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-2">
+            <p class="font-bold text-amber-300">Este serviço possui ${aptCount} atendimento(s) no histórico da Jéssica.</p>
+            <p class="text-slate-300 text-[11px] leading-relaxed">
+              Excluir o procedimento pode descaracterizar relatórios gerenciais e comprovantes passados.
+              <strong>Recomendamos desativá-lo:</strong> ele deixará de ser oferecido aos clientes no WhatsApp, mantendo seus dados históricos intactos.
+            </p>
+          </div>
+        `;
+        btnDeactivate.classList.remove('hidden');
+        btnConfirm.innerText = 'Excluir Definitivamente';
+      } else {
+        document.getElementById('deleteModalTitle').innerText = 'Excluir Serviço';
+        body.innerHTML = `
+          <p class="text-slate-300">Tem certeza que deseja excluir o serviço <strong>"${escapeHtml(svc.name)}"</strong>?</p>
+          <p class="text-slate-500 text-[11px]">Esta ação não poderá ser desfeita.</p>
+        `;
+        btnDeactivate.classList.add('hidden');
+        btnConfirm.innerText = 'Excluir Serviço';
+      }
+
+      const modal = document.getElementById('modalDeleteConfirm');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeDeleteModal() {
+      const modal = document.getElementById('modalDeleteConfirm');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    document.getElementById('btnCloseDeleteModal')?.addEventListener('click', closeDeleteModal);
+    document.getElementById('btnCancelDeleteModal')?.addEventListener('click', closeDeleteModal);
+
+    document.getElementById('btnDeactivateServiceRecommended')?.addEventListener('click', async () => {
+      const id = document.getElementById('deleteServiceId').value;
+      closeDeleteModal();
+      await toggleServiceActive(id);
+    });
+
+    document.getElementById('btnConfirmDeleteService')?.addEventListener('click', async () => {
+      const id = document.getElementById('deleteServiceId').value;
+      try {
+        const res = await fetch(`/api/cliente/services/${id}?force=true`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message || 'Serviço excluído.');
+          closeDeleteModal();
           loadServices();
         } else {
           showToast(data.error || 'Erro ao excluir serviço.', 'error');
         }
       } catch (err) {
-        showToast('Erro de conexão ao excluir serviço.', 'error');
+        showToast('Erro de conexão ao excluir.', 'error');
+      }
+    });
+
+    // ==========================================
+    // CADASTRO EM LOTE (SELEÇÃO MÚLTIPLA)
+    // ==========================================
+    function openBatchModal() {
+      batchSelectedMap.clear();
+      currentBatchCategory = 'all';
+      document.getElementById('batchCatalogSearch').value = '';
+
+      renderBatchStep1();
+
+      // Mostra Passo 1 e esconde Passo 2
+      document.getElementById('batchStep1').classList.remove('hidden');
+      document.getElementById('batchStep2').classList.add('hidden');
+      document.getElementById('btnBatchBack').classList.add('hidden');
+      document.getElementById('btnBatchNext').classList.remove('hidden');
+      document.getElementById('btnBatchSaveAll').classList.add('hidden');
+
+      document.getElementById('batchModalStepTitle').innerText = 'Adicionar Vários Serviços (Catálogo Inteligente)';
+      document.getElementById('batchModalStepSubtitle').innerText = 'Selecione os procedimentos que seu salão realiza para configurá-los rapidamente.';
+
+      updateBatchCounterUI();
+
+      const modal = document.getElementById('modalBatchServices');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    }
+
+    function closeBatchModal() {
+      const modal = document.getElementById('modalBatchServices');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      batchSelectedMap.clear();
+    }
+
+    document.getElementById('btnOpenBatchModal')?.addEventListener('click', openBatchModal);
+    document.getElementById('btnCloseBatchModal')?.addEventListener('click', closeBatchModal);
+    document.getElementById('btnBatchCancel')?.addEventListener('click', closeBatchModal);
+
+    // Abas de Categoria no Modal em Lote
+    document.querySelectorAll('.batch-cat-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.batch-cat-tab').forEach(t => {
+          t.classList.remove('active', 'bg-[#00F59B]/15', 'text-[#00F59B]', 'border', 'border-[#00F59B]/30');
+          t.classList.add('bg-white/5', 'text-slate-400');
+        });
+        tab.classList.add('active', 'bg-[#00F59B]/15', 'text-[#00F59B]', 'border', 'border-[#00F59B]/30');
+        tab.classList.remove('bg-white/5', 'text-slate-400');
+        currentBatchCategory = tab.dataset.cat;
+        renderBatchStep1();
+      });
+    });
+
+    document.getElementById('batchCatalogSearch')?.addEventListener('input', () => {
+      renderBatchStep1();
+    });
+
+    function isServiceAlreadyRegistered(procedureName) {
+      const normProc = normalizeSearchText(procedureName);
+      return cachedServices.some(s => normalizeSearchText(s.name) === normProc);
+    }
+
+    function renderBatchStep1() {
+      const grid = document.getElementById('batchCatalogGrid');
+      grid.innerHTML = '';
+
+      const query = normalizeSearchText(document.getElementById('batchCatalogSearch')?.value || '');
+
+      const filtered = cachedCatalog.filter(item => {
+        if (currentBatchCategory !== 'all' && item.category !== currentBatchCategory) return false;
+        if (query) {
+          const normName = normalizeSearchText(item.name);
+          const normCat = normalizeSearchText(item.category);
+          if (!normName.includes(query) && !normCat.includes(query)) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div class="col-span-full p-6 text-center text-slate-400 text-xs">Nenhum procedimento encontrado.</div>';
+        return;
+      }
+
+      filtered.forEach((item, idx) => {
+        const itemKey = `${item.category}:::${item.name}`;
+        const alreadyRegistered = isServiceAlreadyRegistered(item.name);
+        const isChecked = batchSelectedMap.has(itemKey);
+
+        const card = document.createElement('label');
+        card.className = `p-3 rounded-xl border flex items-start gap-2.5 transition-all text-xs ${
+          alreadyRegistered
+            ? 'bg-white/[0.02] border-white/5 opacity-50 cursor-not-allowed'
+            : isChecked
+              ? 'bg-[#00F59B]/10 border-[#00F59B]/40 cursor-pointer shadow-sm'
+              : 'bg-[#07080c] border-white/5 hover:border-white/10 cursor-pointer'
+        }`;
+
+        card.innerHTML = `
+          <input type="checkbox" ${alreadyRegistered ? 'disabled' : ''} ${isChecked ? 'checked' : ''}
+            class="mt-0.5 rounded bg-[#11131a] border-white/20 text-[#00F59B] focus:ring-0 shrink-0"
+            onchange="toggleBatchItemSelection('${escapeHtml(item.category)}', '${escapeHtml(item.name)}', ${item.suggestedDuration}, this.checked)">
+          <div class="flex-1 space-y-0.5">
+            <div class="flex items-center justify-between gap-1">
+              <span class="font-bold text-white text-xs leading-snug">${escapeHtml(item.name)}</span>
+              ${alreadyRegistered ? `
+                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-500/20 text-slate-400 shrink-0">Já cadastrado</span>
+              ` : `
+                <span class="text-[10px] text-slate-400 shrink-0">⏱ ${item.suggestedDuration}m</span>
+              `}
+            </div>
+            <span class="text-[10px] text-slate-400">${escapeHtml(item.category)}</span>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    window.toggleBatchItemSelection = function(category, name, duration, checked) {
+      const itemKey = `${category}:::${name}`;
+      if (checked) {
+        batchSelectedMap.set(itemKey, { category, name, duration_min: duration, price: '' });
+      } else {
+        batchSelectedMap.delete(itemKey);
+      }
+      updateBatchCounterUI();
+      renderBatchStep1();
+    };
+
+    // Botão Selecionar Todos da Categoria Atual
+    document.getElementById('btnBatchSelectAllCategory')?.addEventListener('click', () => {
+      const query = normalizeSearchText(document.getElementById('batchCatalogSearch')?.value || '');
+      const visible = cachedCatalog.filter(item => {
+        if (currentBatchCategory !== 'all' && item.category !== currentBatchCategory) return false;
+        if (query) {
+          const normName = normalizeSearchText(item.name);
+          const normCat = normalizeSearchText(item.category);
+          if (!normName.includes(query) && !normCat.includes(query)) return false;
+        }
+        return !isServiceAlreadyRegistered(item.name);
+      });
+
+      visible.forEach(item => {
+        const itemKey = `${item.category}:::${item.name}`;
+        batchSelectedMap.set(itemKey, { category: item.category, name: item.name, duration_min: item.suggestedDuration, price: '' });
+      });
+
+      updateBatchCounterUI();
+      renderBatchStep1();
+    });
+
+    // Botão Limpar Seleção
+    document.getElementById('btnBatchClearSelection')?.addEventListener('click', () => {
+      batchSelectedMap.clear();
+      updateBatchCounterUI();
+      renderBatchStep1();
+    });
+
+    function updateBatchCounterUI() {
+      const count = batchSelectedMap.size;
+      const counterBadge = document.getElementById('batchSelectedCounterBadge');
+      if (counterBadge) counterBadge.innerText = `${count} selecionado(s)`;
+
+      const nextBtn = document.getElementById('btnBatchNext');
+      if (nextBtn) {
+        nextBtn.disabled = count === 0;
+        nextBtn.innerHTML = `<span>Continuar com ${count} serviço(s)</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>`;
+        lucide.createIcons();
       }
     }
+
+    // Avançar para o Passo 2: Configuração em Lote
+    document.getElementById('btnBatchNext')?.addEventListener('click', () => {
+      if (batchSelectedMap.size === 0) return;
+
+      document.getElementById('batchStep1').classList.add('hidden');
+      document.getElementById('batchStep2').classList.remove('hidden');
+      document.getElementById('btnBatchBack').classList.remove('hidden');
+      document.getElementById('btnBatchNext').classList.add('hidden');
+      document.getElementById('btnBatchSaveAll').classList.remove('hidden');
+
+      document.getElementById('batchModalStepTitle').innerText = 'Configurar Preços e Durações dos Serviços';
+      document.getElementById('batchModalStepSubtitle').innerText = 'Defina o valor e o tempo de atendimento para cada procedimento selecionado.';
+
+      renderBatchStep2Table();
+      lucide.createIcons();
+    });
+
+    // Voltar para o Passo 1
+    document.getElementById('btnBatchBack')?.addEventListener('click', () => {
+      document.getElementById('batchStep2').classList.add('hidden');
+      document.getElementById('batchStep1').classList.remove('hidden');
+      document.getElementById('btnBatchBack').classList.add('hidden');
+      document.getElementById('btnBatchNext').classList.remove('hidden');
+      document.getElementById('btnBatchSaveAll').classList.add('hidden');
+
+      document.getElementById('batchModalStepTitle').innerText = 'Adicionar Vários Serviços (Catálogo Inteligente)';
+      document.getElementById('batchModalStepSubtitle').innerText = 'Selecione os procedimentos que seu salão realiza para configurá-los rapidamente.';
+
+      renderBatchStep1();
+      lucide.createIcons();
+    });
+
+    function renderBatchStep2Table() {
+      const tbody = document.getElementById('batchTableBody');
+      tbody.innerHTML = '';
+
+      const items = Array.from(batchSelectedMap.entries());
+
+      if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="py-6 text-center text-slate-400">Nenhum serviço selecionado. Volte para selecionar.</td></tr>';
+        return;
+      }
+
+      items.forEach(([itemKey, item], index) => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-white/[0.02] transition-colors';
+        row.innerHTML = `
+          <td class="py-3 px-4">
+            <span class="font-bold text-white block">${escapeHtml(item.name)}</span>
+            <span class="text-slate-400 text-[10px]">${escapeHtml(item.category)}</span>
+          </td>
+          <td class="py-3 px-3">
+            <div class="relative">
+              <span class="absolute left-3 top-2.5 text-slate-500 font-bold">R$</span>
+              <input type="number" step="0.5" min="0" placeholder="0.00" value="${item.price !== '' ? item.price : ''}" required
+                class="batch-price-input w-full pl-9 pr-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white font-bold focus:outline-none focus:border-[#00F59B]"
+                data-key="${escapeHtml(itemKey)}" onchange="updateBatchItemPrice('${escapeHtml(itemKey)}', this.value)">
+            </div>
+          </td>
+          <td class="py-3 px-3">
+            <div class="space-y-1">
+              <div class="flex items-center gap-1.5">
+                <input type="number" min="1" max="1440" step="1" value="${item.duration_min}" required
+                  class="batch-duration-input w-20 px-2.5 py-1.5 rounded-lg bg-[#11131a] border border-white/10 text-white font-semibold focus:outline-none focus:border-[#00F59B]"
+                  data-key="${escapeHtml(itemKey)}" onchange="updateBatchItemDuration('${escapeHtml(itemKey)}', this.value)">
+                <div class="flex flex-wrap items-center gap-1">
+                  <button type="button" onclick="setBatchItemDuration('${escapeHtml(itemKey)}', 30)" class="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-slate-300 text-[10px]">30m</button>
+                  <button type="button" onclick="setBatchItemDuration('${escapeHtml(itemKey)}', 45)" class="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-slate-300 text-[10px]">45m</button>
+                  <button type="button" onclick="setBatchItemDuration('${escapeHtml(itemKey)}', 60)" class="px-1.5 py-0.5 rounded bg-white/5 hover:bg-white/10 text-slate-300 text-[10px]">60m</button>
+                </div>
+              </div>
+            </div>
+          </td>
+          <td class="py-3 px-3 text-center">
+            <button type="button" onclick="removeBatchRow('${escapeHtml(itemKey)}')" class="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors" title="Remover do lote">
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+      lucide.createIcons();
+    }
+
+    window.updateBatchItemPrice = function(itemKey, value) {
+      if (batchSelectedMap.has(itemKey)) {
+        const item = batchSelectedMap.get(itemKey);
+        item.price = value;
+      }
+    };
+
+    window.updateBatchItemDuration = function(itemKey, value) {
+      if (batchSelectedMap.has(itemKey)) {
+        const item = batchSelectedMap.get(itemKey);
+        item.duration_min = parseInt(value, 10) || 45;
+      }
+    };
+
+    window.setBatchItemDuration = function(itemKey, minutes) {
+      if (batchSelectedMap.has(itemKey)) {
+        const item = batchSelectedMap.get(itemKey);
+        item.duration_min = minutes;
+        const input = document.querySelector(`.batch-duration-input[data-key="${itemKey}"]`);
+        if (input) input.value = minutes;
+      }
+    };
+
+    window.removeBatchRow = function(itemKey) {
+      batchSelectedMap.delete(itemKey);
+      updateBatchCounterUI();
+      renderBatchStep2Table();
+      if (batchSelectedMap.size === 0) {
+        document.getElementById('btnBatchBack').click();
+      }
+    };
+
+    // Aplicar mesma duração para todos os itens do lote
+    document.querySelectorAll('.btn-batch-apply-duration').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const dur = parseInt(btn.dataset.duration, 10);
+        batchSelectedMap.forEach(item => {
+          item.duration_min = dur;
+        });
+        document.querySelectorAll('.batch-duration-input').forEach(inp => {
+          inp.value = dur;
+        });
+        showToast(`Duração de ${dur} minutos aplicada a todos os itens.`);
+      });
+    });
+
+    // Salvar todos os serviços em lote
+    document.getElementById('btnBatchSaveAll')?.addEventListener('click', async () => {
+      const items = Array.from(batchSelectedMap.values());
+
+      if (items.length === 0) {
+        showToast('Nenhum serviço selecionado.', 'error');
+        return;
+      }
+
+      // Validação estrita no cliente de todos os campos
+      for (const it of items) {
+        const numPrice = parseFloat(it.price);
+        if (it.price === '' || isNaN(numPrice) || numPrice < 0) {
+          showToast(`Por favor, informe um valor válido para "${it.name}".`, 'error');
+          const input = document.querySelector(`.batch-price-input[data-key="${it.category}:::${it.name}"]`);
+          if (input) input.focus();
+          return;
+        }
+        it.price = numPrice;
+
+        const dur = parseInt(it.duration_min, 10);
+        if (!dur || dur <= 0 || dur > 1440) {
+          showToast(`Duração inválida para "${it.name}". Mínimo 1 minuto.`, 'error');
+          return;
+        }
+        it.duration_min = dur;
+      }
+
+      const saveBtn = document.getElementById('btnBatchSaveAll');
+      const saveText = document.getElementById('btnBatchSaveAllText');
+      saveBtn.disabled = true;
+      saveText.innerText = 'Gravando serviços...';
+
+      try {
+        const res = await fetch('/api/cliente/services/batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            services: items,
+            skipDuplicates: true,
+          }),
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message || `${data.createdCount} serviços cadastrados com sucesso!`);
+          closeBatchModal();
+          loadServices();
+        } else {
+          showToast(data.error || 'Erro ao processar cadastro em lote.', 'error');
+        }
+      } catch (err) {
+        showToast('Erro de conexão ao salvar lote.', 'error');
+      } finally {
+        saveBtn.disabled = false;
+        saveText.innerText = 'Salvar Todos os Serviços';
+      }
+    });
+
+    // Inicialização do Catálogo no carregamento da aba de serviços
+    loadServiceCatalog();
 
     // Staff CRUD
     async function loadStaff() {
@@ -2639,6 +3703,87 @@
         showToast('Erro ao carregar agenda.', 'error');
       }
     }
+
+    // Modal Novo Agendamento
+    async function populateAppointmentServices() {
+      try {
+        const res = await fetch('/api/cliente/services?active=1');
+        const data = await res.json();
+        const select = document.getElementById('aptServiceSelect');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Selecione um serviço ativo...</option>';
+        if (data.success && Array.isArray(data.services)) {
+          data.services.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.dataset.duration = s.duration_min;
+            opt.dataset.price = s.price;
+            opt.dataset.name = s.name;
+            opt.innerText = `${s.name} (${s.duration_min} min - R$ ${Number(s.price).toFixed(2).replace('.', ',')})`;
+            select.appendChild(opt);
+          });
+        }
+      } catch (e) {}
+    }
+
+    document.getElementById('btnOpenNewAppointmentModal')?.addEventListener('click', async () => {
+      await populateAppointmentServices();
+      const modal = document.getElementById('modalNewAppointment');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      lucide.createIcons();
+    });
+
+    const closeNewAppointmentModal = () => {
+      const modal = document.getElementById('modalNewAppointment');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    };
+    document.getElementById('btnCloseNewAppointmentModal')?.addEventListener('click', closeNewAppointmentModal);
+    document.getElementById('btnCancelNewAppointment')?.addEventListener('click', closeNewAppointmentModal);
+
+    document.getElementById('aptServiceSelect')?.addEventListener('change', (e) => {
+      const opt = e.target.selectedOptions[0];
+      const hint = document.getElementById('aptServiceDurationHint');
+      if (opt && opt.dataset.duration) {
+        hint.innerText = `⏱ Tempo previsto de atendimento: ${opt.dataset.duration} minutos`;
+      } else {
+        hint.innerText = '';
+      }
+    });
+
+    document.getElementById('formNewAppointment')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const clientName = document.getElementById('aptClientName').value.trim();
+      const serviceId = document.getElementById('aptServiceSelect').value;
+      const date = document.getElementById('aptDate').value;
+      const time = document.getElementById('aptTime').value;
+
+      if (!clientName || !serviceId || !date || !time) {
+        showToast('Preencha todos os campos do agendamento.', 'error');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/cliente/appointments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientName, serviceId: Number(serviceId), date, time }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message || 'Agendamento registrado!');
+          document.getElementById('formNewAppointment').reset();
+          closeNewAppointmentModal();
+          loadAppointments();
+        } else {
+          showToast(data.error || 'Erro ao registrar agendamento.', 'error');
+        }
+      } catch (err) {
+        showToast('Erro de conexão ao agendar.', 'error');
+      }
+    });
 
     // ==========================================
     // DASHBOARD GERENCIAL & FINANCEIRO 2.0

@@ -7,6 +7,7 @@ const userService = require('../services/userService');
 const config = require('../config');
 const productService = require('../services/productService');
 const salonDashboardService = require('../services/salonDashboardService');
+const serviceCatalog = require('../services/serviceCatalog');
 const { getPlan } = require('../services/planCatalog');
 const whatsappClient = require('../whatsapp/client');
 const {
@@ -556,16 +557,36 @@ router.put('/salon', clientAuthMiddleware, requireProductAccess('JESSICA'), (req
 });
 
 // ==========================================
-// SERVICES & PRICING MANAGEMENT
+// SERVICES & PRICING MANAGEMENT (CADASTRO INTELIGENTE)
 // ==========================================
 
+router.get('/services/catalog', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const { q, category } = req.query || {};
+  const results = serviceCatalog.searchCatalog(q || '', category || '');
+  res.json({
+    success: true,
+    categories: serviceCatalog.CATEGORIES,
+    catalog: results,
+    total: results.length,
+  });
+});
+
 router.get('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
-  const rows = db.prepare(`
-    SELECT id, user_id, name, price, duration_min, category, active
-    FROM client_services
-    WHERE user_id = ?
-    ORDER BY category ASC, price DESC
-  `).all(req.clientUser.id);
+  const { active } = req.query || {};
+  let sql = `
+    SELECT s.id, s.user_id, s.name, s.price, s.duration_min, s.category, s.active,
+           (SELECT COUNT(*) FROM appointments a WHERE a.service_id = s.id AND a.user_id = s.user_id) AS appointment_count
+    FROM client_services s
+    WHERE s.user_id = ?
+  `;
+  const params = [req.clientUser.id];
+  if (active !== undefined && active !== '') {
+    sql += ` AND s.active = ?`;
+    params.push(Number(active) ? 1 : 0);
+  }
+  sql += ` ORDER BY s.active DESC, s.category ASC, s.name ASC`;
+
+  const rows = db.prepare(sql).all(...params);
 
   // Return both duration_min and duration_minutes for total compatibility and predictability
   const services = rows.map((svc) => ({
@@ -577,16 +598,23 @@ router.get('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), (
     duration_minutes: svc.duration_min,
     category: svc.category,
     active: svc.active,
+    appointment_count: svc.appointment_count || 0,
+    has_appointments: (svc.appointment_count || 0) > 0,
   }));
 
   res.json({ success: true, services });
 });
 
 router.post('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
-  const { name, price, category } = req.body || {};
+  const { name, price, category, confirmSimilar } = req.body || {};
 
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ success: false, error: 'Nome e valor do serviço são obrigatórios.' });
+  }
+
+  const cleanName = serviceCatalog.sanitizeName(name);
+  if (!cleanName) {
+    return res.status(400).json({ success: false, error: 'Nome do serviço inválido.' });
   }
 
   if (price === undefined || price === null || price === '') {
@@ -629,14 +657,41 @@ router.post('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), 
     });
   }
 
-  const cleanCategory = category && typeof category === 'string' && category.trim() ? category.trim() : 'Cabelo';
+  // Validação de Duplicidades e Similaridade
+  const existingServices = db.prepare('SELECT id, name FROM client_services WHERE user_id = ?').all(req.clientUser.id);
+  const normNewName = serviceCatalog.normalizeText(cleanName);
+
+  const exactDuplicate = existingServices.find((s) => serviceCatalog.normalizeText(s.name) === normNewName);
+  if (exactDuplicate) {
+    return res.status(409).json({
+      success: false,
+      code: 'SERVICE_DUPLICATE',
+      error: `Você já possui um serviço cadastrado com o nome "${exactDuplicate.name}". Edite o serviço existente ou use um nome diferenciado.`,
+      existingId: exactDuplicate.id,
+    });
+  }
+
+  if (!confirmSimilar) {
+    const similar = existingServices.find((s) => serviceCatalog.calculateSimilarity(s.name, cleanName) >= 0.85);
+    if (similar) {
+      return res.status(409).json({
+        success: false,
+        code: 'SERVICE_SIMILAR',
+        warning: `Já existe um serviço com nome muito similar: "${similar.name}". Deseja cadastrar "${cleanName}" assim mesmo?`,
+        similarTo: similar.name,
+        requiresConfirmation: true,
+      });
+    }
+  }
+
+  const cleanCategory = category && typeof category === 'string' && category.trim() ? category.trim() : 'Cabelos';
 
   const info = db.prepare(`
-    INSERT INTO client_services (user_id, name, price, duration_min, category)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO client_services (user_id, name, price, duration_min, category, active)
+    VALUES (?, ?, ?, ?, ?, 1)
   `).run(
     req.clientUser.id,
-    name.trim(),
+    cleanName,
     numPrice,
     parsedDuration,
     cleanCategory
@@ -645,12 +700,14 @@ router.post('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), 
   const createdService = {
     id: info.lastInsertRowid,
     user_id: req.clientUser.id,
-    name: name.trim(),
+    name: cleanName,
     price: numPrice,
     duration_min: parsedDuration,
     duration_minutes: parsedDuration,
     category: cleanCategory,
     active: 1,
+    appointment_count: 0,
+    has_appointments: false,
   };
 
   res.json({
@@ -660,13 +717,188 @@ router.post('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), 
   });
 });
 
+// Cadastro em Lote Inteligente com Transação Atômica
+router.post('/services/batch', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const { services: rawServices, skipDuplicates = true } = req.body || {};
+
+  if (!Array.isArray(rawServices) || rawServices.length === 0) {
+    return res.status(400).json({ success: false, error: 'A lista de serviços para cadastro em lote é obrigatória.' });
+  }
+
+  if (rawServices.length > 50) {
+    return res.status(400).json({ success: false, error: 'Máximo de 50 serviços por lote permitido.' });
+  }
+
+  // 1. Validação estrita de cada item antes de qualquer escrita no banco
+  const validatedItems = [];
+  const seenInBatch = new Set();
+
+  for (let idx = 0; idx < rawServices.length; idx++) {
+    const item = rawServices[idx];
+    if (!item || typeof item !== 'object') {
+      return res.status(400).json({ success: false, error: `Item #${idx + 1} inválido no lote.` });
+    }
+
+    const cleanName = serviceCatalog.sanitizeName(item.name);
+    if (!cleanName) {
+      return res.status(400).json({ success: false, error: `Nome obrigatório no item #${idx + 1}.` });
+    }
+
+    const price = parseFloat(item.price);
+    if (isNaN(price) || price < 0) {
+      return res.status(400).json({ success: false, error: `Valor inválido no serviço "${cleanName}".` });
+    }
+
+    const rawDuration = item.duration_min !== undefined
+      ? item.duration_min
+      : (item.durationMin !== undefined ? item.durationMin : item.durationMinutes);
+
+    if (rawDuration === undefined || rawDuration === null || (typeof rawDuration === 'string' && String(rawDuration).trim() === '')) {
+      return res.status(400).json({ success: false, error: `Duração obrigatória no serviço "${cleanName}".` });
+    }
+
+    const duration = Number(rawDuration);
+    if (!Number.isInteger(duration) || duration <= 0 || duration > 1440) {
+      return res.status(400).json({
+        success: false,
+        error: `Duração inválida no serviço "${cleanName}". Deve ser um número inteiro entre 1 e 1440 minutos.`,
+      });
+    }
+
+    const normKey = serviceCatalog.normalizeText(cleanName);
+    if (seenInBatch.has(normKey)) {
+      // Ignora duplicata duplicada dentro da mesma requisição de lote
+      continue;
+    }
+    seenInBatch.add(normKey);
+
+    validatedItems.push({
+      name: cleanName,
+      price,
+      duration_min: duration,
+      category: item.category && typeof item.category === 'string' && item.category.trim() ? item.category.trim() : 'Cabelos',
+      normKey,
+    });
+  }
+
+  if (validatedItems.length === 0) {
+    return res.status(400).json({ success: false, error: 'Nenhum serviço válido para cadastro no lote.' });
+  }
+
+  // 2. Consulta serviços já cadastrados pelo salão
+  const existingRows = db.prepare('SELECT id, name FROM client_services WHERE user_id = ?').all(req.clientUser.id);
+  const existingSet = new Set(existingRows.map((r) => serviceCatalog.normalizeText(r.name)));
+
+  const itemsToInsert = [];
+  const skippedItems = [];
+
+  for (const it of validatedItems) {
+    if (existingSet.has(it.normKey)) {
+      skippedItems.push(it.name);
+      if (!skipDuplicates) {
+        return res.status(409).json({
+          success: false,
+          code: 'SERVICE_DUPLICATE',
+          error: `O serviço "${it.name}" já está cadastrado no seu salão.`,
+        });
+      }
+    } else {
+      itemsToInsert.push(it);
+    }
+  }
+
+  if (itemsToInsert.length === 0) {
+    return res.json({
+      success: true,
+      createdCount: 0,
+      skippedCount: skippedItems.length,
+      services: [],
+      skipped: skippedItems,
+      message: 'Todos os serviços selecionados já estavam previamente cadastrados no seu salão.',
+    });
+  }
+
+  // 3. Execução em Transação Atômica SQLite (Rollback completo em caso de falha)
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const stmt = db.prepare(`
+      INSERT INTO client_services (user_id, name, price, duration_min, category, active)
+      VALUES (?, ?, ?, ?, ?, 1)
+    `);
+    const createdServices = [];
+    for (const item of itemsToInsert) {
+      const info = stmt.run(req.clientUser.id, item.name, item.price, item.duration_min, item.category);
+      createdServices.push({
+        id: info.lastInsertRowid,
+        user_id: req.clientUser.id,
+        name: item.name,
+        price: item.price,
+        duration_min: item.duration_min,
+        duration_minutes: item.duration_min,
+        category: item.category,
+        active: 1,
+        appointment_count: 0,
+        has_appointments: false,
+      });
+    }
+    db.exec('COMMIT');
+
+    return res.json({
+      success: true,
+      createdCount: createdServices.length,
+      skippedCount: skippedItems.length,
+      services: createdServices,
+      skipped: skippedItems,
+      message: `${createdServices.length} serviço(s) cadastrado(s) com sucesso!` +
+        (skippedItems.length > 0 ? ` (${skippedItems.length} já cadastrado(s) ignorado(s))` : ''),
+    });
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    console.error('[Services Batch] Erro na transação de cadastro em lote:', err.message);
+    return res.status(500).json({ success: false, error: 'Falha interna ao processar cadastro em lote. Nenhuma alteração foi realizada.' });
+  }
+});
+
 router.put('/services/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { id } = req.params;
-  const { name, price, category, active } = req.body || {};
+  const { name, price, category, active, confirmSimilar } = req.body || {};
 
-  const existing = db.prepare('SELECT id, duration_min FROM client_services WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
+  const existing = db.prepare('SELECT id, name, duration_min FROM client_services WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
   if (!existing) {
     return res.status(404).json({ success: false, error: 'Serviço não encontrado.' });
+  }
+
+  let cleanName = null;
+  if (name !== undefined && name !== null) {
+    cleanName = serviceCatalog.sanitizeName(name);
+    if (!cleanName) {
+      return res.status(400).json({ success: false, error: 'Nome do serviço não pode ser vazio.' });
+    }
+
+    // Checagem de duplicidade contra OUTROS serviços do mesmo salão
+    const normNew = serviceCatalog.normalizeText(cleanName);
+    const otherSameName = db.prepare('SELECT id, name FROM client_services WHERE user_id = ? AND id != ?').all(req.clientUser.id, id);
+    const duplicate = otherSameName.find((s) => serviceCatalog.normalizeText(s.name) === normNew);
+    if (duplicate) {
+      return res.status(409).json({
+        success: false,
+        code: 'SERVICE_DUPLICATE',
+        error: `Você já possui outro serviço cadastrado com o nome "${duplicate.name}".`,
+      });
+    }
+
+    if (!confirmSimilar && cleanName !== existing.name) {
+      const similar = otherSameName.find((s) => serviceCatalog.calculateSimilarity(s.name, cleanName) >= 0.85);
+      if (similar) {
+        return res.status(409).json({
+          success: false,
+          code: 'SERVICE_SIMILAR',
+          warning: `Já existe outro serviço com nome muito similar: "${similar.name}". Deseja atualizar assim mesmo?`,
+          similarTo: similar.name,
+          requiresConfirmation: true,
+        });
+      }
+    }
   }
 
   const rawDuration = req.body?.duration_min !== undefined
@@ -718,16 +950,21 @@ router.put('/services/:id', clientAuthMiddleware, requireProductAccess('JESSICA'
         active = COALESCE(?, active)
     WHERE id = ? AND user_id = ?
   `).run(
-    name && typeof name === 'string' && name.trim() ? name.trim() : null,
+    cleanName || null,
     numPrice !== null ? numPrice : null,
     parsedDuration !== null ? parsedDuration : null,
     category && typeof category === 'string' && category.trim() ? category.trim() : null,
-    active !== undefined ? (active ? 1 : 0) : null,
+    active !== undefined ? (Number(active) ? 1 : 0) : null,
     id,
     req.clientUser.id
   );
 
-  const updated = db.prepare('SELECT id, user_id, name, price, duration_min, category, active FROM client_services WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
+  const updated = db.prepare(`
+    SELECT s.id, s.user_id, s.name, s.price, s.duration_min, s.category, s.active,
+           (SELECT COUNT(*) FROM appointments a WHERE a.service_id = s.id AND a.user_id = s.user_id) AS appointment_count
+    FROM client_services s
+    WHERE s.id = ? AND s.user_id = ?
+  `).get(id, req.clientUser.id);
 
   res.json({
     success: true,
@@ -735,19 +972,59 @@ router.put('/services/:id', clientAuthMiddleware, requireProductAccess('JESSICA'
     service: updated ? {
       ...updated,
       duration_minutes: updated.duration_min,
+      has_appointments: (updated.appointment_count || 0) > 0,
     } : null,
+  });
+});
+
+// Toggle Ativar / Desativar Serviço
+router.patch('/services/:id/toggle', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const { id } = req.params;
+  const existing = db.prepare('SELECT id, name, active FROM client_services WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
+  if (!existing) {
+    return res.status(404).json({ success: false, error: 'Serviço não encontrado.' });
+  }
+
+  const newActive = existing.active ? 0 : 1;
+  db.prepare('UPDATE client_services SET active = ? WHERE id = ? AND user_id = ?').run(newActive, id, req.clientUser.id);
+
+  res.json({
+    success: true,
+    active: newActive,
+    message: `Serviço "${existing.name}" ${newActive ? 'ativado' : 'desativado'} com sucesso!`,
   });
 });
 
 router.delete('/services/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { id } = req.params;
-  const result = db.prepare('DELETE FROM client_services WHERE id = ? AND user_id = ?').run(id, req.clientUser.id);
+  const { force } = req.query || {};
 
-  if (result.changes === 0) {
+  const existing = db.prepare('SELECT id, name FROM client_services WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
+  if (!existing) {
     return res.status(404).json({ success: false, error: 'Serviço não encontrado.' });
   }
 
-  res.json({ success: true, message: 'Serviço removido com sucesso.' });
+  // Verifica agendamentos vinculados a este serviço
+  const appointmentCount = db.prepare('SELECT COUNT(*) as count FROM appointments WHERE service_id = ? AND user_id = ?').get(id, req.clientUser.id)?.count || 0;
+
+  if (appointmentCount > 0 && force !== 'true') {
+    return res.status(409).json({
+      success: false,
+      code: 'SERVICE_HAS_APPOINTMENTS',
+      appointmentCount,
+      error: `Este serviço possui ${appointmentCount} atendimento(s) registrado(s) no histórico da Jéssica. Para manter seus relatórios e métricas íntegros, recomendamos desativar o serviço em vez de excluí-lo definitivamente.`,
+      recommendation: 'deactivate',
+    });
+  }
+
+  db.prepare('DELETE FROM client_services WHERE id = ? AND user_id = ?').run(id, req.clientUser.id);
+
+  res.json({
+    success: true,
+    message: appointmentCount > 0
+      ? `Serviço removido definitivamente (${appointmentCount} agendamento(s) histórico(s) preservado(s)).`
+      : 'Serviço removido com sucesso.',
+  });
 });
 
 // ==========================================
@@ -831,10 +1108,14 @@ router.post('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA
   // Look up service and its configured duration for this user
   let matchedService = null;
   if (serviceId) {
-    matchedService = db.prepare('SELECT id, name, price, duration_min FROM client_services WHERE id = ? AND user_id = ?').get(serviceId, req.clientUser.id);
+    matchedService = db.prepare('SELECT id, name, price, duration_min, active FROM client_services WHERE id = ? AND user_id = ?').get(serviceId, req.clientUser.id);
   }
   if (!matchedService && serviceName) {
-    matchedService = db.prepare('SELECT id, name, price, duration_min FROM client_services WHERE LOWER(name) = LOWER(?) AND user_id = ?').get(serviceName.trim(), req.clientUser.id);
+    matchedService = db.prepare('SELECT id, name, price, duration_min, active FROM client_services WHERE LOWER(name) = LOWER(?) AND user_id = ?').get(serviceName.trim(), req.clientUser.id);
+  }
+
+  if (matchedService && matchedService.active === 0) {
+    return res.status(400).json({ success: false, error: 'Este serviço está inativo e não aceita novos agendamentos.' });
   }
 
   const durationMin = matchedService?.duration_min
