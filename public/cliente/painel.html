@@ -644,13 +644,24 @@
           </div>
 
           <!-- New Service Form (Hidden initially) -->
-          <form id="newServiceForm" class="hidden p-4 rounded-xl bg-[#07080c] border border-white/5 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-            <input type="text" id="svcName" placeholder="Nome do Serviço (ex: Corte Feminino)" required class="sm:col-span-2 px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white">
-            <input type="number" id="svcPrice" placeholder="Preço (R$)" step="0.5" required class="px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white">
-            <input type="number" id="svcDuration" placeholder="Duração (min)" value="45" class="px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white">
-            <div class="sm:col-span-4 flex justify-end gap-2">
-              <button type="button" id="btnCancelService" class="px-3 py-1.5 rounded-lg bg-white/5 text-slate-400">Cancelar</button>
-              <button type="submit" class="px-4 py-1.5 rounded-lg bg-[#00F59B] text-[#07080c] font-bold">Adicionar</button>
+          <form id="newServiceForm" class="hidden p-5 rounded-xl bg-[#07080c] border border-white/10 space-y-4 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              <div class="sm:col-span-2 space-y-1">
+                <label for="svcName" class="block text-slate-400 text-xs font-medium">Nome do Serviço</label>
+                <input type="text" id="svcName" placeholder="Ex: Corte Feminino" required class="w-full px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+              </div>
+              <div class="space-y-1">
+                <label for="svcPrice" class="block text-slate-400 text-xs font-medium">Valor (R$)</label>
+                <input type="number" id="svcPrice" placeholder="Ex: 80.00" step="0.5" min="0" required class="w-full px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+              </div>
+              <div class="space-y-1">
+                <label for="svcDuration" class="block text-slate-400 text-xs font-medium">Duração (minutos)</label>
+                <input type="number" id="svcDuration" placeholder="Ex: 45" min="1" step="1" required class="w-full px-3 py-2 rounded-lg bg-[#11131a] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+              </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-1 border-t border-white/5">
+              <button type="button" id="btnCancelService" class="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all font-medium">Cancelar</button>
+              <button type="submit" class="px-4 py-1.5 rounded-lg bg-[#00F59B] hover:brightness-110 text-[#07080c] font-bold transition-all shadow-sm">Adicionar</button>
             </div>
           </form>
 
@@ -2406,14 +2417,27 @@
         }
 
         data.services.forEach(svc => {
+          const duration = (svc.duration_min !== undefined && svc.duration_min !== null && !isNaN(svc.duration_min))
+            ? Number(svc.duration_min)
+            : ((svc.duration_minutes !== undefined && svc.duration_minutes !== null && !isNaN(svc.duration_minutes))
+              ? Number(svc.duration_minutes)
+              : 45);
+
+          const numPrice = (svc.price !== undefined && svc.price !== null && !isNaN(Number(svc.price)))
+            ? Number(svc.price)
+            : 0;
+
+          const formattedPrice = numPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          const safeName = (svc.name && typeof svc.name === 'string') ? svc.name : 'Serviço';
+
           const item = document.createElement('div');
           item.className = 'flex items-center justify-between p-3.5 rounded-xl bg-[#07080c] border border-white/5 text-xs';
           item.innerHTML = `
             <div>
-              <span class="font-bold text-white text-sm">${svc.name}</span>
-              <div class="text-slate-400 mt-0.5">${svc.duration_minutes} min • R$ ${Number(svc.price).toFixed(2).replace('.', ',')}</div>
+              <span class="font-bold text-white text-sm">${safeName}</span>
+              <div class="text-slate-400 mt-0.5">Duração: ${duration} minutos • Valor: ${formattedPrice}</div>
             </div>
-            <button onclick="deleteService(${svc.id})" class="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10">
+            <button onclick="deleteService(${svc.id})" title="Excluir serviço" aria-label="Excluir serviço" class="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
               <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>
           `;
@@ -2434,35 +2458,67 @@
 
     document.getElementById('newServiceForm').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const name = document.getElementById('svcName').value;
-      const price = parseFloat(document.getElementById('svcPrice').value);
-      const duration = parseInt(document.getElementById('svcDuration').value, 10);
+      const nameInput = document.getElementById('svcName').value.trim();
+      const priceVal = parseFloat(document.getElementById('svcPrice').value);
+      const durationInput = document.getElementById('svcDuration').value.trim();
+
+      if (!nameInput) {
+        showToast('Informe o nome do serviço.', 'error');
+        return;
+      }
+      if (isNaN(priceVal) || priceVal < 0) {
+        showToast('Informe um valor válido para o serviço.', 'error');
+        return;
+      }
+      if (!durationInput) {
+        showToast('Informe a duração do serviço em minutos.', 'error');
+        return;
+      }
+      const duration = Number(durationInput);
+      if (!Number.isInteger(duration) || duration <= 0) {
+        showToast('A duração do serviço deve ser um número inteiro positivo em minutos (mínimo 1 minuto).', 'error');
+        return;
+      }
 
       try {
         const res = await fetch('/api/cliente/services', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, price, durationMinutes: duration }),
+          body: JSON.stringify({
+            name: nameInput,
+            price: priceVal,
+            duration_min: duration,
+            durationMinutes: duration,
+          }),
         });
         const data = await res.json();
         if (data.success) {
-          showToast('Serviço adicionado!');
+          showToast('Serviço adicionado com sucesso!');
           document.getElementById('newServiceForm').reset();
           document.getElementById('newServiceForm').classList.add('hidden');
           loadServices();
         } else {
-          showToast(data.error || 'Erro ao adicionar.', 'error');
+          showToast(data.error || 'Erro ao adicionar serviço.', 'error');
         }
       } catch (e) {
-        showToast('Erro de conexão.', 'error');
+        showToast('Erro de conexão ao adicionar serviço.', 'error');
       }
     });
 
     async function deleteService(id) {
       if (!confirm('Deseja excluir este serviço?')) return;
-      await fetch(`/api/cliente/services/${id}`, { method: 'DELETE' });
-      showToast('Serviço excluído.');
-      loadServices();
+      try {
+        const res = await fetch(`/api/cliente/services/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) {
+          showToast(data.message || 'Serviço excluído com sucesso.');
+          loadServices();
+        } else {
+          showToast(data.error || 'Erro ao excluir serviço.', 'error');
+        }
+      } catch (err) {
+        showToast('Erro de conexão ao excluir serviço.', 'error');
+      }
     }
 
     // Staff CRUD
@@ -2557,12 +2613,22 @@
         data.appointments.forEach(a => {
           const dt = new Date(a.start_datetime);
           const dtFormatted = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+          let durationInfo = '';
+          if (a.start_datetime && a.end_datetime) {
+            const startMs = new Date(a.start_datetime).getTime();
+            const endMs = new Date(a.end_datetime).getTime();
+            if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
+              const diffMin = Math.round((endMs - startMs) / 60000);
+              const endFormatted = new Date(a.end_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+              durationInfo = ` • Até ${endFormatted} (${diffMin} min)`;
+            }
+          }
           const card = document.createElement('div');
           card.className = 'p-4 rounded-xl bg-[#07080c] border border-white/5 flex items-center justify-between text-xs';
           card.innerHTML = `
             <div>
               <span class="font-bold text-white text-sm">${a.title}</span>
-              <div class="text-slate-400 mt-0.5">${dtFormatted} • Cliente: ${a.description || 'WhatsApp'}</div>
+              <div class="text-slate-400 mt-0.5">${dtFormatted}${durationInfo} • Cliente: ${a.description || 'WhatsApp'}</div>
             </div>
             <span class="px-2.5 py-1 rounded-full font-bold text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">CONFIRMADO</span>
           `;

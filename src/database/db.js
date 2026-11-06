@@ -769,6 +769,19 @@ ensureColumnExists('incomes', 'appointment_id', 'INTEGER');
 
 ensureColumnExists('scheduled_payments', 'paid_at', 'TEXT');
 
+ensureColumnExists('client_services', 'duration_min', 'INTEGER DEFAULT 45');
+
+// Safe legacy data correction for client_services duration without overwriting valid data
+try {
+  db.exec(`
+    UPDATE client_services
+    SET duration_min = 45
+    WHERE duration_min IS NULL OR duration_min <= 0;
+  `);
+} catch (e) {
+  console.warn('[Database] Aviso ao verificar migração de duração legada em client_services:', e.message);
+}
+
 try {
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);

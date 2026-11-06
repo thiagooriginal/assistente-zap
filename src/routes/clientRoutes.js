@@ -561,19 +561,35 @@ router.put('/salon', clientAuthMiddleware, requireProductAccess('JESSICA'), (req
 
 router.get('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const rows = db.prepare(`
-    SELECT id, name, price, duration_min, category, active
+    SELECT id, user_id, name, price, duration_min, category, active
     FROM client_services
     WHERE user_id = ?
     ORDER BY category ASC, price DESC
   `).all(req.clientUser.id);
 
-  res.json({ success: true, services: rows });
+  // Return both duration_min and duration_minutes for total compatibility and predictability
+  const services = rows.map((svc) => ({
+    id: svc.id,
+    user_id: svc.user_id,
+    name: svc.name,
+    price: svc.price,
+    duration_min: svc.duration_min,
+    duration_minutes: svc.duration_min,
+    category: svc.category,
+    active: svc.active,
+  }));
+
+  res.json({ success: true, services });
 });
 
 router.post('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
-  const { name, price, durationMin, category } = req.body || {};
+  const { name, price, category } = req.body || {};
 
-  if (!name || !price) {
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ success: false, error: 'Nome e valor do serviço são obrigatórios.' });
+  }
+
+  if (price === undefined || price === null || price === '') {
     return res.status(400).json({ success: false, error: 'Nome e valor do serviço são obrigatórios.' });
   }
 
@@ -582,6 +598,39 @@ router.post('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), 
     return res.status(400).json({ success: false, error: 'Valor inválido.' });
   }
 
+  // Accept duration_min, durationMin, durationMinutes or duration
+  const rawDuration = req.body?.duration_min !== undefined
+    ? req.body.duration_min
+    : (req.body?.durationMin !== undefined
+      ? req.body.durationMin
+      : (req.body?.durationMinutes !== undefined
+        ? req.body.durationMinutes
+        : req.body?.duration));
+
+  if (rawDuration === undefined || rawDuration === null || (typeof rawDuration === 'string' && rawDuration.trim() === '')) {
+    return res.status(400).json({
+      success: false,
+      error: 'A duração do serviço deve ser um número inteiro positivo em minutos (mínimo 1 minuto).',
+    });
+  }
+
+  const parsedDuration = Number(rawDuration);
+  if (!Number.isInteger(parsedDuration) || parsedDuration <= 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'A duração do serviço deve ser um número inteiro positivo em minutos (mínimo 1 minuto).',
+    });
+  }
+
+  if (parsedDuration > 1440) {
+    return res.status(400).json({
+      success: false,
+      error: 'A duração máxima permitida para um serviço é de 1440 minutos (24 horas).',
+    });
+  }
+
+  const cleanCategory = category && typeof category === 'string' && category.trim() ? category.trim() : 'Cabelo';
+
   const info = db.prepare(`
     INSERT INTO client_services (user_id, name, price, duration_min, category)
     VALUES (?, ?, ?, ?, ?)
@@ -589,31 +638,75 @@ router.post('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), 
     req.clientUser.id,
     name.trim(),
     numPrice,
-    parseInt(durationMin, 10) || 45,
-    category ? category.trim() : 'Cabelo'
+    parsedDuration,
+    cleanCategory
   );
+
+  const createdService = {
+    id: info.lastInsertRowid,
+    user_id: req.clientUser.id,
+    name: name.trim(),
+    price: numPrice,
+    duration_min: parsedDuration,
+    duration_minutes: parsedDuration,
+    category: cleanCategory,
+    active: 1,
+  };
 
   res.json({
     success: true,
-    service: {
-      id: info.lastInsertRowid,
-      name: name.trim(),
-      price: numPrice,
-      duration_min: parseInt(durationMin, 10) || 45,
-      category: category ? category.trim() : 'Cabelo',
-      active: 1,
-    },
+    service: createdService,
     message: 'Serviço cadastrado com sucesso!',
   });
 });
 
 router.put('/services/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { id } = req.params;
-  const { name, price, durationMin, category, active } = req.body || {};
+  const { name, price, category, active } = req.body || {};
 
-  const existing = db.prepare('SELECT id FROM client_services WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
+  const existing = db.prepare('SELECT id, duration_min FROM client_services WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
   if (!existing) {
     return res.status(404).json({ success: false, error: 'Serviço não encontrado.' });
+  }
+
+  const rawDuration = req.body?.duration_min !== undefined
+    ? req.body.duration_min
+    : (req.body?.durationMin !== undefined
+      ? req.body.durationMin
+      : (req.body?.durationMinutes !== undefined
+        ? req.body.durationMinutes
+        : req.body?.duration));
+
+  let parsedDuration = null;
+  if (rawDuration !== undefined && rawDuration !== null) {
+    if (typeof rawDuration === 'string' && rawDuration.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'A duração do serviço deve ser um número inteiro positivo em minutos (mínimo 1 minuto).',
+      });
+    }
+    const num = Number(rawDuration);
+    if (!Number.isInteger(num) || num <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'A duração do serviço deve ser um número inteiro positivo em minutos (mínimo 1 minuto).',
+      });
+    }
+    if (num > 1440) {
+      return res.status(400).json({
+        success: false,
+        error: 'A duração máxima permitida para um serviço é de 1440 minutos (24 horas).',
+      });
+    }
+    parsedDuration = num;
+  }
+
+  let numPrice = null;
+  if (price !== undefined && price !== null && price !== '') {
+    numPrice = parseFloat(price);
+    if (isNaN(numPrice) || numPrice < 0) {
+      return res.status(400).json({ success: false, error: 'Valor inválido.' });
+    }
   }
 
   db.prepare(`
@@ -625,16 +718,25 @@ router.put('/services/:id', clientAuthMiddleware, requireProductAccess('JESSICA'
         active = COALESCE(?, active)
     WHERE id = ? AND user_id = ?
   `).run(
-    name ? name.trim() : null,
-    price !== undefined ? parseFloat(price) : null,
-    durationMin !== undefined ? parseInt(durationMin, 10) : null,
-    category ? category.trim() : null,
+    name && typeof name === 'string' && name.trim() ? name.trim() : null,
+    numPrice !== null ? numPrice : null,
+    parsedDuration !== null ? parsedDuration : null,
+    category && typeof category === 'string' && category.trim() ? category.trim() : null,
     active !== undefined ? (active ? 1 : 0) : null,
     id,
     req.clientUser.id
   );
 
-  res.json({ success: true, message: 'Serviço atualizado com sucesso!' });
+  const updated = db.prepare('SELECT id, user_id, name, price, duration_min, category, active FROM client_services WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
+
+  res.json({
+    success: true,
+    message: 'Serviço atualizado com sucesso!',
+    service: updated ? {
+      ...updated,
+      duration_minutes: updated.duration_min,
+    } : null,
+  });
 });
 
 router.delete('/services/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
@@ -709,7 +811,7 @@ router.delete('/staff/:id', clientAuthMiddleware, requireProductAccess('JESSICA'
 
 router.get('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const rows = db.prepare(`
-    SELECT id, title, description, start_datetime, end_datetime, status
+    SELECT id, title, description, start_datetime, end_datetime, service_id, price, client_name, status
     FROM appointments
     WHERE user_id = ?
     ORDER BY start_datetime DESC
@@ -720,21 +822,63 @@ router.get('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA'
 });
 
 router.post('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
-  const { clientName, serviceName, date, time } = req.body || {};
+  const { clientName, serviceName, serviceId, date, time } = req.body || {};
 
   if (!clientName || !date || !time) {
     return res.status(400).json({ success: false, error: 'Cliente, data e horário são obrigatórios.' });
   }
 
+  // Look up service and its configured duration for this user
+  let matchedService = null;
+  if (serviceId) {
+    matchedService = db.prepare('SELECT id, name, price, duration_min FROM client_services WHERE id = ? AND user_id = ?').get(serviceId, req.clientUser.id);
+  }
+  if (!matchedService && serviceName) {
+    matchedService = db.prepare('SELECT id, name, price, duration_min FROM client_services WHERE LOWER(name) = LOWER(?) AND user_id = ?').get(serviceName.trim(), req.clientUser.id);
+  }
+
+  const durationMin = matchedService?.duration_min
+    || parseInt(req.body?.duration_min || req.body?.durationMin || req.body?.durationMinutes || req.body?.duration, 10)
+    || 45;
+
   const startDt = `${date}T${time}:00`;
-  const title = `${clientName.trim()} - ${serviceName || 'Atendimento'}`;
+  let endDt = null;
+  const startDate = new Date(startDt);
+  if (!isNaN(startDate.getTime())) {
+    const endDate = new Date(startDate.getTime() + durationMin * 60 * 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    endDt = `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}T${pad(endDate.getHours())}:${pad(endDate.getMinutes())}:${pad(endDate.getSeconds())}`;
+  }
+
+  const finalServiceName = matchedService?.name || (serviceName ? serviceName.trim() : 'Atendimento');
+  const title = `${clientName.trim()} - ${finalServiceName}`;
 
   const info = db.prepare(`
-    INSERT INTO appointments (user_id, title, description, start_datetime, status)
-    VALUES (?, ?, ?, ?, 'SCHEDULED')
-  `).run(req.clientUser.id, title, `Agendado via Painel por ${req.clientUser.name || 'Salão'}`, startDt);
+    INSERT INTO appointments (user_id, title, description, start_datetime, end_datetime, service_id, price, client_name, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED')
+  `).run(
+    req.clientUser.id,
+    title,
+    `Agendado via Painel por ${req.clientUser.name || 'Salão'} (Duração: ${durationMin} min)`,
+    startDt,
+    endDt,
+    matchedService?.id || null,
+    matchedService?.price || null,
+    clientName.trim()
+  );
 
-  res.json({ success: true, id: info.lastInsertRowid, message: 'Agendamento registrado com sucesso!' });
+  res.json({
+    success: true,
+    id: info.lastInsertRowid,
+    appointment: {
+      id: info.lastInsertRowid,
+      title,
+      start_datetime: startDt,
+      end_datetime: endDt,
+      duration_minutes: durationMin,
+    },
+    message: 'Agendamento registrado com sucesso!',
+  });
 });
 
 router.delete('/appointments/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
