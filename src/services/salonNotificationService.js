@@ -284,7 +284,7 @@ async function dispatchOutboxItem(outboxId) {
     // Registra entrega simulada segura sem disparar mensagem para números reais
     db.prepare(`
       UPDATE whatsapp_notification_outbox
-      SET status = 'SENT_MOCKED', sent_at = CURRENT_TIMESTAMP
+      SET status = 'SIMULATED', is_simulated = 1, sent_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `).run(outboxId);
 
@@ -294,13 +294,7 @@ async function dispatchOutboxItem(outboxId) {
       WHERE id = ?
     `).run(item.appointment_id);
 
-    mockNotificationHistory.push({
-      outboxId: item.id,
-      recipient: item.recipient_phone,
-      eventType: item.event_type,
-      message: item.message_text,
-      timestamp: new Date().toISOString(),
-    });
+    recordMockNotification(item);
 
     return { success: true, simulated: true };
   }
@@ -379,6 +373,16 @@ async function sendTestNotification(userId, customPhone = null) {
 /**
  * Mock Handler Setup for automated testing
  */
+function recordMockNotification(item) {
+  mockNotificationHistory.push({
+    outboxId: item.id,
+    recipient: item.recipient_phone,
+    eventType: item.event_type,
+    message: item.message_text,
+    timestamp: new Date().toISOString(),
+  });
+}
+
 function setMockHandler(handler) {
   mockHandler = handler;
 }
@@ -405,6 +409,7 @@ module.exports = {
   buildSyncFailureMessage,
   queueNotification,
   dispatchOutboxItem,
+  recordMockNotification,
   sendTestNotification,
   setMockHandler,
   resetMockHandler,

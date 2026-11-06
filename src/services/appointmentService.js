@@ -1,5 +1,9 @@
 const db = require('../database/db');
 
+function getSalonAppointmentService() {
+  return require('./salonAppointmentService');
+}
+
 /**
  * Normalizes text removing accents and whitespace for fuzzy matching
  */
@@ -14,7 +18,7 @@ function norm(s) {
 }
 
 /**
- * Create a new appointment / reminder
+ * Create a new appointment / reminder delegating to unified salon appointment core
  */
 function createAppointment({
   userId = 1,
@@ -35,65 +39,66 @@ function createAppointment({
     throw new Error('Título e data/horário são obrigatórios para agendar um compromisso.');
   }
 
-  const finalDuration = Number(durationMin) || 45;
-  const calculatedEnd = endDateTime || new Date(new Date(startDateTime).getTime() + finalDuration * 60000).toISOString();
-
-  // Regra de Sobreposição sem conflitos: inicio_novo < fim_existente AND fim_novo > inicio_existente
-  const conflict = db.prepare(`
-    SELECT id, title, client_name, start_datetime, end_datetime
-    FROM appointments
-    WHERE user_id = ?
-      AND status NOT IN ('CANCELADO', 'CANCELLED')
-      AND (? IS NULL OR staff_id IS NULL OR staff_id = ?)
-      AND start_datetime < ?
-      AND end_datetime > ?
-    LIMIT 1
-  `).get(userId, staffId, staffId, calculatedEnd, startDateTime);
-
-  if (conflict) {
-    const err = new Error(`Conflito de horário detectado com compromisso existente: "${conflict.client_name || conflict.title}".`);
-    err.code = 'SLOT_CONFLICT';
-    throw err;
+  // Parse date and time from startDateTime
+  let dateStr = '';
+  let timeStr = '';
+  if (startDateTime.includes('T')) {
+    const [d, t] = startDateTime.split('T');
+    dateStr = d;
+    timeStr = t.substring(0, 5);
+  } else {
+    const dt = new Date(startDateTime);
+    dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
   }
 
-  const stmt = db.prepare(`
-    INSERT INTO appointments (
-      user_id, title, description, start_datetime, end_datetime, location, source_type,
-      service_id, staff_id, price, client_name, client_phone, duration_min, status
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'SCHEDULED')
-  `);
+  let finalDuration = Number(durationMin) || 45;
+  if (!durationMin && endDateTime) {
+    const sTime = new Date(startDateTime).getTime();
+    const eTime = new Date(endDateTime).getTime();
+    if (eTime > sTime) {
+      finalDuration = Math.round((eTime - sTime) / 60000);
+    }
+  }
 
-  const result = stmt.run(
-    userId,
-    title.trim(),
-    description || null,
-    startDateTime,
-    calculatedEnd,
-    location || null,
-    sourceType,
-    serviceId || null,
-    staffId || null,
-    price || null,
-    clientName || null,
-    clientPhone || null,
-    finalDuration
-  );
+  let resolvedClientName = clientName;
+  if (!resolvedClientName) {
+    if (title.includes('—')) {
+      resolvedClientName = title.split('—')[0].trim();
+    } else if (title.includes('-')) {
+      resolvedClientName = title.split('-')[0].trim();
+    } else {
+      resolvedClientName = title.trim();
+    }
+  }
+
+  const booked = getSalonAppointmentService().bookAppointmentSync(userId, {
+    clientName: resolvedClientName,
+    clientPhone: clientPhone || null,
+    serviceId: serviceId || null,
+    serviceName: title.trim(),
+    staffId: staffId || null,
+    date: dateStr,
+    time: timeStr,
+    durationMin: finalDuration,
+    origin: sourceType || 'whatsapp',
+  });
 
   return {
-    id: result.lastInsertRowid,
-    userId,
-    title: title.trim(),
-    description,
-    startDateTime,
-    endDateTime: calculatedEnd,
-    location,
-    serviceId,
-    staffId,
-    price,
-    clientName,
-    clientPhone,
-    durationMin: finalDuration,
-    status: 'SCHEDULED',
+    id: booked.id,
+    userId: booked.user_id,
+    title: booked.title,
+    description: booked.description || description || null,
+    startDateTime: booked.start_datetime,
+    endDateTime: booked.end_datetime,
+    location: location || null,
+    serviceId: booked.service_id,
+    staffId: booked.staff_id,
+    price: booked.price,
+    clientName: booked.client_name,
+    clientPhone: booked.client_phone,
+    durationMin: booked.duration_min,
+    status: booked.status,
   };
 }
 
@@ -222,9 +227,27 @@ function updateAppointment(id, userId, { title, description, startDateTime, endD
     throw new Error('Compromisso não encontrado para atualização.');
   }
 
+  if (startDateTime) {
+    let dateStr = '';
+    let timeStr = '';
+    if (startDateTime.includes('T')) {
+      const [d, t] = startDateTime.split('T');
+      dateStr = d;
+      timeStr = t.substring(0, 5);
+    } else {
+      const dt = new Date(startDateTime);
+      dateStr = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+      timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+    }
+
+    getSalonAppointmentService().rescheduleAppointment(id, userId, {
+      newDate: dateStr,
+      newTime: timeStr,
+      reason: 'Remarcado via WhatsApp',
+    }).catch?.(() => {});
+  }
+
   const newTitle = (title && typeof title === 'string' && title.trim()) ? title.trim() : existing.title;
-  const newStart = startDateTime || existing.start_datetime;
-  const newEnd = endDateTime || existing.end_datetime;
   const newLoc = (location !== undefined && location !== null && typeof location === 'string' && location.trim()) 
     ? location.trim() 
     : (location === null ? null : existing.location);
@@ -232,18 +255,11 @@ function updateAppointment(id, userId, { title, description, startDateTime, endD
     ? description.trim() 
     : (description === null ? null : existing.description);
 
-  // If time changed, reset reminder notification flags so user receives alerts for the new time!
-  const timeChanged = startDateTime && startDateTime !== existing.start_datetime;
-
   db.prepare(`
     UPDATE appointments
-    SET title = ?, description = ?, start_datetime = ?, end_datetime = ?, location = ?,
-        status = 'SCHEDULED',
-        notified_24h = CASE WHEN ? = 1 THEN 0 ELSE notified_24h END,
-        notified_3h  = CASE WHEN ? = 1 THEN 0 ELSE notified_3h END,
-        notified_1h  = CASE WHEN ? = 1 THEN 0 ELSE notified_1h END
+    SET title = ?, description = ?, location = ?, updated_at = CURRENT_TIMESTAMP
     WHERE id = ? AND user_id = ?
-  `).run(newTitle, newDesc, newStart, newEnd, newLoc, timeChanged ? 1 : 0, timeChanged ? 1 : 0, timeChanged ? 1 : 0, id, userId);
+  `).run(newTitle, newDesc, newLoc, id, userId);
 
   return db.prepare('SELECT * FROM appointments WHERE id = ?').get(id);
 }
@@ -257,7 +273,12 @@ function deleteAppointment(id, userId) {
     throw new Error('Compromisso não encontrado para cancelamento.');
   }
 
-  db.prepare(`UPDATE appointments SET status = 'CANCELLED' WHERE id = ? AND user_id = ?`).run(id, userId);
+  getSalonAppointmentService().cancelAppointment(id, userId, {
+    reason: 'Cancelado pelo usuário',
+    cancelledBy: 'WHATSAPP',
+  }).catch?.(() => {});
+
+  db.prepare(`UPDATE appointments SET status = 'CANCELADO' WHERE id = ? AND user_id = ?`).run(id, userId);
   return existing;
 }
 

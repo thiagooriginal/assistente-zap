@@ -129,9 +129,9 @@ function parseOpeningHours(rawHours) {
 }
 
 /**
- * Checks if a specific candidate slot is free from conflicts and compliant with business hours
+ * Fast synchronous check for internal business hours, staff days off, and SQLite conflict
  */
-async function checkSlotAvailability(userId, {
+function checkInternalSlotAvailability(userId, {
   startDt,
   endDt,
   staffId = null,
@@ -168,7 +168,6 @@ async function checkSlotAvailability(userId, {
     const salon = db.prepare('SELECT opening_hours FROM client_salons WHERE user_id = ?').get(userId);
     const hours = parseOpeningHours(salon?.opening_hours);
 
-    // Identificar dia da semana no fuso de São Paulo
     const dayOfWeek = startDate.getDay();
     const dayConfig = hours.days[dayOfWeek];
 
@@ -211,7 +210,6 @@ async function checkSlotAvailability(userId, {
       const lunchStartMin = lStartH * 60 + lStartM;
       const lunchEndMin = lEndH * 60 + lEndM;
 
-      // Se o agendamento sobrepõe com o almoço
       if (startMinutes < lunchEndMin && endMinutes > lunchStartMin) {
         return {
           available: false,
@@ -283,43 +281,77 @@ async function checkSlotAvailability(userId, {
     };
   }
 
-  // 5. Consulta de Disponibilidade no Google Calendar (se conectado)
-  try {
-    const googleStatus = googleCalendarService.getConnectionStatus(userId);
-    if (googleStatus.isConnected) {
-      const busySlots = await googleCalendarService.getGoogleBusySlots(userId, {
-        timeMin: startDt,
-        timeMax: endDt,
-      });
+  return { available: true };
+}
 
-      const slotStart = new Date(startDt).getTime();
-      const slotEnd = new Date(endDt).getTime();
+/**
+ * Asynchronously checks Google Calendar availability outside SQLite transactions with strict timeout
+ */
+async function checkGoogleAvailability(userId, { startDt, endDt, staffId = null, timeoutMs = 4000 }) {
+  const salon = db.prepare('SELECT google_require_sync_availability FROM client_salons WHERE user_id = ?').get(userId);
+  const isRequired = salon && salon.google_require_sync_availability === 1;
 
-      for (const b of busySlots) {
-        const bStart = new Date(b.start).getTime();
-        const bEnd = new Date(b.end).getTime();
-        if (slotStart < bEnd && slotEnd > bStart) {
-          return {
-            available: false,
-            reason: 'GOOGLE_CALENDAR_BUSY',
-            message: 'O horário selecionado está ocupado na Agenda Google do salão.',
-          };
-        }
-      }
-    }
-  } catch (err) {
-    console.warn(`[SalonAppointmentService] Erro ao consultar Google Calendar:`, err.message);
-    const salon = db.prepare('SELECT google_require_sync_availability FROM client_salons WHERE user_id = ?').get(userId);
-    if (salon && salon.google_require_sync_availability === 1) {
+  const googleStatus = googleCalendarService.getConnectionStatus(userId);
+  if (!googleStatus.isConnected) {
+    if (isRequired) {
       return {
         available: false,
-        reason: 'GOOGLE_SYNC_REQUIRED',
+        reason: 'GOOGLE_CALENDAR_UNAVAILABLE',
+        message: 'A verificação da agenda Google é obrigatória e a conta está desconectada ou inacessível.',
+      };
+    }
+    return { available: true };
+  }
+
+  try {
+    const queryPromise = googleCalendarService.getGoogleBusySlots(userId, {
+      timeMin: startDt,
+      timeMax: endDt,
+      staffId,
+    });
+
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Timeout na consulta do Google Calendar')), timeoutMs).unref?.();
+    });
+
+    const busySlots = await Promise.race([queryPromise, timeoutPromise]);
+
+    const slotStart = new Date(startDt).getTime();
+    const slotEnd = new Date(endDt).getTime();
+
+    for (const b of busySlots) {
+      const bStart = new Date(b.start).getTime();
+      const bEnd = new Date(b.end).getTime();
+      if (slotStart < bEnd && slotEnd > bStart) {
+        return {
+          available: false,
+          reason: 'GOOGLE_CALENDAR_BUSY',
+          message: 'O horário selecionado está ocupado na Agenda Google do salão ou profissional.',
+        };
+      }
+    }
+
+    return { available: true };
+  } catch (err) {
+    console.warn(`[SalonAppointmentService] Aviso na consulta Google Calendar:`, err.message);
+    if (isRequired) {
+      return {
+        available: false,
+        reason: 'GOOGLE_CALENDAR_UNAVAILABLE',
         message: 'A verificação da agenda Google é obrigatória e está temporariamente inacessível.',
       };
     }
+    return { available: true };
   }
+}
 
-  return { available: true };
+/**
+ * Checks if a specific candidate slot is free from conflicts and compliant with business hours
+ */
+async function checkSlotAvailability(userId, params) {
+  const internal = checkInternalSlotAvailability(userId, params);
+  if (!internal.available) return internal;
+  return checkGoogleAvailability(userId, params);
 }
 
 /**
@@ -353,7 +385,7 @@ async function findAlternativeSlots(userId, { date, serviceDurationMin = 45, sta
     const candidateEnd = new Date(new Date(candidateStart).getTime() + serviceDurationMin * 60000);
     const candidateEndStr = `${date}T${padZero(candidateEnd.getHours())}:${padZero(candidateEnd.getMinutes())}:${padZero(candidateEnd.getSeconds())}`;
 
-    const check = await checkSlotAvailability(userId, {
+    const check = checkInternalSlotAvailability(userId, {
       startDt: candidateStart,
       endDt: candidateEndStr,
       staffId,
@@ -373,9 +405,9 @@ async function findAlternativeSlots(userId, { date, serviceDurationMin = 45, sta
 }
 
 /**
- * Books an appointment atomically in SQLite, preventing race conditions via BEGIN IMMEDIATE
+ * Pure atomic synchronous booking inside SQLite transaction (BEGIN IMMEDIATE)
  */
-async function bookAppointment(userId, {
+function bookAppointmentSync(userId, {
   clientName,
   clientPhone,
   serviceId,
@@ -385,7 +417,6 @@ async function bookAppointment(userId, {
   time,
   durationMin = null,
   origin = 'painel',
-  status = 'AGENDADO',
 }) {
   if (!clientName || !clientName.trim()) {
     throw new Error('O nome do cliente é obrigatório.');
@@ -417,7 +448,19 @@ async function bookAppointment(userId, {
   const finalPrice = matchedService?.price !== undefined ? matchedService.price : 0.0;
 
   // 2. Resolução do Profissional (Staff)
-  const activeStaffList = db.prepare('SELECT id, name, specialty FROM client_staff WHERE user_id = ? AND active = 1 ORDER BY id ASC').all(userId);
+  let activeStaffList = db.prepare('SELECT id, name, active FROM client_staff WHERE user_id = ? AND active = 1 ORDER BY id ASC').all(userId);
+
+  if (activeStaffList.length === 0) {
+    const totalStaff = db.prepare('SELECT COUNT(*) as count FROM client_staff WHERE user_id = ?').get(userId)?.count || 0;
+    if (totalStaff === 0) {
+      try {
+        const clientAuth = require('./clientAuthService');
+        clientAuth.ensureSalonForUser(userId);
+        activeStaffList = db.prepare('SELECT id, name, active FROM client_staff WHERE user_id = ? AND active = 1 ORDER BY id ASC').all(userId);
+      } catch (_) {}
+    }
+  }
+
   let resolvedStaffId = staffId ? Number(staffId) : null;
   let resolvedStaffName = 'Profissional';
 
@@ -433,10 +476,15 @@ async function bookAppointment(userId, {
     // Seleciona automaticamente quando houver apenas 1 profissional disponível no salão
     resolvedStaffId = activeStaffList[0].id;
     resolvedStaffName = activeStaffList[0].name;
-  } else if (activeStaffList.length > 1) {
-    // Se não especificado, seleciona o primeiro disponível
-    resolvedStaffId = activeStaffList[0].id;
-    resolvedStaffName = activeStaffList[0].name;
+  } else if (activeStaffList.length === 0) {
+    const err = new Error('Nenhum profissional disponível para agendamento no momento.');
+    err.code = 'NO_ACTIVE_STAFF';
+    throw err;
+  } else {
+    // Mais de 1 profissional ativo sem seleção explícita -> exigir seleção
+    const err = new Error('Existem múltiplos profissionais disponíveis. Por favor, selecione um profissional para o agendamento.');
+    err.code = 'STAFF_REQUIRED';
+    throw err;
   }
 
   // 3. Cálculo de Início e Término
@@ -455,16 +503,11 @@ async function bookAppointment(userId, {
   } catch (lockErr) {
     const err = new Error('O horário está em processo de reserva por outra requisição concorrente. Tente novamente em instantes.');
     err.code = 'SLOT_CONFLICT';
-    try {
-      err.suggestedSlots = await findAlternativeSlots(userId, { date, serviceDurationMin: finalDurationMin, staffId: resolvedStaffId });
-    } catch (_) {
-      err.suggestedSlots = [];
-    }
     throw err;
   }
+
   try {
-    // Validação de Conflito dentro da Transação
-    const check = await checkSlotAvailability(userId, {
+    const check = checkInternalSlotAvailability(userId, {
       startDt,
       endDt,
       staffId: resolvedStaffId,
@@ -472,20 +515,14 @@ async function bookAppointment(userId, {
 
     if (!check.available) {
       db.exec('ROLLBACK');
-      const alternatives = await findAlternativeSlots(userId, {
-        date,
-        serviceDurationMin: finalDurationMin,
-        staffId: resolvedStaffId,
-      });
-
       const err = new Error(check.message);
       err.code = check.reason || 'SLOT_CONFLICT';
-      err.suggestedSlots = alternatives;
       throw err;
     }
 
     const title = `${clientName.trim()} — ${finalServiceName}`;
     const description = `Agendado via ${origin} para ${resolvedStaffName} (Duração: ${finalDurationMin} min)`;
+    const status = 'AGENDADO';
 
     const stmt = db.prepare(`
       INSERT INTO appointments (
@@ -550,50 +587,80 @@ async function bookAppointment(userId, {
       google_sync_status: 'PENDING',
     };
 
-    // 5. Disparos Desacoplados de Integração (Google Calendar & WhatsApp)
-    setImmediate(async () => {
-      try {
-        // Sincronização Google Calendar
-        const gStatus = googleCalendarService.getConnectionStatus(userId);
-        if (gStatus.isConnected) {
-          try {
-            await googleCalendarService.createCalendarEvent(userId, createdAppointment);
-          } catch (gErr) {
-            console.warn(`[SalonAppointmentService] Aviso na sincronização Google do agendamento #${appointmentId}:`, gErr.message);
-            try {
-              db.prepare(`
-                UPDATE appointments
-                SET google_sync_status = 'FAILED', google_sync_error = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-              `).run(gErr.message, appointmentId);
-            } catch (_) {}
-            // Notificar dona do salão sobre a falha se configurado
-            await salonNotificationService.queueNotification(userId, appointmentId, 'SYNC_FAILURE', {
-              clientName: clientName.trim(),
-              serviceName: finalServiceName,
-              staffName: resolvedStaffName,
-              startDt,
-              error: gErr.message,
-            });
-          }
-        }
+    // Enfileirar notificação WhatsApp e notificar o worker
+    salonNotificationService.queueNotification(userId, appointmentId, 'NEW_APPOINTMENT', {
+      clientName: clientName.trim(),
+      serviceName: finalServiceName,
+      staffName: resolvedStaffName,
+      startDt,
+      endDt,
+    }).catch?.(() => {});
 
-        // Notificação no WhatsApp da Responsável
-        await salonNotificationService.queueNotification(userId, appointmentId, 'NEW_APPOINTMENT', {
-          clientName: clientName.trim(),
-          serviceName: finalServiceName,
-          staffName: resolvedStaffName,
-          startDt,
-          endDt,
-        });
-      } catch (postErr) {
-        console.warn(`[SalonAppointmentService] Aviso no processamento posterior do agendamento #${appointmentId}:`, postErr.message);
-      }
-    });
+    const outboxWorker = require('./outboxWorker');
+    outboxWorker.notify();
 
     return createdAppointment;
   } catch (err) {
     try { db.exec('ROLLBACK'); } catch (_) {}
+    throw err;
+  }
+}
+
+/**
+ * Books an appointment with external Google Pre-check outside SQLite transaction
+ */
+async function bookAppointment(userId, params) {
+  const { date, time, durationMin, serviceId, staffId } = params;
+
+  let calcDuration = Number(durationMin) || 45;
+  if (serviceId) {
+    const sRow = db.prepare('SELECT duration_min FROM client_services WHERE id = ? AND user_id = ?').get(serviceId, userId);
+    if (sRow?.duration_min) calcDuration = sRow.duration_min;
+  }
+
+  const startDt = `${date}T${time.length === 5 ? time + ':00' : time}`;
+  const startDate = new Date(startDt);
+  if (!isNaN(startDate.getTime())) {
+    const endDate = new Date(startDate.getTime() + calcDuration * 60000);
+    const endDt = `${endDate.getFullYear()}-${padZero(endDate.getMonth() + 1)}-${padZero(endDate.getDate())}T${padZero(endDate.getHours())}:${padZero(endDate.getMinutes())}:${padZero(endDate.getSeconds())}`;
+
+    // 1. Consulta ao Google Calendar FORA da transação SQLite com timeout
+    const gCheck = await checkGoogleAvailability(userId, {
+      startDt,
+      endDt,
+      staffId: staffId ? Number(staffId) : null,
+      timeoutMs: 4000,
+    });
+
+    if (!gCheck.available) {
+      const err = new Error(gCheck.message);
+      err.code = gCheck.reason || 'GOOGLE_CALENDAR_BUSY';
+      try {
+        err.suggestedSlots = await findAlternativeSlots(userId, { date, serviceDurationMin: calcDuration, staffId });
+      } catch (_) {
+        err.suggestedSlots = [];
+      }
+      throw err;
+    }
+  }
+
+  // 2. Execução atômica no SQLite
+  try {
+    const createdAppointment = bookAppointmentSync(userId, params);
+
+    // Se estiver em ambiente com mock ou testes síncronos, processa o outbox imediatamente
+    const outboxWorker = require('./outboxWorker');
+    await outboxWorker.processAllPending().catch(() => {});
+
+    return createdAppointment;
+  } catch (err) {
+    if (err.code === 'SLOT_CONFLICT' && !err.suggestedSlots) {
+      try {
+        err.suggestedSlots = await findAlternativeSlots(userId, { date, serviceDurationMin: calcDuration, staffId });
+      } catch (_) {
+        err.suggestedSlots = [];
+      }
+    }
     throw err;
   }
 }
@@ -780,7 +847,9 @@ function updateAppointmentStatus(appointmentId, userId, newStatus, reason = '', 
   const cleanStatus = newStatus ? newStatus.toUpperCase().trim() : '';
 
   if (!allowed.includes(cleanStatus)) {
-    throw new Error(`Status inválido. Escolha entre: ${allowed.join(', ')}`);
+    const err = new Error(`Status inválido. Escolha entre: ${allowed.join(', ')}`);
+    err.code = 'INVALID_STATUS';
+    throw err;
   }
 
   const existing = db.prepare('SELECT * FROM appointments WHERE id = ? AND user_id = ?').get(appointmentId, userId);
@@ -941,8 +1010,11 @@ function detectAndFlagHistoricalConflicts(userId) {
 
 module.exports = {
   parseOpeningHours,
+  checkInternalSlotAvailability,
+  checkGoogleAvailability,
   checkSlotAvailability,
   findAlternativeSlots,
+  bookAppointmentSync,
   bookAppointment,
   rescheduleAppointment,
   cancelAppointment,

@@ -906,6 +906,18 @@ try {
     CREATE INDEX IF NOT EXISTS idx_appointments_user_staff_dates ON appointments(user_id, staff_id, start_datetime, end_datetime);
     CREATE INDEX IF NOT EXISTS idx_appointments_google_sync ON appointments(google_sync_status);
   `);
+
+  // Colunas de suporte a resiliência e concorrência das filas outbox
+  ensureColumnExists('google_sync_outbox', 'max_attempts', 'INTEGER DEFAULT 5');
+  ensureColumnExists('google_sync_outbox', 'next_retry_at', 'TEXT');
+  ensureColumnExists('google_sync_outbox', 'locked_at', 'TEXT');
+  ensureColumnExists('google_sync_outbox', 'idempotency_key', 'TEXT');
+
+  ensureColumnExists('whatsapp_notification_outbox', 'max_attempts', 'INTEGER DEFAULT 5');
+  ensureColumnExists('whatsapp_notification_outbox', 'next_retry_at', 'TEXT');
+  ensureColumnExists('whatsapp_notification_outbox', 'locked_at', 'TEXT');
+  ensureColumnExists('whatsapp_notification_outbox', 'dedup_hash', 'TEXT');
+  ensureColumnExists('whatsapp_notification_outbox', 'is_simulated', 'INTEGER DEFAULT 0');
 } catch (e) {
   console.warn('[Database] Aviso ao inicializar tabelas da Agenda Inteligente:', e.message);
 }

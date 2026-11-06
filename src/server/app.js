@@ -3379,6 +3379,13 @@ app.use((err, req, res, next) => {
 });
 
 function startServer(port = 3333) {
+  try {
+    const outboxWorker = require('../services/outboxWorker');
+    outboxWorker.startWorker();
+  } catch (err) {
+    console.warn('[OutboxWorker] Aviso ao iniciar worker de outbox:', err.message);
+  }
+
   return new Promise((resolve) => {
     const server = app.listen(port, () => {
       console.log(`\n📊 Dashboard financeiro Multi-Tenant disponível em: http://localhost:${port}`);

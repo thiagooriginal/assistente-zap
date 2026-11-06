@@ -2082,9 +2082,21 @@ async function handleIncomingMessage(sock, msg) {
         await sock.sendMessage(targetJid, { text: responseText });
       } catch (err) {
         console.error('Erro ao agendar compromisso:', err);
-        if (err.code === 'SLOT_CONFLICT') {
+        if (err.code === 'SLOT_CONFLICT' || err.code === 'GOOGLE_CALENDAR_BUSY') {
           await sock.sendMessage(targetJid, {
             text: `⚠️ *Horário Indisponível!*\n\nNão foi possível agendar para este horário pois já existe outro compromisso marcado.\n\nPor favor, escolha outro horário ou dia! 😊`,
+          });
+          return;
+        }
+        if (err.code === 'STAFF_REQUIRED') {
+          await sock.sendMessage(targetJid, {
+            text: `💇 *Seleção de Profissional Necessária!*\n\nTemos mais de um profissional disponível. Por favor, especifique com qual profissional você deseja agendar! 😊`,
+          });
+          return;
+        }
+        if (err.code === 'NO_ACTIVE_STAFF') {
+          await sock.sendMessage(targetJid, {
+            text: `⚠️ *Salão Indisponível!*\n\nNão há nenhum profissional ativo disponível para agendamento no momento.`,
           });
           return;
         }

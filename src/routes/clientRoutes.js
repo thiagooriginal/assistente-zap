@@ -1274,7 +1274,12 @@ router.post('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA
       'PAST_DATETIME',
       'SERVICE_INACTIVE',
       'STAFF_NOT_FOUND',
+      'STAFF_REQUIRED',
+      'NO_ACTIVE_STAFF',
+      'GOOGLE_CALENDAR_UNAVAILABLE',
+      'GOOGLE_SYNC_REQUIRED',
       'INVALID_DATES',
+      'INVALID_STATUS',
     ].includes(err.code);
 
     res.status(isBadRequest ? 400 : 500).json({
@@ -1330,7 +1335,8 @@ router.patch('/appointments/:id/status', clientAuthMiddleware, requireProductAcc
     const result = salonAppointmentService.updateAppointmentStatus(id, req.clientUser.id, status, reason, 'SALON_USER');
     res.json({ success: true, ...result, message: `Status alterado para ${result.status} com sucesso!` });
   } catch (err) {
-    res.status(err.code === 'NOT_FOUND' ? 404 : 400).json({ success: false, error: err.message });
+    const statusCode = err.code === 'NOT_FOUND' ? 404 : 400;
+    res.status(statusCode).json({ success: false, code: err.code || 'INVALID_STATUS', error: err.message });
   }
 });
 

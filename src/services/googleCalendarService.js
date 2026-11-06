@@ -21,10 +21,13 @@ let mockHandler = null;
  * Derives a 32-byte AES key from environment secrets
  */
 function getEncryptionKey() {
-  const secret = process.env.MFA_ENCRYPTION_KEY 
-    || process.env.SESSION_SECRET 
-    || process.env.CLIENT_AUTH_SECRET 
-    || 'raia-google-calendar-secure-key-fallback';
+  const secret = process.env.GOOGLE_CALENDAR_ENCRYPTION_KEY 
+    || process.env.MFA_ENCRYPTION_KEY;
+  if (!secret || typeof secret !== 'string' || secret.trim().length < 16) {
+    const err = new Error('MISSING_ENCRYPTION_KEY: GOOGLE_CALENDAR_ENCRYPTION_KEY obrigatória não configurada.');
+    err.code = 'MISSING_ENCRYPTION_KEY';
+    throw err;
+  }
   return crypto.createHash('sha256').update(secret.trim()).digest();
 }
 
@@ -49,32 +52,28 @@ function encryptTokens(tokensObj) {
 function decryptTokens(encryptedText) {
   if (!encryptedText) return null;
   if (!encryptedText.startsWith('aes-256-gcm:v1:')) {
-    // Legacy / unencrypted JSON fallback
-    try {
-      return JSON.parse(encryptedText);
-    } catch (_) {
-      return null;
-    }
+    const err = new Error('INVALID_TOKEN_FORMAT: Formato de token não criptografado rejeitado por política de segurança.');
+    err.code = 'INVALID_TOKEN_FORMAT';
+    throw err;
   }
 
   const parts = encryptedText.split(':');
-  if (parts.length !== 5) return null;
+  if (parts.length !== 5) {
+    const err = new Error('INVALID_TOKEN_FORMAT: Estrutura inválida de token encriptado.');
+    err.code = 'INVALID_TOKEN_FORMAT';
+    throw err;
+  }
 
   const iv = Buffer.from(parts[2], 'hex');
   const authTag = Buffer.from(parts[3], 'hex');
   const ciphertext = parts[4];
   const key = getEncryptionKey();
 
-  try {
-    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAuthTag(authTag);
-    let decrypted = decipher.update(ciphertext, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return JSON.parse(decrypted);
-  } catch (err) {
-    console.error('[GoogleCalendarService] Falha ao descriptografar tokens:', err.message);
-    return null;
-  }
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(authTag);
+  let decrypted = decipher.update(ciphertext, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  return JSON.parse(decrypted);
 }
 
 /**
@@ -194,9 +193,9 @@ function generateAuthUrl(userId) {
 /**
  * Handles OAuth callback, validating Anti-CSRF state and saving tokens
  */
-async function handleOAuthCallback(code, state) {
+async function handleOAuthCallback(code, state, authenticatedUserId = null) {
   if (mockHandler?.handleOAuthCallback) {
-    return mockHandler.handleOAuthCallback(code, state);
+    return mockHandler.handleOAuthCallback(code, state, authenticatedUserId);
   }
 
   // 1. Validar Anti-CSRF State
@@ -211,6 +210,10 @@ async function handleOAuthCallback(code, state) {
   }
 
   const userId = stateRow.user_id;
+  if (authenticatedUserId && Number(authenticatedUserId) !== Number(userId)) {
+    db.prepare('DELETE FROM oauth_states WHERE state = ?').run(state);
+    throw new Error('Tentativa de vinculação cruzada entre contas de salões rejeitada por segurança.');
+  }
   db.prepare('DELETE FROM oauth_states WHERE state = ?').run(state);
 
   // 2. Trocar código por tokens
@@ -419,15 +422,25 @@ async function testConnection(userId) {
 /**
  * Queries busy slots from Google Calendar to prevent scheduling conflicts
  */
-async function getGoogleBusySlots(userId, { timeMin, timeMax, calendarId = null }) {
+async function getGoogleBusySlots(userId, { timeMin, timeMax, calendarId = null, staffId = null }) {
   if (mockHandler?.getGoogleBusySlots) {
-    return mockHandler.getGoogleBusySlots(userId, { timeMin, timeMax, calendarId });
+    return mockHandler.getGoogleBusySlots(userId, { timeMin, timeMax, calendarId, staffId });
   }
 
   const status = getConnectionStatus(userId);
   if (!status.isConnected) return [];
 
-  const calId = calendarId || status.selectedCalendarId || 'primary';
+  let calId = calendarId;
+  if (!calId && status.syncMode === 'STAFF' && staffId) {
+    const staffRow = db.prepare('SELECT google_calendar_id FROM client_staff WHERE id = ? AND user_id = ?').get(staffId, userId);
+    if (staffRow?.google_calendar_id) {
+      calId = staffRow.google_calendar_id;
+    }
+  }
+  if (!calId) {
+    calId = status.selectedCalendarId || 'primary';
+  }
+
   const oauth2 = getOAuth2Client(userId);
   const calendar = google.calendar({ version: 'v3', auth: oauth2 });
 
@@ -469,7 +482,17 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
     return { success: false, reason: 'GOOGLE_NOT_CONNECTED' };
   }
 
-  const calId = targetCalendarId || status.selectedCalendarId || 'primary';
+  let calId = targetCalendarId;
+  if (!calId && status.syncMode === 'STAFF' && appointment.staff_id) {
+    const staffRow = db.prepare('SELECT google_calendar_id FROM client_staff WHERE id = ? AND user_id = ?').get(appointment.staff_id, userId);
+    if (staffRow?.google_calendar_id) {
+      calId = staffRow.google_calendar_id;
+    }
+  }
+  if (!calId) {
+    calId = status.selectedCalendarId || 'primary';
+  }
+
   const oauth2 = getOAuth2Client(userId);
   const calendar = google.calendar({ version: 'v3', auth: oauth2 });
 
@@ -544,7 +567,17 @@ async function updateCalendarEvent(userId, googleEventId, appointment, targetCal
     return { success: false, reason: 'GOOGLE_NOT_CONNECTED_OR_MISSING_ID' };
   }
 
-  const calId = targetCalendarId || appointment.google_calendar_id || status.selectedCalendarId || 'primary';
+  let calId = targetCalendarId || appointment.google_calendar_id;
+  if (!calId && status.syncMode === 'STAFF' && appointment.staff_id) {
+    const staffRow = db.prepare('SELECT google_calendar_id FROM client_staff WHERE id = ? AND user_id = ?').get(appointment.staff_id, userId);
+    if (staffRow?.google_calendar_id) {
+      calId = staffRow.google_calendar_id;
+    }
+  }
+  if (!calId) {
+    calId = status.selectedCalendarId || 'primary';
+  }
+
   const oauth2 = getOAuth2Client(userId);
   const calendar = google.calendar({ version: 'v3', auth: oauth2 });
 
@@ -588,7 +621,7 @@ async function updateCalendarEvent(userId, googleEventId, appointment, targetCal
       WHERE id = ? AND user_id = ?
     `).run(appointment.id, userId);
 
-    return { success: true, googleEventId };
+    return { success: true, googleEventId, calendarId: calId };
   } catch (err) {
     const errMsg = err.message || 'Falha ao atualizar evento no Google Calendar';
     db.prepare(`
