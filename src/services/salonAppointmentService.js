@@ -405,6 +405,64 @@ async function findAlternativeSlots(userId, { date, serviceDurationMin = 45, sta
 }
 
 /**
+ * Resolves the effective staff for an appointment:
+ * - If staffId is specified, verifies it exists in client_staff, belongs to the salon and is active.
+ * - If only 1 staff is active in the salon, automatically selects that staff.
+ * - If 0 staff are active, throws NO_ACTIVE_STAFF.
+ * - If > 1 staff are active and no staffId was specified, throws STAFF_REQUIRED.
+ */
+function resolveEffectiveStaff(userId, staffId = null) {
+  let activeStaffList = db.prepare('SELECT id, name, active, google_calendar_id FROM client_staff WHERE user_id = ? AND active = 1 ORDER BY id ASC').all(userId);
+
+  if (activeStaffList.length === 0) {
+    const totalStaff = db.prepare('SELECT COUNT(*) as count FROM client_staff WHERE user_id = ?').get(userId)?.count || 0;
+    if (totalStaff === 0) {
+      try {
+        const clientAuth = require('./clientAuthService');
+        clientAuth.ensureSalonForUser(userId);
+        activeStaffList = db.prepare('SELECT id, name, active, google_calendar_id FROM client_staff WHERE user_id = ? AND active = 1 ORDER BY id ASC').all(userId);
+      } catch (_) {}
+    }
+  }
+
+  let resolvedStaffId = staffId ? Number(staffId) : null;
+  let resolvedStaffName = 'Profissional';
+  let resolvedStaffGoogleCalId = null;
+
+  if (resolvedStaffId) {
+    const matchedStaff = activeStaffList.find((s) => s.id === resolvedStaffId);
+    if (!matchedStaff) {
+      const err = new Error('Profissional selecionado não pertence ao salão ou está inativo.');
+      err.code = 'STAFF_NOT_FOUND';
+      throw err;
+    }
+    resolvedStaffName = matchedStaff.name;
+    resolvedStaffGoogleCalId = matchedStaff.google_calendar_id || null;
+  } else if (activeStaffList.length === 1) {
+    // Seleciona automaticamente quando houver apenas 1 profissional disponível no salão
+    resolvedStaffId = activeStaffList[0].id;
+    resolvedStaffName = activeStaffList[0].name;
+    resolvedStaffGoogleCalId = activeStaffList[0].google_calendar_id || null;
+  } else if (activeStaffList.length === 0) {
+    const err = new Error('Nenhum profissional disponível para agendamento no momento.');
+    err.code = 'NO_ACTIVE_STAFF';
+    throw err;
+  } else {
+    // Mais de 1 profissional ativo sem seleção explícita -> exigir seleção
+    const err = new Error('Existem múltiplos profissionais disponíveis. Por favor, selecione um profissional para o agendamento.');
+    err.code = 'STAFF_REQUIRED';
+    err.availableStaff = activeStaffList.map((s) => ({ id: s.id, name: s.name }));
+    throw err;
+  }
+
+  return {
+    staffId: resolvedStaffId,
+    staffName: resolvedStaffName,
+    googleCalendarId: resolvedStaffGoogleCalId,
+  };
+}
+
+/**
  * Pure atomic synchronous booking inside SQLite transaction (BEGIN IMMEDIATE)
  */
 function bookAppointmentSync(userId, {
@@ -447,45 +505,10 @@ function bookAppointmentSync(userId, {
   const finalServiceName = matchedService?.name || (serviceName ? serviceName.trim() : 'Atendimento Geral');
   const finalPrice = matchedService?.price !== undefined ? matchedService.price : 0.0;
 
-  // 2. Resolução do Profissional (Staff)
-  let activeStaffList = db.prepare('SELECT id, name, active FROM client_staff WHERE user_id = ? AND active = 1 ORDER BY id ASC').all(userId);
-
-  if (activeStaffList.length === 0) {
-    const totalStaff = db.prepare('SELECT COUNT(*) as count FROM client_staff WHERE user_id = ?').get(userId)?.count || 0;
-    if (totalStaff === 0) {
-      try {
-        const clientAuth = require('./clientAuthService');
-        clientAuth.ensureSalonForUser(userId);
-        activeStaffList = db.prepare('SELECT id, name, active FROM client_staff WHERE user_id = ? AND active = 1 ORDER BY id ASC').all(userId);
-      } catch (_) {}
-    }
-  }
-
-  let resolvedStaffId = staffId ? Number(staffId) : null;
-  let resolvedStaffName = 'Profissional';
-
-  if (resolvedStaffId) {
-    const matchedStaff = activeStaffList.find((s) => s.id === resolvedStaffId);
-    if (!matchedStaff) {
-      const err = new Error('Profissional selecionado não pertence ao salão ou está inativo.');
-      err.code = 'STAFF_NOT_FOUND';
-      throw err;
-    }
-    resolvedStaffName = matchedStaff.name;
-  } else if (activeStaffList.length === 1) {
-    // Seleciona automaticamente quando houver apenas 1 profissional disponível no salão
-    resolvedStaffId = activeStaffList[0].id;
-    resolvedStaffName = activeStaffList[0].name;
-  } else if (activeStaffList.length === 0) {
-    const err = new Error('Nenhum profissional disponível para agendamento no momento.');
-    err.code = 'NO_ACTIVE_STAFF';
-    throw err;
-  } else {
-    // Mais de 1 profissional ativo sem seleção explícita -> exigir seleção
-    const err = new Error('Existem múltiplos profissionais disponíveis. Por favor, selecione um profissional para o agendamento.');
-    err.code = 'STAFF_REQUIRED';
-    throw err;
-  }
+  // 2. Resolução do Profissional Efetivo (Staff)
+  const effectiveStaff = resolveEffectiveStaff(userId, staffId);
+  const resolvedStaffId = effectiveStaff.staffId;
+  const resolvedStaffName = effectiveStaff.staffName;
 
   // 3. Cálculo de Início e Término
   const startDt = `${date}T${time.length === 5 ? time + ':00' : time}`;
@@ -613,6 +636,11 @@ function bookAppointmentSync(userId, {
 async function bookAppointment(userId, params) {
   const { date, time, durationMin, serviceId, staffId } = params;
 
+  // 1. Resolver o profissional efetivo ANTES da consulta de disponibilidade Google
+  // Inclui seleção automática quando existe apenas 1 profissional e rejeição se STAFF_REQUIRED/NO_ACTIVE_STAFF
+  const effectiveStaff = resolveEffectiveStaff(userId, staffId);
+  const resolvedStaffId = effectiveStaff.staffId;
+
   let calcDuration = Number(durationMin) || 45;
   if (serviceId) {
     const sRow = db.prepare('SELECT duration_min FROM client_services WHERE id = ? AND user_id = ?').get(serviceId, userId);
@@ -625,11 +653,12 @@ async function bookAppointment(userId, params) {
     const endDate = new Date(startDate.getTime() + calcDuration * 60000);
     const endDt = `${endDate.getFullYear()}-${padZero(endDate.getMonth() + 1)}-${padZero(endDate.getDate())}T${padZero(endDate.getHours())}:${padZero(endDate.getMinutes())}:${padZero(endDate.getSeconds())}`;
 
-    // 1. Consulta ao Google Calendar FORA da transação SQLite com timeout
+    // 2. Consulta ao Google Calendar FORA da transação SQLite com timeout
+    // Em modalidade STAFF, consulta necessariamente o calendário desse profissional
     const gCheck = await checkGoogleAvailability(userId, {
       startDt,
       endDt,
-      staffId: staffId ? Number(staffId) : null,
+      staffId: resolvedStaffId,
       timeoutMs: 4000,
     });
 
@@ -637,7 +666,7 @@ async function bookAppointment(userId, params) {
       const err = new Error(gCheck.message);
       err.code = gCheck.reason || 'GOOGLE_CALENDAR_BUSY';
       try {
-        err.suggestedSlots = await findAlternativeSlots(userId, { date, serviceDurationMin: calcDuration, staffId });
+        err.suggestedSlots = await findAlternativeSlots(userId, { date, serviceDurationMin: calcDuration, staffId: resolvedStaffId });
       } catch (_) {
         err.suggestedSlots = [];
       }
@@ -645,9 +674,12 @@ async function bookAppointment(userId, params) {
     }
   }
 
-  // 2. Execução atômica no SQLite
+  // 3. Execução atômica no SQLite passando o profissional já resolvido
   try {
-    const createdAppointment = bookAppointmentSync(userId, params);
+    const createdAppointment = bookAppointmentSync(userId, {
+      ...params,
+      staffId: resolvedStaffId,
+    });
 
     // Se estiver em ambiente com mock ou testes síncronos, processa o outbox imediatamente
     const outboxWorker = require('./outboxWorker');
@@ -1012,6 +1044,7 @@ function detectAndFlagHistoricalConflicts(userId) {
 }
 
 module.exports = {
+  resolveEffectiveStaff,
   parseOpeningHours,
   checkInternalSlotAvailability,
   checkGoogleAvailability,

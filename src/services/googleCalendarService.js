@@ -213,8 +213,17 @@ async function handleOAuthCallback(code, state, authenticatedUserId = null) {
     throw err;
   }
 
+  // 2. Rejeitar callbacks sem sessão autenticada válida
+  if (!authenticatedUserId) {
+    db.prepare('DELETE FROM oauth_states WHERE state = ?').run(state);
+    const err = new Error('Autenticação de sessão obrigatória para concluir vinculação OAuth.');
+    err.code = 'UNAUTHORIZED_OAUTH_CALLBACK';
+    throw err;
+  }
+
+  // 3. Exigir estrita correspondência entre usuário autenticado e proprietário do state
   const userId = stateRow.user_id;
-  if (authenticatedUserId && Number(authenticatedUserId) !== Number(userId)) {
+  if (Number(authenticatedUserId) !== Number(userId)) {
     db.prepare('DELETE FROM oauth_states WHERE state = ?').run(state);
     const err = new Error('Tentativa de vinculação cruzada entre contas de salões rejeitada por segurança.');
     err.code = 'CROSS_SALON_LINKING_REJECTED';
@@ -507,7 +516,15 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
   const staffName = appointment.staff_name || 'Profissional';
   const duration = appointment.duration_min || 45;
 
+  // Identificador determinístico estável compatível com RFC 4648 Base32Hex da API Google Calendar
+  const stableEventId = crypto
+    .createHash('sha256')
+    .update(`raia_salon_event_${userId}_${appointment.id}`)
+    .digest('hex')
+    .substring(0, 32);
+
   const eventPayload = {
+    id: stableEventId,
     summary: `${clientName} — ${serviceName} (${staffName})`,
     description: `Agendamento RAIA Agentes Jéssica\n\n` +
       `👤 Cliente: ${clientName}\n` +
@@ -532,7 +549,30 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
     },
   };
 
-  // Reconciliação determinística: verificar se o evento já existe no Google antes de criar novo
+  // Reconciliação determinística 1: buscar diretamente pelo identificador estável no Google
+  try {
+    const existingEv = await calendar.events.get({
+      calendarId: calId,
+      eventId: stableEventId,
+    });
+    if (existingEv?.data && existingEv.data.status !== 'cancelled') {
+      db.prepare(`
+        UPDATE appointments
+        SET google_event_id = ?,
+            google_calendar_id = ?,
+            google_sync_status = 'SYNCED',
+            google_sync_error = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND user_id = ?
+      `).run(stableEventId, calId, appointment.id, userId);
+
+      return { success: true, googleEventId: stableEventId, calendarId: calId, reconciled: true };
+    }
+  } catch (_) {
+    // 404 esperado quando o evento ainda não existe no Google
+  }
+
+  // Reconciliação determinística 2: busca por query e propriedades estendidas
   try {
     const listRes = await calendar.events.list({
       calendarId: calId,
@@ -540,8 +580,9 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
       maxResults: 5,
     });
     const found = (listRes.data.items || []).find((ev) => 
-      (ev.description && ev.description.includes(`ID do Agendamento: #${appointment.id}`)) ||
-      (ev.extendedProperties?.private?.raia_appointment_id === String(appointment.id))
+      ev.status !== 'cancelled' &&
+      ((ev.description && ev.description.includes(`ID do Agendamento: #${appointment.id}`)) ||
+       (ev.extendedProperties?.private?.raia_appointment_id === String(appointment.id)))
     );
     if (found) {
       db.prepare(`
@@ -566,7 +607,7 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
       requestBody: eventPayload,
     });
 
-    const googleEventId = res.data.id;
+    const googleEventId = res.data.id || stableEventId;
 
     db.prepare(`
       UPDATE appointments
@@ -580,6 +621,21 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
 
     return { success: true, googleEventId, calendarId: calId };
   } catch (err) {
+    // Se o evento já existe (409 Conflict), reconcilia imediatamente vinculando o stableEventId
+    if (err.code === 409 || err.message?.includes('already exists') || err.message?.includes('409')) {
+      db.prepare(`
+        UPDATE appointments
+        SET google_event_id = ?,
+            google_calendar_id = ?,
+            google_sync_status = 'SYNCED',
+            google_sync_error = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ? AND user_id = ?
+      `).run(stableEventId, calId, appointment.id, userId);
+
+      return { success: true, googleEventId: stableEventId, calendarId: calId, reconciled: true };
+    }
+
     const errMsg = err.message || 'Falha ao criar evento no Google Calendar';
     db.prepare(`
       UPDATE appointments

@@ -1,5 +1,5 @@
 /**
- * RAIA AGENTES — SUÍTE DE AUDITORIA CORRETIVA FINAL DA AGENDA INTELIGENTE (19 TESTES)
+ * RAIA AGENTES — SUÍTE DE AUDITORIA CORRETIVA FINAL DA AGENDA INTELIGENTE (22 TESTES)
  * 
  * Verificações obrigatórias de segurança, concorrência, unificação e resiliência:
  * 1. Agendamento iniciado pelo WhatsApp e sincronizado com o motor central.
@@ -16,12 +16,21 @@
  * 12. Falta de chave criptográfica obrigatória (fail-closed).
  * 13. Compatibilidade com reservas históricas e status legados.
  * 14. Teste ponta a ponta: confirmação, gravação, outbox Google processado e WhatsApp simulado.
+ * 15. Segurança OAuth: sessão ausente, expirada e vinculação cruzada.
+ * 16. WhatsApp valida Google Calendar antes de confirmar.
+ * 17. Outbox durável em remarcação e cancelamento.
+ * 18. Status AGENDADO/SCHEDULED e concorrência no updateAppointment.
+ * 19. Reconciliação determinística no Google Calendar.
+ * 20. Resolução prévia de profissional efetivo e consulta individual em modalidade STAFF.
+ * 21. Idempotência de eventos Google com identificador estável e crash recovery.
+ * 22. Auditoria da rota legada POST /api/appointments impedindo bypass do Google para salões.
  */
 
 process.env.NODE_ENV = 'test';
 process.env.APP_MODE = 'test';
 process.env.ALLOW_WHATSAPP_SENDING = 'false';
 process.env.GOOGLE_CALENDAR_ENCRYPTION_KEY = 'raia-segredo-super-forte-de-32-bytes-para-testes!';
+process.env.ADMIN_PASSWORD = 'raia-segredo-super-forte-admin-123456!';
 
 const assert = require('assert');
 const crypto = require('crypto');
@@ -50,7 +59,7 @@ const mockGoogleState = {
 
 async function setup() {
   console.log('================================================================');
-  console.log('   RAIA AGENTES — AUDITORIA FINAL DA AGENDA INTELIGENTE (19 TESTES)');
+  console.log('   RAIA AGENTES — AUDITORIA FINAL DA AGENDA INTELIGENTE (22 TESTES)');
   console.log('================================================================\n');
 
   // Configurar Mocks determinísticos
@@ -81,7 +90,24 @@ async function setup() {
       }
       if (!cal) cal = mockGoogleState.selectedCalendarId || 'primary';
 
-      // Reconciliação determinística no mock: se evento já existe no Google, vincula sem duplicar
+      const crypto = require('crypto');
+      const stableEventId = crypto
+        .createHash('sha256')
+        .update(`raia_salon_event_${userId}_${appointment.id}`)
+        .digest('hex')
+        .substring(0, 32);
+
+      // Reconciliação determinística no mock por ID estável
+      if (mockGoogleState.events.has(stableEventId)) {
+        db.prepare(`
+          UPDATE appointments
+          SET google_event_id = ?, google_calendar_id = ?, google_sync_status = 'SYNCED', google_sync_error = NULL
+          WHERE id = ?
+        `).run(stableEventId, cal, appointment.id);
+        return { success: true, googleEventId: stableEventId, calendarId: cal, reconciled: true };
+      }
+
+      // Reconciliação determinística no mock por id do compromisso
       for (const [existingId, evData] of mockGoogleState.events.entries()) {
         if (evData.appointment.id === appointment.id) {
           db.prepare(`
@@ -94,7 +120,7 @@ async function setup() {
       }
 
       mockGoogleState.insertCallCount++;
-      const eventId = `g_event_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const eventId = stableEventId;
       mockGoogleState.events.set(eventId, { appointment, calendarId: cal });
 
       db.prepare(`
@@ -549,9 +575,45 @@ async function runTests() {
   console.log('  ✓ 14. Fluxo ponta a ponta validado com integridade entre reserva, Google e WhatsApp.\n');
 
   // ----------------------------------------------------
-  // TESTE 15: Segurança OAuth contra vinculação cruzada (CROSS_SALON_LINKING_REJECTED)
+  // TESTE 15: Segurança OAuth: sessão ausente, expirada e rejeição de vinculação cruzada
   // ----------------------------------------------------
-  console.log('[Teste 15] Segurança OAuth contra vinculação cruzada entre salões...');
+  console.log('[Teste 15] Segurança OAuth: sessão ausente, expirada e vinculação cruzada...');
+  
+  // 15.1 Rejeição de callback sem sessão válida (UNAUTHORIZED_OAUTH_CALLBACK)
+  const stateNoSession = `oauth_state_nosession_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO oauth_states (state, user_id, expires_at)
+    VALUES (?, ?, ?)
+  `).run(stateNoSession, testSalonUser.id, Date.now() + 600000);
+
+  let errNoSession = null;
+  try {
+    await googleCalendarService.handleOAuthCallback('fake_code', stateNoSession, null);
+  } catch (err) {
+    errNoSession = err;
+  }
+  assert(errNoSession);
+  assert.strictEqual(errNoSession.code, 'UNAUTHORIZED_OAUTH_CALLBACK');
+  assert(!db.prepare('SELECT * FROM oauth_states WHERE state = ?').get(stateNoSession), 'State deve ser deletado após rejeição de sessão ausente');
+
+  // 15.2 Rejeição de state expirado (STATE_EXPIRED)
+  const stateExpired = `oauth_state_expired_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO oauth_states (state, user_id, expires_at)
+    VALUES (?, ?, ?)
+  `).run(stateExpired, testSalonUser.id, Date.now() - 5000);
+
+  let errExpired = null;
+  try {
+    await googleCalendarService.handleOAuthCallback('fake_code', stateExpired, testSalonUser.id);
+  } catch (err) {
+    errExpired = err;
+  }
+  assert(errExpired);
+  assert.strictEqual(errExpired.code, 'STATE_EXPIRED');
+  assert(!db.prepare('SELECT * FROM oauth_states WHERE state = ?').get(stateExpired), 'State expirado deve ser deletado após validação');
+
+  // 15.3 Rejeição de vinculação cruzada entre salões (CROSS_SALON_LINKING_REJECTED)
   const testOAuthState = `oauth_state_${Date.now()}`;
   db.prepare(`
     INSERT INTO oauth_states (state, user_id, expires_at)
@@ -570,7 +632,7 @@ async function runTests() {
   assert.strictEqual(errCrossSalon.code, 'CROSS_SALON_LINKING_REJECTED');
   const checkState = db.prepare('SELECT * FROM oauth_states WHERE state = ?').get(testOAuthState);
   assert(!checkState);
-  console.log('  ✓ 15. Vinculação cruzada entre salões bloqueada com CROSS_SALON_LINKING_REJECTED.\n');
+  console.log('  ✓ 15. Segurança OAuth validada (sessão ausente, state expirado e rejeição de outro salão com exclusão do state).\n');
 
   // ----------------------------------------------------
   // TESTE 16: WhatsApp valida disponibilidade no Google Calendar antes de confirmar
@@ -747,8 +809,278 @@ async function runTests() {
   assert.strictEqual(checkAptReconciled.google_sync_status, 'SYNCED');
   console.log('  ✓ 19. Reconciliação determinística preveniu duplicação no Google após falha de crash.\n');
 
+  // ----------------------------------------------------
+  // TESTE 20: Resolução do profissional efetivo antes da consulta Google (modalidade STAFF)
+  // ----------------------------------------------------
+  console.log('[Teste 20] Resolução de profissional efetivo antes da consulta Google em modalidade STAFF...');
+  
+  // Criar salão isolado com apenas 1 profissional ativo
+  const soloEmail = `solo.staff.${Date.now()}@example.com`;
+  const soloPhone = `55119${Math.floor(10000000 + Math.random() * 90000000)}`;
+  const soloUserInsert = db.prepare(`
+    INSERT INTO users (email, phone_number, role, plan_tier, subscription_status, is_demo)
+    VALUES (?, ?, 'CLIENT', 'JESSICA_PRO', 'ACTIVE', 0)
+  `).run(soloEmail, soloPhone);
+  const soloUserId = soloUserInsert.lastInsertRowid;
+
+  db.prepare(`
+    INSERT INTO client_salons (user_id, salon_name, phone, whatsapp_notification_phone, whatsapp_notifications_enabled, notify_new_appointment, google_require_sync_availability)
+    VALUES (?, 'Salão Solo', '5511999991111', '5511999991111', 1, 1, 0)
+  `).run(soloUserId);
+
+  const soloStaffInsert = db.prepare(`
+    INSERT INTO client_staff (user_id, name, specialty, active, google_calendar_id)
+    VALUES (?, 'Carla Solo', 'Unhas', 1, 'carla.agenda@group.calendar.google.com')
+  `).run(soloUserId);
+  const soloStaffId = soloStaffInsert.lastInsertRowid;
+
+  // Habilitar modalidade STAFF e conectar Google no mock
+  mockGoogleState.connected = true;
+  mockGoogleState.syncMode = 'STAFF';
+
+  // Marcar a agenda individual da Carla como ocupada das 10h às 11h
+  mockGoogleState.busySlotsByCalendar.set('carla.agenda@group.calendar.google.com', [
+    { start: '2026-11-30T10:00:00-03:00', end: '2026-11-30T11:00:00-03:00' },
+  ]);
+
+  // Tentativa de agendamento SEM informar staffId
+  // O sistema deve resolver Carla automaticamente e consultar o calendário dela no Google!
+  let errSoloBusy = null;
+  try {
+    await salonAppointmentService.bookAppointment(soloUserId, {
+      clientName: 'Cliente Consulta Carla',
+      date: '2026-11-30',
+      time: '10:15',
+      durationMin: 30,
+      // staffId omitido propositalmente!
+    });
+  } catch (err) {
+    errSoloBusy = err;
+  }
+  assert(errSoloBusy, 'Deve rejeitar agendamento pois o profissional único resolvido está ocupado no Google');
+  assert.strictEqual(errSoloBusy.code, 'GOOGLE_CALENDAR_BUSY');
+
+  // Quando o horário da Carla estiver livre (14h), agendamento sem staffId é resolvido e confirmado com ela
+  const aptSoloConfirmed = await salonAppointmentService.bookAppointment(soloUserId, {
+    clientName: 'Cliente Consulta Carla Livre',
+    date: '2026-11-30',
+    time: '14:00',
+    durationMin: 30,
+  });
+  assert(aptSoloConfirmed.id > 0);
+  assert.strictEqual(aptSoloConfirmed.staff_id, soloStaffId, 'Deve associar automaticamente ao profissional único');
+
+  // Adicionar um segundo profissional ao salão solo
+  db.prepare(`
+    INSERT INTO client_staff (user_id, name, specialty, active, google_calendar_id)
+    VALUES (?, 'Diego Segundo', 'Cabelos', 1, 'diego.agenda@group.calendar.google.com')
+  `).run(soloUserId);
+
+  // Agora que há mais de 1 profissional, agendar sem staffId deve falhar imediatamente com STAFF_REQUIRED
+  let errMultipleStaffReq = null;
+  try {
+    await salonAppointmentService.bookAppointment(soloUserId, {
+      clientName: 'Cliente Múltiplos Staffs',
+      date: '2026-11-30',
+      time: '16:00',
+      durationMin: 30,
+    });
+  } catch (err) {
+    errMultipleStaffReq = err;
+  }
+  assert(errMultipleStaffReq);
+  assert.strictEqual(errMultipleStaffReq.code, 'STAFF_REQUIRED');
+  console.log('  ✓ 20. Resolução prévia do profissional efetivo e consulta Google em modalidade STAFF validadas.\n');
+
+  // ----------------------------------------------------
+  // TESTE 21: Idempotência de eventos Google com identificador estável e crash recovery
+  // ----------------------------------------------------
+  console.log('[Teste 21] Idempotência de eventos Google com ID estável e recuperação pós-crash...');
+  const aptCrash = salonAppointmentService.bookAppointmentSync(testSalonUser.id, {
+    clientName: 'Cliente Crash Recovery',
+    date: '2026-12-01',
+    time: '09:00',
+    durationMin: 45,
+    staffId: staff1.id,
+  });
+
+  const stableCrashId = crypto
+    .createHash('sha256')
+    .update(`raia_salon_event_${testSalonUser.id}_${aptCrash.id}`)
+    .digest('hex')
+    .substring(0, 32);
+
+  // Simular que o evento foi gravado na API Google Calendar antes do processo cair,
+  // mas o SQLite local ainda tem google_event_id = NULL e google_sync_status = 'PENDING'
+  mockGoogleState.events.set(stableCrashId, {
+    appointment: aptCrash,
+    calendarId: staff1.google_calendar_id || 'primary',
+  });
+  db.prepare(`
+    UPDATE appointments
+    SET google_event_id = NULL, google_sync_status = 'PENDING'
+    WHERE id = ?
+  `).run(aptCrash.id);
+
+  const callCountBeforeSync = mockGoogleState.insertCallCount;
+
+  // Chamar createCalendarEvent: deve reconciliar usando o stableEventId
+  const crashSyncResult = await googleCalendarService.createCalendarEvent(testSalonUser.id, aptCrash);
+  assert(crashSyncResult.success);
+  assert.strictEqual(crashSyncResult.googleEventId, stableCrashId);
+  assert.strictEqual(crashSyncResult.reconciled, true);
+  assert.strictEqual(mockGoogleState.insertCallCount, callCountBeforeSync, 'Não deve criar novo evento duplicado');
+
+  const aptAfterCrash = db.prepare('SELECT google_event_id, google_sync_status FROM appointments WHERE id = ?').get(aptCrash.id);
+  assert.strictEqual(aptAfterCrash.google_event_id, stableCrashId);
+  assert.strictEqual(aptAfterCrash.google_sync_status, 'SYNCED');
+  console.log('  ✓ 21. Identificador determinístico estável reconciliou com sucesso evento existente após crash.\n');
+
+  // ----------------------------------------------------
+  // TESTE 22: Auditoria da rota legada POST /api/appointments
+  // ----------------------------------------------------
+  console.log('[Teste 22] Auditoria da rota legada POST /api/appointments com verificação Google...');
+  const { app } = require('../src/server/app');
+  const http = require('http');
+
+  const server = http.createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const serverPort = server.address().port;
+  const apiBase = `http://127.0.0.1:${serverPort}`;
+
+  // Criar sessão de autenticação para testSalonUser
+  const userService = require('../src/services/userService');
+  const userSession = userService.createUserSession(testSalonUser.id, 7);
+  const salonAuthHeader = {
+    'Authorization': `Bearer ${userSession.sessionToken}`,
+    'Content-Type': 'application/json',
+  };
+
+  try {
+    // 22.1 Bloqueio por conflito com o Google Calendar
+    mockGoogleState.busySlotsByCalendar.set(staff1.google_calendar_id, [
+      { start: '2026-12-02T10:00:00-03:00', end: '2026-12-02T11:00:00-03:00' },
+    ]);
+
+    const resGoogleBusy = await fetch(`${apiBase}/api/appointments`, {
+      method: 'POST',
+      headers: salonAuthHeader,
+      body: JSON.stringify({
+        title: 'Corte via Rota Legada',
+        startDateTime: '2026-12-02T10:15:00',
+        endDateTime: '2026-12-02T10:45:00',
+        staffId: staff1.id,
+      }),
+    });
+
+    const bodyGoogleBusy = await resGoogleBusy.json();
+    assert.strictEqual(resGoogleBusy.status, 409, 'Deve retornar HTTP 409 em caso de conflito com o Google');
+    assert.strictEqual(bodyGoogleBusy.code, 'GOOGLE_CALENDAR_BUSY');
+
+    // 22.2 Bloqueio quando Google é obrigatório e está desconectado
+    db.prepare('UPDATE client_salons SET google_require_sync_availability = 1 WHERE user_id = ?').run(testSalonUser.id);
+    mockGoogleState.connected = false;
+
+    const resGoogleDisc = await fetch(`${apiBase}/api/appointments`, {
+      method: 'POST',
+      headers: salonAuthHeader,
+      body: JSON.stringify({
+        title: 'Corte via Rota Legada Google Desconectado',
+        startDateTime: '2026-12-02T14:00:00',
+        endDateTime: '2026-12-02T14:45:00',
+        staffId: staff1.id,
+      }),
+    });
+
+    const bodyGoogleDisc = await resGoogleDisc.json();
+    assert.strictEqual(resGoogleDisc.status, 400, 'Deve retornar HTTP 400 quando Google é obrigatório mas indisponível');
+    assert.strictEqual(bodyGoogleDisc.code, 'GOOGLE_CALENDAR_UNAVAILABLE');
+
+    // Restaurar status do Google
+    mockGoogleState.connected = true;
+    db.prepare('UPDATE client_salons SET google_require_sync_availability = 0 WHERE user_id = ?').run(testSalonUser.id);
+
+    // 22.3 Bloqueio por falta de seleção de profissional quando salão tem múltiplos profissionais
+    const resStaffReq = await fetch(`${apiBase}/api/appointments`, {
+      method: 'POST',
+      headers: salonAuthHeader,
+      body: JSON.stringify({
+        title: 'Corte sem profissional informado',
+        startDateTime: '2026-12-02T15:00:00',
+        endDateTime: '2026-12-02T15:45:00',
+      }),
+    });
+
+    const bodyStaffReq = await resStaffReq.json();
+    assert.strictEqual(resStaffReq.status, 400);
+    assert.strictEqual(bodyStaffReq.code, 'STAFF_REQUIRED');
+
+    // 22.4 Sucesso ao agendar em horário livre e com profissional especificado
+    const resSuccess = await fetch(`${apiBase}/api/appointments`, {
+      method: 'POST',
+      headers: salonAuthHeader,
+      body: JSON.stringify({
+        title: 'Corte Valido via Rota Legada',
+        startDateTime: '2026-12-02T16:00:00',
+        endDateTime: '2026-12-02T16:45:00',
+        staffId: staff1.id,
+      }),
+    });
+
+    const bodySuccess = await resSuccess.json();
+    assert.strictEqual(resSuccess.status, 201);
+    assert.strictEqual(bodySuccess.success, true);
+    assert.strictEqual(bodySuccess.data.status, 'AGENDADO');
+
+    // 22.5 Bloqueio por conflito no SQLite interno ao tentar marcar no mesmo horário
+    const resConflict = await fetch(`${apiBase}/api/appointments`, {
+      method: 'POST',
+      headers: salonAuthHeader,
+      body: JSON.stringify({
+        title: 'Corte Conflitante no Mesmo Horário',
+        startDateTime: '2026-12-02T16:15:00',
+        endDateTime: '2026-12-02T16:45:00',
+        staffId: staff1.id,
+      }),
+    });
+
+    const bodyConflict = await resConflict.json();
+    assert.strictEqual(resConflict.status, 409);
+    assert.strictEqual(bodyConflict.code, 'SLOT_CONFLICT');
+
+    // 22.6 Usuário comum não-salão (sem client_salons) deve criar compromisso sem exigir staff
+    const stdUserEmail = `std.user.${Date.now()}@example.com`;
+    const stdPhone = `55119${Math.floor(10000000 + Math.random() * 90000000)}`;
+    const stdInsert = db.prepare(`
+      INSERT INTO users (email, phone_number, role, plan_tier, subscription_status, is_demo)
+      VALUES (?, ?, 'CLIENT', 'FREE', 'ACTIVE', 0)
+    `).run(stdUserEmail, stdPhone);
+    const stdSession = userService.createUserSession(stdInsert.lastInsertRowid, 7);
+
+    const resStd = await fetch(`${apiBase}/api/appointments`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stdSession.sessionToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: 'Lembrete Pessoal Usuário Comum',
+        startDateTime: '2026-12-02T18:00:00',
+        endDateTime: '2026-12-02T18:30:00',
+      }),
+    });
+
+    const bodyStd = await resStd.json();
+    assert.strictEqual(resStd.status, 201);
+    assert.strictEqual(bodyStd.success, true);
+
+    console.log('  ✓ 22. Rota legada POST /api/appointments auditada: bloqueia conflitos Google e respeita regras de salão.\n');
+  } finally {
+    server.close();
+  }
+
   console.log('================================================================');
-  console.log('   TODOS OS 19 TESTES DE AUDITORIA FORAM APROVADOS COM SUCESSO! ');
+  console.log('   TODOS OS 22 TESTES DE AUDITORIA FORAM APROVADOS COM SUCESSO! ');
   console.log('================================================================\n');
 }
 

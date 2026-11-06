@@ -3263,25 +3263,47 @@ app.get('/api/appointments', authMiddleware, (req, res) => {
 });
 
 // 12. Create an appointment from dashboard
-app.post('/api/appointments', authMiddleware, (req, res) => {
+app.post('/api/appointments', authMiddleware, async (req, res) => {
   try {
-    const { title, description, startDateTime, endDateTime, location } = req.body;
+    const { title, description, startDateTime, endDateTime, location, staffId, serviceId } = req.body;
     if (!title || !startDateTime) {
       return res.status(400).json({ success: false, error: 'Título e data/horário de início são obrigatórios' });
     }
 
-    const created = appointmentService.createAppointment({
+    // Auditar se o usuário opera sobre agenda de salão (Jéssica)
+    const salonRow = db.prepare('SELECT id FROM client_salons WHERE user_id = ?').get(req.user.id);
+    const hasSalon = !!salonRow;
+
+    const created = await appointmentService.createAppointment({
       userId: req.user.id,
       title,
       description,
       startDateTime,
       endDateTime,
       location,
+      staffId: staffId || null,
+      serviceId: serviceId || null,
       sourceType: 'dashboard',
+      checkGoogle: hasSalon,
     });
 
     res.status(201).json({ success: true, data: created });
   } catch (err) {
+    if (err.code === 'SLOT_CONFLICT' || err.code === 'GOOGLE_CALENDAR_BUSY') {
+      return res.status(409).json({
+        success: false,
+        code: err.code,
+        error: err.message,
+        suggestedSlots: err.suggestedSlots || [],
+      });
+    }
+    if (err.code === 'STAFF_REQUIRED' || err.code === 'NO_ACTIVE_STAFF' || err.code === 'GOOGLE_CALENDAR_UNAVAILABLE') {
+      return res.status(400).json({
+        success: false,
+        code: err.code,
+        error: err.message,
+      });
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 });
