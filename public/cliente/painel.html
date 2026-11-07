@@ -40,14 +40,349 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <style>
-    /* Custom scrollbars */
+    /* Custom scrollbars (Default Institutional) */
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #07080c; }
     ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 9999px; }
     ::-webkit-scrollbar-thumb:hover { background: #00F59B; }
+
+    /* ========================================================================= */
+    /* 👑 JÉSSICA BEAUTY PREMIUM THEME SYSTEM (Scoped by Agent)                  */
+    /* ========================================================================= */
+    :root {
+      --beauty-bg-primary: #F7EFE7;
+      --beauty-bg-secondary: #F3E6DB;
+      --beauty-card-bg: #FFFDFB;
+      --beauty-gold: #C89B6D;
+      --beauty-gold-deep: #AD7B42;
+      --beauty-rose: #D9B8AE;
+      --beauty-rose-light: #F0DFD9;
+      --beauty-text-primary: #4E3B31;
+      --beauty-text-secondary: #7A6255;
+      --beauty-border: #E6D6CA;
+      --beauty-input-bg: #FFFFFF;
+    }
+
+    /* Scrollbars in Beauty Theme */
+    body.theme-jessica-beauty ::-webkit-scrollbar-track { background: #F3E6DB !important; }
+    body.theme-jessica-beauty ::-webkit-scrollbar-thumb { background: #D9B8AE !important; }
+    body.theme-jessica-beauty ::-webkit-scrollbar-thumb:hover { background: #C89B6D !important; }
+
+    /* Selection in Beauty Theme */
+    body.theme-jessica-beauty ::selection {
+      background: rgba(200, 155, 109, 0.25) !important;
+      color: #AD7B42 !important;
+    }
+
+    /* Body Background & Atmosphere in Beauty Theme */
+    body.theme-jessica-beauty {
+      background-color: var(--beauty-bg-primary) !important;
+      color: var(--beauty-text-primary) !important;
+      background-image: 
+        radial-gradient(circle at 12% 18%, rgba(200, 155, 109, 0.08) 0%, transparent 45%),
+        radial-gradient(circle at 88% 82%, rgba(217, 184, 174, 0.12) 0%, transparent 50%),
+        linear-gradient(180deg, #F7EFE7 0%, #F3E6DB 100%) !important;
+      background-attachment: fixed;
+    }
+
+    /* Mobile Topbar in Beauty Theme */
+    body.theme-jessica-beauty .md\:hidden.bg-\[\#11131a\] {
+      background-color: #FFFDFB !important;
+      border-bottom: 1px solid var(--beauty-border) !important;
+      box-shadow: 0 2px 10px rgba(78, 59, 49, 0.05) !important;
+    }
+    body.theme-jessica-beauty .md\:hidden span.font-extrabold {
+      color: var(--beauty-text-primary) !important;
+    }
+
+    /* Sidebar in Beauty Theme */
+    body.theme-jessica-beauty aside#sidebar {
+      background-color: #FFFDFB !important;
+      border-right: 1px solid var(--beauty-border) !important;
+      box-shadow: 2px 0 16px rgba(78, 59, 49, 0.04) !important;
+    }
+    body.theme-jessica-beauty aside#sidebar .border-b,
+    body.theme-jessica-beauty aside#sidebar .border-t {
+      border-color: var(--beauty-border) !important;
+    }
+    body.theme-jessica-beauty aside#sidebar #sidebarClientName {
+      color: var(--beauty-text-primary) !important;
+    }
+    body.theme-jessica-beauty aside#sidebar #footerUserName {
+      color: var(--beauty-text-primary) !important;
+    }
+    body.theme-jessica-beauty aside#sidebar #footerUserEmail {
+      color: var(--beauty-text-secondary) !important;
+    }
+    body.theme-jessica-beauty aside#sidebar .bg-\[\#07080c\],
+    body.theme-jessica-beauty aside#sidebar .bg-\[\#11131a\] {
+      background-color: var(--beauty-bg-secondary) !important;
+      border-color: var(--beauty-border) !important;
+    }
+    body.theme-jessica-beauty aside#sidebar #planBadgeText {
+      color: var(--beauty-text-primary) !important;
+    }
+    body.theme-jessica-beauty aside#sidebar nav .nav-btn {
+      color: var(--beauty-text-secondary) !important;
+    }
+    body.theme-jessica-beauty aside#sidebar nav .nav-btn:hover {
+      background-color: rgba(200, 155, 109, 0.1) !important;
+      color: var(--beauty-text-primary) !important;
+    }
+    body.theme-jessica-beauty aside#sidebar #salonModuleNavSection {
+      border-color: var(--beauty-border) !important;
+    }
+    body.theme-jessica-beauty aside#sidebar #toggleSalonNavBtn {
+      background: linear-gradient(135deg, rgba(200, 155, 109, 0.18), rgba(217, 184, 174, 0.18)) !important;
+      border: 1px solid rgba(200, 155, 109, 0.35) !important;
+      color: var(--beauty-gold-deep) !important;
+      font-weight: 700 !important;
+    }
+    body.theme-jessica-beauty aside#sidebar #salonNavSubitems {
+      border-left-color: var(--beauty-gold) !important;
+    }
+    body.theme-jessica-beauty aside#sidebar #salonNavSubitems .nav-btn {
+      color: var(--beauty-text-secondary) !important;
+    }
+    body.theme-jessica-beauty aside#sidebar #salonNavSubitems .nav-btn:hover {
+      background-color: rgba(200, 155, 109, 0.12) !important;
+      color: var(--beauty-text-primary) !important;
+    }
+    body.theme-jessica-beauty aside#sidebar #salonNavSubitems .nav-btn.active {
+      background: linear-gradient(135deg, rgba(200, 155, 109, 0.22), rgba(217, 184, 174, 0.25)) !important;
+      color: var(--beauty-gold-deep) !important;
+      border: 1px solid rgba(200, 155, 109, 0.45) !important;
+      font-weight: 700 !important;
+    }
+
+    /* Header Topbar in Beauty Theme */
+    body.theme-jessica-beauty header {
+      background-color: rgba(255, 253, 251, 0.94) !important;
+      border-bottom: 1px solid var(--beauty-border) !important;
+      box-shadow: 0 4px 20px -2px rgba(78, 59, 49, 0.05) !important;
+    }
+    body.theme-jessica-beauty header #pageTitle,
+    body.theme-jessica-beauty header #pageTitle span {
+      color: var(--beauty-text-primary) !important;
+    }
+    body.theme-jessica-beauty header #pageSubtitle {
+      color: var(--beauty-text-secondary) !important;
+    }
+
+    /* All 9 Salon Tabs & Modals Card Overrides */
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .rounded-2xl,
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .rounded-xl,
+    body.theme-jessica-beauty #modalSingleService .bg-\[\#11131a\],
+    body.theme-jessica-beauty #modalBatchServices .bg-\[\#11131a\],
+    body.theme-jessica-beauty #modalDeleteConfirm .bg-\[\#11131a\],
+    body.theme-jessica-beauty #modalNewAppointment .bg-\[\#11131a\],
+    body.theme-jessica-beauty #modalRescheduleAppointment .bg-\[\#11131a\],
+    body.theme-jessica-beauty #modalStatusAppointment .bg-\[\#11131a\],
+    body.theme-jessica-beauty #modalCancelAppointment .bg-\[\#11131a\],
+    body.theme-jessica-beauty #modalHistoricalConflicts .bg-\[\#11131a\],
+    body.theme-jessica-beauty #modalNewBill .bg-\[\#11131a\],
+    body.theme-jessica-beauty #modalNewTransaction .bg-\[\#11131a\] {
+      background-color: var(--beauty-card-bg) !important;
+      border-color: var(--beauty-border) !important;
+      color: var(--beauty-text-primary) !important;
+      box-shadow: 0 4px 20px -2px rgba(78, 59, 49, 0.05), 0 2px 6px -1px rgba(200, 155, 109, 0.08) !important;
+    }
+
+    /* Nested Dark Containers (e.g., #07080c, #0c0e15, #181b24) mapped to warm beige/sand */
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .bg-\[\#07080c\],
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .bg-\[\#0c0e15\],
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .bg-\[\#181b24\],
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .bg-\[\#11131a\],
+    body.theme-jessica-beauty #modalNewAppointment .bg-\[\#07080c\],
+    body.theme-jessica-beauty #modalRescheduleAppointment .bg-\[\#07080c\] {
+      background-color: var(--beauty-bg-secondary) !important;
+      border-color: var(--beauty-border) !important;
+    }
+
+    /* Inner Shaded Elements */
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .bg-white\/5,
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .bg-white\/10 {
+      background-color: var(--beauty-bg-secondary) !important;
+      border-color: var(--beauty-border) !important;
+      color: var(--beauty-text-primary) !important;
+    }
+
+    /* Typography inside Jéssica Areas */
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .text-white,
+    body.theme-jessica-beauty #modalSingleService .text-white,
+    body.theme-jessica-beauty #modalBatchServices .text-white,
+    body.theme-jessica-beauty #modalDeleteConfirm .text-white,
+    body.theme-jessica-beauty #modalNewAppointment .text-white,
+    body.theme-jessica-beauty #modalRescheduleAppointment .text-white,
+    body.theme-jessica-beauty #modalStatusAppointment .text-white,
+    body.theme-jessica-beauty #modalCancelAppointment .text-white,
+    body.theme-jessica-beauty #modalHistoricalConflicts .text-white,
+    body.theme-jessica-beauty #modalNewBill .text-white,
+    body.theme-jessica-beauty #modalNewTransaction .text-white {
+      color: var(--beauty-text-primary) !important;
+    }
+
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .text-slate-200,
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .text-slate-300,
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .text-slate-400,
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .text-slate-500,
+    body.theme-jessica-beauty #modalSingleService .text-slate-300,
+    body.theme-jessica-beauty #modalSingleService .text-slate-400,
+    body.theme-jessica-beauty #modalNewAppointment .text-slate-300,
+    body.theme-jessica-beauty #modalNewAppointment .text-slate-400,
+    body.theme-jessica-beauty #modalRescheduleAppointment .text-slate-300,
+    body.theme-jessica-beauty #modalRescheduleAppointment .text-slate-400 {
+      color: var(--beauty-text-secondary) !important;
+    }
+
+    /* Borders inside Jéssica */
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .border-white\/5,
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .border-white\/10,
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .border-white\/15,
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .border-white\/20,
+    body.theme-jessica-beauty #modalSingleService .border-white\/10,
+    body.theme-jessica-beauty #modalNewAppointment .border-white\/10,
+    body.theme-jessica-beauty #modalRescheduleAppointment .border-white\/10,
+    body.theme-jessica-beauty #modalNewAppointment .border-b,
+    body.theme-jessica-beauty #modalNewAppointment .border-t,
+    body.theme-jessica-beauty #modalRescheduleAppointment .border-b,
+    body.theme-jessica-beauty #modalRescheduleAppointment .border-t {
+      border-color: var(--beauty-border) !important;
+    }
+
+    /* Form Inputs, Selects, and Textareas */
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) input:not([type="checkbox"]):not([type="radio"]),
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) select,
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) textarea,
+    body.theme-jessica-beauty #modalSingleService input:not([type="checkbox"]):not([type="radio"]),
+    body.theme-jessica-beauty #modalSingleService select,
+    body.theme-jessica-beauty #modalSingleService textarea,
+    body.theme-jessica-beauty #modalNewAppointment input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+    body.theme-jessica-beauty #modalNewAppointment select,
+    body.theme-jessica-beauty #modalRescheduleAppointment input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+    body.theme-jessica-beauty #modalRescheduleAppointment select,
+    body.theme-jessica-beauty #modalNewBill input,
+    body.theme-jessica-beauty #modalNewBill select,
+    body.theme-jessica-beauty #modalNewTransaction input,
+    body.theme-jessica-beauty #modalNewTransaction select {
+      background-color: var(--beauty-input-bg) !important;
+      border-color: var(--beauty-border) !important;
+      color: var(--beauty-text-primary) !important;
+    }
+
+    body.theme-jessica-beauty input:focus,
+    body.theme-jessica-beauty select:focus,
+    body.theme-jessica-beauty textarea:focus {
+      border-color: var(--beauty-gold) !important;
+      box-shadow: 0 0 0 3px rgba(200, 155, 109, 0.25) !important;
+    }
+
+    body.theme-jessica-beauty input::placeholder,
+    body.theme-jessica-beauty textarea::placeholder {
+      color: #A89487 !important;
+    }
+
+    /* Primary Action Buttons in Jéssica (Gold Luxury Gradient) */
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .bg-\[\#00F59B\],
+    body.theme-jessica-beauty #modalSingleService button[type="submit"],
+    body.theme-jessica-beauty #modalBatchServices button[type="submit"],
+    body.theme-jessica-beauty #modalNewAppointment button[type="submit"],
+    body.theme-jessica-beauty #modalRescheduleAppointment button[type="submit"],
+    body.theme-jessica-beauty #modalNewBill button[type="submit"],
+    body.theme-jessica-beauty #modalNewTransaction button[type="submit"],
+    body.theme-jessica-beauty #btnSaveSalonSettings,
+    body.theme-jessica-beauty #btnOpenNewAppointmentModal,
+    body.theme-jessica-beauty #btnConnectGoogle,
+    body.theme-jessica-beauty #btnSaveGoogleSettings,
+    body.theme-jessica-beauty #btnSaveWaSettings,
+    body.theme-jessica-beauty #btnOpenBatchModal,
+    body.theme-jessica-beauty #btnOpenSingleModal {
+      background: linear-gradient(135deg, #C89B6D 0%, #AD7B42 100%) !important;
+      color: #FFFFFF !important;
+      box-shadow: 0 4px 14px rgba(173, 123, 66, 0.28) !important;
+      border: none !important;
+    }
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .bg-\[\#00F59B\]:hover,
+    body.theme-jessica-beauty #modalNewAppointment button[type="submit"]:hover,
+    body.theme-jessica-beauty #modalRescheduleAppointment button[type="submit"]:hover {
+      background: linear-gradient(135deg, #AD7B42 0%, #8C5E28 100%) !important;
+      box-shadow: 0 6px 18px rgba(173, 123, 66, 0.38) !important;
+    }
+
+    /* Neon Icons mapped to Beauty Gold */
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .text-\[\#00F59B\],
+    body.theme-jessica-beauty #modalNewAppointment .text-\[\#00F59B\],
+    body.theme-jessica-beauty #modalRescheduleAppointment .text-\[\#00F59B\] {
+      color: var(--beauty-gold) !important;
+    }
+
+    /* Badges & Pills in Beauty Theme */
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .bg-\[\#00F59B\]\/10,
+    body.theme-jessica-beauty .tab-content:not(#tab-my-products):not(#tab-explore-solutions):not(#tab-my-subscriptions):not(#tab-my-invoices):not(#tab-profile-security) .bg-\[\#00F59B\]\/20 {
+      background-color: rgba(200, 155, 109, 0.15) !important;
+      color: var(--beauty-gold-deep) !important;
+      border-color: rgba(200, 155, 109, 0.35) !important;
+    }
+
+    /* Modals Backdrop in Beauty Theme */
+    body.theme-jessica-beauty #modalSingleService,
+    body.theme-jessica-beauty #modalBatchServices,
+    body.theme-jessica-beauty #modalDeleteConfirm,
+    body.theme-jessica-beauty #modalNewAppointment,
+    body.theme-jessica-beauty #modalRescheduleAppointment,
+    body.theme-jessica-beauty #modalStatusAppointment,
+    body.theme-jessica-beauty #modalCancelAppointment,
+    body.theme-jessica-beauty #modalHistoricalConflicts,
+    body.theme-jessica-beauty #modalNewBill,
+    body.theme-jessica-beauty #modalNewTransaction {
+      background-color: rgba(78, 59, 49, 0.5) !important;
+      backdrop-filter: blur(8px) !important;
+    }
+
+    /* Modal Cards */
+    body.theme-jessica-beauty #modalSingleService > div,
+    body.theme-jessica-beauty #modalBatchServices > div,
+    body.theme-jessica-beauty #modalDeleteConfirm > div,
+    body.theme-jessica-beauty #modalNewAppointment > div,
+    body.theme-jessica-beauty #modalRescheduleAppointment > div,
+    body.theme-jessica-beauty #modalStatusAppointment > div,
+    body.theme-jessica-beauty #modalCancelAppointment > div,
+    body.theme-jessica-beauty #modalHistoricalConflicts > div,
+    body.theme-jessica-beauty #modalNewBill > div,
+    body.theme-jessica-beauty #modalNewTransaction > div {
+      background-color: var(--beauty-card-bg) !important;
+      border: 1px solid var(--beauty-border) !important;
+      color: var(--beauty-text-primary) !important;
+      box-shadow: 0 25px 50px -12px rgba(78, 59, 49, 0.25) !important;
+    }
+
+    /* Time & Date Dropdowns in Modals */
+    body.theme-jessica-beauty #aptTimeDropdown,
+    body.theme-jessica-beauty #rescheduleTimeDropdown,
+    body.theme-jessica-beauty #aptBeautyCalendarPopover,
+    body.theme-jessica-beauty #rescheduleBeautyCalendarPopover {
+      background-color: #FFFDFB !important;
+      border: 1px solid var(--beauty-border) !important;
+      box-shadow: 0 20px 35px -5px rgba(78, 59, 49, 0.18), 0 0 0 1px rgba(200, 155, 109, 0.15) !important;
+    }
+
+    /* Time Slot Buttons inside Dropdown */
+    body.theme-jessica-beauty #aptAvailableSlotsList button,
+    body.theme-jessica-beauty #rescheduleAvailableSlotsList button {
+      background-color: #F7EFE7 !important;
+      border: 1px solid var(--beauty-border) !important;
+      color: var(--beauty-text-primary) !important;
+      font-weight: 600;
+    }
+    body.theme-jessica-beauty #aptAvailableSlotsList button:hover,
+    body.theme-jessica-beauty #rescheduleAvailableSlotsList button:hover {
+      background-color: #C89B6D !important;
+      color: #FFFFFF !important;
+      border-color: #AD7B42 !important;
+    }
   </style>
 </head>
-<body class="bg-[#07080c] text-slate-100 min-h-screen flex flex-col md:flex-row antialiased font-sans selection:bg-[#00F59B]/20 selection:text-[#00F59B]">
+<body class="bg-[#07080c] text-slate-100 min-h-screen flex flex-col md:flex-row antialiased font-sans selection:bg-[#00F59B]/20 selection:text-[#00F59B] theme-raia">
 
   <!-- Demo Notice Banner if Demo Account -->
   <div id="demoNoticeBanner" class="hidden fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 text-white text-xs font-bold py-2 px-4 text-center shadow-lg flex items-center justify-center gap-2">
@@ -254,6 +589,124 @@
 
     <!-- Content Sections Container -->
     <div class="p-6 md:p-8 space-y-8 flex-1">
+
+      <!-- ======================================================== -->
+      <!-- BANNER & SUBNAV EXCLUSIVO JÉSSICA BEAUTY PREMIUM         -->
+      <!-- ======================================================== -->
+      <div id="jessicaBeautyHeaderBanner" class="hidden rounded-3xl p-6 md:p-8 border border-[#E6D6CA] bg-gradient-to-br from-[#FFFDFB] via-[#FDF7F2] to-[#F3E6DB] shadow-lg relative overflow-hidden transition-all duration-300">
+        <!-- Fundo decorativo sutil -->
+        <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-radial from-[#C89B6D]/15 to-transparent rounded-full blur-2xl pointer-events-none"></div>
+        <div class="absolute -left-10 -top-10 w-48 h-48 bg-radial from-[#D9B8AE]/20 to-transparent rounded-full blur-2xl pointer-events-none"></div>
+
+        <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <!-- Apresentação Jéssica -->
+          <div class="space-y-2 max-w-xl">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-bold bg-[#D9B8AE]/25 text-[#AD7B42] border border-[#C89B6D]/40 uppercase tracking-wider">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 text-[#C89B6D]"></i>
+              <span>Beauty &amp; Aesthetics AI • Módulo Jéssica</span>
+            </div>
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-[#4E3B31] tracking-tight">
+              Jéssica Beauty <span class="font-normal italic text-[#AD7B42]">• Salão &amp; Estética Premium</span>
+            </h2>
+            <p class="text-xs sm:text-sm text-[#7A6255] leading-relaxed">
+              Ambiente exclusivo de atendimento humanizado, agendamento inteligente, catálogo de serviços e gestão para cabeleireiros, manicures, barbearias e estética.
+            </p>
+          </div>
+
+          <!-- Ilustração de Beleza Vetorial (Pincel de Maquiagem, Ramo Floral e Tesoura de Cabeleireiro) -->
+          <div class="shrink-0 flex items-center justify-center lg:justify-end">
+            <div class="w-40 h-28 sm:w-48 sm:h-32 relative flex items-center justify-center">
+              <svg viewBox="0 0 240 160" class="w-full h-full drop-shadow-md" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <!-- Brilho de Fundo -->
+                <circle cx="120" cy="80" r="65" fill="url(#beautyGlow)" opacity="0.4" />
+                <defs>
+                  <radialGradient id="beautyGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(120 80) rotate(90) scale(65)">
+                    <stop stop-color="#C89B6D" stop-opacity="0.45" />
+                    <stop offset="0.6" stop-color="#D9B8AE" stop-opacity="0.25" />
+                    <stop offset="1" stop-color="#FFFDFB" stop-opacity="0" />
+                  </radialGradient>
+                  <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#E8D3BE" />
+                    <stop offset="50%" stop-color="#C89B6D" />
+                    <stop offset="100%" stop-color="#AD7B42" />
+                  </linearGradient>
+                  <linearGradient id="roseGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#FFFFFF" />
+                    <stop offset="50%" stop-color="#F0DFD9" />
+                    <stop offset="100%" stop-color="#D9B8AE" />
+                  </linearGradient>
+                </defs>
+
+                <!-- Ramo Floral / Botânico em Dourado Suave (Esquerda) -->
+                <path d="M60 135 C70 100, 85 70, 110 45" stroke="#C89B6D" stroke-width="2" stroke-linecap="round" opacity="0.6" />
+                <path d="M72 110 C62 105, 58 95, 68 92 C78 90, 80 102, 72 110 Z" fill="#D9B8AE" opacity="0.75" />
+                <path d="M85 88 C95 82, 98 72, 88 70 C78 68, 77 80, 85 88 Z" fill="#C89B6D" opacity="0.65" />
+                <path d="M100 65 C110 60, 112 50, 102 48 C92 46, 92 57, 100 65 Z" fill="#D9B8AE" opacity="0.75" />
+
+                <!-- Tesoura Profissional de Salão (Cruza Centro-Direita) -->
+                <g transform="rotate(-25 135 80)">
+                  <path d="M95 130 C95 138 88 144 80 144 C72 144 65 138 65 130 C65 122 72 116 80 116 C85 116 89 119 92 123 L130 85 L180 50" stroke="url(#goldGradient)" stroke-width="3" stroke-linecap="round" />
+                  <path d="M110 130 C110 138 117 144 125 144 C133 144 140 138 140 130 C140 122 133 116 125 116 C120 116 116 119 113 123 L120 85 L180 65" stroke="url(#goldGradient)" stroke-width="3" stroke-linecap="round" />
+                  <circle cx="125" cy="85" r="3.5" fill="#AD7B42" stroke="#FFFDFB" stroke-width="1.5" />
+                </g>
+
+                <!-- Pincel de Maquiagem Elegante (Cruza Centro-Esquerda) -->
+                <g transform="rotate(35 150 90)">
+                  <path d="M150 140 L150 85" stroke="#4E3B31" stroke-width="5" stroke-linecap="round" />
+                  <rect x="147" y="65" width="6" height="20" rx="1.5" fill="url(#goldGradient)" />
+                  <path d="M147 65 C144 55, 142 42, 150 32 C158 42, 156 55, 153 65 Z" fill="url(#roseGradient)" />
+                  <path d="M148 65 C147 50, 148 40, 150 32 C152 40, 153 50, 152 65 Z" fill="#D9B8AE" opacity="0.6" />
+                </g>
+
+                <!-- Estrelas de Brilho / Sparkles -->
+                <path d="M190 35 L192 41 L198 43 L192 45 L190 51 L188 45 L182 43 L188 41 Z" fill="#C89B6D" />
+                <path d="M60 55 L61 59 L65 60 L61 61 L60 65 L59 61 L55 60 L59 59 Z" fill="#D9B8AE" />
+                <path d="M130 20 L131 23 L134 24 L131 25 L130 28 L129 25 L126 24 L129 23 Z" fill="#AD7B42" />
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submenu Rápido de Navegação entre as 9 Áreas da Jéssica -->
+        <div class="mt-6 pt-5 border-t border-[#E6D6CA] flex items-center gap-2 overflow-x-auto pb-1" id="jessicaQuickNavContainer">
+          <button type="button" data-jessica-nav="overview" class="jessica-quick-nav-btn shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all">
+            <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i>
+            <span>Visão Geral</span>
+          </button>
+          <button type="button" data-jessica-nav="salon" class="jessica-quick-nav-btn shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all">
+            <i data-lucide="store" class="w-3.5 h-3.5"></i>
+            <span>Meu Salão</span>
+          </button>
+          <button type="button" data-jessica-nav="services" class="jessica-quick-nav-btn shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all">
+            <i data-lucide="scissors" class="w-3.5 h-3.5"></i>
+            <span>Serviços &amp; Preços</span>
+          </button>
+          <button type="button" data-jessica-nav="staff" class="jessica-quick-nav-btn shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all">
+            <i data-lucide="users" class="w-3.5 h-3.5"></i>
+            <span>Equipe</span>
+          </button>
+          <button type="button" data-jessica-nav="appointments" class="jessica-quick-nav-btn shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all">
+            <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+            <span>Agenda Inteligente</span>
+          </button>
+          <button type="button" data-jessica-nav="integrations-google" class="jessica-quick-nav-btn shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all">
+            <i data-lucide="calendar-days" class="w-3.5 h-3.5"></i>
+            <span>Google Calendar</span>
+          </button>
+          <button type="button" data-jessica-nav="integrations-whatsapp" class="jessica-quick-nav-btn shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all">
+            <i data-lucide="message-square" class="w-3.5 h-3.5"></i>
+            <span>WhatsApp</span>
+          </button>
+          <button type="button" data-jessica-nav="dashboard-pro" class="jessica-quick-nav-btn shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all">
+            <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i>
+            <span>Dashboard Pro</span>
+          </button>
+          <button type="button" data-jessica-nav="campaigns-pro" class="jessica-quick-nav-btn shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all">
+            <i data-lucide="megaphone" class="w-3.5 h-3.5"></i>
+            <span>Campanhas Pro</span>
+          </button>
+        </div>
+      </div>
 
       <!-- ============================================== -->
       <!-- TAB: MEUS PRODUTOS (CENTRAL HUB DEFAULT)       -->
@@ -1090,7 +1543,7 @@
 
         <!-- MODAL: NOVO AGENDAMENTO COM VALIDAÇÃO DE CONFLITO E SUGESTÃO -->
         <div id="modalNewAppointment" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-4 text-xs shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-4 text-xs shadow-2xl max-h-[90vh] min-h-[520px] overflow-y-auto">
             <div class="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 class="text-sm font-bold text-white flex items-center gap-2">
                 <i data-lucide="calendar-plus" class="w-4 h-4 text-[#00F59B]"></i>
@@ -1111,7 +1564,7 @@
               <div id="aptSuggestedSlotsPills" class="flex flex-wrap gap-1.5 pt-1"></div>
             </div>
 
-            <form id="formNewAppointment" class="space-y-3.5">
+            <form id="formNewAppointment" class="space-y-3.5 pb-8">
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label for="aptClientName" class="block text-slate-300 font-semibold mb-1">Nome do(a) Cliente *</label>
@@ -1143,7 +1596,7 @@
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <!-- Data com 2 formas de seleção (Digitação DD/MM/AAAA ou Calendário Visual) -->
-                <div>
+                <div class="relative" id="aptDatePickerWrapper">
                   <label for="aptDateDisplay" class="block text-slate-300 font-semibold mb-1">Data *</label>
                   <div class="relative">
                     <input type="text" id="aptDateDisplay" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" required
@@ -1156,6 +1609,23 @@
                     <input type="hidden" id="aptDate" name="aptDate">
                   </div>
                   <p id="aptDateError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
+
+                  <!-- Popover Calendário Visual Beauty -->
+                  <div id="aptBeautyCalendarPopover" class="hidden absolute left-0 top-full mt-1.5 p-3 rounded-2xl bg-[#FFFDFB] border border-[#E6D6CA] shadow-2xl z-[70] w-72 select-none">
+                    <div class="flex items-center justify-between pb-2 mb-2 border-b border-[#E6D6CA]">
+                      <button type="button" id="btnPrevAptCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors">
+                        <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                      </button>
+                      <span id="aptCalMonthYearLabel" class="text-xs font-bold text-[#4E3B31]"></span>
+                      <button type="button" id="btnNextAptCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors">
+                        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                      </button>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[#AD7B42] mb-1">
+                      <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+                    </div>
+                    <div id="aptCalDaysGrid" class="grid grid-cols-7 gap-1 text-center text-xs"></div>
+                  </div>
                 </div>
 
                 <!-- Horário com 2 formas de seleção (Digitação HH:MM ou Lista de Horários Disponíveis) -->
@@ -1173,7 +1643,7 @@
                   <p id="aptTimeError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
 
                   <!-- Popover Dropdown de Horários Disponíveis -->
-                  <div id="aptTimeDropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 p-3 rounded-xl bg-[#11131a] border border-white/15 shadow-2xl z-50 space-y-2">
+                  <div id="aptTimeDropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 p-3 rounded-xl bg-[#11131a] border border-white/15 shadow-2xl z-[70] space-y-2">
                     <div class="flex items-center justify-between text-[11px] font-semibold text-slate-300 border-b border-white/10 pb-1.5">
                       <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i> Horários Livres</span>
                       <span id="aptSlotsCountBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"></span>
@@ -1208,7 +1678,7 @@
 
         <!-- MODAL: REMARCAR AGENDAMENTO -->
         <div id="modalRescheduleAppointment" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl">
+          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl min-h-[460px]">
             <div class="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 class="text-sm font-bold text-white flex items-center gap-2">
                 <i data-lucide="calendar-clock" class="w-4 h-4 text-[#00F59B]"></i>
@@ -1231,7 +1701,7 @@
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <!-- Nova Data com 2 formas de seleção -->
-                <div>
+                <div class="relative" id="rescheduleDatePickerWrapper">
                   <label for="rescheduleDateDisplay" class="block text-slate-300 font-semibold mb-1">Nova Data *</label>
                   <div class="relative">
                     <input type="text" id="rescheduleDateDisplay" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" required
@@ -1244,6 +1714,23 @@
                     <input type="hidden" id="rescheduleDate" name="rescheduleDate">
                   </div>
                   <p id="rescheduleDateError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
+
+                  <!-- Popover Calendário Visual Beauty -->
+                  <div id="rescheduleBeautyCalendarPopover" class="hidden absolute left-0 top-full mt-1.5 p-3 rounded-2xl bg-[#FFFDFB] border border-[#E6D6CA] shadow-2xl z-[70] w-72 select-none">
+                    <div class="flex items-center justify-between pb-2 mb-2 border-b border-[#E6D6CA]">
+                      <button type="button" id="btnPrevRescheduleCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors">
+                        <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                      </button>
+                      <span id="rescheduleCalMonthYearLabel" class="text-xs font-bold text-[#4E3B31]"></span>
+                      <button type="button" id="btnNextRescheduleCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors">
+                        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                      </button>
+                    </div>
+                    <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[#AD7B42] mb-1">
+                      <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+                    </div>
+                    <div id="rescheduleCalDaysGrid" class="grid grid-cols-7 gap-1 text-center text-xs"></div>
+                  </div>
                 </div>
 
                 <!-- Novo Horário com 2 formas de seleção -->
@@ -1260,7 +1747,7 @@
                   </div>
                   <p id="rescheduleTimeError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
 
-                  <div id="rescheduleTimeDropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 p-3 rounded-xl bg-[#11131a] border border-white/15 shadow-2xl z-50 space-y-2">
+                  <div id="rescheduleTimeDropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 p-3 rounded-xl bg-[#11131a] border border-white/15 shadow-2xl z-[70] space-y-2">
                     <div class="flex items-center justify-between text-[11px] font-semibold text-slate-300 border-b border-white/10 pb-1.5">
                       <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i> Horários Livres</span>
                       <span id="rescheduleSlotsCountBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"></span>
@@ -1401,7 +1888,10 @@
             </div>
 
             <div id="googleConnectionStatusBadge" class="flex items-center gap-2">
-              <!-- Preenchido via JS -->
+              <span class="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 border border-amber-500/30 flex items-center gap-1.5">
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-500"></i>
+                <span>Aguardando conexão com Google</span>
+              </span>
             </div>
           </div>
 
@@ -2292,15 +2782,68 @@
       const pageSubtitle = document.getElementById('pageSubtitle');
       const btnBackToHub = document.getElementById('btnBackToHub');
       const salonNavSubitems = document.getElementById('salonNavSubitems');
+      const headerPlanBadge = document.getElementById('headerPlanBadge');
+      const mobilePlanBadge = document.getElementById('mobilePlanBadge');
+      const jessicaBanner = document.getElementById('jessicaBeautyHeaderBanner');
 
+      const inSalon = isSalonTab(tabId);
+
+      // 1. Dinamismo de Tema Visual: RAIA AGENTES INSTITUCIONAL vs JÉSSICA BEAUTY PREMIUM
+      if (inSalon) {
+        document.documentElement.classList.remove('dark');
+        document.body.classList.remove('theme-raia');
+        document.body.classList.add('theme-jessica-beauty');
+        if (jessicaBanner) jessicaBanner.classList.remove('hidden');
+        if (headerPlanBadge) {
+          headerPlanBadge.textContent = 'JÉSSICA BEAUTY';
+          headerPlanBadge.className = 'text-xs px-3 py-1 rounded-full font-bold bg-[#C89B6D]/20 text-[#AD7B42] border border-[#C89B6D]/40';
+        }
+        if (mobilePlanBadge) {
+          mobilePlanBadge.textContent = 'JÉSSICA';
+          mobilePlanBadge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#C89B6D]/20 text-[#AD7B42] border border-[#C89B6D]/40';
+        }
+      } else {
+        document.documentElement.classList.add('dark');
+        document.body.classList.add('theme-raia');
+        document.body.classList.remove('theme-jessica-beauty');
+        if (jessicaBanner) jessicaBanner.classList.add('hidden');
+        if (headerPlanBadge) {
+          headerPlanBadge.textContent = 'CENTRAL RAIA';
+          headerPlanBadge.className = 'text-xs px-3 py-1 rounded-full font-bold bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30';
+        }
+        if (mobilePlanBadge) {
+          mobilePlanBadge.textContent = 'CENTRAL';
+          mobilePlanBadge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/30';
+        }
+      }
+
+      // 2. Atualizar estado dos botões de navegação lateral (Sidebar)
       navButtons.forEach(btn => {
         if (btn.dataset.tab === tabId) {
-          btn.className = 'nav-btn active w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/20';
+          if (inSalon) {
+            btn.className = 'nav-btn active w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition-all bg-gradient-to-r from-[#C89B6D]/20 to-[#D9B8AE]/25 text-[#AD7B42] border border-[#C89B6D]/40';
+          } else {
+            btn.className = 'nav-btn active w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/20';
+          }
         } else {
-          btn.className = 'nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all';
+          if (inSalon) {
+            btn.className = 'nav-btn w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium text-[#7A6255] hover:text-[#4E3B31] hover:bg-[#F3E6DB] transition-all';
+          } else {
+            btn.className = 'nav-btn w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all';
+          }
         }
       });
 
+      // 3. Atualizar estado do submenu de acesso rápido do Banner da Jéssica
+      document.querySelectorAll('.jessica-quick-nav-btn').forEach(b => {
+        if (b.dataset.jessicaNav === tabId) {
+          b.className = 'jessica-quick-nav-btn shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all bg-gradient-to-r from-[#C89B6D] to-[#AD7B42] text-white shadow-sm border border-[#AD7B42]';
+        } else {
+          b.className = 'jessica-quick-nav-btn shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-[#7A6255] hover:text-[#4E3B31] bg-white hover:bg-[#F3E6DB] border border-[#E6D6CA] transition-all';
+        }
+      });
+
+      // 4. Alternar exibição dos conteúdos das abas
       tabContents.forEach(content => {
         if (content.id === `tab-${tabId}`) content.classList.remove('hidden');
         else content.classList.add('hidden');
@@ -2312,7 +2855,7 @@
       }
 
       // Contextual Header: Back to Hub
-      if (isSalonTab(tabId)) {
+      if (inSalon) {
         btnBackToHub.classList.remove('hidden');
         salonNavSubitems.classList.remove('hidden');
       } else {
@@ -2340,6 +2883,10 @@
 
     document.querySelectorAll('.nav-btn').forEach(btn => {
       btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+    });
+
+    document.querySelectorAll('.jessica-quick-nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => switchTab(btn.dataset.jessicaNav));
     });
 
     document.getElementById('btnBackToHub').addEventListener('click', () => switchTab('my-products'));
@@ -4280,6 +4827,26 @@
             ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><i data-lucide="message-circle" class="w-2.5 h-2.5"></i> WhatsApp</span>'
             : '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-slate-400 border border-white/10">Painel</span>';
 
+          const isCancelled = a.status === 'CANCELLED' || a.status === 'Cancelado';
+          const actionsHtml = isCancelled
+            ? '<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 font-bold border border-rose-500/20 text-xs"><i data-lucide="ban" class="w-3.5 h-3.5"></i> Atendimento Cancelado</span>'
+            : `
+              <button type="button" class="btn-apt-reschedule px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-semibold hover:text-white transition-all flex items-center gap-1" data-id="${a.id}">
+                <i data-lucide="calendar-clock" class="w-3.5 h-3.5 text-blue-400"></i>
+                <span>Remarcar</span>
+              </button>
+
+              <button type="button" class="btn-apt-status px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-semibold hover:text-white transition-all flex items-center gap-1" data-id="${a.id}" data-status="${a.status}">
+                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span>Status</span>
+              </button>
+
+              <button type="button" class="btn-apt-cancel px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-semibold transition-all flex items-center gap-1" data-id="${a.id}">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                <span>Cancelar</span>
+              </button>
+            `;
+
           card.innerHTML = `
             <div class="space-y-1.5 min-w-0">
               <div class="flex flex-wrap items-center gap-2">
@@ -4312,20 +4879,7 @@
             </div>
 
             <div class="flex items-center gap-1.5 shrink-0 self-end md:self-center">
-              <button type="button" class="btn-apt-reschedule px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-semibold hover:text-white transition-all flex items-center gap-1" data-id="${a.id}">
-                <i data-lucide="calendar-clock" class="w-3.5 h-3.5 text-blue-400"></i>
-                <span>Remarcar</span>
-              </button>
-
-              <button type="button" class="btn-apt-status px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-semibold hover:text-white transition-all flex items-center gap-1" data-id="${a.id}" data-status="${a.status}">
-                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
-                <span>Status</span>
-              </button>
-
-              <button type="button" class="btn-apt-cancel px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-semibold transition-all flex items-center gap-1" data-id="${a.id}">
-                <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                <span>Cancelar</span>
-              </button>
+              ${actionsHtml}
             </div>
           `;
           list.appendChild(card);
@@ -4650,6 +5204,7 @@
               document.getElementById('aptTimeInput')?.classList.remove('border-rose-500');
               document.getElementById('aptTimeDropdown')?.classList.add('hidden');
               checkNewAppointmentSlot();
+              validateAppointmentFormCompletion();
             });
             listEl.appendChild(btn);
           });
@@ -4707,6 +5262,7 @@
                   document.getElementById('aptTime').value = slot;
                   if (container) container.classList.add('hidden');
                   checkNewAppointmentSlot();
+                  validateAppointmentFormCompletion();
                   showToast(`Horário ${slot} selecionado.`);
                 });
                 pills.appendChild(pill);
@@ -4726,11 +5282,7 @@
         } else if (data.available === true) {
           // Horário liberado!
           if (container) container.classList.add('hidden');
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-            submitBtn.removeAttribute('title');
-          }
+          validateAppointmentFormCompletion();
         }
       } catch (err) {
         if (err.name === 'AbortError') return;
@@ -4927,22 +5479,183 @@
         }
         e.target.classList.add('border-rose-500');
       }
+      validateAppointmentFormCompletion();
     });
 
-    document.getElementById('btnOpenAptDatePicker')?.addEventListener('click', () => {
-      const picker = document.getElementById('aptDatePicker');
-      if (!picker) return;
-      try {
-        if (typeof picker.showPicker === 'function') {
-          picker.showPicker();
-        } else {
-          picker.focus();
-          picker.click();
-        }
-      } catch (_) {
-        picker.focus();
-        picker.click();
+    // ========================================================
+    // 👑 CUSTOM BEAUTY CALENDAR POPOVER & FORM VALIDATOR
+    // ========================================================
+    let aptCalCurrentDate = new Date();
+    let rescheduleCalCurrentDate = new Date();
+
+    function renderBeautyCalendar(type = 'apt') {
+      const isApt = type === 'apt';
+      const curr = isApt ? aptCalCurrentDate : rescheduleCalCurrentDate;
+      const label = document.getElementById(isApt ? 'aptCalMonthYearLabel' : 'rescheduleCalMonthYearLabel');
+      const grid = document.getElementById(isApt ? 'aptCalDaysGrid' : 'rescheduleCalDaysGrid');
+      const hiddenInput = document.getElementById(isApt ? 'aptDate' : 'rescheduleDate');
+      const displayInput = document.getElementById(isApt ? 'aptDateDisplay' : 'rescheduleDateDisplay');
+      const popover = document.getElementById(isApt ? 'aptBeautyCalendarPopover' : 'rescheduleBeautyCalendarPopover');
+
+      if (!label || !grid) return;
+
+      const monthNames = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      ];
+
+      const year = curr.getFullYear();
+      const month = curr.getMonth();
+      label.innerText = `${monthNames[month]} de ${year}`;
+      grid.innerHTML = '';
+
+      const firstDayIndex = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      for (let i = 0; i < firstDayIndex; i++) {
+        const emptyCell = document.createElement('div');
+        emptyCell.className = 'w-7 h-7';
+        grid.appendChild(emptyCell);
       }
+
+      const selectedIso = hiddenInput ? hiddenInput.value : '';
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dayDate = new Date(year, month, d);
+        dayDate.setHours(0, 0, 0, 0);
+        const dayBtn = document.createElement('button');
+        dayBtn.type = 'button';
+        dayBtn.innerText = d;
+        dayBtn.className = 'w-7 h-7 rounded-lg text-xs flex items-center justify-center font-semibold transition-all ';
+
+        const isoStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const brStr = `${String(d).padStart(2, '0')}/${String(month + 1).padStart(2, '0')}/${year}`;
+
+        if (dayDate < today) {
+          dayBtn.classList.add('text-stone-300', 'cursor-not-allowed', 'opacity-35');
+          dayBtn.disabled = true;
+        } else {
+          if (selectedIso === isoStr) {
+            dayBtn.classList.add('bg-gradient-to-r', 'from-[#C89B6D]', 'to-[#AD7B42]', 'text-white', 'font-bold', 'shadow-sm');
+          } else if (dayDate.getTime() === today.getTime()) {
+            dayBtn.classList.add('border', 'border-[#C89B6D]', 'text-[#AD7B42]', 'hover:bg-[#F3E6DB]');
+          } else {
+            dayBtn.classList.add('text-[#4E3B31]', 'hover:bg-[#F3E6DB]', 'hover:text-[#AD7B42]');
+          }
+
+          dayBtn.addEventListener('click', () => {
+            if (displayInput) {
+              displayInput.value = brStr;
+              displayInput.classList.remove('border-rose-500');
+            }
+            if (hiddenInput) {
+              hiddenInput.value = isoStr;
+            }
+            const err = document.getElementById(isApt ? 'aptDateError' : 'rescheduleDateError');
+            if (err) err.classList.add('hidden');
+            if (popover) popover.classList.add('hidden');
+
+            if (isApt) {
+              fetchNewAppointmentSlots();
+              if (document.getElementById('aptTime')?.value) checkNewAppointmentSlot();
+              validateAppointmentFormCompletion();
+            } else {
+              fetchRescheduleSlots();
+              if (document.getElementById('rescheduleTime')?.value) checkRescheduleSlot();
+            }
+          });
+        }
+        grid.appendChild(dayBtn);
+      }
+    }
+
+    // Month Navigation Listeners
+    document.getElementById('btnPrevAptCalMonth')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      aptCalCurrentDate.setMonth(aptCalCurrentDate.getMonth() - 1);
+      renderBeautyCalendar('apt');
+    });
+    document.getElementById('btnNextAptCalMonth')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      aptCalCurrentDate.setMonth(aptCalCurrentDate.getMonth() + 1);
+      renderBeautyCalendar('apt');
+    });
+
+    document.getElementById('btnPrevRescheduleCalMonth')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      rescheduleCalCurrentDate.setMonth(rescheduleCalCurrentDate.getMonth() - 1);
+      renderBeautyCalendar('reschedule');
+    });
+    document.getElementById('btnNextRescheduleCalMonth')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      rescheduleCalCurrentDate.setMonth(rescheduleCalCurrentDate.getMonth() + 1);
+      renderBeautyCalendar('reschedule');
+    });
+
+    // Calendar Toggle Button Listeners
+    document.getElementById('btnOpenAptDatePicker')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const popover = document.getElementById('aptBeautyCalendarPopover');
+      document.getElementById('aptTimeDropdown')?.classList.add('hidden');
+      if (popover) {
+        popover.classList.toggle('hidden');
+        if (!popover.classList.contains('hidden')) {
+          renderBeautyCalendar('apt');
+          popover.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    });
+
+    document.getElementById('btnOpenRescheduleDatePicker')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const popover = document.getElementById('rescheduleBeautyCalendarPopover');
+      document.getElementById('rescheduleTimeDropdown')?.classList.add('hidden');
+      if (popover) {
+        popover.classList.toggle('hidden');
+        if (!popover.classList.contains('hidden')) {
+          renderBeautyCalendar('reschedule');
+          popover.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    });
+
+    // Validador de obrigatoriedade e integridade do formulário de agendamento
+    function validateAppointmentFormCompletion() {
+      const name = document.getElementById('aptClientName')?.value?.trim();
+      const service = document.getElementById('aptServiceSelect')?.value?.trim();
+      const date = document.getElementById('aptDate')?.value?.trim();
+      const time = document.getElementById('aptTime')?.value?.trim();
+      const submitBtn = document.getElementById('btnSubmitNewAppointment');
+      if (!submitBtn) return;
+
+      const hasConflict = !document.getElementById('aptSuggestedSlotsContainer')?.classList.contains('hidden');
+      const hasDateErr = !document.getElementById('aptDateError')?.classList.contains('hidden');
+      const hasTimeErr = !document.getElementById('aptTimeError')?.classList.contains('hidden');
+
+      const isValid = Boolean(name && service && date && time && !hasConflict && !hasDateErr && !hasTimeErr);
+
+      if (isValid) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.removeAttribute('title');
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        submitBtn.title = 'Preencha todos os campos obrigatórios (Cliente, Serviço, Data e Horário) para confirmar.';
+      }
+    }
+
+    document.getElementById('aptClientName')?.addEventListener('input', validateAppointmentFormCompletion);
+    document.getElementById('aptServiceSelect')?.addEventListener('change', () => {
+      validateAppointmentFormCompletion();
+      fetchNewAppointmentSlots();
+    });
+    document.getElementById('aptStaffSelect')?.addEventListener('change', () => {
+      validateAppointmentFormCompletion();
+      fetchNewAppointmentSlots();
     });
 
     document.getElementById('aptDatePicker')?.addEventListener('change', (e) => {
@@ -4957,11 +5670,7 @@
       }
       if (errEl) errEl.classList.add('hidden');
       document.getElementById('aptDate').value = iso;
-      const submitBtn = document.getElementById('btnSubmitNewAppointment');
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-      }
+      validateAppointmentFormCompletion();
       fetchNewAppointmentSlots();
       if (document.getElementById('aptTime')?.value) checkNewAppointmentSlot();
     });
@@ -4980,36 +5689,40 @@
           }
           e.target.classList.add('border-rose-500');
           document.getElementById('aptTime').value = '';
-          const submitBtn = document.getElementById('btnSubmitNewAppointment');
-          if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-          }
+          validateAppointmentFormCompletion();
         } else {
           if (errEl) errEl.classList.add('hidden');
           e.target.classList.remove('border-rose-500');
           document.getElementById('aptTime').value = v.time;
           checkNewAppointmentSlot();
+          validateAppointmentFormCompletion();
         }
       } else {
         if (errEl) errEl.classList.add('hidden');
         e.target.classList.remove('border-rose-500');
+        validateAppointmentFormCompletion();
       }
     });
 
-    document.getElementById('aptTimeInput')?.addEventListener('click', () => {
+    document.getElementById('aptTimeInput')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('aptBeautyCalendarPopover')?.classList.add('hidden');
       const dropdown = document.getElementById('aptTimeDropdown');
       if (dropdown) dropdown.classList.toggle('hidden');
       if (dropdown && !dropdown.classList.contains('hidden')) {
         fetchNewAppointmentSlots();
+        dropdown.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     });
 
-    document.getElementById('btnToggleAptTimeDropdown')?.addEventListener('click', () => {
+    document.getElementById('btnToggleAptTimeDropdown')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('aptBeautyCalendarPopover')?.classList.add('hidden');
       const dropdown = document.getElementById('aptTimeDropdown');
       if (dropdown) dropdown.classList.toggle('hidden');
       if (dropdown && !dropdown.classList.contains('hidden')) {
         fetchNewAppointmentSlots();
+        dropdown.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     });
 
@@ -5048,22 +5761,6 @@
       } else {
         if (errEl) errEl.classList.add('hidden');
         e.target.classList.remove('border-rose-500');
-      }
-    });
-
-    document.getElementById('btnOpenRescheduleDatePicker')?.addEventListener('click', () => {
-      const picker = document.getElementById('rescheduleDatePicker');
-      if (!picker) return;
-      try {
-        if (typeof picker.showPicker === 'function') {
-          picker.showPicker();
-        } else {
-          picker.focus();
-          picker.click();
-        }
-      } catch (_) {
-        picker.focus();
-        picker.click();
       }
     });
 
@@ -5119,19 +5816,25 @@
       }
     });
 
-    document.getElementById('rescheduleTimeInput')?.addEventListener('click', () => {
+    document.getElementById('rescheduleTimeInput')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('rescheduleBeautyCalendarPopover')?.classList.add('hidden');
       const dropdown = document.getElementById('rescheduleTimeDropdown');
       if (dropdown) dropdown.classList.toggle('hidden');
       if (dropdown && !dropdown.classList.contains('hidden')) {
         fetchRescheduleSlots();
+        dropdown.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     });
 
-    document.getElementById('btnToggleRescheduleTimeDropdown')?.addEventListener('click', () => {
+    document.getElementById('btnToggleRescheduleTimeDropdown')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('rescheduleBeautyCalendarPopover')?.classList.add('hidden');
       const dropdown = document.getElementById('rescheduleTimeDropdown');
       if (dropdown) dropdown.classList.toggle('hidden');
       if (dropdown && !dropdown.classList.contains('hidden')) {
         fetchRescheduleSlots();
+        dropdown.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     });
 
@@ -5140,18 +5843,24 @@
       if (document.getElementById('rescheduleTime')?.value) checkRescheduleSlot();
     });
 
-    // Fechar popovers ao clicar fora
+    // Fechar popovers e dropdowns ao clicar fora
     document.addEventListener('click', (e) => {
-      const aptWrapper = document.getElementById('aptTimePickerWrapper');
-      const aptDropdown = document.getElementById('aptTimeDropdown');
-      if (aptWrapper && !aptWrapper.contains(e.target) && aptDropdown) {
-        aptDropdown.classList.add('hidden');
-      }
+      const aptTimeWrapper = document.getElementById('aptTimePickerWrapper');
+      const aptCalWrapper = document.getElementById('aptDatePickerWrapper');
+      const reschedTimeWrapper = document.getElementById('rescheduleTimePickerWrapper');
+      const reschedCalWrapper = document.getElementById('rescheduleDatePickerWrapper');
 
-      const reschedWrapper = document.getElementById('rescheduleTimePickerWrapper');
-      const reschedDropdown = document.getElementById('rescheduleTimeDropdown');
-      if (reschedWrapper && !reschedWrapper.contains(e.target) && reschedDropdown) {
-        reschedDropdown.classList.add('hidden');
+      if (aptTimeWrapper && !aptTimeWrapper.contains(e.target)) {
+        document.getElementById('aptTimeDropdown')?.classList.add('hidden');
+      }
+      if (aptCalWrapper && !aptCalWrapper.contains(e.target)) {
+        document.getElementById('aptBeautyCalendarPopover')?.classList.add('hidden');
+      }
+      if (reschedTimeWrapper && !reschedTimeWrapper.contains(e.target)) {
+        document.getElementById('rescheduleTimeDropdown')?.classList.add('hidden');
+      }
+      if (reschedCalWrapper && !reschedCalWrapper.contains(e.target)) {
+        document.getElementById('rescheduleBeautyCalendarPopover')?.classList.add('hidden');
       }
     });
 
@@ -5168,6 +5877,12 @@
       const dd = String(today.getDate()).padStart(2, '0');
       const isoToday = `${yyyy}-${mm}-${dd}`;
       const brToday = `${dd}/${mm}/${yyyy}`;
+
+      const clientName = document.getElementById('aptClientName');
+      if (clientName) clientName.value = '';
+
+      const clientPhone = document.getElementById('aptClientPhone');
+      if (clientPhone) clientPhone.value = '';
 
       const dateDisplay = document.getElementById('aptDateDisplay');
       if (dateDisplay) {
@@ -5188,13 +5903,10 @@
 
       document.getElementById('aptSuggestedSlotsContainer')?.classList.add('hidden');
       document.getElementById('aptTimeDropdown')?.classList.add('hidden');
+      document.getElementById('aptBeautyCalendarPopover')?.classList.add('hidden');
 
-      const submitBtn = document.getElementById('btnSubmitNewAppointment');
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        submitBtn.removeAttribute('title');
-      }
+      // Inicia desabilitado até preencher todos os campos obrigatórios
+      validateAppointmentFormCompletion();
 
       fetchNewAppointmentSlots();
 
@@ -5598,8 +6310,8 @@
           // Carregar Calendários da Conta Google
           loadUserGoogleCalendars(data.selectedCalendarId);
         } else {
-          badge.innerHTML = '<span class="px-3 py-1 rounded-full text-xs font-bold bg-slate-500/10 text-slate-400 border border-slate-500/30 flex items-center gap-1.5"><i data-lucide="circle" class="w-3.5 h-3.5"></i> Desconectado</span>';
-          if (navBadge) navBadge.className = 'w-2 h-2 rounded-full bg-slate-600';
+          badge.innerHTML = '<span class="px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-600 border border-amber-500/30 flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 text-amber-500"></i> Aguardando conexão com Google</span>';
+          if (navBadge) navBadge.className = 'w-2 h-2 rounded-full bg-amber-500/50';
           emailText.innerText = 'Nenhuma conta Google conectada';
           lastSyncText.innerText = data.lastError ? `Aviso: ${data.lastError}` : 'Conecte sua conta para sincronizar agendamentos.';
           btnConnect.innerText = 'Conectar minha Agenda Google';
