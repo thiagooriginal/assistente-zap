@@ -549,8 +549,12 @@
     }
 
     /* Clear Contrast for Disabled vs Enabled Submit Buttons */
+    body.theme-jessica-beauty #btnSubmitNewAppointment[disabled],
     body.theme-jessica-beauty #btnSubmitNewAppointment:disabled,
+    body.theme-jessica-beauty #btnSubmitNewAppointment.cursor-not-allowed,
+    body.theme-jessica-beauty #btnSubmitRescheduleAppointment[disabled],
     body.theme-jessica-beauty #btnSubmitRescheduleAppointment:disabled,
+    body.theme-jessica-beauty #btnSubmitRescheduleAppointment.cursor-not-allowed,
     body.theme-jessica-beauty #modalNewAppointment button[type="submit"]:disabled,
     body.theme-jessica-beauty #modalRescheduleAppointment button[type="submit"]:disabled,
     body.theme-jessica-beauty button[type="submit"]:disabled {
@@ -560,6 +564,7 @@
       box-shadow: none !important;
       cursor: not-allowed !important;
       opacity: 0.85 !important;
+      pointer-events: auto !important;
     }
 
     /* Time & Date Dropdowns in Modals */
@@ -2173,14 +2178,19 @@
                   <p id="aptDateError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
 
                   <!-- Popover Calendário Visual Beauty -->
-                  <div id="aptBeautyCalendarPopover" class="hidden absolute left-0 top-full mt-1.5 p-3 rounded-2xl bg-[#FFFDFB] border border-[#E6D6CA] shadow-2xl z-[70] w-72 select-none">
+                  <div id="aptBeautyCalendarPopover" class="hidden absolute left-0 top-full mt-1.5 p-3.5 rounded-2xl bg-[#FFFDFB] border border-[#E6D6CA] shadow-2xl z-[70] w-72 select-none">
                     <div class="flex items-center justify-between pb-2 mb-2 border-b border-[#E6D6CA]">
-                      <button type="button" id="btnPrevAptCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors">
-                        <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                      </button>
-                      <span id="aptCalMonthYearLabel" class="text-xs font-bold text-[#4E3B31]"></span>
-                      <button type="button" id="btnNextAptCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors">
-                        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                      <div class="flex items-center gap-1.5">
+                        <button type="button" id="btnPrevAptCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Mês anterior">
+                          <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                        </button>
+                        <span id="aptCalMonthYearLabel" class="text-xs font-bold text-[#4E3B31]"></span>
+                        <button type="button" id="btnNextAptCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Próximo mês">
+                          <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                        </button>
+                      </div>
+                      <button type="button" id="btnCloseAptCalPopover" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Fechar calendário">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
                       </button>
                     </div>
                     <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[#AD7B42] mb-1">
@@ -2230,7 +2240,7 @@
 
               <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
                 <button type="button" id="btnCancelNewAppointment" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-medium">Cancelar</button>
-                <button type="submit" id="btnSubmitNewAppointment" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 shadow-sm flex items-center gap-1.5">
+                <button type="submit" id="btnSubmitNewAppointment" disabled class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 shadow-sm flex items-center gap-1.5 opacity-50 cursor-not-allowed" title="Preencha todos os campos obrigatórios (Cliente, Serviço, Data e Horário) para confirmar.">
                   <span>Confirmar Agendamento</span>
                 </button>
               </div>
@@ -2240,7 +2250,7 @@
 
         <!-- MODAL: REMARCAR AGENDAMENTO -->
         <div id="modalRescheduleAppointment" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl min-h-[460px]">
+          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl max-h-[90vh] min-h-[460px] overflow-y-auto">
             <div class="flex items-center justify-between border-b border-white/10 pb-3">
               <h3 class="text-sm font-bold text-white flex items-center gap-2">
                 <i data-lucide="calendar-clock" class="w-4 h-4 text-[#00F59B]"></i>
@@ -2278,14 +2288,19 @@
                   <p id="rescheduleDateError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
 
                   <!-- Popover Calendário Visual Beauty -->
-                  <div id="rescheduleBeautyCalendarPopover" class="hidden absolute left-0 top-full mt-1.5 p-3 rounded-2xl bg-[#FFFDFB] border border-[#E6D6CA] shadow-2xl z-[70] w-72 select-none">
+                  <div id="rescheduleBeautyCalendarPopover" class="hidden absolute left-0 top-full mt-1.5 p-3.5 rounded-2xl bg-[#FFFDFB] border border-[#E6D6CA] shadow-2xl z-[70] w-72 select-none">
                     <div class="flex items-center justify-between pb-2 mb-2 border-b border-[#E6D6CA]">
-                      <button type="button" id="btnPrevRescheduleCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors">
-                        <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                      </button>
-                      <span id="rescheduleCalMonthYearLabel" class="text-xs font-bold text-[#4E3B31]"></span>
-                      <button type="button" id="btnNextRescheduleCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors">
-                        <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                      <div class="flex items-center gap-1.5">
+                        <button type="button" id="btnPrevRescheduleCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Mês anterior">
+                          <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                        </button>
+                        <span id="rescheduleCalMonthYearLabel" class="text-xs font-bold text-[#4E3B31]"></span>
+                        <button type="button" id="btnNextRescheduleCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Próximo mês">
+                          <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                        </button>
+                      </div>
+                      <button type="button" id="btnCloseRescheduleCalPopover" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Fechar calendário">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
                       </button>
                     </div>
                     <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[#AD7B42] mb-1">
@@ -2331,7 +2346,7 @@
 
               <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
                 <button type="button" id="btnCancelRescheduleModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">Cancelar</button>
-                <button type="submit" id="btnSubmitRescheduleAppointment" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110">Salvar Remarcação</button>
+                <button type="submit" id="btnSubmitRescheduleAppointment" disabled class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 opacity-50 cursor-not-allowed">Salvar Remarcação</button>
               </div>
             </form>
           </div>
@@ -5866,26 +5881,67 @@
     // Posicionamento adaptativo de seletores (Calendário e Horários)
     function positionAdaptiveDropdown(wrapper, dropdown) {
       if (!wrapper || !dropdown) return;
-      const modalScroll = wrapper.closest('.overflow-y-auto') || document.body;
+      const modalScroll = wrapper.closest('#modalNewAppointment > div, #modalRescheduleAppointment > div, .overflow-y-auto, [id^="modal"] > div') || document.body;
       const wrapperRect = wrapper.getBoundingClientRect();
       const modalRect = modalScroll.getBoundingClientRect();
 
-      const bottomLimit = Math.min(modalRect.bottom, window.innerHeight);
-      const topLimit = Math.max(modalRect.top, 0);
+      const isMobile = window.innerWidth < 640;
+      const isCalendar = dropdown.id.includes('Calendar') || dropdown.id.includes('Cal');
+      const neededHeight = dropdown.offsetHeight || (isCalendar ? 260 : 200);
+
+      // Limites visíveis seguros dentro do modal e da viewport (evita cortar cabeçalho do modal ou rodapé)
+      const topLimit = Math.max(modalRect.top + 45, 12);
+      const bottomLimit = Math.min(modalRect.bottom - 45, window.innerHeight - 12);
+
       const spaceBelow = bottomLimit - wrapperRect.bottom;
       const spaceAbove = wrapperRect.top - topLimit;
-      const neededHeight = dropdown.offsetHeight || 250;
 
-      if (spaceBelow < (neededHeight + 15) && spaceAbove > spaceBelow) {
-        dropdown.style.setProperty('top', 'auto', 'important');
-        dropdown.style.setProperty('bottom', 'calc(100% + 6px)', 'important');
-        dropdown.style.setProperty('margin-top', '0px', 'important');
-        dropdown.style.setProperty('margin-bottom', '6px', 'important');
-      } else {
+      const canFitBelow = spaceBelow >= (neededHeight + 8);
+      const canFitAbove = spaceAbove >= (neededHeight + 8);
+
+      // Em dispositivos móveis ou quando não houver espaço suficiente acima ou abaixo sem cortes:
+      // Usar a apresentação centralizada em formato de painel/modal interno seguro
+      if (isMobile || (!canFitBelow && !canFitAbove)) {
+        dropdown.style.setProperty('position', 'fixed', 'important');
+        dropdown.style.setProperty('top', '50%', 'important');
+        dropdown.style.setProperty('left', '50%', 'important');
+        dropdown.style.setProperty('bottom', 'auto', 'important');
+        dropdown.style.setProperty('right', 'auto', 'important');
+        dropdown.style.setProperty('transform', 'translate(-50%, -50%)', 'important');
+        dropdown.style.setProperty('z-index', '120', 'important');
+        dropdown.style.setProperty('margin', '0px', 'important');
+        const calWidth = window.innerWidth < 360 ? 'calc(100vw - 24px)' : (window.innerWidth < 420 ? 'calc(100vw - 32px)' : '300px');
+        dropdown.style.setProperty('width', isCalendar ? calWidth : 'calc(100vw - 32px)', 'important');
+        dropdown.style.setProperty('max-width', '92vw', 'important');
+        dropdown.style.setProperty('box-shadow', '0 25px 60px -15px rgba(78, 59, 49, 0.4), 0 0 0 100vmax rgba(40, 25, 15, 0.45)', 'important');
+      } else if (canFitBelow) {
+        // Abre para baixo com segurança
+        dropdown.style.setProperty('position', 'absolute', 'important');
         dropdown.style.setProperty('top', 'calc(100% + 6px)', 'important');
         dropdown.style.setProperty('bottom', 'auto', 'important');
+        dropdown.style.setProperty('left', '0px', 'important');
+        dropdown.style.setProperty('right', 'auto', 'important');
+        dropdown.style.setProperty('transform', 'none', 'important');
+        dropdown.style.setProperty('z-index', '70', 'important');
         dropdown.style.setProperty('margin-top', '6px', 'important');
         dropdown.style.setProperty('margin-bottom', '0px', 'important');
+        dropdown.style.setProperty('width', isCalendar ? '18rem' : '100%', 'important');
+        dropdown.style.setProperty('max-width', 'none', 'important');
+        dropdown.style.setProperty('box-shadow', '0 20px 35px -5px rgba(78, 59, 49, 0.22), 0 0 0 1px rgba(200, 155, 109, 0.18)', 'important');
+      } else {
+        // Abre para cima com segurança
+        dropdown.style.setProperty('position', 'absolute', 'important');
+        dropdown.style.setProperty('top', 'auto', 'important');
+        dropdown.style.setProperty('bottom', 'calc(100% + 6px)', 'important');
+        dropdown.style.setProperty('left', '0px', 'important');
+        dropdown.style.setProperty('right', 'auto', 'important');
+        dropdown.style.setProperty('transform', 'none', 'important');
+        dropdown.style.setProperty('z-index', '70', 'important');
+        dropdown.style.setProperty('margin-top', '0px', 'important');
+        dropdown.style.setProperty('margin-bottom', '6px', 'important');
+        dropdown.style.setProperty('width', isCalendar ? '18rem' : '100%', 'important');
+        dropdown.style.setProperty('max-width', 'none', 'important');
+        dropdown.style.setProperty('box-shadow', '0 20px 35px -5px rgba(78, 59, 49, 0.22), 0 0 0 1px rgba(200, 155, 109, 0.18)', 'important');
       }
     }
 
@@ -6396,6 +6452,16 @@
       }
     });
 
+    document.getElementById('btnCloseAptCalPopover')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('aptBeautyCalendarPopover')?.classList.add('hidden');
+    });
+
+    document.getElementById('btnCloseRescheduleCalPopover')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('rescheduleBeautyCalendarPopover')?.classList.add('hidden');
+    });
+
     // Validador de obrigatoriedade e integridade do formulário de agendamento
     function validateAppointmentFormCompletion() {
       const name = document.getElementById('aptClientName')?.value?.trim();
@@ -6413,10 +6479,12 @@
 
       if (isValid) {
         submitBtn.disabled = false;
+        submitBtn.removeAttribute('disabled');
         submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         submitBtn.removeAttribute('title');
       } else {
         submitBtn.disabled = true;
+        submitBtn.setAttribute('disabled', 'disabled');
         submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
         submitBtn.title = 'Preencha todos os campos obrigatórios (Cliente, Serviço, Data e Horário) para confirmar.';
       }
@@ -6642,6 +6710,26 @@
       }
     });
 
+    // Re-adaptar posicionamento de seletores ao redimensionar a janela ou rotacionar dispositivo
+    window.addEventListener('resize', () => {
+      const aptPop = document.getElementById('aptBeautyCalendarPopover');
+      if (aptPop && !aptPop.classList.contains('hidden')) {
+        positionAdaptiveDropdown(document.getElementById('aptDatePickerWrapper'), aptPop);
+      }
+      const reschedPop = document.getElementById('rescheduleBeautyCalendarPopover');
+      if (reschedPop && !reschedPop.classList.contains('hidden')) {
+        positionAdaptiveDropdown(document.getElementById('rescheduleDatePickerWrapper'), reschedPop);
+      }
+      const aptTimeDrop = document.getElementById('aptTimeDropdown');
+      if (aptTimeDrop && !aptTimeDrop.classList.contains('hidden')) {
+        positionAdaptiveDropdown(document.getElementById('aptTimePickerWrapper'), aptTimeDrop);
+      }
+      const reschedTimeDrop = document.getElementById('rescheduleTimeDropdown');
+      if (reschedTimeDrop && !reschedTimeDrop.classList.contains('hidden')) {
+        positionAdaptiveDropdown(document.getElementById('rescheduleTimePickerWrapper'), reschedTimeDrop);
+      }
+    });
+
     // Abrir Modal Novo Agendamento
     document.getElementById('btnOpenNewAppointmentModal')?.addEventListener('click', async () => {
       await Promise.all([
@@ -6811,11 +6899,14 @@
         });
 
         const data = await res.json();
-        submitBtn.disabled = false;
         submitBtn.innerHTML = '<span>Confirmar Agendamento</span>';
 
         if (res.status === 409) {
-          // Conflito de Horário! Exibir Sugestões Alternativas
+          // Conflito de Horário! Manter botão desabilitado e exibir sugestões
+          submitBtn.disabled = true;
+          submitBtn.setAttribute('disabled', 'disabled');
+          submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
           const container = document.getElementById('aptSuggestedSlotsContainer');
           const pills = document.getElementById('aptSuggestedSlotsPills');
           const alertMsg = document.getElementById('aptConflictAlertMessage');
@@ -6833,8 +6924,7 @@
                   document.getElementById('aptTimeInput').value = slot;
                   document.getElementById('aptTime').value = slot;
                   if (container) container.classList.add('hidden');
-                  submitBtn.disabled = false;
-                  submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                  validateAppointmentFormCompletion();
                   showToast(`Horário ${slot} selecionado! Clique em confirmar.`);
                 });
                 pills.appendChild(pill);
