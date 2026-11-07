@@ -1141,16 +1141,50 @@
               </div>
               <p id="aptServiceDurationHint" class="text-[11px] text-slate-400"></p>
 
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <!-- Data com 2 formas de seleção (Digitação DD/MM/AAAA ou Calendário Visual) -->
                 <div>
-                  <label for="aptDate" class="block text-slate-300 font-semibold mb-1">Data *</label>
-                  <input type="date" id="aptDate" required
-                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                  <label for="aptDateDisplay" class="block text-slate-300 font-semibold mb-1">Data *</label>
+                  <div class="relative">
+                    <input type="text" id="aptDateDisplay" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" required
+                      class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] text-xs transition-colors">
+                    <button type="button" id="btnOpenAptDatePicker" title="Abrir calendário visual"
+                      class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#00F59B] hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                      <i data-lucide="calendar" class="w-4 h-4"></i>
+                    </button>
+                    <input type="date" id="aptDatePicker" tabindex="-1" class="absolute -z-10 opacity-0 pointer-events-none w-0 h-0">
+                    <input type="hidden" id="aptDate" name="aptDate">
+                  </div>
+                  <p id="aptDateError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
                 </div>
-                <div>
-                  <label for="aptTime" class="block text-slate-300 font-semibold mb-1">Horário de Início *</label>
-                  <input type="time" id="aptTime" required
-                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+
+                <!-- Horário com 2 formas de seleção (Digitação HH:MM ou Lista de Horários Disponíveis) -->
+                <div class="relative" id="aptTimePickerWrapper">
+                  <label for="aptTimeInput" class="block text-slate-300 font-semibold mb-1">Horário de Início *</label>
+                  <div class="relative">
+                    <input type="text" id="aptTimeInput" placeholder="HH:MM" maxlength="5" inputmode="numeric" required
+                      class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] text-xs transition-colors">
+                    <button type="button" id="btnToggleAptTimeDropdown" title="Ver horários livres"
+                      class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#00F59B] hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                      <i data-lucide="clock" class="w-4 h-4"></i>
+                    </button>
+                    <input type="hidden" id="aptTime" name="aptTime">
+                  </div>
+                  <p id="aptTimeError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
+
+                  <!-- Popover Dropdown de Horários Disponíveis -->
+                  <div id="aptTimeDropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 p-3 rounded-xl bg-[#11131a] border border-white/15 shadow-2xl z-50 space-y-2">
+                    <div class="flex items-center justify-between text-[11px] font-semibold text-slate-300 border-b border-white/10 pb-1.5">
+                      <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i> Horários Livres</span>
+                      <span id="aptSlotsCountBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"></span>
+                    </div>
+                    <div id="aptSlotsLoading" class="hidden py-3 text-center text-slate-400 text-xs">
+                      <i data-lucide="loader-2" class="w-4 h-4 animate-spin inline-block text-[#00F59B] mb-1"></i>
+                      <div>Buscando horários disponíveis...</div>
+                    </div>
+                    <div id="aptAvailableSlotsList" class="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto pr-1"></div>
+                    <p id="aptSlotsEmptyMsg" class="hidden text-[11px] text-amber-300/80 text-center py-2">Nenhum horário livre para esta data e serviço.</p>
+                  </div>
                 </div>
               </div>
 
@@ -1195,16 +1229,49 @@
             <form id="formRescheduleAppointment" class="space-y-3.5">
               <input type="hidden" id="rescheduleAptId">
 
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <!-- Nova Data com 2 formas de seleção -->
                 <div>
-                  <label for="rescheduleDate" class="block text-slate-300 font-semibold mb-1">Nova Data *</label>
-                  <input type="date" id="rescheduleDate" required
-                    class="w-full px-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                  <label for="rescheduleDateDisplay" class="block text-slate-300 font-semibold mb-1">Nova Data *</label>
+                  <div class="relative">
+                    <input type="text" id="rescheduleDateDisplay" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" required
+                      class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] text-xs transition-colors">
+                    <button type="button" id="btnOpenRescheduleDatePicker" title="Abrir calendário visual"
+                      class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#00F59B] hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                      <i data-lucide="calendar" class="w-4 h-4"></i>
+                    </button>
+                    <input type="date" id="rescheduleDatePicker" tabindex="-1" class="absolute -z-10 opacity-0 pointer-events-none w-0 h-0">
+                    <input type="hidden" id="rescheduleDate" name="rescheduleDate">
+                  </div>
+                  <p id="rescheduleDateError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
                 </div>
-                <div>
-                  <label for="rescheduleTime" class="block text-slate-300 font-semibold mb-1">Novo Horário *</label>
-                  <input type="time" id="rescheduleTime" required
-                    class="w-full px-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+
+                <!-- Novo Horário com 2 formas de seleção -->
+                <div class="relative" id="rescheduleTimePickerWrapper">
+                  <label for="rescheduleTimeInput" class="block text-slate-300 font-semibold mb-1">Novo Horário *</label>
+                  <div class="relative">
+                    <input type="text" id="rescheduleTimeInput" placeholder="HH:MM" maxlength="5" inputmode="numeric" required
+                      class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] text-xs transition-colors">
+                    <button type="button" id="btnToggleRescheduleTimeDropdown" title="Ver horários livres"
+                      class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#00F59B] hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                      <i data-lucide="clock" class="w-4 h-4"></i>
+                    </button>
+                    <input type="hidden" id="rescheduleTime" name="rescheduleTime">
+                  </div>
+                  <p id="rescheduleTimeError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
+
+                  <div id="rescheduleTimeDropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 p-3 rounded-xl bg-[#11131a] border border-white/15 shadow-2xl z-50 space-y-2">
+                    <div class="flex items-center justify-between text-[11px] font-semibold text-slate-300 border-b border-white/10 pb-1.5">
+                      <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i> Horários Livres</span>
+                      <span id="rescheduleSlotsCountBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"></span>
+                    </div>
+                    <div id="rescheduleSlotsLoading" class="hidden py-3 text-center text-slate-400 text-xs">
+                      <i data-lucide="loader-2" class="w-4 h-4 animate-spin inline-block text-[#00F59B] mb-1"></i>
+                      <div>Buscando horários disponíveis...</div>
+                    </div>
+                    <div id="rescheduleAvailableSlotsList" class="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto pr-1"></div>
+                    <p id="rescheduleSlotsEmptyMsg" class="hidden text-[11px] text-amber-300/80 text-center py-2">Nenhum horário livre para esta data.</p>
+                  </div>
                 </div>
               </div>
 
@@ -1215,7 +1282,7 @@
 
               <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
                 <button type="button" id="btnCancelRescheduleModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">Cancelar</button>
-                <button type="submit" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110">Salvar Remarcação</button>
+                <button type="submit" id="btnSubmitRescheduleAppointment" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110">Salvar Remarcação</button>
               </div>
             </form>
           </div>
@@ -4279,16 +4346,53 @@
           const apt = appointmentsState.appointments.find(a => a.id === id);
           if (!apt) return;
 
+          const aptDatePart = apt.start_datetime.split('T')[0];
+          const aptTimePart = apt.start_datetime.split('T')[1].slice(0, 5);
+
           document.getElementById('rescheduleAptId').value = apt.id;
           document.getElementById('rescheduleAptInfo').innerHTML = `
             <strong>${escapeHtml(apt.client_name)}</strong> • ${escapeHtml(apt.service_name)} (${apt.duration_formatted})<br>
             <span class="text-slate-400">Horário Atual: ${new Date(apt.start_datetime).toLocaleDateString('pt-BR')} às ${new Date(apt.start_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • ${escapeHtml(apt.staff_name)}</span>
           `;
-          document.getElementById('rescheduleDate').value = apt.start_datetime.split('T')[0];
-          document.getElementById('rescheduleTime').value = apt.start_datetime.split('T')[1].slice(0, 5);
-          document.getElementById('rescheduleSuggestedSlotsContainer').classList.add('hidden');
+
+          // Inicializar campos de Nova Data (BR e ISO)
+          const rescheduleDateDisplay = document.getElementById('rescheduleDateDisplay');
+          const rescheduleDatePicker = document.getElementById('rescheduleDatePicker');
+          const rescheduleDate = document.getElementById('rescheduleDate');
+          const rescheduleDateError = document.getElementById('rescheduleDateError');
+          if (rescheduleDateDisplay) {
+            rescheduleDateDisplay.value = isoToBRDate(aptDatePart);
+            rescheduleDateDisplay.classList.remove('border-rose-500');
+          }
+          if (rescheduleDatePicker) rescheduleDatePicker.value = aptDatePart;
+          if (rescheduleDate) rescheduleDate.value = aptDatePart;
+          if (rescheduleDateError) rescheduleDateError.classList.add('hidden');
+
+          // Inicializar campos de Novo Horário
+          const rescheduleTimeInput = document.getElementById('rescheduleTimeInput');
+          const rescheduleTime = document.getElementById('rescheduleTime');
+          const rescheduleTimeError = document.getElementById('rescheduleTimeError');
+          if (rescheduleTimeInput) {
+            rescheduleTimeInput.value = aptTimePart;
+            rescheduleTimeInput.classList.remove('border-rose-500');
+          }
+          if (rescheduleTime) rescheduleTime.value = aptTimePart;
+          if (rescheduleTimeError) rescheduleTimeError.classList.add('hidden');
+
+          const rescheduleSuggestedSlotsContainer = document.getElementById('rescheduleSuggestedSlotsContainer');
+          if (rescheduleSuggestedSlotsContainer) rescheduleSuggestedSlotsContainer.classList.add('hidden');
+          const rescheduleTimeDropdown = document.getElementById('rescheduleTimeDropdown');
+          if (rescheduleTimeDropdown) rescheduleTimeDropdown.classList.add('hidden');
+
+          const submitBtn = document.getElementById('btnSubmitRescheduleAppointment');
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            submitBtn.innerHTML = 'Salvar Remarcação';
+          }
 
           populateStaffSelect(document.getElementById('rescheduleStaffSelect'), apt.staff_id);
+          fetchRescheduleSlots(apt.service_id);
 
           const modal = document.getElementById('modalRescheduleAppointment');
           modal.classList.remove('hidden');
@@ -4419,13 +4523,681 @@
       } catch (e) {}
     }
 
+    // --- UTILITÁRIOS DE DATA E HORÁRIO (JÉSSICA - AGENDA INTELIGENTE) ---
+    function isoToBRDate(iso) {
+      if (!iso || !iso.includes('-')) return '';
+      const parts = iso.trim().split('-');
+      if (parts.length !== 3) return '';
+      return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+    }
+
+    function brDateToISO(br) {
+      if (!br || !br.includes('/')) return '';
+      const parts = br.trim().split('/');
+      if (parts.length !== 3) return '';
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+
+    function maskDateInput(val) {
+      const digits = (val || '').replace(/\D/g, '').slice(0, 8);
+      if (digits.length <= 2) return digits;
+      if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+      return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+    }
+
+    function maskTimeInput(val) {
+      const digits = (val || '').replace(/\D/g, '').slice(0, 4);
+      if (digits.length <= 2) return digits;
+      return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+    }
+
+    function validateBRDate(str, { allowPast = false } = {}) {
+      if (!str || str.length !== 10) {
+        return { valid: false, error: 'Digite a data completa no formato DD/MM/AAAA.' };
+      }
+      const parts = str.split('/');
+      if (parts.length !== 3) return { valid: false, error: 'Formato de data inválido. Use DD/MM/AAAA.' };
+      const d = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      const y = parseInt(parts[2], 10);
+      if (isNaN(d) || isNaN(m) || isNaN(y)) return { valid: false, error: 'A data deve conter apenas números.' };
+      if (y < 2024 || y > 2100) return { valid: false, error: 'Ano fora do intervalo permitido (2024 a 2100).' };
+      if (m < 1 || m > 12) return { valid: false, error: 'Mês inválido (01 a 12).' };
+
+      const daysInMonth = new Date(y, m, 0).getDate();
+      if (d < 1 || d > daysInMonth) return { valid: false, error: `Dia inválido para o mês ${String(m).padStart(2, '0')} (máximo ${daysInMonth} dias).` };
+
+      const parsedDate = new Date(y, m - 1, d, 0, 0, 0, 0);
+      if (isNaN(parsedDate.getTime())) return { valid: false, error: 'Data inválida.' };
+
+      if (!allowPast) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (parsedDate < today) {
+          return { valid: false, error: 'Não é permitido agendar em datas passadas.' };
+        }
+      }
+
+      const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      return { valid: true, iso };
+    }
+
+    function validateTimeStr(str) {
+      if (!str || str.length !== 5) {
+        return { valid: false, error: 'Digite o horário no formato HH:MM.' };
+      }
+      const parts = str.split(':');
+      if (parts.length !== 2) return { valid: false, error: 'Formato de horário inválido. Use HH:MM.' };
+      const h = parseInt(parts[0], 10);
+      const min = parseInt(parts[1], 10);
+      if (isNaN(h) || isNaN(min)) return { valid: false, error: 'Horário deve conter apenas números.' };
+      if (h < 0 || h > 23) return { valid: false, error: 'Hora inválida (00 a 23).' };
+      if (min < 0 || min > 59) return { valid: false, error: 'Minuto inválido (00 a 59).' };
+
+      return { valid: true, time: `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}` };
+    }
+
+    // --- REQUISIÇÕES DE SLOTS E VALIDAÇÃO EM TEMPO REAL (NOVO AGENDAMENTO) ---
+    let aptSlotsAbortCtrl = null;
+    async function fetchNewAppointmentSlots() {
+      const dateVal = document.getElementById('aptDate')?.value;
+      const serviceId = document.getElementById('aptServiceSelect')?.value;
+      const staffId = document.getElementById('aptStaffSelect')?.value;
+      const listEl = document.getElementById('aptAvailableSlotsList');
+      const badgeEl = document.getElementById('aptSlotsCountBadge');
+      const loadingEl = document.getElementById('aptSlotsLoading');
+      const emptyEl = document.getElementById('aptSlotsEmptyMsg');
+
+      if (!listEl) return;
+      if (!dateVal) {
+        listEl.innerHTML = '';
+        if (badgeEl) badgeEl.innerText = '';
+        if (emptyEl) {
+          emptyEl.innerText = 'Selecione uma data para listar horários.';
+          emptyEl.classList.remove('hidden');
+        }
+        return;
+      }
+
+      if (aptSlotsAbortCtrl) aptSlotsAbortCtrl.abort();
+      aptSlotsAbortCtrl = new AbortController();
+
+      listEl.innerHTML = '';
+      if (emptyEl) emptyEl.classList.add('hidden');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+
+      try {
+        const url = `/api/cliente/appointments/available-slots?date=${encodeURIComponent(dateVal)}&service_id=${serviceId || ''}&staff_id=${staffId || ''}&limit=50`;
+        const res = await fetch(url, { signal: aptSlotsAbortCtrl.signal });
+        const data = await res.json();
+        if (loadingEl) loadingEl.classList.add('hidden');
+
+        if (data.success && Array.isArray(data.slots) && data.slots.length > 0) {
+          if (badgeEl) badgeEl.innerText = `${data.slots.length} livres`;
+          if (emptyEl) emptyEl.classList.add('hidden');
+
+          data.slots.forEach(slot => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'py-1.5 px-2 rounded-lg bg-white/5 hover:bg-[#00F59B] hover:text-[#07080c] text-slate-200 font-semibold text-xs transition-all text-center border border-white/5 hover:border-[#00F59B] cursor-pointer';
+            btn.innerText = slot;
+            btn.addEventListener('click', () => {
+              const timeInput = document.getElementById('aptTimeInput');
+              const timeHidden = document.getElementById('aptTime');
+              if (timeInput) timeInput.value = slot;
+              if (timeHidden) timeHidden.value = slot;
+              document.getElementById('aptTimeError')?.classList.add('hidden');
+              document.getElementById('aptTimeInput')?.classList.remove('border-rose-500');
+              document.getElementById('aptTimeDropdown')?.classList.add('hidden');
+              checkNewAppointmentSlot();
+            });
+            listEl.appendChild(btn);
+          });
+        } else {
+          if (badgeEl) badgeEl.innerText = '0 livres';
+          if (emptyEl) {
+            emptyEl.innerText = 'Nenhum horário livre para esta data e serviço.';
+            emptyEl.classList.remove('hidden');
+          }
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (emptyEl) {
+          emptyEl.innerText = 'Erro ao consultar horários disponíveis.';
+          emptyEl.classList.remove('hidden');
+        }
+      }
+    }
+
+    let aptCheckSlotAbortCtrl = null;
+    async function checkNewAppointmentSlot() {
+      const date = document.getElementById('aptDate')?.value;
+      const time = document.getElementById('aptTime')?.value;
+      const serviceId = document.getElementById('aptServiceSelect')?.value;
+      const staffId = document.getElementById('aptStaffSelect')?.value;
+      const submitBtn = document.getElementById('btnSubmitNewAppointment');
+      const container = document.getElementById('aptSuggestedSlotsContainer');
+      const pills = document.getElementById('aptSuggestedSlotsPills');
+      const alertMsg = document.getElementById('aptConflictAlertMessage');
+
+      if (!date || !time) return;
+
+      if (aptCheckSlotAbortCtrl) aptCheckSlotAbortCtrl.abort();
+      aptCheckSlotAbortCtrl = new AbortController();
+
+      try {
+        const url = `/api/cliente/appointments/check-slot?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&service_id=${serviceId || ''}&staff_id=${staffId || ''}`;
+        const res = await fetch(url, { signal: aptCheckSlotAbortCtrl.signal });
+        const data = await res.json();
+
+        if (data.available === false) {
+          // Bloqueio imediato! Horário ocupado ou em conflito
+          if (alertMsg) alertMsg.innerText = data.message || 'Horário solicitado já ocupado ou indisponível.';
+          if (pills) {
+            pills.innerHTML = '';
+            if (Array.isArray(data.suggestedSlots) && data.suggestedSlots.length > 0) {
+              data.suggestedSlots.forEach(slot => {
+                const pill = document.createElement('button');
+                pill.type = 'button';
+                pill.className = 'px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer';
+                pill.innerHTML = `<i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i><span>${slot}</span>`;
+                pill.addEventListener('click', () => {
+                  document.getElementById('aptTimeInput').value = slot;
+                  document.getElementById('aptTime').value = slot;
+                  if (container) container.classList.add('hidden');
+                  checkNewAppointmentSlot();
+                  showToast(`Horário ${slot} selecionado.`);
+                });
+                pills.appendChild(pill);
+              });
+              lucide.createIcons();
+            } else {
+              pills.innerHTML = '<span class="text-slate-400 text-xs">Não há outros horários livres nesta data. Tente outro dia.</span>';
+            }
+          }
+          if (container) container.classList.remove('hidden');
+
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            submitBtn.title = 'Horário indisponível. Selecione um horário livre para confirmar.';
+          }
+        } else if (data.available === true) {
+          // Horário liberado!
+          if (container) container.classList.add('hidden');
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            submitBtn.removeAttribute('title');
+          }
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+
+    // --- REQUISIÇÕES DE SLOTS E VALIDAÇÃO EM TEMPO REAL (REMARCAÇÃO) ---
+    let reschedSlotsAbortCtrl = null;
+    async function fetchRescheduleSlots(serviceIdOverride = null) {
+      const dateVal = document.getElementById('rescheduleDate')?.value;
+      const staffId = document.getElementById('rescheduleStaffSelect')?.value;
+      const aptId = document.getElementById('rescheduleAptId')?.value;
+      const apt = appointmentsState.appointments.find(a => a.id === Number(aptId));
+      const serviceId = serviceIdOverride || (apt ? apt.service_id : null);
+
+      const listEl = document.getElementById('rescheduleAvailableSlotsList');
+      const badgeEl = document.getElementById('rescheduleSlotsCountBadge');
+      const loadingEl = document.getElementById('rescheduleSlotsLoading');
+      const emptyEl = document.getElementById('rescheduleSlotsEmptyMsg');
+
+      if (!listEl) return;
+      if (!dateVal) {
+        listEl.innerHTML = '';
+        if (badgeEl) badgeEl.innerText = '';
+        if (emptyEl) {
+          emptyEl.innerText = 'Selecione uma data para listar horários.';
+          emptyEl.classList.remove('hidden');
+        }
+        return;
+      }
+
+      if (reschedSlotsAbortCtrl) reschedSlotsAbortCtrl.abort();
+      reschedSlotsAbortCtrl = new AbortController();
+
+      listEl.innerHTML = '';
+      if (emptyEl) emptyEl.classList.add('hidden');
+      if (loadingEl) loadingEl.classList.remove('hidden');
+
+      try {
+        const url = `/api/cliente/appointments/available-slots?date=${encodeURIComponent(dateVal)}&service_id=${serviceId || ''}&staff_id=${staffId || ''}&limit=50`;
+        const res = await fetch(url, { signal: reschedSlotsAbortCtrl.signal });
+        const data = await res.json();
+        if (loadingEl) loadingEl.classList.add('hidden');
+
+        if (data.success && Array.isArray(data.slots) && data.slots.length > 0) {
+          if (badgeEl) badgeEl.innerText = `${data.slots.length} livres`;
+          if (emptyEl) emptyEl.classList.add('hidden');
+
+          data.slots.forEach(slot => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'py-1.5 px-2 rounded-lg bg-white/5 hover:bg-[#00F59B] hover:text-[#07080c] text-slate-200 font-semibold text-xs transition-all text-center border border-white/5 hover:border-[#00F59B] cursor-pointer';
+            btn.innerText = slot;
+            btn.addEventListener('click', () => {
+              const timeInput = document.getElementById('rescheduleTimeInput');
+              const timeHidden = document.getElementById('rescheduleTime');
+              if (timeInput) timeInput.value = slot;
+              if (timeHidden) timeHidden.value = slot;
+              document.getElementById('rescheduleTimeError')?.classList.add('hidden');
+              document.getElementById('rescheduleTimeInput')?.classList.remove('border-rose-500');
+              document.getElementById('rescheduleTimeDropdown')?.classList.add('hidden');
+              checkRescheduleSlot();
+            });
+            listEl.appendChild(btn);
+          });
+        } else {
+          if (badgeEl) badgeEl.innerText = '0 livres';
+          if (emptyEl) {
+            emptyEl.innerText = 'Nenhum horário livre para esta data.';
+            emptyEl.classList.remove('hidden');
+          }
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (emptyEl) {
+          emptyEl.innerText = 'Erro ao consultar horários disponíveis.';
+          emptyEl.classList.remove('hidden');
+        }
+      }
+    }
+
+    let reschedCheckSlotAbortCtrl = null;
+    async function checkRescheduleSlot() {
+      const date = document.getElementById('rescheduleDate')?.value;
+      const time = document.getElementById('rescheduleTime')?.value;
+      const staffId = document.getElementById('rescheduleStaffSelect')?.value;
+      const aptId = document.getElementById('rescheduleAptId')?.value;
+      const apt = appointmentsState.appointments.find(a => a.id === Number(aptId));
+      const serviceId = apt ? apt.service_id : null;
+
+      const submitBtn = document.getElementById('btnSubmitRescheduleAppointment');
+      const container = document.getElementById('rescheduleSuggestedSlotsContainer');
+      const pills = document.getElementById('rescheduleSuggestedPills');
+
+      if (!date || !time) return;
+
+      if (reschedCheckSlotAbortCtrl) reschedCheckSlotAbortCtrl.abort();
+      reschedCheckSlotAbortCtrl = new AbortController();
+
+      try {
+        const url = `/api/cliente/appointments/check-slot?date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&service_id=${serviceId || ''}&staff_id=${staffId || ''}&exclude_id=${aptId || ''}`;
+        const res = await fetch(url, { signal: reschedCheckSlotAbortCtrl.signal });
+        const data = await res.json();
+
+        if (data.available === false) {
+          if (pills) {
+            pills.innerHTML = '';
+            if (Array.isArray(data.suggestedSlots) && data.suggestedSlots.length > 0) {
+              data.suggestedSlots.forEach(slot => {
+                const pill = document.createElement('button');
+                pill.type = 'button';
+                pill.className = 'px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 font-bold text-xs transition-all cursor-pointer';
+                pill.innerText = slot;
+                pill.addEventListener('click', () => {
+                  document.getElementById('rescheduleTimeInput').value = slot;
+                  document.getElementById('rescheduleTime').value = slot;
+                  if (container) container.classList.add('hidden');
+                  checkRescheduleSlot();
+                });
+                pills.appendChild(pill);
+              });
+              lucide.createIcons();
+            } else {
+              pills.innerHTML = '<span class="text-slate-400 text-xs">Não há outros horários livres nesta data.</span>';
+            }
+          }
+          if (container) container.classList.remove('hidden');
+
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            submitBtn.title = 'Horário indisponível.';
+          }
+        } else if (data.available === true) {
+          if (container) container.classList.add('hidden');
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            submitBtn.removeAttribute('title');
+          }
+        }
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+      }
+    }
+
+    // --- EVENT LISTENERS DOS CAMPOS DE DATA E HORÁRIO ---
+    // 1. Data do Novo Agendamento (digitação com máscara ou picker visual)
+    document.getElementById('aptDateDisplay')?.addEventListener('input', (e) => {
+      e.target.value = maskDateInput(e.target.value);
+      const val = e.target.value;
+      const errEl = document.getElementById('aptDateError');
+      if (val.length === 10) {
+        const v = validateBRDate(val);
+        if (!v.valid) {
+          if (errEl) {
+            errEl.innerText = v.error;
+            errEl.classList.remove('hidden');
+          }
+          e.target.classList.add('border-rose-500');
+          document.getElementById('aptDate').value = '';
+          const submitBtn = document.getElementById('btnSubmitNewAppointment');
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+          }
+        } else {
+          if (errEl) errEl.classList.add('hidden');
+          e.target.classList.remove('border-rose-500');
+          document.getElementById('aptDate').value = v.iso;
+          document.getElementById('aptDatePicker').value = v.iso;
+          const submitBtn = document.getElementById('btnSubmitNewAppointment');
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+          fetchNewAppointmentSlots();
+          if (document.getElementById('aptTime')?.value) checkNewAppointmentSlot();
+        }
+      } else {
+        if (errEl) errEl.classList.add('hidden');
+        e.target.classList.remove('border-rose-500');
+      }
+    });
+
+    document.getElementById('aptDateDisplay')?.addEventListener('blur', (e) => {
+      const val = e.target.value.trim();
+      const errEl = document.getElementById('aptDateError');
+      if (val && val.length < 10) {
+        if (errEl) {
+          errEl.innerText = 'Digite a data completa (DD/MM/AAAA).';
+          errEl.classList.remove('hidden');
+        }
+        e.target.classList.add('border-rose-500');
+      }
+    });
+
+    document.getElementById('btnOpenAptDatePicker')?.addEventListener('click', () => {
+      const picker = document.getElementById('aptDatePicker');
+      if (!picker) return;
+      try {
+        if (typeof picker.showPicker === 'function') {
+          picker.showPicker();
+        } else {
+          picker.focus();
+          picker.click();
+        }
+      } catch (_) {
+        picker.focus();
+        picker.click();
+      }
+    });
+
+    document.getElementById('aptDatePicker')?.addEventListener('change', (e) => {
+      const iso = e.target.value;
+      if (!iso) return;
+      const br = isoToBRDate(iso);
+      const display = document.getElementById('aptDateDisplay');
+      const errEl = document.getElementById('aptDateError');
+      if (display) {
+        display.value = br;
+        display.classList.remove('border-rose-500');
+      }
+      if (errEl) errEl.classList.add('hidden');
+      document.getElementById('aptDate').value = iso;
+      const submitBtn = document.getElementById('btnSubmitNewAppointment');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      }
+      fetchNewAppointmentSlots();
+      if (document.getElementById('aptTime')?.value) checkNewAppointmentSlot();
+    });
+
+    // 2. Horário do Novo Agendamento (digitação com máscara ou lista dropdown)
+    document.getElementById('aptTimeInput')?.addEventListener('input', (e) => {
+      e.target.value = maskTimeInput(e.target.value);
+      const val = e.target.value;
+      const errEl = document.getElementById('aptTimeError');
+      if (val.length === 5) {
+        const v = validateTimeStr(val);
+        if (!v.valid) {
+          if (errEl) {
+            errEl.innerText = v.error;
+            errEl.classList.remove('hidden');
+          }
+          e.target.classList.add('border-rose-500');
+          document.getElementById('aptTime').value = '';
+          const submitBtn = document.getElementById('btnSubmitNewAppointment');
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+          }
+        } else {
+          if (errEl) errEl.classList.add('hidden');
+          e.target.classList.remove('border-rose-500');
+          document.getElementById('aptTime').value = v.time;
+          checkNewAppointmentSlot();
+        }
+      } else {
+        if (errEl) errEl.classList.add('hidden');
+        e.target.classList.remove('border-rose-500');
+      }
+    });
+
+    document.getElementById('aptTimeInput')?.addEventListener('click', () => {
+      const dropdown = document.getElementById('aptTimeDropdown');
+      if (dropdown) dropdown.classList.toggle('hidden');
+      if (dropdown && !dropdown.classList.contains('hidden')) {
+        fetchNewAppointmentSlots();
+      }
+    });
+
+    document.getElementById('btnToggleAptTimeDropdown')?.addEventListener('click', () => {
+      const dropdown = document.getElementById('aptTimeDropdown');
+      if (dropdown) dropdown.classList.toggle('hidden');
+      if (dropdown && !dropdown.classList.contains('hidden')) {
+        fetchNewAppointmentSlots();
+      }
+    });
+
+    // 3. Data da Remarcação (digitação com máscara ou picker visual)
+    document.getElementById('rescheduleDateDisplay')?.addEventListener('input', (e) => {
+      e.target.value = maskDateInput(e.target.value);
+      const val = e.target.value;
+      const errEl = document.getElementById('rescheduleDateError');
+      if (val.length === 10) {
+        const v = validateBRDate(val);
+        if (!v.valid) {
+          if (errEl) {
+            errEl.innerText = v.error;
+            errEl.classList.remove('hidden');
+          }
+          e.target.classList.add('border-rose-500');
+          document.getElementById('rescheduleDate').value = '';
+          const submitBtn = document.getElementById('btnSubmitRescheduleAppointment');
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+          }
+        } else {
+          if (errEl) errEl.classList.add('hidden');
+          e.target.classList.remove('border-rose-500');
+          document.getElementById('rescheduleDate').value = v.iso;
+          document.getElementById('rescheduleDatePicker').value = v.iso;
+          const submitBtn = document.getElementById('btnSubmitRescheduleAppointment');
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          }
+          fetchRescheduleSlots();
+          if (document.getElementById('rescheduleTime')?.value) checkRescheduleSlot();
+        }
+      } else {
+        if (errEl) errEl.classList.add('hidden');
+        e.target.classList.remove('border-rose-500');
+      }
+    });
+
+    document.getElementById('btnOpenRescheduleDatePicker')?.addEventListener('click', () => {
+      const picker = document.getElementById('rescheduleDatePicker');
+      if (!picker) return;
+      try {
+        if (typeof picker.showPicker === 'function') {
+          picker.showPicker();
+        } else {
+          picker.focus();
+          picker.click();
+        }
+      } catch (_) {
+        picker.focus();
+        picker.click();
+      }
+    });
+
+    document.getElementById('rescheduleDatePicker')?.addEventListener('change', (e) => {
+      const iso = e.target.value;
+      if (!iso) return;
+      const br = isoToBRDate(iso);
+      const display = document.getElementById('rescheduleDateDisplay');
+      const errEl = document.getElementById('rescheduleDateError');
+      if (display) {
+        display.value = br;
+        display.classList.remove('border-rose-500');
+      }
+      if (errEl) errEl.classList.add('hidden');
+      document.getElementById('rescheduleDate').value = iso;
+      const submitBtn = document.getElementById('btnSubmitRescheduleAppointment');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      }
+      fetchRescheduleSlots();
+      if (document.getElementById('rescheduleTime')?.value) checkRescheduleSlot();
+    });
+
+    // 4. Horário da Remarcação
+    document.getElementById('rescheduleTimeInput')?.addEventListener('input', (e) => {
+      e.target.value = maskTimeInput(e.target.value);
+      const val = e.target.value;
+      const errEl = document.getElementById('rescheduleTimeError');
+      if (val.length === 5) {
+        const v = validateTimeStr(val);
+        if (!v.valid) {
+          if (errEl) {
+            errEl.innerText = v.error;
+            errEl.classList.remove('hidden');
+          }
+          e.target.classList.add('border-rose-500');
+          document.getElementById('rescheduleTime').value = '';
+          const submitBtn = document.getElementById('btnSubmitRescheduleAppointment');
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+          }
+        } else {
+          if (errEl) errEl.classList.add('hidden');
+          e.target.classList.remove('border-rose-500');
+          document.getElementById('rescheduleTime').value = v.time;
+          checkRescheduleSlot();
+        }
+      } else {
+        if (errEl) errEl.classList.add('hidden');
+        e.target.classList.remove('border-rose-500');
+      }
+    });
+
+    document.getElementById('rescheduleTimeInput')?.addEventListener('click', () => {
+      const dropdown = document.getElementById('rescheduleTimeDropdown');
+      if (dropdown) dropdown.classList.toggle('hidden');
+      if (dropdown && !dropdown.classList.contains('hidden')) {
+        fetchRescheduleSlots();
+      }
+    });
+
+    document.getElementById('btnToggleRescheduleTimeDropdown')?.addEventListener('click', () => {
+      const dropdown = document.getElementById('rescheduleTimeDropdown');
+      if (dropdown) dropdown.classList.toggle('hidden');
+      if (dropdown && !dropdown.classList.contains('hidden')) {
+        fetchRescheduleSlots();
+      }
+    });
+
+    document.getElementById('rescheduleStaffSelect')?.addEventListener('change', () => {
+      fetchRescheduleSlots();
+      if (document.getElementById('rescheduleTime')?.value) checkRescheduleSlot();
+    });
+
+    // Fechar popovers ao clicar fora
+    document.addEventListener('click', (e) => {
+      const aptWrapper = document.getElementById('aptTimePickerWrapper');
+      const aptDropdown = document.getElementById('aptTimeDropdown');
+      if (aptWrapper && !aptWrapper.contains(e.target) && aptDropdown) {
+        aptDropdown.classList.add('hidden');
+      }
+
+      const reschedWrapper = document.getElementById('rescheduleTimePickerWrapper');
+      const reschedDropdown = document.getElementById('rescheduleTimeDropdown');
+      if (reschedWrapper && !reschedWrapper.contains(e.target) && reschedDropdown) {
+        reschedDropdown.classList.add('hidden');
+      }
+    });
+
+    // Abrir Modal Novo Agendamento
     document.getElementById('btnOpenNewAppointmentModal')?.addEventListener('click', async () => {
       await Promise.all([
         populateAppointmentServices(),
         populateStaffSelect(document.getElementById('aptStaffSelect')),
       ]);
 
-      document.getElementById('aptSuggestedSlotsContainer').classList.add('hidden');
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const dd = String(today.getDate()).padStart(2, '0');
+      const isoToday = `${yyyy}-${mm}-${dd}`;
+      const brToday = `${dd}/${mm}/${yyyy}`;
+
+      const dateDisplay = document.getElementById('aptDateDisplay');
+      if (dateDisplay) {
+        dateDisplay.value = brToday;
+        dateDisplay.classList.remove('border-rose-500');
+      }
+      document.getElementById('aptDatePicker').value = isoToday;
+      document.getElementById('aptDate').value = isoToday;
+      document.getElementById('aptDateError')?.classList.add('hidden');
+
+      const timeInput = document.getElementById('aptTimeInput');
+      if (timeInput) {
+        timeInput.value = '';
+        timeInput.classList.remove('border-rose-500');
+      }
+      document.getElementById('aptTime').value = '';
+      document.getElementById('aptTimeError')?.classList.add('hidden');
+
+      document.getElementById('aptSuggestedSlotsContainer')?.classList.add('hidden');
+      document.getElementById('aptTimeDropdown')?.classList.add('hidden');
+
+      const submitBtn = document.getElementById('btnSubmitNewAppointment');
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.removeAttribute('title');
+      }
+
+      fetchNewAppointmentSlots();
+
       const modal = document.getElementById('modalNewAppointment');
       modal.classList.remove('hidden');
       modal.classList.add('flex');
@@ -4476,6 +5248,13 @@
       } else {
         hint.innerText = '';
       }
+      fetchNewAppointmentSlots();
+      if (document.getElementById('aptTime')?.value) checkNewAppointmentSlot();
+    });
+
+    document.getElementById('aptStaffSelect')?.addEventListener('change', () => {
+      fetchNewAppointmentSlots();
+      if (document.getElementById('aptTime')?.value) checkNewAppointmentSlot();
     });
 
     // Submissão do Novo Agendamento com Conflito e Sugestão
@@ -4485,14 +5264,41 @@
       const clientPhone = document.getElementById('aptClientPhone').value.trim();
       const serviceId = document.getElementById('aptServiceSelect').value;
       const staffId = document.getElementById('aptStaffSelect').value;
-      const date = document.getElementById('aptDate').value;
-      const time = document.getElementById('aptTime').value;
+      const dateDisplay = document.getElementById('aptDateDisplay').value.trim();
+      const timeInput = document.getElementById('aptTimeInput').value.trim();
       const status = document.getElementById('aptStatusSelect').value;
 
-      if (!clientName || !serviceId || !date || !time) {
+      if (!clientName || !serviceId || !dateDisplay || !timeInput) {
         showToast('Preencha os campos obrigatórios.', 'error');
         return;
       }
+
+      const dateValidation = validateBRDate(dateDisplay);
+      if (!dateValidation.valid) {
+        const errEl = document.getElementById('aptDateError');
+        if (errEl) {
+          errEl.innerText = dateValidation.error;
+          errEl.classList.remove('hidden');
+        }
+        document.getElementById('aptDateDisplay').classList.add('border-rose-500');
+        showToast(dateValidation.error, 'error');
+        return;
+      }
+
+      const timeValidation = validateTimeStr(timeInput);
+      if (!timeValidation.valid) {
+        const errEl = document.getElementById('aptTimeError');
+        if (errEl) {
+          errEl.innerText = timeValidation.error;
+          errEl.classList.remove('hidden');
+        }
+        document.getElementById('aptTimeInput').classList.add('border-rose-500');
+        showToast(timeValidation.error, 'error');
+        return;
+      }
+
+      const date = dateValidation.iso;
+      const time = timeValidation.time;
 
       const submitBtn = document.getElementById('btnSubmitNewAppointment');
       submitBtn.disabled = true;
@@ -4524,28 +5330,35 @@
           const pills = document.getElementById('aptSuggestedSlotsPills');
           const alertMsg = document.getElementById('aptConflictAlertMessage');
 
-          alertMsg.innerText = data.error || 'Horário solicitado já ocupado para este profissional.';
-          pills.innerHTML = '';
-
-          if (Array.isArray(data.suggestedSlots) && data.suggestedSlots.length > 0) {
-            data.suggestedSlots.forEach(slot => {
-              const pill = document.createElement('button');
-              pill.type = 'button';
-              pill.className = 'px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 font-bold text-xs transition-all flex items-center gap-1';
-              pill.innerHTML = `<i data-lucide="clock" class="w-3 h-3"></i><span>${slot}</span>`;
-              pill.addEventListener('click', () => {
-                document.getElementById('aptTime').value = slot;
-                container.classList.add('hidden');
-                showToast(`Horário ${slot} selecionado! Clique em confirmar.`);
+          if (alertMsg) alertMsg.innerText = data.error || 'Horário solicitado já ocupado para este profissional.';
+          if (pills) {
+            pills.innerHTML = '';
+            if (Array.isArray(data.suggestedSlots) && data.suggestedSlots.length > 0) {
+              data.suggestedSlots.forEach(slot => {
+                const pill = document.createElement('button');
+                pill.type = 'button';
+                pill.className = 'px-3 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 font-bold text-xs transition-all flex items-center gap-1 cursor-pointer';
+                pill.innerHTML = `<i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i><span>${slot}</span>`;
+                pill.addEventListener('click', () => {
+                  document.getElementById('aptTimeInput').value = slot;
+                  document.getElementById('aptTime').value = slot;
+                  if (container) container.classList.add('hidden');
+                  submitBtn.disabled = false;
+                  submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                  showToast(`Horário ${slot} selecionado! Clique em confirmar.`);
+                });
+                pills.appendChild(pill);
               });
-              pills.appendChild(pill);
-            });
-            container.classList.remove('hidden');
-            lucide.createIcons();
-          } else {
-            container.classList.remove('hidden');
-            pills.innerHTML = '<span class="text-slate-400 text-xs">Não há outros horários livres nesta data. Tente outro dia.</span>';
+              if (container) container.classList.remove('hidden');
+              lucide.createIcons();
+            } else {
+              if (container) container.classList.remove('hidden');
+              pills.innerHTML = '<span class="text-slate-400 text-xs">Não há outros horários livres nesta data. Tente outro dia.</span>';
+            }
           }
+
+          submitBtn.disabled = true;
+          submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
           return;
         }
 
@@ -4568,9 +5381,31 @@
     document.getElementById('formRescheduleAppointment')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       const id = document.getElementById('rescheduleAptId').value;
-      const newDate = document.getElementById('rescheduleDate').value;
-      const newTime = document.getElementById('rescheduleTime').value;
+      const dateDisplay = document.getElementById('rescheduleDateDisplay').value.trim();
+      const timeInput = document.getElementById('rescheduleTimeInput').value.trim();
       const newStaffId = document.getElementById('rescheduleStaffSelect').value;
+
+      const dateValidation = validateBRDate(dateDisplay);
+      if (!dateValidation.valid) {
+        showToast(dateValidation.error, 'error');
+        return;
+      }
+
+      const timeValidation = validateTimeStr(timeInput);
+      if (!timeValidation.valid) {
+        showToast(timeValidation.error, 'error');
+        return;
+      }
+
+      const newDate = dateValidation.iso;
+      const newTime = timeValidation.time;
+
+      const submitBtn = document.getElementById('btnSubmitRescheduleAppointment');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Salvando...</span>';
+        lucide.createIcons();
+      }
 
       try {
         const res = await fetch(`/api/cliente/appointments/${id}/reschedule`, {
@@ -4584,24 +5419,39 @@
         });
 
         const data = await res.json();
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = 'Salvar Remarcação';
+        }
+
         if (res.status === 409) {
           const container = document.getElementById('rescheduleSuggestedSlotsContainer');
           const pills = document.getElementById('rescheduleSuggestedPills');
-          pills.innerHTML = '';
-
-          if (Array.isArray(data.suggestedSlots) && data.suggestedSlots.length > 0) {
-            data.suggestedSlots.forEach(slot => {
-              const pill = document.createElement('button');
-              pill.type = 'button';
-              pill.className = 'px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 font-bold text-xs transition-all';
-              pill.innerText = slot;
-              pill.addEventListener('click', () => {
-                document.getElementById('rescheduleTime').value = slot;
-                container.classList.add('hidden');
+          if (pills) {
+            pills.innerHTML = '';
+            if (Array.isArray(data.suggestedSlots) && data.suggestedSlots.length > 0) {
+              data.suggestedSlots.forEach(slot => {
+                const pill = document.createElement('button');
+                pill.type = 'button';
+                pill.className = 'px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 font-bold text-xs transition-all cursor-pointer';
+                pill.innerText = slot;
+                pill.addEventListener('click', () => {
+                  document.getElementById('rescheduleTimeInput').value = slot;
+                  document.getElementById('rescheduleTime').value = slot;
+                  if (container) container.classList.add('hidden');
+                  if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                  }
+                });
+                pills.appendChild(pill);
               });
-              pills.appendChild(pill);
-            });
-            container.classList.remove('hidden');
+              if (container) container.classList.remove('hidden');
+            }
+          }
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
           }
           showToast(data.error || 'Conflito de horário detectado.', 'error');
           return;
@@ -4615,6 +5465,10 @@
           showToast(data.error || 'Erro ao remarcar.', 'error');
         }
       } catch (_) {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = 'Salvar Remarcação';
+        }
         showToast('Erro de conexão ao remarcar.', 'error');
       }
     });

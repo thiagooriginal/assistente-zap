@@ -372,11 +372,28 @@ async function checkSlotAvailability(userId, params) {
 /**
  * Finds alternative available slots on a given date for a service duration
  */
-async function findAlternativeSlots(userId, { date, serviceDurationMin = 45, staffId = null }) {
+async function findAlternativeSlots(userId, { date, serviceDurationMin = 45, staffId = null, limit = 50 }) {
+  let cleanDate = date;
+  if (typeof cleanDate === 'string' && cleanDate.includes('/')) {
+    const parts = cleanDate.trim().split('/');
+    if (parts.length === 3) {
+      const [d, m, y] = parts;
+      cleanDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+  }
+
   const salon = db.prepare('SELECT opening_hours FROM client_salons WHERE user_id = ?').get(userId);
   const hours = parseOpeningHours(salon?.opening_hours);
 
-  const targetDate = new Date(`${date}T12:00:00`);
+  let resolvedStaffId = staffId ? Number(staffId) : null;
+  if (!resolvedStaffId) {
+    try {
+      const eff = resolveEffectiveStaff(userId, null);
+      resolvedStaffId = eff.staffId;
+    } catch (_) {}
+  }
+
+  const targetDate = new Date(`${cleanDate}T12:00:00`);
   const dayOfWeek = targetDate.getDay();
   const dayConfig = hours.days[dayOfWeek];
 
@@ -387,6 +404,19 @@ async function findAlternativeSlots(userId, { date, serviceDurationMin = 45, sta
   const [openH, openM] = (dayConfig.start || '08:00').split(':').map(Number);
   const [closeH, closeM] = (dayConfig.end || '19:00').split(':').map(Number);
 
+  // Consulta do Google Calendar para o dia todo (para evitar múltiplas chamadas externas)
+  let googleBusy = [];
+  try {
+    const googleStatus = googleCalendarService.getConnectionStatus(userId);
+    if (googleStatus.isConnected) {
+      googleBusy = await googleCalendarService.getGoogleBusySlots(userId, {
+        timeMin: `${cleanDate}T00:00:00`,
+        timeMax: `${cleanDate}T23:59:59`,
+        staffId: resolvedStaffId,
+      });
+    }
+  } catch (_) {}
+
   const candidateSlots = [];
   let currentMin = openH * 60 + openM;
   const maxStartMin = closeH * 60 + closeM - serviceDurationMin;
@@ -396,21 +426,31 @@ async function findAlternativeSlots(userId, { date, serviceDurationMin = 45, sta
     const m = currentMin % 60;
     const timeStr = `${padZero(h)}:${padZero(m)}`;
 
-    const candidateStart = `${date}T${timeStr}:00`;
+    const candidateStart = `${cleanDate}T${timeStr}:00`;
     const candidateEnd = new Date(new Date(candidateStart).getTime() + serviceDurationMin * 60000);
-    const candidateEndStr = `${date}T${padZero(candidateEnd.getHours())}:${padZero(candidateEnd.getMinutes())}:${padZero(candidateEnd.getSeconds())}`;
+    const candidateEndStr = `${cleanDate}T${padZero(candidateEnd.getHours())}:${padZero(candidateEnd.getMinutes())}:${padZero(candidateEnd.getSeconds())}`;
 
     const check = checkInternalSlotAvailability(userId, {
       startDt: candidateStart,
       endDt: candidateEndStr,
-      staffId,
+      staffId: resolvedStaffId,
       bypassPastCheck: false,
       bypassHoursCheck: false,
     });
 
     if (check.available) {
-      candidateSlots.push(timeStr);
-      if (candidateSlots.length >= 5) break;
+      const slotStartMs = new Date(candidateStart).getTime();
+      const slotEndMs = candidateEnd.getTime();
+      const hasGoogleConflict = googleBusy.some((b) => {
+        const bStart = new Date(b.start).getTime();
+        const bEnd = new Date(b.end).getTime();
+        return slotStartMs < bEnd && slotEndMs > bStart;
+      });
+
+      if (!hasGoogleConflict) {
+        candidateSlots.push(timeStr);
+        if (limit && candidateSlots.length >= limit) break;
+      }
     }
 
     currentMin += 30; // Incrementos de 30 minutos
@@ -526,7 +566,17 @@ function bookAppointmentSync(userId, {
   const resolvedStaffName = effectiveStaff.staffName;
 
   // 3. Cálculo de Início e Término
-  const startDt = `${date}T${time.length === 5 ? time + ':00' : time}`;
+  let cleanDate = date;
+  if (typeof cleanDate === 'string' && cleanDate.includes('/')) {
+    const parts = cleanDate.trim().split('/');
+    if (parts.length === 3) {
+      const [d, m, y] = parts;
+      cleanDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+  }
+
+  const cleanTime = time.length === 5 ? time + ':00' : time;
+  const startDt = `${cleanDate}T${cleanTime}`;
   const startDate = new Date(startDt);
   if (isNaN(startDate.getTime())) {
     throw new Error('Data ou horário inválido.');
@@ -662,7 +712,17 @@ async function bookAppointment(userId, params) {
     if (sRow?.duration_min) calcDuration = sRow.duration_min;
   }
 
-  const startDt = `${date}T${time.length === 5 ? time + ':00' : time}`;
+  let cleanDate = date;
+  if (typeof cleanDate === 'string' && cleanDate.includes('/')) {
+    const parts = cleanDate.trim().split('/');
+    if (parts.length === 3) {
+      const [d, m, y] = parts;
+      cleanDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+  }
+
+  const cleanTime = time.length === 5 ? time + ':00' : time;
+  const startDt = `${cleanDate}T${cleanTime}`;
   const startDate = new Date(startDt);
   if (!isNaN(startDate.getTime())) {
     const endDate = new Date(startDate.getTime() + calcDuration * 60000);
@@ -681,7 +741,7 @@ async function bookAppointment(userId, params) {
       const err = new Error(gCheck.message);
       err.code = gCheck.reason || 'GOOGLE_CALENDAR_BUSY';
       try {
-        err.suggestedSlots = await findAlternativeSlots(userId, { date, serviceDurationMin: calcDuration, staffId: resolvedStaffId });
+        err.suggestedSlots = await findAlternativeSlots(userId, { date: cleanDate, serviceDurationMin: calcDuration, staffId: resolvedStaffId });
       } catch (_) {
         err.suggestedSlots = [];
       }
@@ -689,10 +749,11 @@ async function bookAppointment(userId, params) {
     }
   }
 
-  // 3. Execução atômica no SQLite passando o profissional já resolvido
+  // 3. Execução atômica no SQLite passando o profissional já resolvido e data normalizada
   try {
     const createdAppointment = bookAppointmentSync(userId, {
       ...params,
+      date: cleanDate,
       staffId: resolvedStaffId,
     });
 
@@ -704,7 +765,7 @@ async function bookAppointment(userId, params) {
   } catch (err) {
     if (err.code === 'SLOT_CONFLICT' && !err.suggestedSlots) {
       try {
-        err.suggestedSlots = await findAlternativeSlots(userId, { date, serviceDurationMin: calcDuration, staffId });
+        err.suggestedSlots = await findAlternativeSlots(userId, { date: cleanDate, serviceDurationMin: calcDuration, staffId: resolvedStaffId });
       } catch (_) {
         err.suggestedSlots = [];
       }
@@ -730,8 +791,18 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
     throw err;
   }
 
+  let cleanNewDate = newDate;
+  if (typeof cleanNewDate === 'string' && cleanNewDate.includes('/')) {
+    const parts = cleanNewDate.trim().split('/');
+    if (parts.length === 3) {
+      const [d, m, y] = parts;
+      cleanNewDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+  }
+
   const durationMin = existing.duration_min || 45;
-  const startDt = `${newDate}T${newTime.length === 5 ? newTime + ':00' : newTime}`;
+  const cleanNewTime = newTime.length === 5 ? newTime + ':00' : newTime;
+  const startDt = `${cleanNewDate}T${cleanNewTime}`;
   const startDate = new Date(startDt);
   if (isNaN(startDate.getTime())) {
     throw new Error('Nova data ou horário em formato inválido.');
@@ -754,9 +825,10 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
     if (!check.available) {
       db.exec('ROLLBACK');
       const alternatives = await findAlternativeSlots(userId, {
-        date: newDate,
+        date: cleanNewDate,
         serviceDurationMin: durationMin,
         staffId: targetStaffId,
+        limit: 5,
       });
 
       const err = new Error(check.message);

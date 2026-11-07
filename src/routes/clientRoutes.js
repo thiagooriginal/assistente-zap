@@ -1201,9 +1201,18 @@ router.get('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA'
 });
 
 router.get('/appointments/available-slots', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
-  const { date, service_id, staff_id } = req.query || {};
+  const { date, service_id, staff_id, limit } = req.query || {};
   if (!date) {
-    return res.status(400).json({ success: false, error: 'A data é obrigatória (formato YYYY-MM-DD).' });
+    return res.status(400).json({ success: false, error: 'A data é obrigatória (formato YYYY-MM-DD ou DD/MM/AAAA).' });
+  }
+
+  let cleanDate = date;
+  if (typeof cleanDate === 'string' && cleanDate.includes('/')) {
+    const parts = cleanDate.trim().split('/');
+    if (parts.length === 3) {
+      const [d, m, y] = parts;
+      cleanDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
   }
 
   let durationMin = 45;
@@ -1213,12 +1222,79 @@ router.get('/appointments/available-slots', clientAuthMiddleware, requireProduct
   }
 
   const slots = await salonAppointmentService.findAlternativeSlots(req.clientUser.id, {
-    date,
+    date: cleanDate,
     serviceDurationMin: durationMin,
     staffId: staff_id ? Number(staff_id) : null,
+    limit: limit ? Number(limit) : 50,
   });
 
-  res.json({ success: true, date, slots });
+  res.json({ success: true, date: cleanDate, durationMin, slots });
+});
+
+router.get('/appointments/check-slot', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+  const { date, time, service_id, staff_id, exclude_id } = req.query || {};
+  if (!date || !time) {
+    return res.status(400).json({ success: false, error: 'Data e horário são obrigatórios.' });
+  }
+
+  let cleanDate = date;
+  if (typeof cleanDate === 'string' && cleanDate.includes('/')) {
+    const parts = cleanDate.trim().split('/');
+    if (parts.length === 3) {
+      const [d, m, y] = parts;
+      cleanDate = `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+  }
+
+  let durationMin = 45;
+  if (service_id) {
+    const svc = db.prepare('SELECT duration_min FROM client_services WHERE id = ? AND user_id = ?').get(service_id, req.clientUser.id);
+    if (svc && svc.duration_min) durationMin = svc.duration_min;
+  }
+
+  const cleanTime = time.length === 5 ? time + ':00' : time;
+  const startDt = `${cleanDate}T${cleanTime}`;
+  const startDate = new Date(startDt);
+  if (isNaN(startDate.getTime())) {
+    return res.status(400).json({ success: false, error: 'Data ou horário em formato inválido.' });
+  }
+
+  const endDate = new Date(startDate.getTime() + durationMin * 60000);
+  const pad = (n) => String(n).padStart(2, '0');
+  const endDt = `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}T${pad(endDate.getHours())}:${pad(endDate.getMinutes())}:${pad(endDate.getSeconds())}`;
+
+  const check = await salonAppointmentService.checkSlotAvailability(req.clientUser.id, {
+    startDt,
+    endDt,
+    staffId: staff_id ? Number(staff_id) : null,
+    excludeAppointmentId: exclude_id ? Number(exclude_id) : null,
+  });
+
+  if (!check.available) {
+    const suggestedSlots = await salonAppointmentService.findAlternativeSlots(req.clientUser.id, {
+      date: cleanDate,
+      serviceDurationMin: durationMin,
+      staffId: staff_id ? Number(staff_id) : null,
+      limit: 6,
+    });
+
+    return res.json({
+      success: true,
+      available: false,
+      reason: check.reason || 'SLOT_CONFLICT',
+      message: check.message,
+      conflict: check.conflict || null,
+      suggestedSlots,
+    });
+  }
+
+  return res.json({
+    success: true,
+    available: true,
+    startDt,
+    endDt,
+    durationMin,
+  });
 });
 
 router.get('/appointments/conflicts', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
