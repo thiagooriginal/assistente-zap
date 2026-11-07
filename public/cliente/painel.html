@@ -523,6 +523,45 @@
       box-shadow: 0 25px 50px -12px rgba(78, 59, 49, 0.25) !important;
     }
 
+    /* Modal Dynamic Height: Hugs content without dead empty space at bottom */
+    body.theme-jessica-beauty #modalNewAppointment > div,
+    body.theme-jessica-beauty #modalRescheduleAppointment > div {
+      min-height: auto !important;
+      max-height: 90vh !important;
+      height: auto !important;
+    }
+
+    /* Adaptive Dropdowns and Popovers in Modals */
+    #aptTimeDropdown,
+    #rescheduleTimeDropdown {
+      max-height: 250px !important;
+      overflow-y: auto !important;
+    }
+    #aptBeautyCalendarPopover,
+    #rescheduleBeautyCalendarPopover {
+      max-height: 330px !important;
+      overflow-y: auto !important;
+    }
+    #aptAvailableSlotsList,
+    #rescheduleAvailableSlotsList {
+      max-height: 180px !important;
+      overflow-y: auto !important;
+    }
+
+    /* Clear Contrast for Disabled vs Enabled Submit Buttons */
+    body.theme-jessica-beauty #btnSubmitNewAppointment:disabled,
+    body.theme-jessica-beauty #btnSubmitRescheduleAppointment:disabled,
+    body.theme-jessica-beauty #modalNewAppointment button[type="submit"]:disabled,
+    body.theme-jessica-beauty #modalRescheduleAppointment button[type="submit"]:disabled,
+    body.theme-jessica-beauty button[type="submit"]:disabled {
+      background: #E8DCD1 !important;
+      color: #9C8578 !important;
+      border: 1px solid #D9C8BA !important;
+      box-shadow: none !important;
+      cursor: not-allowed !important;
+      opacity: 0.85 !important;
+    }
+
     /* Time & Date Dropdowns in Modals */
     body.theme-jessica-beauty #aptTimeDropdown,
     body.theme-jessica-beauty #rescheduleTimeDropdown,
@@ -623,10 +662,11 @@
       background-color: rgba(200, 155, 109, 0.15) !important;
     }
     body.theme-jessica-beauty #tab-appointments .apt-view-btn.active {
-      background-color: #C08272 !important;
+      background-color: #9E5343 !important;
       color: #FFFFFF !important;
       font-weight: 700 !important;
-      box-shadow: 0 1px 4px rgba(192, 130, 114, 0.3) !important;
+      border: 1px solid #894233 !important;
+      box-shadow: 0 1px 4px rgba(158, 83, 67, 0.35) !important;
     }
 
     /* Button + Novo Agendamento */
@@ -689,19 +729,19 @@
     }
     body.theme-jessica-beauty .apt-status-pill:not(.active) {
       background-color: #F6EDE6 !important;
-      color: #7A6255 !important;
-      border: 1px solid transparent !important;
+      color: #634C3E !important;
+      border: 1px solid #EED8C6 !important;
     }
     body.theme-jessica-beauty .apt-status-pill:not(.active):hover {
       background-color: #EED8C6 !important;
-      color: #4E3B31 !important;
+      color: #3D2B22 !important;
     }
     body.theme-jessica-beauty .apt-status-pill.active {
-      background-color: #C08272 !important;
+      background-color: #9E5343 !important;
       color: #FFFFFF !important;
-      border: 1px solid #C08272 !important;
+      border: 1px solid #894233 !important;
       font-weight: 700 !important;
-      box-shadow: 0 1px 4px rgba(192, 130, 114, 0.3) !important;
+      box-shadow: 0 1px 4px rgba(158, 83, 67, 0.35) !important;
     }
 
     /* Appointment Cards in Appointments List */
@@ -1134,9 +1174,9 @@
             <img src="../images/beauty/jessica-silhouette-trans.png" alt="Módulo Jéssica" class="w-8 h-8 sm:w-9 sm:h-9 object-contain shrink-0">
             <div class="space-y-0.5">
               <h2 class="text-base sm:text-xl font-bold text-[#4E3B31] tracking-tight md:whitespace-nowrap" style="font-family: 'Playfair Display', Georgia, serif;">
-                Módulo Jéssica <span class="font-normal text-[#4E3B31]">• Agenda de Atendimentos</span>
+                Módulo Jéssica <span id="jessicaBannerTabTitle" class="font-normal text-[#4E3B31]">• Agenda de Atendimentos</span>
               </h2>
-              <p class="text-[11px] text-[#7A6255] md:whitespace-nowrap">
+              <p id="jessicaBannerTabSubtitle" class="text-[11px] text-[#7A6255] md:whitespace-nowrap">
                 Gestão de horários, profissionais, concorrência e sincronização com Google Calendar.
               </p>
             </div>
@@ -3420,6 +3460,20 @@
       if (tabMeta[tabId]) {
         pageTitle.innerHTML = `<span>${tabMeta[tabId].title}</span>`;
         pageSubtitle.innerText = tabMeta[tabId].subtitle;
+
+        // Atualizar título e subtítulo dinamicamente no Banner Decorativo da Jéssica
+        const jessicaBannerTabTitle = document.getElementById('jessicaBannerTabTitle');
+        const jessicaBannerTabSubtitle = document.getElementById('jessicaBannerTabSubtitle');
+        if (inSalon) {
+          const rawTitle = tabMeta[tabId].title || '';
+          const subTitlePart = rawTitle.includes('•') ? rawTitle.split('•')[1].trim() : rawTitle;
+          if (jessicaBannerTabTitle) {
+            jessicaBannerTabTitle.textContent = `• ${subTitlePart}`;
+          }
+          if (jessicaBannerTabSubtitle) {
+            jessicaBannerTabSubtitle.textContent = tabMeta[tabId].subtitle || '';
+          }
+        }
       }
 
       // Contextual Header: Back to Hub
@@ -5809,6 +5863,32 @@
       return { valid: true, time: `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}` };
     }
 
+    // Posicionamento adaptativo de seletores (Calendário e Horários)
+    function positionAdaptiveDropdown(wrapper, dropdown) {
+      if (!wrapper || !dropdown) return;
+      const modalScroll = wrapper.closest('.overflow-y-auto') || document.body;
+      const wrapperRect = wrapper.getBoundingClientRect();
+      const modalRect = modalScroll.getBoundingClientRect();
+
+      const bottomLimit = Math.min(modalRect.bottom, window.innerHeight);
+      const topLimit = Math.max(modalRect.top, 0);
+      const spaceBelow = bottomLimit - wrapperRect.bottom;
+      const spaceAbove = wrapperRect.top - topLimit;
+      const neededHeight = dropdown.offsetHeight || 250;
+
+      if (spaceBelow < (neededHeight + 15) && spaceAbove > spaceBelow) {
+        dropdown.style.setProperty('top', 'auto', 'important');
+        dropdown.style.setProperty('bottom', 'calc(100% + 6px)', 'important');
+        dropdown.style.setProperty('margin-top', '0px', 'important');
+        dropdown.style.setProperty('margin-bottom', '6px', 'important');
+      } else {
+        dropdown.style.setProperty('top', 'calc(100% + 6px)', 'important');
+        dropdown.style.setProperty('bottom', 'auto', 'important');
+        dropdown.style.setProperty('margin-top', '6px', 'important');
+        dropdown.style.setProperty('margin-bottom', '0px', 'important');
+      }
+    }
+
     // --- REQUISIÇÕES DE SLOTS E VALIDAÇÃO EM TEMPO REAL (NOVO AGENDAMENTO) ---
     let aptSlotsAbortCtrl = null;
     async function fetchNewAppointmentSlots() {
@@ -5821,11 +5901,21 @@
       const emptyEl = document.getElementById('aptSlotsEmptyMsg');
 
       if (!listEl) return;
+      if (!serviceId) {
+        listEl.innerHTML = '';
+        if (badgeEl) badgeEl.innerText = '';
+        if (emptyEl) {
+          emptyEl.innerHTML = '<span class="text-amber-800 font-semibold flex items-center justify-center gap-1.5 py-1 text-xs"><i data-lucide="info" class="w-3.5 h-3.5 text-[#AD7B42]"></i> Selecione um serviço primeiro para calcular os horários livres com base na duração.</span>';
+          emptyEl.classList.remove('hidden');
+          lucide.createIcons();
+        }
+        return;
+      }
       if (!dateVal) {
         listEl.innerHTML = '';
         if (badgeEl) badgeEl.innerText = '';
         if (emptyEl) {
-          emptyEl.innerText = 'Selecione uma data para listar horários.';
+          emptyEl.innerText = 'Selecione uma data para listar horários disponíveis.';
           emptyEl.classList.remove('hidden');
         }
         return;
@@ -5966,7 +6056,7 @@
         listEl.innerHTML = '';
         if (badgeEl) badgeEl.innerText = '';
         if (emptyEl) {
-          emptyEl.innerText = 'Selecione uma data para listar horários.';
+          emptyEl.innerText = 'Selecione uma data para listar horários disponíveis.';
           emptyEl.classList.remove('hidden');
         }
         return;
@@ -6262,8 +6352,21 @@
         popover.classList.toggle('hidden');
         if (!popover.classList.contains('hidden')) {
           renderBeautyCalendar('apt');
+          positionAdaptiveDropdown(document.getElementById('aptDatePickerWrapper'), popover);
           popover.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
+      }
+    });
+
+    document.getElementById('aptDateDisplay')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const popover = document.getElementById('aptBeautyCalendarPopover');
+      document.getElementById('aptTimeDropdown')?.classList.add('hidden');
+      if (popover && popover.classList.contains('hidden')) {
+        popover.classList.remove('hidden');
+        renderBeautyCalendar('apt');
+        positionAdaptiveDropdown(document.getElementById('aptDatePickerWrapper'), popover);
+        popover.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     });
 
@@ -6275,8 +6378,21 @@
         popover.classList.toggle('hidden');
         if (!popover.classList.contains('hidden')) {
           renderBeautyCalendar('reschedule');
+          positionAdaptiveDropdown(document.getElementById('rescheduleDatePickerWrapper'), popover);
           popover.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
+      }
+    });
+
+    document.getElementById('rescheduleDateDisplay')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const popover = document.getElementById('rescheduleBeautyCalendarPopover');
+      document.getElementById('rescheduleTimeDropdown')?.classList.add('hidden');
+      if (popover && popover.classList.contains('hidden')) {
+        popover.classList.remove('hidden');
+        renderBeautyCalendar('reschedule');
+        positionAdaptiveDropdown(document.getElementById('rescheduleDatePickerWrapper'), popover);
+        popover.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     });
 
@@ -6368,6 +6484,7 @@
       const dropdown = document.getElementById('aptTimeDropdown');
       if (dropdown) dropdown.classList.toggle('hidden');
       if (dropdown && !dropdown.classList.contains('hidden')) {
+        positionAdaptiveDropdown(document.getElementById('aptTimePickerWrapper'), dropdown);
         fetchNewAppointmentSlots();
         dropdown.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
@@ -6379,6 +6496,7 @@
       const dropdown = document.getElementById('aptTimeDropdown');
       if (dropdown) dropdown.classList.toggle('hidden');
       if (dropdown && !dropdown.classList.contains('hidden')) {
+        positionAdaptiveDropdown(document.getElementById('aptTimePickerWrapper'), dropdown);
         fetchNewAppointmentSlots();
         dropdown.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
@@ -6480,6 +6598,7 @@
       const dropdown = document.getElementById('rescheduleTimeDropdown');
       if (dropdown) dropdown.classList.toggle('hidden');
       if (dropdown && !dropdown.classList.contains('hidden')) {
+        positionAdaptiveDropdown(document.getElementById('rescheduleTimePickerWrapper'), dropdown);
         fetchRescheduleSlots();
         dropdown.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
@@ -6491,6 +6610,7 @@
       const dropdown = document.getElementById('rescheduleTimeDropdown');
       if (dropdown) dropdown.classList.toggle('hidden');
       if (dropdown && !dropdown.classList.contains('hidden')) {
+        positionAdaptiveDropdown(document.getElementById('rescheduleTimePickerWrapper'), dropdown);
         fetchRescheduleSlots();
         dropdown.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
