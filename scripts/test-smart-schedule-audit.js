@@ -73,9 +73,18 @@ async function setup() {
     }),
     getGoogleBusySlots: async (userId, { timeMin, timeMax, calendarId, staffId }) => {
       let cal = calendarId;
-      if (!cal && mockGoogleState.syncMode === 'STAFF' && staffId) {
-        const row = db.prepare('SELECT google_calendar_id FROM client_staff WHERE id = ?').get(staffId);
-        if (row?.google_calendar_id) cal = row.google_calendar_id;
+      let targetStaffId = staffId ? Number(staffId) : null;
+      if (!cal && mockGoogleState.syncMode === 'STAFF') {
+        if (!targetStaffId) {
+          try {
+            const eff = salonAppointmentService.resolveEffectiveStaff(userId, null);
+            targetStaffId = eff.staffId;
+          } catch (_) {}
+        }
+        if (targetStaffId) {
+          const row = db.prepare('SELECT google_calendar_id FROM client_staff WHERE id = ?').get(targetStaffId);
+          if (row?.google_calendar_id) cal = row.google_calendar_id;
+        }
       }
       if (!cal) cal = mockGoogleState.selectedCalendarId || 'primary';
 
@@ -632,7 +641,24 @@ async function runTests() {
   assert.strictEqual(errCrossSalon.code, 'CROSS_SALON_LINKING_REJECTED');
   const checkState = db.prepare('SELECT * FROM oauth_states WHERE state = ?').get(testOAuthState);
   assert(!checkState);
-  console.log('  ✓ 15. Segurança OAuth validada (sessão ausente, state expirado e rejeição de outro salão com exclusão do state).\n');
+
+  // 15.4 Rejeição de sessão expirada (SESSION_EXPIRED) com remoção do state
+  const stateSessionExpired = `oauth_state_sexp_${Date.now()}`;
+  db.prepare(`
+    INSERT INTO oauth_states (state, user_id, expires_at)
+    VALUES (?, ?, ?)
+  `).run(stateSessionExpired, testSalonUser.id, Date.now() + 600000);
+
+  let errSessionExpired = null;
+  try {
+    await googleCalendarService.handleOAuthCallback('fake_code', stateSessionExpired, null, { sessionExpired: true });
+  } catch (err) {
+    errSessionExpired = err;
+  }
+  assert(errSessionExpired);
+  assert.strictEqual(errSessionExpired.code, 'SESSION_EXPIRED');
+  assert(!db.prepare('SELECT * FROM oauth_states WHERE state = ?').get(stateSessionExpired), 'State deve ser deletado após rejeição de sessão expirada');
+  console.log('  ✓ 15. Segurança OAuth validada (sessão ausente, sessão expirada, state expirado e rejeição de outro salão com exclusão do state).\n');
 
   // ----------------------------------------------------
   // TESTE 16: WhatsApp valida disponibilidade no Google Calendar antes de confirmar
@@ -1074,7 +1100,50 @@ async function runTests() {
     assert.strictEqual(resStd.status, 201);
     assert.strictEqual(bodyStd.success, true);
 
-    console.log('  ✓ 22. Rota legada POST /api/appointments auditada: bloqueia conflitos Google e respeita regras de salão.\n');
+    // 22.7 Teste HTTP da rota OAuth Callback: rejeição de sessão ausente, expirada e outro salão
+    const stateHttpNoSession = `oauth_http_nosess_${Date.now()}`;
+    db.prepare('INSERT INTO oauth_states (state, user_id, expires_at) VALUES (?, ?, ?)').run(stateHttpNoSession, testSalonUser.id, Date.now() + 600000);
+    const resNoSess = await fetch(`${apiBase}/api/cliente/integrations/google/callback?code=fake&state=${stateHttpNoSession}`, { redirect: 'manual' });
+    assert.strictEqual(resNoSess.status, 302);
+    assert(resNoSess.headers.get('location').includes('google_error=UNAUTHORIZED_OAUTH_CALLBACK'));
+    assert(!db.prepare('SELECT * FROM oauth_states WHERE state = ?').get(stateHttpNoSession), 'State deve ser deletado após rejeição de sessão ausente na rota HTTP');
+
+    // Sessão expirada na rota HTTP
+    const stateHttpExpired = `oauth_state_exp_${Date.now()}`;
+    db.prepare('INSERT INTO oauth_states (state, user_id, expires_at) VALUES (?, ?, ?)').run(stateHttpExpired, testSalonUser.id, Date.now() + 600000);
+    const expToken = 'exp_token_' + Date.now();
+    db.prepare(`
+      INSERT INTO users (email, phone_number, role, session_token, session_expires_at)
+      VALUES (?, ?, 'CLIENT', ?, datetime('now', '-1 day'))
+    `).run(`exp.${Date.now()}@example.com`, `55119${Math.floor(10000000 + Math.random() * 90000000)}`, expToken);
+
+    const resExp = await fetch(`${apiBase}/api/cliente/integrations/google/callback?code=fake&state=${stateHttpExpired}`, {
+      headers: { 'Authorization': `Bearer ${expToken}` },
+      redirect: 'manual',
+    });
+    assert.strictEqual(resExp.status, 302);
+    assert(resExp.headers.get('location').includes('google_error=SESSION_EXPIRED'));
+    assert(!db.prepare('SELECT * FROM oauth_states WHERE state = ?').get(stateHttpExpired), 'State deve ser deletado após rejeição de sessão expirada na rota HTTP');
+
+    // Outro salão tentando vincular na rota HTTP
+    const stateHttpCross = `oauth_state_cross_${Date.now()}`;
+    db.prepare('INSERT INTO oauth_states (state, user_id, expires_at) VALUES (?, ?, ?)').run(stateHttpCross, testSalonUser.id, Date.now() + 600000);
+    const otherUserEmail = `other.salon.${Date.now()}@example.com`;
+    const otherInsert = db.prepare(`
+      INSERT INTO users (email, phone_number, role, plan_tier, subscription_status, is_demo)
+      VALUES (?, ?, 'CLIENT', 'JESSICA_PRO', 'ACTIVE', 0)
+    `).run(otherUserEmail, `55119${Math.floor(10000000 + Math.random() * 90000000)}`);
+    const otherSession = userService.createUserSession(otherInsert.lastInsertRowid, 7);
+
+    const resCross = await fetch(`${apiBase}/api/cliente/integrations/google/callback?code=fake&state=${stateHttpCross}`, {
+      headers: { 'Authorization': `Bearer ${otherSession.sessionToken}` },
+      redirect: 'manual',
+    });
+    assert.strictEqual(resCross.status, 302);
+    assert(resCross.headers.get('location').includes('google_error=CROSS_SALON_LINKING_REJECTED'));
+    assert(!db.prepare('SELECT * FROM oauth_states WHERE state = ?').get(stateHttpCross), 'State deve ser deletado após rejeição de outro salão na rota HTTP');
+
+    console.log('  ✓ 22. Rota legada POST /api/appointments e rota HTTP OAuth Callback auditadas com sucesso.\n');
   } finally {
     server.close();
   }

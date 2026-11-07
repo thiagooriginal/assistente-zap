@@ -1402,11 +1402,23 @@ router.get('/integrations/google/callback', async (req, res) => {
     token = getCookie(req, 'client_auth_token') || getCookie(req, 'auth_token');
   }
 
-  const sessionUser = token ? userService.getUserBySessionToken(token) : null;
+  let sessionUser = null;
+  let sessionExpired = false;
+
+  if (token) {
+    sessionUser = userService.getUserBySessionToken(token);
+    if (!sessionUser) {
+      const rawUser = db.prepare('SELECT id, session_expires_at FROM users WHERE session_token = ?').get(token);
+      if (rawUser && (!rawUser.session_expires_at || new Date(rawUser.session_expires_at) < new Date())) {
+        sessionExpired = true;
+      }
+    }
+  }
+
   const sessionUserId = sessionUser?.id || null;
 
   try {
-    const result = await googleCalendarService.handleOAuthCallback(code, state, sessionUserId);
+    const result = await googleCalendarService.handleOAuthCallback(code, state, sessionUserId, { sessionExpired });
     res.redirect(`/cliente/painel.html?google_connected=true&email=${encodeURIComponent(result.email || '')}#tab-integrations-google`);
   } catch (err) {
     res.redirect(`/cliente/painel.html?google_error=${encodeURIComponent(err.code || err.message)}#tab-integrations-google`);

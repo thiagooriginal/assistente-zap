@@ -291,6 +291,14 @@ async function checkGoogleAvailability(userId, { startDt, endDt, staffId = null,
   const salon = db.prepare('SELECT google_require_sync_availability FROM client_salons WHERE user_id = ?').get(userId);
   const isRequired = salon && salon.google_require_sync_availability === 1;
 
+  let resolvedStaffId = staffId ? Number(staffId) : null;
+  if (!resolvedStaffId) {
+    try {
+      const eff = resolveEffectiveStaff(userId, null);
+      resolvedStaffId = eff.staffId;
+    } catch (_) {}
+  }
+
   const googleStatus = googleCalendarService.getConnectionStatus(userId);
   if (!googleStatus.isConnected) {
     if (isRequired) {
@@ -307,7 +315,7 @@ async function checkGoogleAvailability(userId, { startDt, endDt, staffId = null,
     const queryPromise = googleCalendarService.getGoogleBusySlots(userId, {
       timeMin: startDt,
       timeMax: endDt,
-      staffId,
+      staffId: resolvedStaffId,
     });
 
     const timeoutPromise = new Promise((_, reject) => {
@@ -349,9 +357,16 @@ async function checkGoogleAvailability(userId, { startDt, endDt, staffId = null,
  * Checks if a specific candidate slot is free from conflicts and compliant with business hours
  */
 async function checkSlotAvailability(userId, params) {
-  const internal = checkInternalSlotAvailability(userId, params);
+  let resolvedStaffId = params?.staffId ? Number(params.staffId) : null;
+  if (!resolvedStaffId) {
+    try {
+      const eff = resolveEffectiveStaff(userId, null);
+      resolvedStaffId = eff.staffId;
+    } catch (_) {}
+  }
+  const internal = checkInternalSlotAvailability(userId, { ...params, staffId: resolvedStaffId });
   if (!internal.available) return internal;
-  return checkGoogleAvailability(userId, params);
+  return checkGoogleAvailability(userId, { ...params, staffId: resolvedStaffId });
 }
 
 /**

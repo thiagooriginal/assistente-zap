@@ -193,9 +193,9 @@ function generateAuthUrl(userId) {
 /**
  * Handles OAuth callback, validating Anti-CSRF state and saving tokens
  */
-async function handleOAuthCallback(code, state, authenticatedUserId = null) {
+async function handleOAuthCallback(code, state, authenticatedUserId = null, options = {}) {
   if (mockHandler?.handleOAuthCallback) {
-    return mockHandler.handleOAuthCallback(code, state, authenticatedUserId);
+    return mockHandler.handleOAuthCallback(code, state, authenticatedUserId, options);
   }
 
   // 1. Validar Anti-CSRF State
@@ -213,7 +213,15 @@ async function handleOAuthCallback(code, state, authenticatedUserId = null) {
     throw err;
   }
 
-  // 2. Rejeitar callbacks sem sessão autenticada válida
+  // 2. Rejeitar sessões explicitamente expiradas
+  if (authenticatedUserId === 'EXPIRED' || options?.sessionExpired) {
+    db.prepare('DELETE FROM oauth_states WHERE state = ?').run(state);
+    const err = new Error('Sessão expirada. Faça login novamente para concluir a vinculação do Google Calendar.');
+    err.code = 'SESSION_EXPIRED';
+    throw err;
+  }
+
+  // 3. Rejeitar callbacks sem sessão autenticada válida
   if (!authenticatedUserId) {
     db.prepare('DELETE FROM oauth_states WHERE state = ?').run(state);
     const err = new Error('Autenticação de sessão obrigatória para concluir vinculação OAuth.');
@@ -221,7 +229,7 @@ async function handleOAuthCallback(code, state, authenticatedUserId = null) {
     throw err;
   }
 
-  // 3. Exigir estrita correspondência entre usuário autenticado e proprietário do state
+  // 4. Exigir estrita correspondência entre usuário autenticado e proprietário do state
   const userId = stateRow.user_id;
   if (Number(authenticatedUserId) !== Number(userId)) {
     db.prepare('DELETE FROM oauth_states WHERE state = ?').run(state);
@@ -446,10 +454,20 @@ async function getGoogleBusySlots(userId, { timeMin, timeMax, calendarId = null,
   if (!status.isConnected) return [];
 
   let calId = calendarId;
-  if (!calId && status.syncMode === 'STAFF' && staffId) {
-    const staffRow = db.prepare('SELECT google_calendar_id FROM client_staff WHERE id = ? AND user_id = ?').get(staffId, userId);
-    if (staffRow?.google_calendar_id) {
-      calId = staffRow.google_calendar_id;
+  let targetStaffId = staffId ? Number(staffId) : null;
+  if (!calId && status.syncMode === 'STAFF') {
+    if (!targetStaffId) {
+      try {
+        const salonAppointmentService = require('./salonAppointmentService');
+        const effective = salonAppointmentService.resolveEffectiveStaff(userId, null);
+        targetStaffId = effective.staffId;
+      } catch (_) {}
+    }
+    if (targetStaffId) {
+      const staffRow = db.prepare('SELECT google_calendar_id FROM client_staff WHERE id = ? AND user_id = ?').get(targetStaffId, userId);
+      if (staffRow?.google_calendar_id) {
+        calId = staffRow.google_calendar_id;
+      }
     }
   }
   if (!calId) {
