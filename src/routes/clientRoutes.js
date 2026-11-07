@@ -1197,7 +1197,9 @@ router.get('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA'
     search: search || null,
   });
 
-  res.json({ success: true, appointments });
+  const googleStatus = googleCalendarService.getConnectionStatus(req.clientUser.id);
+
+  res.json({ success: true, appointments, isGoogleConnected: Boolean(googleStatus?.isConnected) });
 });
 
 router.get('/appointments/available-slots', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {

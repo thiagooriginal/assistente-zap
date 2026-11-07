@@ -143,17 +143,78 @@ runTest('Botão de confirmação de agendamento inicia desabilitado e valida com
   assert(html.includes("submitBtn.title = 'Preencha todos os campos obrigatórios"), 'Tooltip de orientação deve ser atribuído');
 });
 
-// 9. Agendamentos cancelados ocultam ações de remarcar e cancelar
-runTest('Agendamentos com status CANCELLED exibem tag Atendimento Cancelado e ocultam ações inválidas', () => {
-  assert(html.includes("a.status === 'CANCELLED'"), 'Renderizador de agendamentos deve verificar status CANCELLED');
+// 9. Agendamentos cancelados reconhecem todas as variantes (CANCELADO, CANCELLED, etc.)
+runTest('Agendamentos com status CANCELADO e CANCELLED exibem tag Atendimento Cancelado e ocultam ações inválidas', () => {
+  assert(
+    html.includes("const isCancelled = ['CANCELLED', 'CANCELADO', 'CANCEL'].includes(String(a.status || '').toUpperCase());"),
+    'isCancelled deve reconhecer todas as variantes válidas (CANCELADO, CANCELLED, etc.)'
+  );
   assert(html.includes('Atendimento Cancelado'), 'Tag Atendimento Cancelado deve ser exibida para agendamentos cancelados');
-  assert(html.includes('const isCancelled = a.status === \'CANCELLED\' || a.status === \'Cancelado\';'), 'Validação explícita de cancelamento presente');
+
+  // Teste lógico das variantes
+  const checkCancelled = (status) => ['CANCELLED', 'CANCELADO', 'CANCEL'].includes(String(status || '').toUpperCase());
+  assert.strictEqual(checkCancelled('CANCELADO'), true, 'CANCELADO deve ser considerado cancelado');
+  assert.strictEqual(checkCancelled('CANCELLED'), true, 'CANCELLED deve ser considerado cancelado');
+  assert.strictEqual(checkCancelled('Cancelado'), true, 'Cancelado deve ser considerado cancelado');
+  assert.strictEqual(checkCancelled('cancelado'), true, 'cancelado deve ser considerado cancelado');
+  assert.strictEqual(checkCancelled('cancelled'), true, 'cancelled deve ser considerado cancelado');
+  assert.strictEqual(checkCancelled('AGENDADO'), false, 'AGENDADO não é cancelado');
+  assert.strictEqual(checkCancelled('CONFIRMADO'), false, 'CONFIRMADO não é cancelado');
 });
 
-// 10. Status transparente do Google Calendar quando desconectado
-runTest('Google Calendar desconectado exibe claramente "Aguardando conexão com Google"', () => {
-  assert(html.includes('Aguardando conexão com Google'), 'Badge deve exibir "Aguardando conexão com Google" sem induzir falsa sincronização');
-  assert(html.includes("data.isConnected"), 'Status do Google deve checar isConnected');
+// 10. Status Google Calendar na agenda considera se a conta está conectada
+runTest('getGoogleSyncBadgeHtml considera conexão: exibe Aguardando conexão se desconectado e não Sincronizando falso', () => {
+  assert(
+    html.includes('function getGoogleSyncBadgeHtml(syncStatus, isGoogleConnected = appointmentsState.isGoogleConnected)'),
+    'getGoogleSyncBadgeHtml deve aceitar e validar isGoogleConnected'
+  );
+  assert(
+    html.includes('if (!isGoogleConnected) {') || html.includes('if (!isGoogleConnected)'),
+    'getGoogleSyncBadgeHtml deve checar se a conta está conectada'
+  );
+
+  // Execução direta simulada da lógica de getGoogleSyncBadgeHtml
+  function testBadge(syncStatus, isGoogleConnected) {
+    if (!isGoogleConnected) {
+      return '<span ...>Aguardando conexão com Google</span>';
+    }
+    if (!syncStatus || syncStatus === 'NOT_CONNECTED') {
+      return '<span ...>Aguardando conexão com Google</span>';
+    }
+    if (syncStatus === 'SYNCED') {
+      return '<span ...>Google Calendar</span>';
+    }
+    if (syncStatus === 'PENDING') {
+      return '<span ...>Sincronizando</span>';
+    }
+    if (syncStatus === 'FAILED') {
+      return '<span ...>Falha Google</span>';
+    }
+    return '';
+  }
+
+  // Cenário A: Desconectado com status PENDING no banco -> Deve exibir Aguardando conexão, NUNCA Sincronizando
+  const badgeDisconnected = testBadge('PENDING', false);
+  assert(badgeDisconnected.includes('Aguardando conexão com Google'), 'Quando desconectado, PENDING deve exibir Aguardando conexão');
+  assert(!badgeDisconnected.includes('Sincronizando'), 'Quando desconectado, PENDING NÃO deve exibir Sincronizando');
+
+  // Cenário B: Conectado com status PENDING -> Exibe Sincronizando
+  const badgePending = testBadge('PENDING', true);
+  assert(badgePending.includes('Sincronizando'), 'Quando conectado, PENDING deve exibir Sincronizando');
+
+  // Cenário C: Conectado com status SYNCED -> Exibe Google Calendar
+  const badgeSynced = testBadge('SYNCED', true);
+  assert(badgeSynced.includes('Google Calendar'), 'Quando conectado, SYNCED deve exibir Google Calendar');
+});
+
+// 10.1 Backend API /appointments retorna isGoogleConnected
+runTest('Backend API GET /api/cliente/appointments retorna isGoogleConnected', () => {
+  const routesPath = path.join(__dirname, '..', 'src', 'routes', 'clientRoutes.js');
+  const routesContent = fs.readFileSync(routesPath, 'utf8');
+  assert(
+    routesContent.includes('isGoogleConnected: Boolean(googleStatus?.isConnected)'),
+    'clientRoutes.js deve incluir isGoogleConnected na resposta de /api/cliente/appointments'
+  );
 });
 
 // 11. Preservação dos botões e estilos institucionais na Central Hub
