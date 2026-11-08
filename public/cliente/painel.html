@@ -6771,6 +6771,9 @@
       document.getElementById('aptTimeDropdown')?.classList.add('hidden');
       document.getElementById('aptBeautyCalendarPopover')?.classList.add('hidden');
 
+      const statusSelect = document.getElementById('aptStatusSelect');
+      if (statusSelect) statusSelect.value = 'CONFIRMADO';
+
       // Inicia desabilitado até preencher todos os campos obrigatórios
       validateAppointmentFormCompletion();
 

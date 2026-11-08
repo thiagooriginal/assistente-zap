@@ -54,6 +54,7 @@ function createAppointment({
   clientPhone = null,
   durationMin = 45,
   checkGoogle = false,
+  status = 'AGENDADO',
 }) {
   if (!title || !startDateTime) {
     throw new Error('Título e data/horário são obrigatórios para agendar um compromisso.');
@@ -102,6 +103,7 @@ function createAppointment({
     time: timeStr,
     durationMin: finalDuration,
     origin: sourceType || 'whatsapp',
+    status: status || 'AGENDADO',
   };
 
   if (checkGoogle) {

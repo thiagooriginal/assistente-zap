@@ -3285,6 +3285,7 @@ app.post('/api/appointments', authMiddleware, async (req, res) => {
       serviceId: serviceId || null,
       sourceType: 'dashboard',
       checkGoogle: hasSalon,
+      status: req.body?.status || 'AGENDADO',
     });
 
     res.status(201).json({ success: true, data: created });

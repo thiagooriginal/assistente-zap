@@ -127,7 +127,10 @@ async function runVisualValidation() {
       returnByValue: true
     });
 
-    const dData = desktopRes.result.value;
+    if (desktopRes.exceptionDetails) {
+      console.error('CDP Exception in Desktop evaluation:', desktopRes.exceptionDetails);
+    }
+    const dData = desktopRes.result?.value;
     assert(dData.submitBtn.disabled, 'Botão Confirmar Agendamento deve estar com disabled=true');
     assert(dData.submitBtn.hasAttr, 'Botão Confirmar Agendamento deve possuir atributo disabled');
     assert(dData.popover.isVisible, 'Calendário deve estar visível');

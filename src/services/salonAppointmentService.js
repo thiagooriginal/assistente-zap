@@ -530,6 +530,7 @@ function bookAppointmentSync(userId, {
   time,
   durationMin = null,
   origin = 'painel',
+  status = 'AGENDADO',
 }) {
   if (!clientName || !clientName.trim()) {
     throw new Error('O nome do cliente é obrigatório.');
@@ -610,7 +611,17 @@ function bookAppointmentSync(userId, {
 
     const title = `${clientName.trim()} — ${finalServiceName}`;
     const description = `Agendado via ${origin} para ${resolvedStaffName} (Duração: ${finalDurationMin} min)`;
-    const status = 'AGENDADO';
+
+    // Validar status inicial permitido (apenas AGENDADO e CONFIRMADO são permitidos no momento do cadastro inicial)
+    // Se receber status forjado (ex: CONCLUÍDO, CANCELADO) ou não permitido, fallback seguro para AGENDADO
+    const ALLOWED_INITIAL_STATUSES = ['AGENDADO', 'CONFIRMADO'];
+    let finalStatus = 'AGENDADO';
+    if (status) {
+      const normalizedStatus = mapToPortugueseStatus(status);
+      if (ALLOWED_INITIAL_STATUSES.includes(normalizedStatus)) {
+        finalStatus = normalizedStatus;
+      }
+    }
 
     const stmt = db.prepare(`
       INSERT INTO appointments (
@@ -634,7 +645,7 @@ function bookAppointmentSync(userId, {
       clientPhone ? clientPhone.trim() : null,
       finalDurationMin,
       origin,
-      status
+      finalStatus
     );
 
     const appointmentId = info.lastInsertRowid;
@@ -643,7 +654,7 @@ function bookAppointmentSync(userId, {
     db.prepare(`
       INSERT INTO appointment_status_history (appointment_id, user_id, previous_status, new_status, changed_by, reason)
       VALUES (?, ?, NULL, ?, ?, 'Novo agendamento criado')
-    `).run(appointmentId, userId, status, origin.toUpperCase());
+    `).run(appointmentId, userId, finalStatus, origin.toUpperCase());
 
     // Enfileirar sincronização com Google Calendar no Outbox durável
     db.prepare(`
@@ -679,7 +690,7 @@ function bookAppointmentSync(userId, {
       duration_min: finalDurationMin,
       duration_minutes: finalDurationMin,
       origin,
-      status,
+      status: finalStatus,
       has_conflict: 0,
       google_sync_status: 'PENDING',
     };
