@@ -1551,8 +1551,19 @@ router.get('/integrations/google/sync-existing-preview', clientAuthMiddleware, r
 
 router.post('/integrations/google/sync-existing', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
   try {
-    const confirmed = Boolean(req.body?.confirmed);
-    const result = await googleCalendarService.syncPreExistingAppointments(req.clientUser.id, { confirmed });
+    // Validação estrita: aceita única e exclusivamente o valor booleano true
+    // Rejeita valores "false", "true", 1, 0, null, undefined ou campos ausentes
+    if (req.body?.confirmed !== true) {
+      const preview = googleCalendarService.getPreExistingSyncPreview(req.clientUser.id);
+      return res.status(400).json({
+        success: false,
+        error: `CONFIRMATION_REQUIRED: A sincronização em massa exige confirmação estrita (confirmed: true). Existem ${preview.count} agendamento(s) elegível(is).`,
+        code: 'CONFIRMATION_REQUIRED',
+        eligibleCount: preview.count,
+      });
+    }
+
+    const result = await googleCalendarService.syncPreExistingAppointments(req.clientUser.id, { confirmed: true });
     res.json(result);
   } catch (err) {
     res.status(400).json({

@@ -406,7 +406,7 @@ async function disconnectUserCalendar(userId) {
   }
 
   const row = db.prepare('SELECT * FROM google_calendar_tokens WHERE user_id = ?').get(userId);
-  if (row && row.encrypted_tokens) {
+  if (row && row.encrypted_tokens && isLiveGoogleSyncAllowed(row.account_email)) {
     try {
       const oauth2 = getOAuth2Client(userId);
       await oauth2.revokeCredentials();
@@ -1089,11 +1089,11 @@ async function syncPreExistingAppointments(userId, options = {}) {
     throw new Error('Google Calendar não está conectado para este salão.');
   }
 
-  // Exigir confirmação prévia explícita
-  const isConfirmed = options === true || options?.confirmed === true;
+  // Exigir confirmação prévia explícita estrita (apenas boolean true)
+  const isConfirmed = options === true || (typeof options === 'object' && options !== null && options.confirmed === true);
   if (!isConfirmed) {
     const preview = getPreExistingSyncPreview(userId);
-    const err = new Error(`CONFIRMATION_REQUIRED: A sincronização em massa requer confirmação prévia e explícita. Existem ${preview.count} agendamento(s) elegível(is).`);
+    const err = new Error(`CONFIRMATION_REQUIRED: A sincronização em massa requer confirmação prévia e explícita (confirmed: true). Existem ${preview.count} agendamento(s) elegível(is).`);
     err.code = 'CONFIRMATION_REQUIRED';
     err.eligibleCount = preview.count;
     throw err;
