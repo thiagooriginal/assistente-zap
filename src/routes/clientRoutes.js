@@ -1540,12 +1540,27 @@ router.post('/integrations/google/test', clientAuthMiddleware, requireProductAcc
   res.json(result);
 });
 
-router.post('/integrations/google/sync-existing', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+router.get('/integrations/google/sync-existing-preview', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   try {
-    const result = await googleCalendarService.syncPreExistingAppointments(req.clientUser.id);
-    res.json(result);
+    const preview = googleCalendarService.getPreExistingSyncPreview(req.clientUser.id);
+    res.json({ success: true, ...preview });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/integrations/google/sync-existing', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+  try {
+    const confirmed = Boolean(req.body?.confirmed);
+    const result = await googleCalendarService.syncPreExistingAppointments(req.clientUser.id, { confirmed });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({
+      success: false,
+      error: err.message,
+      code: err.code || 'SYNC_ERROR',
+      eligibleCount: err.eligibleCount ?? null,
+    });
   }
 });
 

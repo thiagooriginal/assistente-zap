@@ -125,8 +125,10 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         continue;
       }
 
-      // 3. Prevenção de criação de eventos para agendamentos já cancelados antes da sincronização
-      if (item.action === 'CREATE' && ['CANCELADO', 'CANCELLED'].includes(apt.status)) {
+      const hasRealGoogleEvent = Boolean(apt.google_event_id && !apt.google_event_id.startsWith('sim_'));
+
+      // 3. Prevenção de criação/atualização de eventos para agendamentos já cancelados antes da sincronização
+      if (['CANCELADO', 'CANCELLED'].includes(apt.status) && !hasRealGoogleEvent) {
         db.prepare(`
           UPDATE google_sync_outbox
           SET status = 'SENT', processed_at = CURRENT_TIMESTAMP, last_error = 'SKIPPED: Agendamento cancelado antes da sincronização'
@@ -143,7 +145,7 @@ async function processGoogleSyncOutbox(filterUserId = null) {
 
       // 4. Prevenção de criação de eventos para agendamentos históricos no passado ao conectar conta
       const endMs = new Date(apt.end_datetime).getTime();
-      if (item.action === 'CREATE' && !apt.google_event_id && !isNaN(endMs) && endMs < Date.now()) {
+      if (!hasRealGoogleEvent && !isNaN(endMs) && endMs < Date.now()) {
         db.prepare(`
           UPDATE google_sync_outbox
           SET status = 'SENT', processed_at = CURRENT_TIMESTAMP, last_error = 'SKIPPED: Agendamento histórico concluído no passado'
@@ -159,13 +161,14 @@ async function processGoogleSyncOutbox(filterUserId = null) {
       }
 
       // 4b. Prevenção de sincronização de agendamentos preexistentes à primeira conexão sem autorização explícita (Requisitos 2 e 5)
+      // Cobre CREATE, UPDATE e DELETE para garantir que nenhum agendamento fictício anterior seja enviado
       const tokenRow = db.prepare(`
         SELECT initial_connection_at, sync_existing_authorized 
         FROM google_calendar_tokens 
         WHERE user_id = ?
       `).get(item.user_id);
 
-      if (tokenRow && tokenRow.initial_connection_at && !tokenRow.sync_existing_authorized && item.action === 'CREATE' && !apt.google_event_id) {
+      if (tokenRow && tokenRow.initial_connection_at && !tokenRow.sync_existing_authorized && !hasRealGoogleEvent) {
         const aptCreatedMs = new Date(apt.created_at).getTime();
         const initialConnMs = new Date(tokenRow.initial_connection_at).getTime();
         if (!isNaN(aptCreatedMs) && !isNaN(initialConnMs) && aptCreatedMs <= initialConnMs) {
@@ -217,23 +220,25 @@ async function processGoogleSyncOutbox(filterUserId = null) {
       // 5. Executar ação idempotente
       let result = null;
       if (item.action === 'CREATE') {
-        if (apt.google_event_id) {
+        if (hasRealGoogleEvent) {
           // Idempotência: evento já foi criado anteriormente no Google
           result = await googleCalendarService.updateCalendarEvent(item.user_id, apt.google_event_id, apt, apt.google_calendar_id);
         } else {
           result = await googleCalendarService.createCalendarEvent(item.user_id, apt);
         }
       } else if (item.action === 'UPDATE') {
-        if (apt.google_event_id) {
+        if (hasRealGoogleEvent) {
           result = await googleCalendarService.updateCalendarEvent(item.user_id, apt.google_event_id, apt, apt.google_calendar_id);
         } else {
+          // Transição de simulação para real: agendamento com sim_ ou sem evento é criado no Google
           result = await googleCalendarService.createCalendarEvent(item.user_id, apt);
         }
       } else if (item.action === 'DELETE') {
-        if (apt.google_event_id) {
+        if (hasRealGoogleEvent) {
           result = await googleCalendarService.deleteCalendarEvent(item.user_id, apt.google_event_id, apt.google_calendar_id);
         } else {
-          result = { success: true, reason: 'NO_EVENT_ID_TO_DELETE' };
+          // Evento nunca existiu no Google ou é simulado: trata cancelamento localmente sem chamada de rede
+          result = await googleCalendarService.deleteCalendarEvent(item.user_id, apt.google_event_id || `sim_${apt.id}`, apt.google_calendar_id);
         }
       }
 
@@ -475,6 +480,7 @@ module.exports = {
   processWhatsAppOutbox,
   processAllPending,
   notify,
+  triggerWorkerImmediate: notify,
   startWorker,
   stopWorker,
 };

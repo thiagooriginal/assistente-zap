@@ -19,33 +19,40 @@ let mockHandler = null;
 
 /**
  * Verifica se chamadas reais de rede para a API do Google Calendar são permitidas.
- * Em homologação, desenvolvimento e testes, chamadas externas são bloqueadas por padrão,
- * sendo autorizadas apenas quando explicitamente habilitadas (GOOGLE_SYNC_LIVE_ENABLED=true)
- * e com escopo/whitelist de emails autorizados (GOOGLE_SYNC_ALLOWED_EMAILS).
+ * Bloqueio estrito fail-closed: exige GOOGLE_SYNC_LIVE_ENABLED=true, lista
+ * GOOGLE_SYNC_ALLOWED_EMAILS não vazia e email da conta conectada explicitamente presente.
+ * Lista vazia ou email ausente resultam obrigatoriamente em bloqueio.
  */
 function isLiveGoogleSyncAllowed(accountEmail = null) {
   // Se houver um mockHandler ativo (testes automatizados com simulação em memória):
   if (isMockActive()) return true;
 
-  const isStrictProd = process.env.NODE_ENV === 'production' &&
-                       process.env.HOMOLOGACAO !== 'true' &&
-                       process.env.APP_MODE !== 'staging';
-  if (isStrictProd) return true;
-
+  // 1. Bloqueio fail-closed: exige GOOGLE_SYNC_LIVE_ENABLED=true
   if (process.env.GOOGLE_SYNC_LIVE_ENABLED !== 'true') {
     return false;
   }
 
+  // 2. Exige e-mail da conta conectada válido
+  if (!accountEmail || typeof accountEmail !== 'string') {
+    return false;
+  }
+  const emailTrimmed = accountEmail.trim().toLowerCase();
+  if (!emailTrimmed) {
+    return false;
+  }
+
+  // 3. Exige lista GOOGLE_SYNC_ALLOWED_EMAILS não vazia
   const allowedList = (process.env.GOOGLE_SYNC_ALLOWED_EMAILS || '')
     .split(',')
     .map(e => e.trim().toLowerCase())
     .filter(Boolean);
 
-  if (allowedList.length > 0 && accountEmail) {
-    return allowedList.includes(accountEmail.toLowerCase());
+  if (allowedList.length === 0) {
+    return false;
   }
 
-  return true;
+  // 4. Exige email da conta conectada explicitamente presente na lista
+  return allowedList.includes(emailTrimmed);
 }
 
 
@@ -321,30 +328,40 @@ async function handleOAuthCallback(code, state, authenticatedUserId = null, opti
         updated_at = CURRENT_TIMESTAMP
     `).run(userId, accountEmail || 'Conta Google', encTokens, tokens.scope || 'calendar', initialConnAt, connectionTimestamp, syncAuthorized);
 
-    // Sanitização 1: Agendamentos históricos no passado
+    // Sanitização 1: Agendamentos históricos no passado (CREATE, UPDATE, DELETE sem ID Google real)
     db.prepare(`
       UPDATE google_sync_outbox
       SET status = 'SENT', processed_at = CURRENT_TIMESTAMP, last_error = 'SKIPPED: Agendamento histórico concluído no passado'
-      WHERE user_id = ? AND status = 'PENDING' AND action = 'CREATE'
+      WHERE user_id = ? AND status = 'PENDING'
         AND appointment_id IN (
           SELECT id FROM appointments 
           WHERE user_id = ? AND datetime(end_datetime) < datetime('now')
+            AND (google_event_id IS NULL OR google_event_id = '' OR google_event_id LIKE 'sim_%')
         )
     `).run(userId, userId);
 
-    // Sanitização 2: Agendamentos cancelados antes da conexão Google
+    // Sanitização 2: Agendamentos cancelados antes da conexão Google (CREATE, UPDATE, DELETE sem ID Google real)
     db.prepare(`
       UPDATE google_sync_outbox
       SET status = 'SENT', processed_at = CURRENT_TIMESTAMP, last_error = 'SKIPPED: Agendamento cancelado antes da conexão Google'
-      WHERE user_id = ? AND status = 'PENDING' AND action = 'CREATE'
+      WHERE user_id = ? AND status = 'PENDING'
         AND appointment_id IN (
           SELECT id FROM appointments 
           WHERE user_id = ? AND status IN ('CANCELADO', 'CANCELLED')
+            AND (google_event_id IS NULL OR google_event_id = '' OR google_event_id LIKE 'sim_%')
         )
     `).run(userId, userId);
 
+    db.prepare(`
+      UPDATE appointments
+      SET google_sync_status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ? AND status IN ('CANCELADO', 'CANCELLED')
+        AND (google_event_id IS NULL OR google_event_id = '' OR google_event_id LIKE 'sim_%')
+    `).run(userId);
+
     // Sanitização 3 (Proteção Crítica na Primeira Conexão - Requisitos 2, 3 e 5):
     // Na primeira conexão Google, agendamentos preexistentes NÃO devem ser sincronizados sem autorização explícita.
+    // Abrange todas as ações da fila outbox (CREATE, UPDATE, DELETE) para agendamentos sem evento real.
     // Todos os registros no SQLite e histórico permanecem 100% preservados (não apaga registros).
     // Na reconexão (!isFirstConnection), novos agendamentos legítimos pós-conexão inicial NÃO são descartados.
     if (isFirstConnection && !syncAuthorized) {
@@ -352,10 +369,10 @@ async function handleOAuthCallback(code, state, authenticatedUserId = null, opti
         UPDATE google_sync_outbox
         SET status = 'SENT', processed_at = CURRENT_TIMESTAMP, 
             last_error = 'SKIPPED_PRE_EXISTING: Agendamento preexistente à primeira conexão Google (requer autorização explícita)'
-        WHERE user_id = ? AND status = 'PENDING' AND action = 'CREATE'
+        WHERE user_id = ? AND status = 'PENDING'
           AND appointment_id IN (
             SELECT id FROM appointments 
-            WHERE user_id = ? AND (google_event_id IS NULL OR google_event_id = '')
+            WHERE user_id = ? AND (google_event_id IS NULL OR google_event_id = '' OR google_event_id LIKE 'sim_%')
               AND datetime(created_at) <= datetime(?)
           )
       `).run(userId, userId, connectionTimestamp);
@@ -365,9 +382,10 @@ async function handleOAuthCallback(code, state, authenticatedUserId = null, opti
         SET google_sync_status = 'NOT_SYNCED', 
             google_sync_error = 'Agendamento preexistente à conexão Google (aguardando autorização para sincronização em massa)',
             updated_at = CURRENT_TIMESTAMP
-        WHERE user_id = ? AND (google_event_id IS NULL OR google_event_id = '')
+        WHERE user_id = ? AND (google_event_id IS NULL OR google_event_id = '' OR google_event_id LIKE 'sim_%')
           AND datetime(created_at) <= datetime(?)
-          AND google_sync_status IN ('PENDING', 'NOT_CONNECTED')
+          AND status NOT IN ('CANCELADO', 'CANCELLED')
+          AND google_sync_status IN ('PENDING', 'NOT_CONNECTED', 'SIMULATED')
       `).run(userId, connectionTimestamp);
     }
     db.exec('COMMIT');
@@ -650,18 +668,6 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
     calId = status.selectedCalendarId || 'primary';
   }
 
-  // Proteção de Homologação/Staging contra chamadas externas inadvertidas (Requisito 7)
-  if (!isLiveGoogleSyncAllowed(status.accountEmail)) {
-    db.prepare(`
-      UPDATE appointments
-      SET google_sync_status = 'SIMULATED',
-          google_sync_error = 'Ambiente de Homologação: Sincronização segura simulada (GOOGLE_SYNC_LIVE_ENABLED=false)',
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ? AND user_id = ?
-    `).run(appointment.id, userId);
-
-    return { success: true, googleEventId, calendarId: calId, isSimulated: true };
-  }
 
   const oauth2 = getOAuth2Client(userId);
   const calendar = google.calendar({ version: 'v3', auth: oauth2 });
@@ -850,6 +856,37 @@ async function updateCalendarEvent(userId, googleEventId, appointment, targetCal
     calId = status.selectedCalendarId || 'primary';
   }
 
+  // 1. Proteção de Homologação/Staging contra chamadas externas inadvertidas (Requisito 7 e Item 3)
+  if (!isLiveGoogleSyncAllowed(status.accountEmail)) {
+    const simEventId = googleEventId.startsWith('sim_')
+      ? googleEventId
+      : `sim_${googleEventId.substring(0, 28)}`;
+
+    db.prepare(`
+      UPDATE appointments
+      SET google_event_id = ?,
+          google_calendar_id = ?,
+          google_sync_status = 'SIMULATED',
+          google_sync_error = 'Ambiente de Homologação: Sincronização segura simulada (GOOGLE_SYNC_LIVE_ENABLED=false)',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ?
+    `).run(simEventId, calId, appointment.id, userId);
+
+    return {
+      success: true,
+      googleEventId: simEventId,
+      calendarId: calId,
+      isSimulated: true,
+    };
+  }
+
+  // 2. Transição de Simulado para Real (Item 3):
+  // Se o ID for simulado (sim_ ou sim_gcal_), o evento ainda NÃO existe no Google Calendar real.
+  // Nunca enviar IDs simulados para a API do Google (evita 404). Executa criação segura e idempotente.
+  if (googleEventId.startsWith('sim_')) {
+    return createCalendarEvent(userId, appointment, calId);
+  }
+
   const oauth2 = getOAuth2Client(userId);
   const calendar = google.calendar({ version: 'v3', auth: oauth2 });
 
@@ -923,15 +960,15 @@ async function deleteCalendarEvent(userId, googleEventId, targetCalendarId = nul
 
   const calId = targetCalendarId || status.selectedCalendarId || 'primary';
 
-  // Proteção de Homologação/Staging contra chamadas externas inadvertidas (Requisito 7)
-  if (!isLiveGoogleSyncAllowed(status.accountEmail)) {
+  // Proteção contra chamadas de rede em ambiente simulado OU se o evento for simulado (nunca existiu no Google)
+  if (!isLiveGoogleSyncAllowed(status.accountEmail) || googleEventId.startsWith('sim_')) {
     db.prepare(`
       UPDATE appointments
       SET google_sync_status = 'CANCELLED',
           google_sync_error = NULL,
           updated_at = CURRENT_TIMESTAMP
-      WHERE google_event_id = ? AND user_id = ?
-    `).run(googleEventId, userId);
+      WHERE (google_event_id = ? OR id = ?) AND user_id = ?
+    `).run(googleEventId, googleEventId, userId);
 
     return { success: true, isSimulated: true };
   }
@@ -997,18 +1034,69 @@ function isMockActive() {
 
 
 /**
+ * Retorna prévia dos agendamentos elegíveis para sincronização manual preexistente (Requisito 4)
+ */
+function getPreExistingSyncPreview(userId) {
+  if (mockHandler?.getPreExistingSyncPreview) {
+    return mockHandler.getPreExistingSyncPreview(userId);
+  }
+
+  const status = getConnectionStatus(userId);
+  if (!status.isConnected) {
+    return {
+      canSync: false,
+      reason: 'GOOGLE_NOT_CONNECTED',
+      count: 0,
+      appointments: [],
+    };
+  }
+
+  const eligible = db.prepare(`
+    SELECT id, client_name, title, start_datetime, end_datetime, price, google_sync_status, google_event_id
+    FROM appointments
+    WHERE user_id = ?
+      AND (google_event_id IS NULL OR google_event_id = '' OR google_event_id LIKE 'sim_%')
+      AND datetime(end_datetime) >= datetime('now')
+      AND status NOT IN ('CANCELADO', 'CANCELLED', 'NO_SHOW', 'COMPLETED', 'CONCLUIDO', 'CONCLUÍDO')
+      AND google_sync_status != 'PENDING'
+      AND id NOT IN (
+        SELECT appointment_id FROM google_sync_outbox
+        WHERE user_id = ? AND status IN ('PENDING', 'PROCESSING')
+      )
+    ORDER BY start_datetime ASC
+  `).all(userId, userId);
+
+  return {
+    canSync: true,
+    count: eligible.length,
+    appointments: eligible,
+  };
+}
+
+/**
  * Sincronização controlada de agendamentos preexistentes para salões reais (Requisito 4).
  * Permite ao salão autorizar explicitamente a sincronização no Google Calendar de agendamentos futuros
  * criados antes da primeira vinculação com o Google.
+ * Exige prévia confirmação explícita e previne duplicações no outbox.
  */
-async function syncPreExistingAppointments(userId) {
+async function syncPreExistingAppointments(userId, options = {}) {
   if (mockHandler?.syncPreExistingAppointments) {
-    return mockHandler.syncPreExistingAppointments(userId);
+    return mockHandler.syncPreExistingAppointments(userId, options);
   }
 
   const status = getConnectionStatus(userId);
   if (!status.isConnected) {
     throw new Error('Google Calendar não está conectado para este salão.');
+  }
+
+  // Exigir confirmação prévia explícita
+  const isConfirmed = options === true || options?.confirmed === true;
+  if (!isConfirmed) {
+    const preview = getPreExistingSyncPreview(userId);
+    const err = new Error(`CONFIRMATION_REQUIRED: A sincronização em massa requer confirmação prévia e explícita. Existem ${preview.count} agendamento(s) elegível(is).`);
+    err.code = 'CONFIRMATION_REQUIRED';
+    err.eligibleCount = preview.count;
+    throw err;
   }
 
   // 1. Gravar autorização explícita
@@ -1024,17 +1112,21 @@ async function syncPreExistingAppointments(userId) {
     WHERE user_id = ?
   `).run(userId);
 
-  // 2. Buscar agendamentos futuros não cancelados sem evento Google
+  // 2. Buscar agendamentos futuros não cancelados sem evento Google real e sem duplicatas pendentes
   const eligible = db.prepare(`
     SELECT * FROM appointments
     WHERE user_id = ?
-      AND (google_event_id IS NULL OR google_event_id = '')
+      AND (google_event_id IS NULL OR google_event_id = '' OR google_event_id LIKE 'sim_%')
       AND datetime(end_datetime) >= datetime('now')
       AND status NOT IN ('CANCELADO', 'CANCELLED', 'NO_SHOW', 'COMPLETED', 'CONCLUIDO', 'CONCLUÍDO')
+      AND google_sync_status != 'PENDING'
+      AND id NOT IN (
+        SELECT appointment_id FROM google_sync_outbox
+        WHERE user_id = ? AND status IN ('PENDING', 'PROCESSING')
+      )
     ORDER BY start_datetime ASC
-  `).all(userId);
+  `).all(userId, userId);
 
-  const salonAppointmentService = require('./salonAppointmentService');
   let enqueuedCount = 0;
 
   for (const apt of eligible) {
@@ -1060,10 +1152,14 @@ async function syncPreExistingAppointments(userId) {
     enqueuedCount++;
   }
 
-  // 3. Disparar worker assíncrono para processar a fila imediatamente
+  // 3. Disparar worker assíncrono para processar a fila imediatamente usando notify()
   try {
     const outboxWorker = require('./outboxWorker');
-    outboxWorker.triggerWorkerImmediate(userId);
+    if (typeof outboxWorker.notify === 'function') {
+      outboxWorker.notify();
+    } else if (typeof outboxWorker.triggerWorkerImmediate === 'function') {
+      outboxWorker.triggerWorkerImmediate(userId);
+    }
   } catch (_) {}
 
   return {
@@ -1088,6 +1184,7 @@ module.exports = {
   createCalendarEvent,
   updateCalendarEvent,
   deleteCalendarEvent,
+  getPreExistingSyncPreview,
   syncPreExistingAppointments,
   isLiveGoogleSyncAllowed,
   setMockHandler,
