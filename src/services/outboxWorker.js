@@ -104,9 +104,10 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         continue;
       }
 
-      // 2. Proteção contra sincronização de dados fictícios em contas de demonstração (is_demo)
+      // 2. Proteção contra sincronização de dados fictícios em contas de demonstração (is_demo) - Requisito 8
       const userRow = db.prepare('SELECT is_demo FROM users WHERE id = ?').get(item.user_id);
       if (userRow && Boolean(userRow.is_demo)) {
+        const simId = 'sim_demo_' + item.appointment_id;
         db.prepare(`
           UPDATE google_sync_outbox
           SET status = 'SIMULATED', processed_at = CURRENT_TIMESTAMP, last_error = 'Conta de demonstração (is_demo) - sincronização simulada'
@@ -114,9 +115,12 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         `).run(item.id);
         db.prepare(`
           UPDATE appointments
-          SET google_sync_status = 'SYNCED', updated_at = CURRENT_TIMESTAMP
+          SET google_event_id = COALESCE(google_event_id, ?),
+              google_sync_status = 'SIMULATED',
+              google_sync_error = 'Conta de demonstração: sincronização simulada',
+              updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
-        `).run(item.appointment_id);
+        `).run(simId, item.appointment_id);
         processedCount++;
         continue;
       }
@@ -154,6 +158,62 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         continue;
       }
 
+      // 4b. Prevenção de sincronização de agendamentos preexistentes à primeira conexão sem autorização explícita (Requisitos 2 e 5)
+      const tokenRow = db.prepare(`
+        SELECT initial_connection_at, sync_existing_authorized 
+        FROM google_calendar_tokens 
+        WHERE user_id = ?
+      `).get(item.user_id);
+
+      if (tokenRow && tokenRow.initial_connection_at && !tokenRow.sync_existing_authorized && item.action === 'CREATE' && !apt.google_event_id) {
+        const aptCreatedMs = new Date(apt.created_at).getTime();
+        const initialConnMs = new Date(tokenRow.initial_connection_at).getTime();
+        if (!isNaN(aptCreatedMs) && !isNaN(initialConnMs) && aptCreatedMs <= initialConnMs) {
+          db.prepare(`
+            UPDATE google_sync_outbox
+            SET status = 'SENT', processed_at = CURRENT_TIMESTAMP, 
+                last_error = 'SKIPPED_PRE_EXISTING: Agendamento preexistente à primeira conexão Google (requer autorização explícita)'
+            WHERE id = ?
+          `).run(item.id);
+          db.prepare(`
+            UPDATE appointments
+            SET google_sync_status = 'NOT_SYNCED', 
+                google_sync_error = 'Agendamento preexistente à conexão Google (aguardando autorização para sincronização em massa)',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(item.appointment_id);
+          processedCount++;
+          continue;
+        }
+      }
+
+      // 4c. Proteção de Homologação/Staging: bloquear chamadas externas não autorizadas (Requisito 7)
+      const isLiveAllowed = googleCalendarService.isLiveGoogleSyncAllowed(status.accountEmail);
+      if (!isLiveAllowed) {
+        const simId = 'sim_gcal_' + crypto.createHash('sha256').update(`sim_${item.user_id}_${apt.id}`).digest('hex').substring(0, 24);
+        db.prepare(`
+          UPDATE google_sync_outbox
+          SET status = 'SIMULATED', processed_at = CURRENT_TIMESTAMP, 
+              last_error = 'HOMOLOGAÇÃO: Chamada externa bloqueada por segurança (GOOGLE_SYNC_LIVE_ENABLED=false) - Sincronização Simulada'
+          WHERE id = ?
+        `).run(item.id);
+
+        const finalSyncStatus = item.action === 'DELETE' ? 'CANCELLED' : 'SIMULATED';
+        const finalEventId = item.action === 'DELETE' ? null : (apt.google_event_id || simId);
+
+        db.prepare(`
+          UPDATE appointments
+          SET google_event_id = ?,
+              google_sync_status = ?,
+              google_sync_error = 'Ambiente de Homologação: Sincronização segura simulada',
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(finalEventId, finalSyncStatus, item.appointment_id);
+
+        processedCount++;
+        continue;
+      }
+
       // 5. Executar ação idempotente
       let result = null;
       if (item.action === 'CREATE') {
@@ -177,14 +237,18 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         }
       }
 
-      // 3. Sucesso na execução
+      // 3. Sucesso na execução (distingue SIMULATED de SYNCED - Requisito 8)
+      const isSimulated = Boolean(result?.isSimulated);
+      const outboxStatus = isSimulated ? 'SIMULATED' : 'SENT';
+      const outboxError = isSimulated ? 'Ambiente de Homologação: Sincronização segura simulada' : null;
+
       db.prepare(`
         UPDATE google_sync_outbox
-        SET status = 'SENT', processed_at = CURRENT_TIMESTAMP, last_error = NULL
+        SET status = ?, processed_at = CURRENT_TIMESTAMP, last_error = ?
         WHERE id = ?
-      `).run(item.id);
+      `).run(outboxStatus, outboxError, item.id);
 
-      const finalSyncStatus = item.action === 'DELETE' ? 'CANCELLED' : 'SYNCED';
+      const finalSyncStatus = item.action === 'DELETE' ? 'CANCELLED' : (isSimulated ? 'SIMULATED' : 'SYNCED');
       db.prepare(`
         UPDATE appointments
         SET google_sync_status = ?, google_sync_error = NULL, updated_at = CURRENT_TIMESTAMP

@@ -843,6 +843,9 @@ try {
       is_connected INTEGER DEFAULT 1,
       last_sync_at TEXT,
       last_error TEXT,
+      initial_connection_at TEXT,
+      connected_at TEXT,
+      sync_existing_authorized INTEGER DEFAULT 0,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
@@ -912,6 +915,11 @@ try {
   ensureColumnExists('google_sync_outbox', 'next_retry_at', 'TEXT');
   ensureColumnExists('google_sync_outbox', 'locked_at', 'TEXT');
   ensureColumnExists('google_sync_outbox', 'idempotency_key', 'TEXT');
+
+  ensureColumnExists('google_calendar_tokens', 'initial_connection_at', 'TEXT');
+  ensureColumnExists('google_calendar_tokens', 'connected_at', 'TEXT');
+  ensureColumnExists('google_calendar_tokens', 'sync_existing_authorized', 'INTEGER DEFAULT 0');
+  ensureColumnExists('client_salons', 'google_sync_existing_authorized', 'INTEGER DEFAULT 0');
 
   ensureColumnExists('whatsapp_notification_outbox', 'max_attempts', 'INTEGER DEFAULT 5');
   ensureColumnExists('whatsapp_notification_outbox', 'next_retry_at', 'TEXT');

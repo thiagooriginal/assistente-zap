@@ -855,6 +855,16 @@
       color: #356CB5 !important;
       border: 1px solid #D1E1FA !important;
     }
+    body.theme-jessica-beauty .apt-badge-google-simulated {
+      background-color: #F8EDF9 !important;
+      color: #8E3E96 !important;
+      border: 1px solid #E9D2EC !important;
+    }
+    body.theme-jessica-beauty .apt-badge-google-skipped {
+      background-color: #F5F1EC !important;
+      color: #8C7C73 !important;
+      border: 1px solid #E2D9D1 !important;
+    }
     body.theme-jessica-beauty .apt-badge-google-pending {
       background-color: #FDF4E7 !important;
       color: #B8822A !important;
@@ -5422,6 +5432,14 @@
 
       if (syncStatus === 'SYNCED') {
         return '<span class="apt-badge-google-sync apt-badge-google-synced inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20" title="Sincronizado no Google Calendar"><i data-lucide="check" class="w-2.5 h-2.5"></i> Google Calendar</span>';
+      }
+
+      if (syncStatus === 'SIMULATED') {
+        return '<span class="apt-badge-google-sync apt-badge-google-simulated inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/30" title="Sincronização Simulada (Ambiente de Homologação)"><i data-lucide="flask-conical" class="w-2.5 h-2.5 text-purple-500"></i> Simulado (Homologação)</span>';
+      }
+
+      if (syncStatus === 'NOT_SYNCED' || syncStatus === 'SKIPPED') {
+        return '<span class="apt-badge-google-sync apt-badge-google-skipped inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-slate-500/10 text-slate-500 border border-slate-500/20" title="Não sincronizado no Google Calendar"><i data-lucide="calendar-off" class="w-2.5 h-2.5"></i> Não Sincronizado</span>';
       }
 
       if (syncStatus === 'PENDING') {

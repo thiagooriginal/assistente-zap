@@ -1540,6 +1540,15 @@ router.post('/integrations/google/test', clientAuthMiddleware, requireProductAcc
   res.json(result);
 });
 
+router.post('/integrations/google/sync-existing', clientAuthMiddleware, requireProductAccess('JESSICA'), async (req, res) => {
+  try {
+    const result = await googleCalendarService.syncPreExistingAppointments(req.clientUser.id);
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
 // ==========================================
 // WHATSAPP NOTIFICATIONS INTEGRATIONS
 // ==========================================
