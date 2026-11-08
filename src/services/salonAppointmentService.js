@@ -824,26 +824,55 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
 
   const targetStaffId = newStaffId !== null ? Number(newStaffId) : existing.staff_id;
 
+  // 1. Consulta externa de disponibilidade Google FORA da transação SQLite (sem prender locks)
+  const gCheck = await checkGoogleAvailability(userId, {
+    startDt,
+    endDt,
+    staffId: targetStaffId,
+    timeoutMs: 4000,
+  });
+
+  if (!gCheck.available) {
+    let alternatives = [];
+    try {
+      alternatives = await findAlternativeSlots(userId, {
+        date: cleanNewDate,
+        serviceDurationMin: durationMin,
+        staffId: targetStaffId,
+        limit: 5,
+      });
+    } catch (_) {}
+
+    const err = new Error(gCheck.message);
+    err.code = gCheck.reason || 'GOOGLE_CALENDAR_BUSY';
+    err.suggestedSlots = alternatives;
+    throw err;
+  }
+
+  // 2. Transação atômica SQLite (BEGIN IMMEDIATE) estritamente local (sem chamadas externas de rede)
   db.exec('BEGIN IMMEDIATE');
   try {
-    const check = await checkSlotAvailability(userId, {
+    const internalCheck = checkInternalSlotAvailability(userId, {
       startDt,
       endDt,
       staffId: targetStaffId,
       excludeAppointmentId: appointmentId,
     });
 
-    if (!check.available) {
+    if (!internalCheck.available) {
       db.exec('ROLLBACK');
-      const alternatives = await findAlternativeSlots(userId, {
-        date: cleanNewDate,
-        serviceDurationMin: durationMin,
-        staffId: targetStaffId,
-        limit: 5,
-      });
+      let alternatives = [];
+      try {
+        alternatives = await findAlternativeSlots(userId, {
+          date: cleanNewDate,
+          serviceDurationMin: durationMin,
+          staffId: targetStaffId,
+          limit: 5,
+        });
+      } catch (_) {}
 
-      const err = new Error(check.message);
-      err.code = check.reason || 'SLOT_CONFLICT';
+      const err = new Error(internalCheck.message);
+      err.code = internalCheck.reason || 'SLOT_CONFLICT';
       err.suggestedSlots = alternatives;
       throw err;
     }

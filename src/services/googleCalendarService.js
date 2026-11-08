@@ -277,6 +277,28 @@ async function handleOAuthCallback(code, state, authenticatedUserId = null, opti
       updated_at = CURRENT_TIMESTAMP
   `).run(userId, accountEmail || 'Conta Google', encTokens, tokens.scope || 'calendar');
 
+  // 5. Sanitizar fila outbox pendente do salão ao conectar conta:
+  // Marcar agendamentos históricos no passado ou já cancelados como SKIPPED para evitar poluir o Google Calendar recém-conectado
+  db.prepare(`
+    UPDATE google_sync_outbox
+    SET status = 'SENT', processed_at = CURRENT_TIMESTAMP, last_error = 'SKIPPED: Agendamento histórico concluído no passado'
+    WHERE user_id = ? AND status = 'PENDING' AND action = 'CREATE'
+      AND appointment_id IN (
+        SELECT id FROM appointments 
+        WHERE user_id = ? AND datetime(end_datetime) < datetime('now')
+      )
+  `).run(userId, userId);
+
+  db.prepare(`
+    UPDATE google_sync_outbox
+    SET status = 'SENT', processed_at = CURRENT_TIMESTAMP, last_error = 'SKIPPED: Agendamento cancelado antes da conexão Google'
+    WHERE user_id = ? AND status = 'PENDING' AND action = 'CREATE'
+      AND appointment_id IN (
+        SELECT id FROM appointments 
+        WHERE user_id = ? AND status IN ('CANCELADO', 'CANCELLED')
+      )
+  `).run(userId, userId);
+
   return { success: true, userId, email: accountEmail };
 }
 

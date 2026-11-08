@@ -104,7 +104,57 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         continue;
       }
 
-      // 2. Executar ação idempotente
+      // 2. Proteção contra sincronização de dados fictícios em contas de demonstração (is_demo)
+      const userRow = db.prepare('SELECT is_demo FROM users WHERE id = ?').get(item.user_id);
+      if (userRow && Boolean(userRow.is_demo)) {
+        db.prepare(`
+          UPDATE google_sync_outbox
+          SET status = 'SIMULATED', processed_at = CURRENT_TIMESTAMP, last_error = 'Conta de demonstração (is_demo) - sincronização simulada'
+          WHERE id = ?
+        `).run(item.id);
+        db.prepare(`
+          UPDATE appointments
+          SET google_sync_status = 'SYNCED', updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(item.appointment_id);
+        processedCount++;
+        continue;
+      }
+
+      // 3. Prevenção de criação de eventos para agendamentos já cancelados antes da sincronização
+      if (item.action === 'CREATE' && ['CANCELADO', 'CANCELLED'].includes(apt.status)) {
+        db.prepare(`
+          UPDATE google_sync_outbox
+          SET status = 'SENT', processed_at = CURRENT_TIMESTAMP, last_error = 'SKIPPED: Agendamento cancelado antes da sincronização'
+          WHERE id = ?
+        `).run(item.id);
+        db.prepare(`
+          UPDATE appointments
+          SET google_sync_status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(item.appointment_id);
+        processedCount++;
+        continue;
+      }
+
+      // 4. Prevenção de criação de eventos para agendamentos históricos no passado ao conectar conta
+      const endMs = new Date(apt.end_datetime).getTime();
+      if (item.action === 'CREATE' && !apt.google_event_id && !isNaN(endMs) && endMs < Date.now()) {
+        db.prepare(`
+          UPDATE google_sync_outbox
+          SET status = 'SENT', processed_at = CURRENT_TIMESTAMP, last_error = 'SKIPPED: Agendamento histórico concluído no passado'
+          WHERE id = ?
+        `).run(item.id);
+        db.prepare(`
+          UPDATE appointments
+          SET google_sync_status = 'NOT_SYNCED', google_sync_error = 'Agendamento histórico no passado', updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(item.appointment_id);
+        processedCount++;
+        continue;
+      }
+
+      // 5. Executar ação idempotente
       let result = null;
       if (item.action === 'CREATE') {
         if (apt.google_event_id) {
@@ -134,31 +184,43 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         WHERE id = ?
       `).run(item.id);
 
+      const finalSyncStatus = item.action === 'DELETE' ? 'CANCELLED' : 'SYNCED';
       db.prepare(`
         UPDATE appointments
-        SET google_sync_status = 'SYNCED', google_sync_error = NULL, updated_at = CURRENT_TIMESTAMP
+        SET google_sync_status = ?, google_sync_error = NULL, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(item.appointment_id);
+      `).run(finalSyncStatus, item.appointment_id);
 
       processedCount++;
     } catch (err) {
+      const errMsg = err.message || 'Falha ao sincronizar com Google Calendar';
+      const isRevoked = errMsg.includes('invalid_grant') || errMsg.includes('Token has been expired or revoked');
+
+      if (isRevoked) {
+        db.prepare(`
+          UPDATE google_calendar_tokens
+          SET is_connected = 0, last_error = 'Token revogado ou expirado no Google. Reconecte sua conta.', updated_at = CURRENT_TIMESTAMP
+          WHERE user_id = ?
+        `).run(item.user_id);
+      }
+
       const newAttempts = (item.attempts || 0) + 1;
       const maxAttempts = item.max_attempts || 5;
-      const isFinal = newAttempts >= maxAttempts;
+      const isFinal = newAttempts >= maxAttempts || isRevoked;
       const backoffMin = Math.min(Math.pow(2, newAttempts), 60);
-      const nextRetry = new Date(Date.now() + backoffMin * 60000).toISOString();
+      const nextRetry = isRevoked ? null : new Date(Date.now() + backoffMin * 60000).toISOString();
 
       db.prepare(`
         UPDATE google_sync_outbox
         SET status = ?, attempts = ?, last_error = ?, next_retry_at = ?, locked_at = NULL
         WHERE id = ?
-      `).run(isFinal ? 'FAILED' : 'PENDING', newAttempts, err.message, nextRetry, item.id);
+      `).run(isFinal ? 'FAILED' : 'PENDING', newAttempts, errMsg, nextRetry, item.id);
 
       db.prepare(`
         UPDATE appointments
         SET google_sync_status = 'FAILED', google_sync_error = ?, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
-      `).run(err.message, item.appointment_id);
+      `).run(errMsg, item.appointment_id);
     }
   }
 
