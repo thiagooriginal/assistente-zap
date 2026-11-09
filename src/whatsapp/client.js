@@ -14,6 +14,7 @@ const db = require('../database/db');
 const { handleIncomingMessage } = require('./messageHandler');
 const { startReminderJob } = require('../services/reminderService');
 const agentChatService = require('../services/agentChatService');
+const phoneUtils = require('../utils/phoneUtils');
 
 let currentSock = null;
 let lastKnownUserJid = null;
@@ -44,17 +45,16 @@ async function sendWhatsAppMessage(jid, text) {
 
   let finalJid = jid;
   if (finalJid.includes('@lid')) {
-    const clean = finalJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
-    try {
-      const mappingPath = path.resolve(config.authDir, `lid-mapping-${clean}_reverse.json`);
-      if (fs.existsSync(mappingPath)) {
-        const raw = fs.readFileSync(mappingPath, 'utf8');
-        const phone = JSON.parse(raw);
-        if (phone) finalJid = `${String(phone).replace(/[^0-9]/g, '')}@s.whatsapp.net`;
-      }
-    } catch (e) {}
+    const cleanLid = finalJid.split('@')[0].split(':')[0];
+    const resolvedPhone = phoneUtils.resolveLidToPhone(cleanLid, config.authDir);
+    if (resolvedPhone) {
+      finalJid = `${resolvedPhone}@s.whatsapp.net`;
+    } else {
+      console.warn(`[Bloqueio de Segurança] Envio para WhatsApp LID sem mapeamento seguro impedido: ${jid}`);
+      return;
+    }
   } else if (!finalJid.endsWith('@s.whatsapp.net')) {
-    const clean = finalJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
+    const clean = phoneUtils.cleanDigits(finalJid.split('@')[0].split(':')[0]);
     finalJid = `${clean}@s.whatsapp.net`;
   }
 
@@ -153,23 +153,9 @@ async function startWhatsAppBot() {
     for (const msg of messages) {
       if (!msg.message || !msg.key?.remoteJid) continue;
 
-      const myCleanNumber = sock.user?.id ? sock.user.id.split('@')[0].split(':')[0].replace(/[^0-9]/g, '') : '';
-      let senderClean = '';
-
-      if (msg.key.remoteJid.includes('@s.whatsapp.net') || msg.key.remoteJid.includes('@lid')) {
-        let clean = msg.key.remoteJid.split('@')[0].split(':')[0].replace(/[^0-9]/g, '');
-        if (msg.key.remoteJid.includes('@lid')) {
-          try {
-            const mappingPath = path.resolve(config.authDir, `lid-mapping-${clean}_reverse.json`);
-            if (fs.existsSync(mappingPath)) {
-              const raw = fs.readFileSync(mappingPath, 'utf8');
-              const phone = JSON.parse(raw);
-              if (phone) clean = String(phone).replace(/[^0-9]/g, '');
-            }
-          } catch (e) {}
-        }
-        senderClean = clean;
-      }
+      const myCleanNumber = sock.user?.id ? phoneUtils.cleanDigits(sock.user.id.split('@')[0].split(':')[0]) : '';
+      const rawJid = msg.key?.remoteJid || '';
+      const senderClean = phoneUtils.extractCleanPhone('', rawJid, config.authDir) || '';
 
       // If message is fromMe: only process if it's a self-chat (talking to oneself) or authorized tester
       if (msg.key.fromMe) {
@@ -213,7 +199,7 @@ async function startWhatsAppBot() {
       }
 
       // 1. PRIORIDADE MÁXIMA: Verificar se é um Lead interagindo com um Agente RAIA (Jéssica, Sofia, Lex, etc.)
-      const lead = agentChatService.findActiveLead(senderClean, msg.key?.remoteJid);
+      const lead = agentChatService.findActiveLead(senderClean, rawJid);
       if (lead) {
         console.log(`[WhatsApp] 🤖 Lead ativo para Agente ${lead.agent_name || lead.agent_key} (${senderClean || msg.key?.remoteJid}). Processando resposta com agentChatService...`);
         try {

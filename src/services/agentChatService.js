@@ -2,6 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
 const db = require('../database/db');
 const config = require('../config');
+const phoneUtils = require('../utils/phoneUtils');
 
 let genAI = null;
 
@@ -170,81 +171,31 @@ Suas características:
 
 /**
  * Find active test lead by phone number or raw JID
+ * Hardening P0: isolamento estrito por candidatos canônicos (mesmo DDD).
+ * Sem correspondência por sufixo LIKE e sem fallback para leads recentes de 24h.
  */
-function resolvePhone(candidate) {
-  if (!candidate) return '';
-  let clean = String(candidate).replace(/\D/g, '');
-  if (clean.length > 13) {
-    try {
-      const mappingFile = path.resolve(config.authDir, `lid-mapping-${clean}_reverse.json`);
-      if (fs.existsSync(mappingFile)) {
-        const raw = fs.readFileSync(mappingFile, 'utf8');
-        const p = JSON.parse(raw);
-        if (p) return String(p).replace(/\D/g, '');
-      }
-    } catch (e) {}
-  }
-  return clean;
-}
-
 function findActiveLead(phoneNumber, rawJid = '') {
-  const clean = String(phoneNumber || '').replace(/\D/g, '');
-  const cleanJid = String(rawJid || '').split('@')[0].split(':')[0].replace(/\D/g, '');
-  
-  const phone1 = resolvePhone(clean);
-  const phone2 = resolvePhone(cleanJid);
-  const candidates = [clean, cleanJid, phone1, phone2].filter(Boolean);
-
-  if (candidates.length === 0) return null;
-
   try {
-    // 1. Direct match by exact phone, with 55, or last 8 digits
-    for (const c of candidates) {
-      if (c.length >= 8 && c.length <= 13) {
-        const suffix = c.slice(-8);
-        const lead = db.prepare(`
-          SELECT * FROM leads
-          WHERE phone = ? OR phone = ? OR phone LIKE ?
-          ORDER BY id DESC
-          LIMIT 1
-        `).get(c, `55${c}`, `%${suffix}`);
-        if (lead) return lead;
-      }
+    const cleanPhone = phoneUtils.extractCleanPhone(phoneNumber, rawJid, config.authDir);
+    if (!cleanPhone) {
+      return null;
     }
 
-    // 2. If it is an authorized phone/LID (e.g. Thiago's admin LID 179082956419107)
-    if (config.authorizedPhone) {
-      const list = config.authorizedPhone.split(',').map((s) => s.trim().replace(/\D/g, '')).filter(Boolean);
-      const isAuth = candidates.some((c) => list.includes(c));
-      if (isAuth) {
-        for (const authPhone of list) {
-          if (authPhone.length >= 10 && authPhone.length <= 13) {
-            const lead = db.prepare(`
-              SELECT * FROM leads
-              WHERE phone = ? OR phone = ? OR phone LIKE ?
-              ORDER BY id DESC
-              LIMIT 1
-            `).get(authPhone, `55${authPhone}`, `%${authPhone.slice(-8)}`);
-            if (lead) return lead;
-          }
-        }
-      }
+    const candidates = phoneUtils.getPhoneCandidates(cleanPhone);
+    if (!candidates || candidates.length === 0) {
+      return null;
     }
 
-    // 3. Fallback: Most recent lead created in the last 24 hours
-    const recentLead = db.prepare(`
+    const placeholders = candidates.map(() => '?').join(', ');
+    const lead = db.prepare(`
       SELECT * FROM leads
-      WHERE (status = 'SENT' OR status = 'ACTIVE')
-        AND created_at >= datetime('now', '-24 hours')
+      WHERE phone IN (${placeholders})
+        AND (status = 'SENT' OR status = 'ACTIVE')
       ORDER BY id DESC
       LIMIT 1
-    `).get();
+    `).get(...candidates);
 
-    if (recentLead) {
-      return recentLead;
-    }
-
-    return null;
+    return lead || null;
   } catch (err) {
     console.error('Erro ao buscar lead ativo:', err.message);
     return null;
@@ -256,10 +207,11 @@ function findActiveLead(phoneNumber, rawJid = '') {
  */
 function recordMessage(leadId, phone, agentKey, role, content) {
   try {
+    const clean = phoneUtils.cleanDigits(phone);
     db.prepare(`
       INSERT INTO agent_messages (lead_id, phone, agent_key, role, content)
       VALUES (?, ?, ?, ?, ?)
-    `).run(leadId || null, String(phone).replace(/\D/g, ''), agentKey || 'OTHER', role, content);
+    `).run(leadId || null, clean, agentKey || 'OTHER', role, content);
   } catch (err) {
     console.error('Erro ao registrar mensagem do agente no banco:', err.message);
   }
@@ -267,18 +219,33 @@ function recordMessage(leadId, phone, agentKey, role, content) {
 
 /**
  * Get recent conversation history for lead
+ * Hardening P0: prioriza isolamento estrito por lead_id;
+ * fallback para candidatos canônicos exatos (mesmo DDD). Sem LIKE %suffix.
  */
-function getRecentHistory(phone, limit = 8) {
-  const clean = String(phone).replace(/\D/g, '');
-  const suffix = clean.length >= 8 ? clean.slice(-8) : clean;
-
+function getRecentHistory(phone, limit = 8, leadId = null) {
   try {
+    if (leadId) {
+      return db.prepare(`
+        SELECT role, content FROM agent_messages
+        WHERE lead_id = ?
+        ORDER BY id DESC
+        LIMIT ?
+      `).all(leadId, limit).reverse();
+    }
+
+    const clean = phoneUtils.cleanDigits(phone);
+    if (!clean) return [];
+
+    const candidates = phoneUtils.getPhoneCandidates(clean);
+    if (!candidates || candidates.length === 0) return [];
+
+    const placeholders = candidates.map(() => '?').join(', ');
     return db.prepare(`
       SELECT role, content FROM agent_messages
-      WHERE phone = ? OR phone LIKE ?
+      WHERE phone IN (${placeholders})
       ORDER BY id DESC
       LIMIT ?
-    `).all(clean, `%${suffix}`, limit).reverse();
+    `).all(...candidates, limit).reverse();
   } catch (err) {
     console.error('Erro ao buscar histórico recente:', err.message);
     return [];
@@ -306,7 +273,7 @@ DIRETRIZES FUNDAMENTAIS DE COMUNICAÇÃO NO WHATSAPP:
 7. PERGUNTA DE FECHAMENTO: Toda mensagem DEVE terminar com uma pergunta conduzindo o cliente ao próximo passo (ex: "Qual opção você prefere?", "Gostaria de agendar para amanhã às 14h ou 16h30?").
 8. NUNCA responda em JSON ou código. Responda em texto natural pronto para envio direto no WhatsApp.`;
 
-  const rawHistory = getRecentHistory(lead.phone, 8);
+  const rawHistory = getRecentHistory(lead.phone, 8, lead.id);
   const contents = [];
 
   // Filter out any accidentally truncated history items so they don't corrupt the prompt
