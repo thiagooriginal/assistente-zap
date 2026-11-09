@@ -16,13 +16,24 @@
         var s = window.location.search || '';
         var clean = h.replace(/^#+/, '').replace(/^tab-/, '').split('?')[0].split('&')[0];
         var jessicaTabs = ['overview', 'salon', 'services', 'staff', 'appointments', 'integrations-google', 'integrations-whatsapp', 'dashboard-pro', 'campaigns-pro'];
-        var isJessica = jessicaTabs.indexOf(clean) !== -1 || s.indexOf('modulo=jessica') !== -1;
+        var hubTabs = ['my-products', 'my-subscriptions', 'my-invoices', 'explore-solutions', 'profile-security'];
         
-        if (!isJessica && !clean) {
-          for (var i = 0; i < jessicaTabs.length; i++) {
-            if (s.indexOf('tab=' + jessicaTabs[i]) !== -1) {
-              isJessica = true;
-              break;
+        var isJessica = false;
+        // Precedência canônica estrita: a hash válida sempre tem prioridade sobre qualquer parâmetro de query
+        if (clean && jessicaTabs.indexOf(clean) !== -1) {
+          isJessica = true;
+        } else if (clean && hubTabs.indexOf(clean) !== -1) {
+          isJessica = false;
+        } else {
+          // Fallback para query parameters apenas se a hash não indicar uma aba conhecida
+          if (s.indexOf('modulo=jessica') !== -1) {
+            isJessica = true;
+          } else {
+            for (var i = 0; i < jessicaTabs.length; i++) {
+              if (s.indexOf('tab=' + jessicaTabs[i]) !== -1) {
+                isJessica = true;
+                break;
+              }
             }
           }
         }
@@ -177,6 +188,13 @@
     body.theme-jessica-beauty ::selection {
       background: rgba(200, 155, 109, 0.25) !important;
       color: #AD7B42 !important;
+    }
+
+    /* Institutional RAIA Dark Atmosphere */
+    body.theme-raia {
+      background-color: #07080c !important;
+      color: #F1F5F9 !important;
+      background-image: none !important;
     }
 
     /* Body Background & Atmosphere in Beauty Theme */
@@ -3675,7 +3693,9 @@
       // 1. Dinamismo de Tema Visual: RAIA AGENTES INSTITUCIONAL vs JÉSSICA BEAUTY PREMIUM
       if (inSalon) {
         document.documentElement.classList.remove('dark');
-        document.body.classList.remove('theme-raia');
+        document.documentElement.classList.remove('theme-raia');
+        document.documentElement.classList.add('theme-jessica-beauty');
+        document.body.classList.remove('theme-raia', 'bg-[#07080c]', 'text-slate-100');
         document.body.classList.add('theme-jessica-beauty');
         if (jessicaBanner) jessicaBanner.classList.remove('hidden');
         if (sidebarRaiaBrand) sidebarRaiaBrand.classList.add('hidden');
@@ -3707,8 +3727,10 @@
         }
       } else {
         document.documentElement.classList.add('dark');
-        document.body.classList.add('theme-raia');
+        document.documentElement.classList.remove('theme-jessica-beauty');
+        document.documentElement.classList.add('theme-raia');
         document.body.classList.remove('theme-jessica-beauty');
+        document.body.classList.add('theme-raia', 'bg-[#07080c]', 'text-slate-100');
         if (jessicaBanner) jessicaBanner.classList.add('hidden');
         if (sidebarRaiaBrand) sidebarRaiaBrand.classList.remove('hidden');
         if (sidebarJessicaBrand) {
@@ -4602,7 +4624,17 @@
     });
 
     function revealInterface() {
-      document.body.classList.remove('app-initializing');
+      // 1. Desativar completamente as classes de pré-inicialização do html e body
+      document.documentElement.classList.remove('pre-jessica', 'pre-raia', 'app-initializing');
+      document.body.classList.remove('pre-jessica', 'pre-raia', 'app-initializing');
+
+      // 2. Limpar estilos inline de background e color residuais se houver
+      document.documentElement.style.backgroundColor = '';
+      document.documentElement.style.color = '';
+      document.body.style.backgroundColor = '';
+      document.body.style.color = '';
+
+      // 3. Ocultar e descartar suavemente a cortina visual
       const curtain = document.getElementById('appInitCurtain');
       if (curtain) {
         curtain.classList.add('curtain-hidden');

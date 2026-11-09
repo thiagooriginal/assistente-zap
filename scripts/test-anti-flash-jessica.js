@@ -188,7 +188,7 @@ async function runValidation() {
 
     assert.strictEqual(resA.hash, '#appointments', 'Hash deve ser #appointments');
     assert.strictEqual(resA.hasDarkClass, false, 'HTML NÃO deve ter classe dark em seção da Jéssica');
-    assert.strictEqual(resA.hasPreJessica, true, 'Pré-detecção síncrona pre-jessica deve estar ativa');
+    assert.strictEqual(resA.hasPreJessica, false, 'Pré-detecção síncrona pre-jessica deve ser removida após revealInterface()');
     assert.strictEqual(resA.hasBeautyTheme, true, 'Body deve ter tema Jéssica Beauty');
     assert.strictEqual(resA.myProductsHidden, true, 'Aba "Meus Produtos" JAMAIS deve ser renderizada na Jéssica');
     assert.strictEqual(resA.appointmentsVisible, true, 'Aba appointments deve estar visível');
@@ -307,7 +307,7 @@ async function runValidation() {
       console.log(`  -> Seção #${sec}: aberta diretamente, tema Beauty=${r.isBeauty}, Hub oculto=${r.hubHidden}`);
       assert.strictEqual(r.hash, '#' + sec);
       assert.strictEqual(r.isDark, false);
-      assert.strictEqual(r.isPreJessica, true);
+      assert.strictEqual(r.isPreJessica, false, 'pre-jessica deve ser removido após revealInterface()');
       assert.strictEqual(r.isBeauty, true);
       assert.strictEqual(r.tabVisible, true);
       assert.strictEqual(r.hubHidden, true);
@@ -360,7 +360,7 @@ async function runValidation() {
     fs.writeFileSync(path.join(ARTIFACT_DIR, 'hub-central-anti-flash-reloaded.png'), Buffer.from(shotD.data, 'base64'));
 
     assert.strictEqual(resD.isDark, true, 'Hub Central deve ser dark');
-    assert.strictEqual(resD.isPreRaia, true, 'pre-raia deve estar ativo para o Hub');
+    assert.strictEqual(resD.isPreRaia, false, 'pre-raia deve ser removido após revealInterface()');
     assert.strictEqual(resD.isBeauty, false, 'Hub NÃO deve ter tema Jéssica Beauty');
     assert.strictEqual(resD.hubVisible, true, 'Aba "Meus Produtos" deve estar visível no Hub');
     assert.strictEqual(resD.aptHidden, true, 'Aba appointments deve estar oculta');
