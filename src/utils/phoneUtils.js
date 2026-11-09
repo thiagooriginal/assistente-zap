@@ -1,160 +1,266 @@
 /**
- * Utilitários de higienização, normalização e resolução de telefones brasileiros e LIDs do WhatsApp.
- * Padrão RAIA AGENTES — Matriz de Isolamento e Segurança (P0).
+ * Utilitários puros para higienização, normalização e resolução de identificadores
+ * telefônicos e LIDs do WhatsApp na plataforma RAIA AGENTES.
+ *
+ * Em conformidade com a Matriz RAIA-27 (OWASP ASVS 5.0 - Proteção 03: Isolamento Multi-tenant).
  */
+
 const fs = require('node:fs');
 const path = require('node:path');
 
 /**
- * Remove qualquer caractere não numérico.
- * @param {string|number|null|undefined} value
- * @returns {string}
+ * Remove todos os caracteres não numéricos da entrada fornecida.
+ *
+ * @param {string|number|null|undefined} str - String ou número bruto
+ * @returns {string} String contendo exclusivamente dígitos [0-9]
  */
-function cleanDigits(value) {
-  if (value === null || value === undefined) return '';
-  return String(value).replace(/\D/g, '');
+function cleanDigits(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/\D/g, '');
 }
 
 /**
- * Valida se um código de área (DDD) de 2 dígitos é válido no Brasil.
- * DDDs válidos: 11 a 99, onde o primeiro dígito é 1-9 e o segundo é 1-9 (10, 20, 30... não existem).
- * @param {string} ddd
- * @returns {boolean}
+ * Valida se uma string de 2 caracteres corresponde a um DDD brasileiro válido.
+ * No plano de numeração nacional (Anatel), DDDs válidos situam-se entre 11 e 99,
+ * sendo o segundo dígito estritamente entre 1 e 9 (nenhum DDD termina em 0).
+ *
+ * @param {string} ddd - Código de área de 2 dígitos
+ * @returns {boolean} True se for DDD brasileiro válido
  */
 function isValidBrazilianDdd(ddd) {
-  if (!ddd || typeof ddd !== 'string' || ddd.length !== 2) return false;
-  const num = parseInt(ddd, 10);
-  if (isNaN(num) || num < 11 || num > 99) return false;
-  const secondDigit = parseInt(ddd[1], 10);
-  return secondDigit >= 1 && secondDigit <= 9;
+  if (typeof ddd !== 'string' || ddd.length !== 2) return false;
+  const d1 = Number(ddd[0]);
+  const d2 = Number(ddd[1]);
+  return d1 >= 1 && d1 <= 9 && d2 >= 1 && d2 <= 9;
 }
 
 /**
- * Resolve um WhatsApp LID para número de telefone real usando o mapeamento reverso seguro.
- * Retorna null se não houver mapeamento confiável em disco.
- * @param {string} lidInput JID ou dígitos de LID
- * @param {string} authDir Diretório de autenticação do Baileys
- * @returns {string|null}
+ * Resolve um JID de privacidade do WhatsApp (@lid) para o número de telefone real
+ * utilizando o arquivo de mapeamento reverso gerado pelo Baileys no authDir.
+ *
+ * @param {string|number|null|undefined} jid - JID ou identificador do usuário
+ * @param {string} authDir - Caminho do diretório de autenticação/sessão do Baileys
+ * @returns {string|null} Telefone limpo resolvido (10 a 13 dígitos) ou null
  */
-function resolveLidToPhone(lidInput, authDir) {
-  if (!lidInput || !authDir) return null;
-  const cleanLid = cleanDigits(lidInput);
-  if (!cleanLid) return null;
+function resolveLidToPhone(jid, authDir) {
+  if (!jid || !authDir || typeof authDir !== 'string') return null;
+
+  const jidStr = String(jid).trim();
+  const isLid = jidStr.includes('@lid');
+  const clean = cleanDigits(jidStr.split('@')[0].split(':')[0]);
+
+  // Se não tiver domínio @lid explícito, só trata como LID se possuir mais de 13 dígitos
+  if (!isLid && clean.length <= 13) {
+    return null;
+  }
+
+  if (!clean) return null;
 
   try {
-    const mappingPath = path.resolve(authDir, `lid-mapping-${cleanLid}_reverse.json`);
-    if (fs.existsSync(mappingPath)) {
-      const raw = fs.readFileSync(mappingPath, 'utf8');
+    const mappingFile = path.resolve(authDir, `lid-mapping-${clean}_reverse.json`);
+    if (fs.existsSync(mappingFile)) {
+      const raw = fs.readFileSync(mappingFile, 'utf8');
       const parsed = JSON.parse(raw);
       if (parsed) {
-        const cleanPhone = cleanDigits(parsed);
-        if (cleanPhone && cleanPhone.length >= 10 && cleanPhone.length <= 13) {
-          return cleanPhone;
+        const phoneClean = cleanDigits(parsed);
+        if (phoneClean.length >= 10 && phoneClean.length <= 13) {
+          return phoneClean;
         }
       }
     }
   } catch (err) {
-    // Fail-closed silencioso em erro de leitura/parsing de arquivo
+    // Fail-safe defensivo: erro de leitura ou parse corrompido retorna null
   }
 
   return null;
 }
 
 /**
- * Extrai e normaliza um número de telefone seguro a partir de um número ou JID de WhatsApp.
- * Se for um LID não mapeado, retorna null (fail-closed).
- * @param {string|null|undefined} phoneNumber
- * @param {string|null|undefined} rawJid
- * @param {string} authDir
- * @returns {string|null}
+ * Extrai o número de telefone limpo a partir de @s.whatsapp.net, @lid (via mapeamento reverso)
+ * ou string numérica pura. Se for um @lid não mapeado ou inválido, retorna null (fail-closed).
+ *
+ * @param {string|number|null|undefined} phoneNumber - Telefone recebido
+ * @param {string|number|null|undefined} [rawJid] - JID bruto do WhatsApp
+ * @param {string} [authDir] - Caminho da sessão do Baileys
+ * @returns {string|null} Dígitos numéricos válidos ou null
  */
 function extractCleanPhone(phoneNumber, rawJid, authDir) {
-  const jidStr = String(rawJid || '');
-  const isLid = jidStr.includes('@lid') || (phoneNumber && String(phoneNumber).includes('@lid'));
-
-  if (isLid) {
-    const lidCandidate = jidStr.includes('@lid') ? jidStr.split('@')[0].split(':')[0] : phoneNumber;
-    return resolveLidToPhone(lidCandidate, authDir);
+  // Se o terceiro parâmetro não foi passado, mas authDir veio no segundo
+  let effectiveRawJid = rawJid;
+  let effectiveAuthDir = authDir;
+  if (typeof rawJid === 'string' && (rawJid.includes('\\') || rawJid.includes('/')) && !authDir) {
+    effectiveAuthDir = rawJid;
+    effectiveRawJid = '';
   }
 
-  // Tentar primeiro do phoneNumber
-  let digits = cleanDigits(phoneNumber);
-  if (!digits && jidStr) {
-    const baseJid = jidStr.split('@')[0].split(':')[0];
-    digits = cleanDigits(baseJid);
+  const rawJidStr = String(effectiveRawJid || '').trim();
+  const phoneStr = String(phoneNumber || '').trim();
+
+  // 1. Verificar se é LID explícito
+  if (rawJidStr.includes('@lid') || phoneStr.includes('@lid')) {
+    const lidTarget = rawJidStr.includes('@lid') ? rawJidStr : phoneStr;
+    const resolved = resolveLidToPhone(lidTarget, effectiveAuthDir);
+    return resolved || null;
   }
 
-  if (!digits) return null;
+  // 2. Extrair de @s.whatsapp.net
+  if (rawJidStr.includes('@s.whatsapp.net')) {
+    const clean = cleanDigits(rawJidStr.split('@')[0].split(':')[0]);
+    if (clean && clean.length >= 8 && clean.length <= 13) return clean;
+    if (clean.length > 13 && effectiveAuthDir) {
+      return resolveLidToPhone(clean, effectiveAuthDir);
+    }
+    return null;
+  }
 
-  // LIDs numéricos com mais de 13 dígitos sem sufixo explícito
-  if (digits.length > 13) {
-    return resolveLidToPhone(digits, authDir);
+  // 3. Tentar pelo phoneNumber
+  let clean = cleanDigits(phoneStr);
+  if (!clean && rawJidStr) {
+    clean = cleanDigits(rawJidStr.split('@')[0].split(':')[0]);
+  }
+
+  if (!clean) return null;
+
+  // 4. Identificadores longos sem domínio (> 13 dígitos) tratam-se de LID numérico
+  if (clean.length > 13) {
+    if (effectiveAuthDir) {
+      const resolved = resolveLidToPhone(clean, effectiveAuthDir);
+      if (resolved) return resolved;
+    }
+    // LID sem mapeamento reverso não pode vazar como telefone
+    return null;
   }
 
   // Número brasileiro válido tem entre 8 e 13 dígitos
-  if (digits.length >= 8 && digits.length <= 13) {
-    return digits;
+  if (clean.length >= 8 && clean.length <= 13) {
+    return clean;
   }
 
   return null;
 }
 
 /**
- * Gera lista estrita de candidatos canônicos para busca de lead no banco.
- * Garante que variações com/sem DDI 55 e com/sem nono dígito (8 vs 9 dígitos)
- * pertençam EXATAMENTE AO MESMO DDD.
- * Nunca gera correspondência por sufixo genérico nem mistura DDDs.
+ * Gera candidatos exatos de apresentação (com e sem DDI 55) preservando ESTRITAMENTE
+ * a quantidade de dígitos locais do número original. NÃO gera variantes de 8 dígitos
+ * a partir de 9 nem de 9 dígitos a partir de 8 (Eliminação de Ambiguidade P0).
  *
- * @param {string} phone
- * @returns {string[]} Lista ordenada de candidatos sem duplicatas
+ * @param {string|number|null|undefined} phone - Telefone ou JID
+ * @param {string} [authDir] - Diretório de autenticação do Baileys
+ * @returns {string[]} Lista de candidatos exatos deduplicados
  */
-function getPhoneCandidates(phone) {
-  const clean = cleanDigits(phone);
-  if (!clean || clean.length < 8 || clean.length > 13) {
+function getExactPhoneCandidates(phone, authDir) {
+  const digits = extractCleanPhone(phone, '', authDir);
+  if (!digits) {
     return [];
   }
 
-  const candidates = new Set();
-  candidates.add(clean);
-
-  let ddd = '';
-  let localNumber = '';
-
-  if (clean.startsWith('55') && (clean.length === 12 || clean.length === 13)) {
-    // Ex: 5511999998888 (13 dígitos) ou 551199998888 (12 dígitos)
-    ddd = clean.slice(2, 4);
-    localNumber = clean.slice(4);
-  } else if (!clean.startsWith('55') && (clean.length === 10 || clean.length === 11)) {
-    // Ex: 11999998888 (11 dígitos) ou 1199998888 (10 dígitos)
-    ddd = clean.slice(0, 2);
-    localNumber = clean.slice(2);
-  }
-
-  if (ddd && isValidBrazilianDdd(ddd) && localNumber) {
-    // Número com DDD brasileiro validado
-    if (localNumber.length === 9 && localNumber.startsWith('9')) {
-      const eightDigits = localNumber.slice(1);
-      candidates.add(`55${ddd}${localNumber}`);
-      candidates.add(`${ddd}${localNumber}`);
-      candidates.add(`55${ddd}${eightDigits}`);
-      candidates.add(`${ddd}${eightDigits}`);
-    } else if (localNumber.length === 8) {
-      const nineDigits = `9${localNumber}`;
-      candidates.add(`55${ddd}${localNumber}`);
-      candidates.add(`${ddd}${localNumber}`);
-      candidates.add(`55${ddd}${nineDigits}`);
-      candidates.add(`${ddd}${nineDigits}`);
-    }
-  } else if (!ddd && (clean.length === 8 || clean.length === 9)) {
-    // Número local isolado sem DDD
-    if (clean.length === 9 && clean.startsWith('9')) {
-      candidates.add(clean.slice(1));
-    } else if (clean.length === 8) {
-      candidates.add(`9${clean}`);
+  // 10 dígitos (DDD 2 + local 8)
+  if (digits.length === 10) {
+    const ddd = digits.slice(0, 2);
+    if (isValidBrazilianDdd(ddd)) {
+      return [`55${digits}`, digits];
     }
   }
 
-  return Array.from(candidates);
+  // 11 dígitos (DDD 2 + local 9 começando com 9)
+  if (digits.length === 11) {
+    const ddd = digits.slice(0, 2);
+    const local = digits.slice(2);
+    if (isValidBrazilianDdd(ddd) && local.startsWith('9')) {
+      return [`55${digits}`, digits];
+    }
+  }
+
+  // 12 dígitos (55 + DDD 2 + local 8)
+  if (digits.length === 12 && digits.startsWith('55')) {
+    const ddd = digits.slice(2, 4);
+    if (isValidBrazilianDdd(ddd)) {
+      const without55 = digits.slice(2);
+      return [digits, without55];
+    }
+  }
+
+  // 13 dígitos (55 + DDD 2 + local 9 começando com 9)
+  if (digits.length === 13 && digits.startsWith('55')) {
+    const ddd = digits.slice(2, 4);
+    const local = digits.slice(4);
+    if (isValidBrazilianDdd(ddd) && local.startsWith('9')) {
+      const without55 = digits.slice(2);
+      return [digits, without55];
+    }
+  }
+
+  // Se não for formato brasileiro reconhecível com DDD, retorna candidato único
+  return [digits];
+}
+
+/**
+ * Gera exclusivamente as variações sintéticas de 8 vs 9 dígitos para o mesmo DDD.
+ * Utilizado estritamente como Etapa 2 (fallback) em findActiveLead quando o match
+ * exato (Etapa 1) não encontrar correspondências.
+ *
+ * @param {string|number|null|undefined} phone - Telefone ou JID
+ * @param {string} [authDir] - Diretório de autenticação do Baileys
+ * @returns {string[]} Lista de candidatos sintéticos alternativos
+ */
+function getSyntheticAlternativeCandidates(phone, authDir) {
+  const digits = extractCleanPhone(phone, '', authDir);
+  if (!digits) {
+    return [];
+  }
+
+  // 10 dígitos (DDD + 8 dígitos) -> alternativa é 9 dígitos
+  if (digits.length === 10) {
+    const ddd = digits.slice(0, 2);
+    const local8 = digits.slice(2);
+    if (isValidBrazilianDdd(ddd)) {
+      const local9 = '9' + local8;
+      return [`55${ddd}${local9}`, `${ddd}${local9}`];
+    }
+  }
+
+  // 11 dígitos (DDD + 9 dígitos começando com 9) -> alternativa é 8 dígitos
+  if (digits.length === 11) {
+    const ddd = digits.slice(0, 2);
+    const local = digits.slice(2);
+    if (isValidBrazilianDdd(ddd) && local.startsWith('9')) {
+      const local8 = local.slice(1);
+      return [`55${ddd}${local8}`, `${ddd}${local8}`];
+    }
+  }
+
+  // 12 dígitos (55 + DDD + 8 dígitos) -> alternativa é 9 dígitos
+  if (digits.length === 12 && digits.startsWith('55')) {
+    const ddd = digits.slice(2, 4);
+    const local8 = digits.slice(4);
+    if (isValidBrazilianDdd(ddd)) {
+      const local9 = '9' + local8;
+      return [`55${ddd}${local9}`, `${ddd}${local9}`];
+    }
+  }
+
+  // 13 dígitos (55 + DDD + 9 dígitos começando com 9) -> alternativa é 8 dígitos
+  if (digits.length === 13 && digits.startsWith('55')) {
+    const ddd = digits.slice(2, 4);
+    const local = digits.slice(4);
+    if (isValidBrazilianDdd(ddd) && local.startsWith('9')) {
+      const local8 = local.slice(1);
+      return [`55${ddd}${local8}`, `${ddd}${local8}`];
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Alias retrocompatível com getExactPhoneCandidates.
+ *
+ * @param {string|number|null|undefined} phone - Telefone ou JID
+ * @param {string} [authDir] - Diretório de autenticação do Baileys
+ * @returns {string[]} Lista de candidatos exatos
+ */
+function getPhoneCandidates(phone, authDir) {
+  return getExactPhoneCandidates(phone, authDir);
 }
 
 module.exports = {
@@ -162,5 +268,7 @@ module.exports = {
   isValidBrazilianDdd,
   resolveLidToPhone,
   extractCleanPhone,
+  getExactPhoneCandidates,
+  getSyntheticAlternativeCandidates,
   getPhoneCandidates,
 };

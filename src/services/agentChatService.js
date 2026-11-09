@@ -170,32 +170,120 @@ Suas características:
 };
 
 /**
- * Find active test lead by phone number or raw JID
- * Hardening P0: isolamento estrito por candidatos canônicos (mesmo DDD).
- * Sem correspondência por sufixo LIKE e sem fallback para leads recentes de 24h.
+ * Find active test lead by phone number or raw JID using two-stage strict candidate matching.
+ * Stage 1: Exact canonical match (same DDD, same digit length, with/without 55).
+ * Stage 2: Synthetic 9th-digit fallback (fails closed if multiple matches found).
+ *
+ * @param {string} phoneNumber - Incoming phone number or JID
+ * @param {string} [rawJid=''] - Raw WhatsApp JID (e.g. from Baileys)
+ * @returns {object|null} Active lead row or null
  */
 function findActiveLead(phoneNumber, rawJid = '') {
+  const cleanPhone = phoneUtils.extractCleanPhone(phoneNumber, rawJid, config.authDir);
+  if (!cleanPhone) {
+    return null;
+  }
+
+  const exactCandidates = phoneUtils.getExactPhoneCandidates(cleanPhone, config.authDir);
+  if (!exactCandidates || exactCandidates.length === 0) {
+    return null;
+  }
+
   try {
-    const cleanPhone = phoneUtils.extractCleanPhone(phoneNumber, rawJid, config.authDir);
-    if (!cleanPhone) {
-      return null;
-    }
-
-    const candidates = phoneUtils.getPhoneCandidates(cleanPhone);
-    if (!candidates || candidates.length === 0) {
-      return null;
-    }
-
-    const placeholders = candidates.map(() => '?').join(', ');
-    const lead = db.prepare(`
+    // =========================================================================
+    // ETAPA 1: MATCH CANÔNICO EXATO (COM / SEM DDI 55, MESMO NÚMERO LOCAL)
+    // =========================================================================
+    const placeholders = exactCandidates.map(() => '?').join(', ');
+    const matches = db.prepare(`
       SELECT * FROM leads
       WHERE phone IN (${placeholders})
-        AND (status = 'SENT' OR status = 'ACTIVE')
+        AND status IN ('SENT', 'ACTIVE')
       ORDER BY id DESC
-      LIMIT 1
-    `).get(...candidates);
+    `).all(...exactCandidates);
 
-    return lead || null;
+    if (matches.length === 1) {
+      return matches[0];
+    }
+
+    if (matches.length > 1) {
+      // Detectar se há conflito de agentes/personas distintos
+      const distinctAgents = new Set(matches.map((m) => m.agent_key));
+      if (distinctAgents.size > 1) {
+        console.warn(
+          `[Security Audit P0] Conflito de personas detectado em findActiveLead: múltiplos leads ativos com agent_key distintos (${Array.from(distinctAgents).join(', ')}) para o número ${cleanPhone}. Abortando com fail-closed.`
+        );
+        return null;
+      }
+      // Mesmo agente: re-cadastro legítimo, seleciona com segurança o mais recente
+      return matches[0];
+    }
+
+    // =========================================================================
+    // ETAPA 2: VARIAÇÃO DE 9º DÍGITO (FALLBACK SE ETAPA 1 RETORNOU 0 RESULTADOS)
+    // =========================================================================
+    const altCandidates = phoneUtils.getSyntheticAlternativeCandidates(cleanPhone, config.authDir);
+    if (altCandidates && altCandidates.length > 0) {
+      const altPlaceholders = altCandidates.map(() => '?').join(', ');
+      const altMatches = db.prepare(`
+        SELECT * FROM leads
+        WHERE phone IN (${altPlaceholders})
+          AND status IN ('SENT', 'ACTIVE')
+        ORDER BY id DESC
+      `).all(...altCandidates);
+
+      if (altMatches.length === 1) {
+        return altMatches[0];
+      }
+
+      if (altMatches.length > 1) {
+        console.warn(
+          `[Security Audit P0] Colisão detectada na variação sintética de 9º dígito: múltiplos leads encontrados para ${cleanPhone}. Abortando com fail-closed.`
+        );
+        return null;
+      }
+    }
+
+    // =========================================================================
+    // ADMIN PHONE CHECK (VERIFICAÇÃO DE TESTADOR AUTORIZADO)
+    // registered explicitly for the admin's own authorized phone number.
+    // NEVER bind the admin to third-party leads!
+    // =========================================================================
+    if (config.authorizedPhone) {
+      const authList = config.authorizedPhone
+        .split(',')
+        .map((s) => phoneUtils.cleanDigits(s))
+        .filter(Boolean);
+
+      const isSenderAuthorized = exactCandidates.some((c) => authList.includes(c)) || authList.includes(cleanPhone);
+
+      if (isSenderAuthorized) {
+        for (const authPhone of authList) {
+          const authCandidates = phoneUtils.getExactPhoneCandidates(authPhone, config.authDir);
+          if (authCandidates.length > 0) {
+            const authPlaceholders = authCandidates.map(() => '?').join(', ');
+            const adminMatches = db.prepare(`
+              SELECT * FROM leads
+              WHERE phone IN (${authPlaceholders})
+                AND status IN ('SENT', 'ACTIVE')
+              ORDER BY id DESC
+            `).all(...authCandidates);
+
+            if (adminMatches.length === 1) {
+              return adminMatches[0];
+            }
+            if (adminMatches.length > 1) {
+              const distinct = new Set(adminMatches.map((m) => m.agent_key));
+              if (distinct.size === 1) {
+                return adminMatches[0];
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Strict fail-closed: nenhum lead inequívoco encontrado
+    return null;
   } catch (err) {
     console.error('Erro ao buscar lead ativo:', err.message);
     return null;
@@ -206,48 +294,53 @@ function findActiveLead(phoneNumber, rawJid = '') {
  * Record message in history
  */
 function recordMessage(leadId, phone, agentKey, role, content) {
+  const numericLeadId = Number(leadId);
+  if (!leadId || isNaN(numericLeadId) || numericLeadId <= 0) {
+    console.warn('[Security Audit P0] Tentativa de gravar mensagem sem lead_id válido impedida.');
+    return;
+  }
+
   try {
     const clean = phoneUtils.cleanDigits(phone);
     db.prepare(`
       INSERT INTO agent_messages (lead_id, phone, agent_key, role, content)
       VALUES (?, ?, ?, ?, ?)
-    `).run(leadId || null, clean, agentKey || 'OTHER', role, content);
+    `).run(numericLeadId, clean, agentKey || 'OTHER', role, content);
   } catch (err) {
     console.error('Erro ao registrar mensagem do agente no banco:', err.message);
   }
 }
 
 /**
- * Get recent conversation history for lead
- * Hardening P0: prioriza isolamento estrito por lead_id;
- * fallback para candidatos canônicos exatos (mesmo DDD). Sem LIKE %suffix.
+ * Get recent conversation history for lead.
+ * Hardening P0: Exige obrigatoriamente lead_id válido. Chamadas sem lead_id retornam
+ * imediatamente [] (fail-closed absoluto contra vazamento de histórico).
+ *
+ * @param {string} [phone] - Telefone (mantido por retrocompatibilidade de assinatura)
+ * @param {number} [limit=8] - Limite de mensagens
+ * @param {number|null} [leadId=null] - Identificador único do lead
+ * @returns {Array<{role: string, content: string}>}
  */
 function getRecentHistory(phone, limit = 8, leadId = null) {
+  const numericLeadId = Number(leadId);
+  if (!leadId || isNaN(numericLeadId) || numericLeadId <= 0) {
+    // Fail-closed absoluto: chamadas sem lead_id válido são recusadas para prevenir vazamento de histórico
+    return [];
+  }
+
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 8, 50));
+
   try {
-    if (leadId) {
-      return db.prepare(`
-        SELECT role, content FROM agent_messages
-        WHERE lead_id = ?
-        ORDER BY id DESC
-        LIMIT ?
-      `).all(leadId, limit).reverse();
-    }
-
-    const clean = phoneUtils.cleanDigits(phone);
-    if (!clean) return [];
-
-    const candidates = phoneUtils.getPhoneCandidates(clean);
-    if (!candidates || candidates.length === 0) return [];
-
-    const placeholders = candidates.map(() => '?').join(', ');
-    return db.prepare(`
+    const rows = db.prepare(`
       SELECT role, content FROM agent_messages
-      WHERE phone IN (${placeholders})
+      WHERE lead_id = ?
       ORDER BY id DESC
       LIMIT ?
-    `).all(...candidates, limit).reverse();
+    `).all(numericLeadId, safeLimit);
+
+    return rows ? rows.reverse() : [];
   } catch (err) {
-    console.error('Erro ao buscar histórico recente:', err.message);
+    console.error('Erro ao buscar histórico isolado por lead_id:', err.message);
     return [];
   }
 }

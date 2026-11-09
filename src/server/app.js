@@ -9,6 +9,7 @@ const appointmentService = require('../services/appointmentService');
 const userService = require('../services/userService');
 const pixService = require('../services/pixService');
 const config = require('../config');
+const phoneUtils = require('../utils/phoneUtils');
 const aiService = require('../services/aiService');
 const calendarService = require('../services/calendarService');
 const whatsappClient = require('../whatsapp/client');
@@ -1584,10 +1585,24 @@ async function handleLeadTestRequest(req, res) {
 
     let leadId = null;
     try {
+      const resolvedAgentKey = agentKey || 'OTHER';
+      const resolvedAgentName = agentName || 'Agente RAIA';
+      const phoneCandidates = phoneUtils.getExactPhoneCandidates(cleanPhone);
+      const phonePlaceholders = phoneCandidates.map(() => '?').join(', ');
+
+      // Inativar leads anteriores para o mesmo telefone e agente mantendo a base atômica e higienizada
+      db.prepare(`
+        UPDATE leads
+        SET status = 'SUPERSEDED'
+        WHERE phone IN (${phonePlaceholders})
+          AND agent_key = ?
+          AND status IN ('SENT', 'ACTIVE')
+      `).run(...phoneCandidates, resolvedAgentKey);
+
       const info = db.prepare(`
         INSERT INTO leads (name, phone, agent_key, agent_name, status)
         VALUES (?, ?, ?, ?, 'SENT')
-      `).run(name.trim(), cleanPhone, agentKey || 'OTHER', agentName || 'Agente RAIA');
+      `).run(name.trim(), cleanPhone, resolvedAgentKey, resolvedAgentName);
       leadId = info.lastInsertRowid;
     } catch (e) {
       console.warn('Erro ao salvar lead na tabela leads:', e.message);

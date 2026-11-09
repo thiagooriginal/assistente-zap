@@ -271,9 +271,9 @@ async function runTests() {
     assert.equal(historyB.length, 1, 'Lead B deve conter apenas 1 mensagem');
     assert.equal(historyB[0].content, 'Qual o horário de atendimento?');
 
-    // Consultar histórico sem leadId (usando telefone canônico)
+    // Consultar histórico sem leadId (deve retornar [] fail-closed conforme Comando 016)
     const historyByPhone = agentChatService.getRecentHistory('5511999998888', 8);
-    assert.equal(historyByPhone.length, 2);
+    assert.deepEqual(historyByPhone, [], 'getRecentHistory sem lead_id DEVE retornar array vazio (fail-closed)');
 
     console.log('  ✓ Histórico perfeitamente isolado por lead_id e candidatos canônicos (sem vazamento cruzado).\n');
     passedTests++;
