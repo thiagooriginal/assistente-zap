@@ -614,7 +614,84 @@
       border-color: rgba(200, 155, 109, 0.35) !important;
     }
 
-    /* Modals Backdrop in Beauty Theme */
+    /* ======================================================== */
+    /* RAIA & JÉSSICA MODAL PORTAL & BACKDROP SPECIFICATION     */
+    /* ======================================================== */
+    #modal-root {
+      position: relative;
+      z-index: 99990;
+    }
+
+    /* All modal overlays inside portal or globally */
+    .raia-modal-overlay,
+    #modal-root > div[id^="modal"],
+    #modal-root #productDetailsModal,
+    #modalSingleService,
+    #modalBatchServices,
+    #modalDeleteConfirm,
+    #modalNewAppointment,
+    #modalRescheduleAppointment,
+    #modalStatusAppointment,
+    #modalCancelAppointment,
+    #modalHistoricalConflicts,
+    #modalNewBill,
+    #modalNewTransaction,
+    #productDetailsModal {
+      position: fixed !important;
+      inset: 0 !important;
+      top: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      bottom: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      height: 100dvh !important;
+      min-height: 100vh !important;
+      margin: 0 !important;
+      padding: 1rem !important;
+      z-index: 99999 !important;
+      background-color: rgba(7, 8, 12, 0.75) !important;
+      backdrop-filter: blur(12px) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
+      box-sizing: border-box !important;
+    }
+
+    /* Strict visibility enforcement */
+    #modal-root > div.hidden,
+    .raia-modal-overlay.hidden,
+    #modalSingleService.hidden,
+    #modalBatchServices.hidden,
+    #modalDeleteConfirm.hidden,
+    #modalNewAppointment.hidden,
+    #modalRescheduleAppointment.hidden,
+    #modalStatusAppointment.hidden,
+    #modalCancelAppointment.hidden,
+    #modalHistoricalConflicts.hidden,
+    #modalNewBill.hidden,
+    #modalNewTransaction.hidden,
+    #productDetailsModal.hidden {
+      display: none !important;
+    }
+
+    #modal-root > div:not(.hidden),
+    .raia-modal-overlay:not(.hidden),
+    #modalSingleService:not(.hidden),
+    #modalBatchServices:not(.hidden),
+    #modalDeleteConfirm:not(.hidden),
+    #modalNewAppointment:not(.hidden),
+    #modalRescheduleAppointment:not(.hidden),
+    #modalStatusAppointment:not(.hidden),
+    #modalCancelAppointment:not(.hidden),
+    #modalHistoricalConflicts:not(.hidden),
+    #modalNewBill:not(.hidden),
+    #modalNewTransaction:not(.hidden),
+    #productDetailsModal:not(.hidden) {
+      display: flex !important;
+    }
+
+    /* Modals Backdrop in Beauty Theme: Warm luxurious translucent champagne tone */
+    body.theme-jessica-beauty .raia-modal-overlay,
+    body.theme-jessica-beauty #modal-root > div[id^="modal"],
     body.theme-jessica-beauty #modalSingleService,
     body.theme-jessica-beauty #modalBatchServices,
     body.theme-jessica-beauty #modalDeleteConfirm,
@@ -625,8 +702,18 @@
     body.theme-jessica-beauty #modalHistoricalConflicts,
     body.theme-jessica-beauty #modalNewBill,
     body.theme-jessica-beauty #modalNewTransaction {
-      background-color: rgba(78, 59, 49, 0.5) !important;
-      backdrop-filter: blur(8px) !important;
+      background-color: rgba(30, 20, 15, 0.65) !important;
+      backdrop-filter: blur(12px) !important;
+      -webkit-backdrop-filter: blur(12px) !important;
+    }
+
+    /* Scroll Lock when Modal is Active */
+    body.modal-open,
+    html.modal-open {
+      overflow: hidden !important;
+    }
+    body.modal-open main {
+      overflow: hidden !important;
     }
 
     /* Modal Cards */
@@ -1978,252 +2065,17 @@
         <!-- ============================================== -->
         <!-- MODAL: NOVO / EDITAR SERVIÇO INDIVIDUAL        -->
         <!-- ============================================== -->
-        <div id="modalSingleService" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-4 text-xs shadow-2xl relative">
-            <div class="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 id="modalSingleServiceTitle" class="text-sm font-bold text-white flex items-center gap-2">
-                <i data-lucide="scissors" class="w-4 h-4 text-[#00F59B]"></i>
-                <span>Cadastrar Novo Serviço</span>
-              </h3>
-              <button type="button" id="btnCloseSingleServiceModal" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
-                <i data-lucide="x" class="w-4 h-4"></i>
-              </button>
-            </div>
-
-            <form id="formSingleService" class="space-y-4">
-              <input type="hidden" id="singleServiceId" value="">
-
-              <!-- Nome do Serviço com Autocomplete do Catálogo -->
-              <div class="space-y-1 relative">
-                <label for="singleServiceName" class="block text-slate-300 font-semibold">Nome do Serviço *</label>
-                <div class="relative">
-                  <input type="text" id="singleServiceName" placeholder="Ex: Corte Feminino, Manicure, Barba..." required autocomplete="off"
-                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
-                  <button type="button" id="btnToggleCatalogDropdown" class="absolute right-2.5 top-2.5 px-2 py-0.5 rounded text-[11px] bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10">
-                    Sugestões
-                  </button>
-                </div>
-                <!-- Dropdown de Sugestões do Catálogo -->
-                <div id="catalogSuggestionsDropdown" class="hidden absolute left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto bg-[#07080c] border border-white/10 rounded-xl shadow-2xl z-30 divide-y divide-white/5">
-                </div>
-                <p class="text-[11px] text-slate-500">Dica: Escolha do catálogo de sugestões ou digite seu serviço personalizado.</p>
-              </div>
-
-              <!-- Categoria & Preço -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div class="space-y-1">
-                  <label for="singleServiceCategory" class="block text-slate-300 font-semibold">Categoria *</label>
-                  <select id="singleServiceCategory" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
-                    <option value="Cabelos">Cabelos</option>
-                    <option value="Barbearia">Barbearia</option>
-                    <option value="Unhas">Unhas</option>
-                    <option value="Sobrancelhas e cílios">Sobrancelhas e cílios</option>
-                    <option value="Estética e maquiagem">Estética e maquiagem</option>
-                    <option value="Outros">Outros</option>
-                  </select>
-                </div>
-                <div class="space-y-1">
-                  <label for="singleServicePrice" class="block text-slate-300 font-semibold">Valor (R$) *</label>
-                  <input type="number" id="singleServicePrice" step="0.50" min="0" placeholder="0.00" required
-                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white font-bold placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
-                </div>
-              </div>
-
-              <!-- Duração com Atalhos Rápidos -->
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between">
-                  <label for="singleServiceDuration" class="block text-slate-300 font-semibold">Duração (minutos) *</label>
-                  <span class="text-[11px] text-slate-500">Atalhos rápidos:</span>
-                </div>
-                <div class="flex items-center gap-2">
-                  <input type="number" id="singleServiceDuration" min="1" max="1440" step="1" placeholder="Ex: 45" required
-                    class="w-28 px-3.5 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
-                  <div class="flex flex-wrap items-center gap-1">
-                    <button type="button" data-duration="15" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">15m</button>
-                    <button type="button" data-duration="30" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">30m</button>
-                    <button type="button" data-duration="45" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">45m</button>
-                    <button type="button" data-duration="60" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">60m</button>
-                    <button type="button" data-duration="90" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">90m</button>
-                    <button type="button" data-duration="120" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">120m</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Status Ativo / Inativo -->
-              <div class="flex items-center justify-between p-3 rounded-xl bg-[#07080c] border border-white/5">
-                <div>
-                  <span class="font-semibold text-white block">Serviço Ativo</span>
-                  <span class="text-slate-400 text-[11px]">Disponível para a Jéssica agendar novos horários</span>
-                </div>
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" id="singleServiceActive" checked class="sr-only peer">
-                  <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#00F59B]"></div>
-                </label>
-              </div>
-
-              <!-- Alerta de Agendamentos Históricos -->
-              <div id="singleServiceAppointmentsAlert" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-2">
-                <i data-lucide="info" class="w-4 h-4 shrink-0 mt-0.5"></i>
-                <span id="singleServiceAppointmentsAlertText">Este serviço possui agendamentos no histórico. Alterações de duração afetarão apenas novos agendamentos.</span>
-              </div>
-
-              <!-- Botões de Ação -->
-              <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
-                <button type="button" id="btnCancelSingleService" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all font-medium">Cancelar</button>
-                <button type="submit" id="btnSaveSingleService" class="px-5 py-2 rounded-xl bg-[#00F59B] hover:brightness-110 text-[#07080c] font-bold transition-all shadow-sm flex items-center gap-2">
-                  <i data-lucide="check" class="w-4 h-4"></i>
-                  <span id="btnSaveSingleServiceText">Salvar Serviço</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        
 
         <!-- ============================================== -->
         <!-- MODAL: CADASTRO EM LOTE DE SERVIÇOS            -->
         <!-- ============================================== -->
-        <div id="modalBatchServices" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-3 md:p-6">
-          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col text-xs shadow-2xl overflow-hidden">
-            <!-- Modal Header -->
-            <div class="p-4 md:p-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#11131a]">
-              <div>
-                <h3 class="text-sm md:text-base font-bold text-white flex items-center gap-2">
-                  <i data-lucide="layers" class="w-4 h-4 text-[#00F59B]"></i>
-                  <span id="batchModalStepTitle">Adicionar Vários Serviços (Catálogo Inteligente)</span>
-                </h3>
-                <p id="batchModalStepSubtitle" class="text-xs text-slate-400 mt-0.5">Selecione os procedimentos que seu salão realiza para configurá-los rapidamente.</p>
-              </div>
-              <button type="button" id="btnCloseBatchModal" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5">
-                <i data-lucide="x" class="w-5 h-5"></i>
-              </button>
-            </div>
-
-            <!-- PASSO 1: SELEÇÃO DE PROCEDIMENTOS -->
-            <div id="batchStep1" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
-              <!-- Controls: Category Filter & Search -->
-              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div class="relative flex-1">
-                  <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
-                  <input type="text" id="batchCatalogSearch" placeholder="Pesquisar procedimentos (ex: corte, escova, barba, unhas)..."
-                    class="w-full pl-9 pr-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
-                </div>
-                <div class="flex items-center gap-2">
-                  <button type="button" id="btnBatchSelectAllCategory" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-semibold border border-white/10">
-                    Selecionar Todos da Categoria
-                  </button>
-                  <button type="button" id="btnBatchClearSelection" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">
-                    Limpar
-                  </button>
-                </div>
-              </div>
-
-              <!-- Category Tabs -->
-              <div class="flex flex-wrap gap-1.5 border-b border-white/5 pb-2" id="batchCategoryTabs">
-                <button type="button" data-cat="all" class="batch-cat-tab active px-3 py-1 rounded-lg text-xs font-semibold bg-[#00F59B]/15 text-[#00F59B] border border-[#00F59B]/30">Todos</button>
-                <button type="button" data-cat="Cabelos" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Cabelos</button>
-                <button type="button" data-cat="Barbearia" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Barbearia</button>
-                <button type="button" data-cat="Unhas" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Unhas</button>
-                <button type="button" data-cat="Sobrancelhas e cílios" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Sobrancelhas e cílios</button>
-                <button type="button" data-cat="Estética e maquiagem" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Estética e maquiagem</button>
-              </div>
-
-              <!-- Grid of Catalog Items -->
-              <div id="batchCatalogGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[50vh] overflow-y-auto p-1">
-                <!-- Dynamically populated -->
-              </div>
-            </div>
-
-            <!-- PASSO 2: CONFIGURAÇÃO DE VALORES E DURAÇÕES -->
-            <div id="batchStep2" class="hidden flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
-              <!-- Quick tool: Apply duration to all -->
-              <div class="p-3.5 rounded-xl bg-[#07080c] border border-white/5 flex flex-wrap items-center justify-between gap-3">
-                <div class="flex items-center gap-2 text-slate-300">
-                  <i data-lucide="clock" class="w-4 h-4 text-[#00F59B]"></i>
-                  <span class="font-semibold">Aplicar mesma duração a todos:</span>
-                </div>
-                <div class="flex flex-wrap items-center gap-1">
-                  <button type="button" data-duration="15" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">15 min</button>
-                  <button type="button" data-duration="30" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">30 min</button>
-                  <button type="button" data-duration="45" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">45 min</button>
-                  <button type="button" data-duration="60" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">60 min</button>
-                  <button type="button" data-duration="90" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">90 min</button>
-                  <button type="button" data-duration="120" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">120 min</button>
-                </div>
-              </div>
-
-              <!-- Batch Table -->
-              <div class="overflow-x-auto border border-white/10 rounded-xl bg-[#07080c]">
-                <table class="w-full text-left text-xs">
-                  <thead>
-                    <tr class="border-b border-white/10 text-slate-400 bg-white/[0.02]">
-                      <th class="py-3 px-4 font-semibold">Procedimento</th>
-                      <th class="py-3 px-3 font-semibold w-36">Valor (R$) *</th>
-                      <th class="py-3 px-3 font-semibold w-56">Duração (min) *</th>
-                      <th class="py-3 px-3 font-semibold text-center w-16">Remover</th>
-                    </tr>
-                  </thead>
-                  <tbody id="batchTableBody" class="divide-y divide-white/5 text-slate-200">
-                    <!-- Rows generated dynamically -->
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <!-- Modal Footer -->
-            <div class="p-4 md:p-5 border-t border-white/10 flex items-center justify-between bg-[#11131a] shrink-0">
-              <div class="flex items-center gap-2">
-                <span id="batchSelectedCounterBadge" class="px-3 py-1 rounded-full bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/20 font-bold">
-                  0 selecionados
-                </span>
-              </div>
-              <div class="flex items-center gap-2">
-                <button type="button" id="btnBatchBack" class="hidden px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold">
-                  Voltar
-                </button>
-                <button type="button" id="btnBatchCancel" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-medium">
-                  Cancelar
-                </button>
-                <button type="button" id="btnBatchNext" disabled class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all flex items-center gap-2">
-                  <span>Continuar com 0 serviços</span>
-                  <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                </button>
-                <button type="button" id="btnBatchSaveAll" class="hidden px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 transition-all flex items-center gap-2">
-                  <i data-lucide="save" class="w-4 h-4"></i>
-                  <span id="btnBatchSaveAllText">Salvar Todos os Serviços</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        
 
         <!-- ============================================== -->
         <!-- MODAL: CONFIRMAÇÃO DE EXCLUSÃO / DESATIVAÇÃO   -->
         <!-- ============================================== -->
-        <div id="modalDeleteConfirm" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl">
-            <div class="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i>
-                <span id="deleteModalTitle">Gerenciar Serviço</span>
-              </h3>
-              <button type="button" id="btnCloseDeleteModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
-                <i data-lucide="x" class="w-4 h-4"></i>
-              </button>
-            </div>
-
-            <input type="hidden" id="deleteServiceId" value="">
-
-            <div id="deleteModalBody" class="space-y-3 text-slate-300">
-              <!-- Dynamically populated -->
-            </div>
-
-            <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-white/5">
-              <button type="button" id="btnCancelDeleteModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-medium order-2 sm:order-1">Cancelar</button>
-              <button type="button" id="btnDeactivateServiceRecommended" class="hidden px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 order-1 sm:order-2">Desativar Serviço (Recomendado)</button>
-              <button type="button" id="btnConfirmDeleteService" class="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold order-3">Excluir Definitivamente</button>
-            </div>
-          </div>
-        </div>
+        
       </section>
 
       <!-- ============================================== -->
@@ -2351,356 +2203,19 @@
         </div>
 
         <!-- MODAL: NOVO AGENDAMENTO COM VALIDAÇÃO DE CONFLITO E SUGESTÃO -->
-        <div id="modalNewAppointment" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-4 text-xs shadow-2xl max-h-[90vh] min-h-[520px] overflow-y-auto">
-            <div class="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                <i data-lucide="calendar-plus" class="w-4 h-4 text-[#00F59B]"></i>
-                <span>Registrar Novo Agendamento</span>
-              </h3>
-              <button type="button" id="btnCloseNewAppointmentModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
-                <i data-lucide="x" class="w-4 h-4"></i>
-              </button>
-            </div>
-
-            <!-- Sugestões de Horários Alternativos (aparece em caso de conflito) -->
-            <div id="aptSuggestedSlotsContainer" class="hidden p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/30 space-y-2">
-              <p class="font-bold text-amber-200 text-xs flex items-center gap-1.5">
-                <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400"></i>
-                <span id="aptConflictAlertMessage">Horário em conflito com outro agendamento.</span>
-              </p>
-              <p class="text-[11px] text-slate-300">Horários disponíveis para este dia:</p>
-              <div id="aptSuggestedSlotsPills" class="flex flex-wrap gap-1.5 pt-1"></div>
-            </div>
-
-            <form id="formNewAppointment" class="space-y-3.5 pb-8">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label for="aptClientName" class="block text-slate-300 font-semibold mb-1">Nome do(a) Cliente *</label>
-                  <input type="text" id="aptClientName" placeholder="Ex: Mariana Silva" required
-                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
-                </div>
-                <div>
-                  <label for="aptClientPhone" class="block text-slate-300 font-semibold mb-1">WhatsApp do(a) Cliente</label>
-                  <input type="tel" id="aptClientPhone" placeholder="(11) 99999-9999"
-                    class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
-                </div>
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label for="aptServiceSelect" class="block text-slate-300 font-semibold mb-1">Serviço *</label>
-                  <select id="aptServiceSelect" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
-                    <option value="">Selecione um serviço...</option>
-                  </select>
-                </div>
-                <div>
-                  <label for="aptStaffSelect" class="block text-slate-300 font-semibold mb-1">Profissional *</label>
-                  <select id="aptStaffSelect" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
-                    <option value="">Automático (primeiro livre)</option>
-                  </select>
-                </div>
-              </div>
-              <p id="aptServiceDurationHint" class="text-[11px] text-slate-400"></p>
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <!-- Data com 2 formas de seleção (Digitação DD/MM/AAAA ou Calendário Visual) -->
-                <div class="relative" id="aptDatePickerWrapper">
-                  <label for="aptDateDisplay" class="block text-slate-300 font-semibold mb-1">Data *</label>
-                  <div class="relative">
-                    <input type="text" id="aptDateDisplay" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" required
-                      class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] text-xs transition-colors">
-                    <button type="button" id="btnOpenAptDatePicker" title="Abrir calendário visual"
-                      class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#00F59B] hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
-                      <i data-lucide="calendar" class="w-4 h-4"></i>
-                    </button>
-                    <input type="date" id="aptDatePicker" tabindex="-1" class="absolute -z-10 opacity-0 pointer-events-none w-0 h-0">
-                    <input type="hidden" id="aptDate" name="aptDate">
-                  </div>
-                  <p id="aptDateError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
-
-                  <!-- Popover Calendário Visual Beauty -->
-                  <div id="aptBeautyCalendarPopover" class="hidden absolute left-0 top-full mt-1.5 p-3.5 rounded-2xl bg-[#FFFDFB] border border-[#E6D6CA] shadow-2xl z-[70] w-72 select-none">
-                    <div class="flex items-center justify-between pb-2 mb-2 border-b border-[#E6D6CA]">
-                      <div class="flex items-center gap-1.5">
-                        <button type="button" id="btnPrevAptCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Mês anterior">
-                          <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                        </button>
-                        <span id="aptCalMonthYearLabel" class="text-xs font-bold text-[#4E3B31]"></span>
-                        <button type="button" id="btnNextAptCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Próximo mês">
-                          <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                        </button>
-                      </div>
-                      <button type="button" id="btnCloseAptCalPopover" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Fechar calendário">
-                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                      </button>
-                    </div>
-                    <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[#AD7B42] mb-1">
-                      <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
-                    </div>
-                    <div id="aptCalDaysGrid" class="grid grid-cols-7 gap-1 text-center text-xs"></div>
-                  </div>
-                </div>
-
-                <!-- Horário com 2 formas de seleção (Digitação HH:MM ou Lista de Horários Disponíveis) -->
-                <div class="relative" id="aptTimePickerWrapper">
-                  <label for="aptTimeInput" class="block text-slate-300 font-semibold mb-1">Horário de Início *</label>
-                  <div class="relative">
-                    <input type="text" id="aptTimeInput" placeholder="HH:MM" maxlength="5" inputmode="numeric" required
-                      class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] text-xs transition-colors">
-                    <button type="button" id="btnToggleAptTimeDropdown" title="Ver horários livres"
-                      class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#00F59B] hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
-                      <i data-lucide="clock" class="w-4 h-4"></i>
-                    </button>
-                    <input type="hidden" id="aptTime" name="aptTime">
-                  </div>
-                  <p id="aptTimeError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
-
-                  <!-- Popover Dropdown de Horários Disponíveis -->
-                  <div id="aptTimeDropdown" class="hidden absolute left-0 top-full mt-1.5 p-3 rounded-2xl bg-[#11131a] border border-white/15 shadow-2xl z-[70] space-y-2 w-[280px] max-w-[min(320px,calc(100vw-32px))] select-none">
-                    <div class="flex items-center justify-between text-[11px] font-semibold text-slate-300 border-b border-white/10 pb-1.5">
-                      <span class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i><span>Horários Livres</span></span>
-                      <div class="flex items-center gap-1.5">
-                        <span id="aptSlotsCountBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold"></span>
-                        <button type="button" id="btnCloseAptTimeDropdown" class="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors" title="Fechar horários">
-                          <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                        </button>
-                      </div>
-                    </div>
-                    <div id="aptSlotsLoading" class="hidden py-3 text-center text-slate-400 text-xs">
-                      <i data-lucide="loader-2" class="w-4 h-4 animate-spin inline-block text-[#00F59B] mb-1"></i>
-                      <div>Buscando horários disponíveis...</div>
-                    </div>
-                    <div id="aptAvailableSlotsList" class="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto pr-1"></div>
-                    <p id="aptSlotsEmptyMsg" class="hidden text-[11px] text-amber-300/80 text-center py-2">Nenhum horário livre para esta data e serviço.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label for="aptStatusSelect" class="block text-slate-300 font-semibold mb-1">Status Inicial</label>
-                <select id="aptStatusSelect" class="w-full px-3.5 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
-                  <option value="AGENDADO">AGENDADO</option>
-                  <option value="CONFIRMADO" selected>CONFIRMADO</option>
-                </select>
-              </div>
-
-              <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
-                <button type="button" id="btnCancelNewAppointment" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-medium">Cancelar</button>
-                <button type="submit" id="btnSubmitNewAppointment" disabled class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 shadow-sm flex items-center gap-1.5 opacity-50 cursor-not-allowed" title="Preencha todos os campos obrigatórios (Cliente, Serviço, Data e Horário) para confirmar.">
-                  <span>Confirmar Agendamento</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        
 
         <!-- MODAL: REMARCAR AGENDAMENTO -->
-        <div id="modalRescheduleAppointment" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl max-h-[90vh] min-h-[460px] overflow-y-auto">
-            <div class="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                <i data-lucide="calendar-clock" class="w-4 h-4 text-[#00F59B]"></i>
-                <span>Remarcar Horário</span>
-              </h3>
-              <button type="button" id="btnCloseRescheduleModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
-                <i data-lucide="x" class="w-4 h-4"></i>
-              </button>
-            </div>
-
-            <div id="rescheduleAptInfo" class="p-3 rounded-xl bg-[#07080c] border border-white/5 text-slate-300 text-xs"></div>
-
-            <div id="rescheduleSuggestedSlotsContainer" class="hidden p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 space-y-1.5">
-              <p class="font-bold text-amber-200 text-xs">Horário solicitado em conflito. Alternativas disponíveis:</p>
-              <div id="rescheduleSuggestedPills" class="flex flex-wrap gap-1.5"></div>
-            </div>
-
-            <form id="formRescheduleAppointment" class="space-y-3.5">
-              <input type="hidden" id="rescheduleAptId">
-
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <!-- Nova Data com 2 formas de seleção -->
-                <div class="relative" id="rescheduleDatePickerWrapper">
-                  <label for="rescheduleDateDisplay" class="block text-slate-300 font-semibold mb-1">Nova Data *</label>
-                  <div class="relative">
-                    <input type="text" id="rescheduleDateDisplay" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" required
-                      class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] text-xs transition-colors">
-                    <button type="button" id="btnOpenRescheduleDatePicker" title="Abrir calendário visual"
-                      class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#00F59B] hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
-                      <i data-lucide="calendar" class="w-4 h-4"></i>
-                    </button>
-                    <input type="date" id="rescheduleDatePicker" tabindex="-1" class="absolute -z-10 opacity-0 pointer-events-none w-0 h-0">
-                    <input type="hidden" id="rescheduleDate" name="rescheduleDate">
-                  </div>
-                  <p id="rescheduleDateError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
-
-                  <!-- Popover Calendário Visual Beauty -->
-                  <div id="rescheduleBeautyCalendarPopover" class="hidden absolute left-0 top-full mt-1.5 p-3.5 rounded-2xl bg-[#FFFDFB] border border-[#E6D6CA] shadow-2xl z-[70] w-72 select-none">
-                    <div class="flex items-center justify-between pb-2 mb-2 border-b border-[#E6D6CA]">
-                      <div class="flex items-center gap-1.5">
-                        <button type="button" id="btnPrevRescheduleCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Mês anterior">
-                          <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                        </button>
-                        <span id="rescheduleCalMonthYearLabel" class="text-xs font-bold text-[#4E3B31]"></span>
-                        <button type="button" id="btnNextRescheduleCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Próximo mês">
-                          <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                        </button>
-                      </div>
-                      <button type="button" id="btnCloseRescheduleCalPopover" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Fechar calendário">
-                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                      </button>
-                    </div>
-                    <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[#AD7B42] mb-1">
-                      <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
-                    </div>
-                    <div id="rescheduleCalDaysGrid" class="grid grid-cols-7 gap-1 text-center text-xs"></div>
-                  </div>
-                </div>
-
-                <!-- Novo Horário com 2 formas de seleção -->
-                <div class="relative" id="rescheduleTimePickerWrapper">
-                  <label for="rescheduleTimeInput" class="block text-slate-300 font-semibold mb-1">Novo Horário *</label>
-                  <div class="relative">
-                    <input type="text" id="rescheduleTimeInput" placeholder="HH:MM" maxlength="5" inputmode="numeric" required
-                      class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] text-xs transition-colors">
-                    <button type="button" id="btnToggleRescheduleTimeDropdown" title="Ver horários livres"
-                      class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#00F59B] hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
-                      <i data-lucide="clock" class="w-4 h-4"></i>
-                    </button>
-                    <input type="hidden" id="rescheduleTime" name="rescheduleTime">
-                  </div>
-                  <p id="rescheduleTimeError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
-
-                  <!-- Popover Dropdown de Horários Disponíveis (Remarcação) -->
-                  <div id="rescheduleTimeDropdown" class="hidden absolute right-0 top-full mt-1.5 p-3 rounded-2xl bg-[#11131a] border border-white/15 shadow-2xl z-[70] space-y-2 w-[280px] max-w-[min(320px,calc(100vw-32px))] select-none">
-                    <div class="flex items-center justify-between text-[11px] font-semibold text-slate-300 border-b border-white/10 pb-1.5">
-                      <span class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i><span>Horários Livres</span></span>
-                      <div class="flex items-center gap-1.5">
-                        <span id="rescheduleSlotsCountBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold"></span>
-                        <button type="button" id="btnCloseRescheduleTimeDropdown" class="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors" title="Fechar horários">
-                          <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                        </button>
-                      </div>
-                    </div>
-                    <div id="rescheduleSlotsLoading" class="hidden py-3 text-center text-slate-400 text-xs">
-                      <i data-lucide="loader-2" class="w-4 h-4 animate-spin inline-block text-[#00F59B] mb-1"></i>
-                      <div>Buscando horários disponíveis...</div>
-                    </div>
-                    <div id="rescheduleAvailableSlotsList" class="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto pr-1"></div>
-                    <p id="rescheduleSlotsEmptyMsg" class="hidden text-[11px] text-amber-300/80 text-center py-2">Nenhum horário livre para esta data.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label for="rescheduleStaffSelect" class="block text-slate-300 font-semibold mb-1">Profissional</label>
-                <select id="rescheduleStaffSelect" class="w-full px-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]"></select>
-              </div>
-
-              <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
-                <button type="button" id="btnCancelRescheduleModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">Cancelar</button>
-                <button type="submit" id="btnSubmitRescheduleAppointment" disabled class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 opacity-50 cursor-not-allowed">Salvar Remarcação</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        
 
         <!-- MODAL: ALTERAR STATUS DO AGENDAMENTO -->
-        <div id="modalStatusAppointment" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-sm p-6 space-y-4 text-xs shadow-2xl">
-            <div class="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                <i data-lucide="check-circle" class="w-4 h-4 text-[#00F59B]"></i>
-                <span>Atualizar Status</span>
-              </h3>
-              <button type="button" id="btnCloseStatusModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
-                <i data-lucide="x" class="w-4 h-4"></i>
-              </button>
-            </div>
-
-            <form id="formStatusAppointment" class="space-y-3.5">
-              <input type="hidden" id="statusAptId">
-              <div>
-                <label for="statusTargetSelect" class="block text-slate-300 font-semibold mb-1">Novo Status *</label>
-                <select id="statusTargetSelect" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
-                  <option value="AGENDADO">AGENDADO (Aguardando)</option>
-                  <option value="CONFIRMADO">CONFIRMADO (Cliente confirmou)</option>
-                  <option value="CONCLUÍDO">CONCLUÍDO (Atendimento realizado)</option>
-                  <option value="NÃO COMPARECEU">NÃO COMPARECEU (Ausência)</option>
-                  <option value="CANCELADO">CANCELADO (Horário liberado)</option>
-                </select>
-              </div>
-
-              <div>
-                <label for="statusReasonInput" class="block text-slate-300 font-semibold mb-1">Observação / Motivo</label>
-                <input type="text" id="statusReasonInput" placeholder="Ex: Cliente confirmou via WhatsApp"
-                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
-              </div>
-
-              <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
-                <button type="button" id="btnCancelStatusModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">Fechar</button>
-                <button type="submit" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110">Salvar Status</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        
 
         <!-- MODAL: CANCELAR AGENDAMENTO COM SEGURANÇA -->
-        <div id="modalCancelAppointment" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-          <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl">
-            <div class="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                <i data-lucide="x-circle" class="w-4 h-4 text-rose-400"></i>
-                <span>Cancelar Agendamento</span>
-              </h3>
-              <button type="button" id="btnCloseCancelModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
-                <i data-lucide="x" class="w-4 h-4"></i>
-              </button>
-            </div>
-
-            <p class="text-slate-300">Tem certeza que deseja cancelar este agendamento? O horário será liberado na agenda e o evento correspondente no Google Calendar será removido.</p>
-            <div id="cancelAptInfo" class="p-3 rounded-xl bg-[#07080c] border border-white/5 text-slate-400 text-xs"></div>
-
-            <form id="formCancelAppointment" class="space-y-3.5">
-              <input type="hidden" id="cancelAptId">
-              <div>
-                <label for="cancelReasonInput" class="block text-slate-300 font-semibold mb-1">Motivo do Cancelamento</label>
-                <input type="text" id="cancelReasonInput" placeholder="Ex: Pedido da cliente"
-                  class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
-              </div>
-
-              <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
-                <button type="button" id="btnAbortCancelModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">Não, manter</button>
-                <button type="submit" class="px-5 py-2 rounded-xl bg-rose-500 text-white font-bold hover:brightness-110">Sim, Cancelar Horário</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        
 
         <!-- MODAL: REVISÃO DE CONFLITOS HISTÓRICOS -->
-        <div id="modalHistoricalConflicts" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-          <div class="bg-[#11131a] border border-amber-500/30 rounded-2xl w-full max-w-2xl p-6 space-y-4 text-xs shadow-2xl max-h-[85vh] overflow-y-auto">
-            <div class="flex items-center justify-between border-b border-white/10 pb-3">
-              <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i>
-                <span>Conflitos Históricos Identificados</span>
-              </h3>
-              <button type="button" id="btnCloseHistoricalConflictsModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
-                <i data-lucide="x" class="w-4 h-4"></i>
-              </button>
-            </div>
-
-            <p class="text-slate-300 text-xs">
-              Estes agendamentos foram identificados com sobreposição de horários para o mesmo profissional. Conforme as diretrizes de preservação de dados da RAIA, nenhum agendamento foi excluído automaticamente. Você pode remarcar ou cancelar um dos horários abaixo:
-            </p>
-
-            <div id="conflictsListContainer" class="space-y-3"></div>
-
-            <div class="flex justify-end pt-3 border-t border-white/10">
-              <button type="button" id="btnDismissConflictsModal" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110">Entendido</button>
-            </div>
-          </div>
-        </div>
+        
       </section>
 
       <!-- ============================================== -->
@@ -3284,123 +2799,12 @@
       <!-- ============================================== -->
       <!-- MODAL: NOVA CONTA A PAGAR                      -->
       <!-- ============================================== -->
-      <div id="modalNewBill" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-        <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs">
-          <div class="flex items-center justify-between border-b border-white/10 pb-3">
-            <h3 class="text-sm font-bold text-white flex items-center gap-2">
-              <i data-lucide="receipt" class="w-4 h-4 text-[#F59E0B]"></i>
-              <span>Cadastrar Nova Conta a Pagar</span>
-            </h3>
-            <button type="button" id="btnCloseNewBillModal" class="text-slate-400 hover:text-white">
-              <i data-lucide="x" class="w-4 h-4"></i>
-            </button>
-          </div>
-          <form id="formNewBill" class="space-y-3.5">
-            <div>
-              <label class="block text-slate-400 font-semibold mb-1">Título / Fornecedor *</label>
-              <input type="text" id="billTitle" placeholder="Ex: Fornecedor de Produtos, Aluguel, Luz" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-slate-400 font-semibold mb-1">Valor Total (R$) *</label>
-                <input type="number" step="0.01" min="0.01" id="billAmount" placeholder="0,00" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white font-bold">
-              </div>
-              <div>
-                <label class="block text-slate-400 font-semibold mb-1">Data de Vencimento *</label>
-                <input type="date" id="billDueDate" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-slate-400 font-semibold mb-1">Categoria</label>
-                <select id="billCategory" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
-                  <option value="Contas">Contas Básicas</option>
-                  <option value="Fornecedores">Fornecedores / Produtos</option>
-                  <option value="Aluguel">Aluguel / Imóvel</option>
-                  <option value="Tributos">Tributos / Impostos</option>
-                  <option value="Equipe">Comissão / Folha</option>
-                  <option value="Outros">Outros</option>
-                </select>
-              </div>
-              <div>
-                <label class="block text-slate-400 font-semibold mb-1">Parcelas</label>
-                <input type="number" min="1" max="60" id="billInstallments" value="1" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
-              </div>
-            </div>
-            <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
-              <button type="button" id="btnCancelNewBill" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold">Cancelar</button>
-              <button type="submit" id="btnSaveNewBill" class="px-4 py-2 rounded-xl bg-[#F59E0B] text-[#07080c] font-bold hover:brightness-110">Salvar Conta</button>
-            </div>
-          </form>
-        </div>
-      </div>
+      
 
       <!-- ============================================== -->
       <!-- MODAL: NOVA MOVIMENTAÇÃO DE CAIXA             -->
       <!-- ============================================== -->
-      <div id="modalNewTransaction" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
-        <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs">
-          <div class="flex items-center justify-between border-b border-white/10 pb-3">
-            <h3 class="text-sm font-bold text-white flex items-center gap-2">
-              <i data-lucide="plus-circle" class="w-4 h-4 text-[#00F59B]"></i>
-              <span>Lançar Movimentação de Caixa</span>
-            </h3>
-            <button type="button" id="btnCloseNewTxModal" class="text-slate-400 hover:text-white">
-              <i data-lucide="x" class="w-4 h-4"></i>
-            </button>
-          </div>
-          <form id="formNewTransaction" class="space-y-3.5">
-            <div>
-              <label class="block text-slate-400 font-semibold mb-1">Tipo de Lançamento *</label>
-              <div class="grid grid-cols-2 gap-2">
-                <label class="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-white/10 bg-[#07080c] cursor-pointer hover:border-[#00F59B]/50 transition-all text-emerald-400 font-bold">
-                  <input type="radio" name="txType" value="INCOME" checked class="accent-[#00F59B]">
-                  <span>Receita / Entrada</span>
-                </label>
-                <label class="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-white/10 bg-[#07080c] cursor-pointer hover:border-rose-500/50 transition-all text-rose-400 font-bold">
-                  <input type="radio" name="txType" value="EXPENSE" class="accent-rose-500">
-                  <span>Despesa / Saída</span>
-                </label>
-              </div>
-            </div>
-            <div>
-              <label class="block text-slate-400 font-semibold mb-1">Descrição / Cliente / Fornecedor *</label>
-              <input type="text" id="txDescription" placeholder="Ex: Procedimento Extra, Compra de Café" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-slate-400 font-semibold mb-1">Valor (R$) *</label>
-                <input type="number" step="0.01" min="0.01" id="txAmount" placeholder="0,00" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white font-bold">
-              </div>
-              <div>
-                <label class="block text-slate-400 font-semibold mb-1">Forma de Pagamento</label>
-                <select id="txPaymentMethod" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
-                  <option value="Pix">Pix</option>
-                  <option value="Cartão de Crédito">Cartão de Crédito</option>
-                  <option value="Cartão de Débito">Cartão de Débito</option>
-                  <option value="Dinheiro">Dinheiro</option>
-                  <option value="Boleto">Boleto</option>
-                  <option value="Outro">Outro</option>
-                </select>
-              </div>
-            </div>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <label class="block text-slate-400 font-semibold mb-1">Categoria</label>
-                <input type="text" id="txCategory" placeholder="Ex: Cortes, Insumos, Manutenção" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
-              </div>
-              <div>
-                <label class="block text-slate-400 font-semibold mb-1">Data</label>
-                <input type="date" id="txDate" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
-              </div>
-            </div>
-            <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
-              <button type="button" id="btnCancelNewTx" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold">Cancelar</button>
-              <button type="submit" id="btnSaveNewTx" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110">Salvar Lançamento</button>
-            </div>
-          </form>
-        </div>
-      </div>
+      
 
       <!-- ============================================== -->
       <!-- TAB 7: CAMPANHAS PRO (EXCLUSIVE PRO + LGPD)    -->
@@ -3462,56 +2866,767 @@
     </div>
   </main>
 
-  <!-- Product Details Modal (Commercial Exploration) -->
-  <div id="productDetailsModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-[#11131a] border border-white/10 rounded-3xl max-w-xl w-full p-6 md:p-8 space-y-6 max-h-[90vh] overflow-y-auto relative">
-      <button onclick="closeProductDetailsModal()" class="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white bg-white/5">
-        <i data-lucide="x" class="w-4 h-4"></i>
-      </button>
+  <!-- ============================================== -->
+  <!-- MODAL ROOT PORTAL (DIRECT BODY LEVEL)         -->
+  <!-- ============================================== -->
+  <div id="modal-root">
+    <div id="modalSingleService" class="raia-modal-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+              <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-4 text-xs shadow-2xl relative">
+                <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                  <h3 id="modalSingleServiceTitle" class="text-sm font-bold text-white flex items-center gap-2">
+                    <i data-lucide="scissors" class="w-4 h-4 text-[#00F59B]"></i>
+                    <span>Cadastrar Novo Serviço</span>
+                  </h3>
+                  <button type="button" id="btnCloseSingleServiceModal" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-all">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
+                </div>
+    
+                <form id="formSingleService" class="space-y-4">
+                  <input type="hidden" id="singleServiceId" value="">
+    
+                  <!-- Nome do Serviço com Autocomplete do Catálogo -->
+                  <div class="space-y-1 relative">
+                    <label for="singleServiceName" class="block text-slate-300 font-semibold">Nome do Serviço *</label>
+                    <div class="relative">
+                      <input type="text" id="singleServiceName" placeholder="Ex: Corte Feminino, Manicure, Barba..." required autocomplete="off"
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+                      <button type="button" id="btnToggleCatalogDropdown" class="absolute right-2.5 top-2.5 px-2 py-0.5 rounded text-[11px] bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10">
+                        Sugestões
+                      </button>
+                    </div>
+                    <!-- Dropdown de Sugestões do Catálogo -->
+                    <div id="catalogSuggestionsDropdown" class="hidden absolute left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto bg-[#07080c] border border-white/10 rounded-xl shadow-2xl z-30 divide-y divide-white/5">
+                    </div>
+                    <p class="text-[11px] text-slate-500">Dica: Escolha do catálogo de sugestões ou digite seu serviço personalizado.</p>
+                  </div>
+    
+                  <!-- Categoria & Preço -->
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="space-y-1">
+                      <label for="singleServiceCategory" class="block text-slate-300 font-semibold">Categoria *</label>
+                      <select id="singleServiceCategory" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                        <option value="Cabelos">Cabelos</option>
+                        <option value="Barbearia">Barbearia</option>
+                        <option value="Unhas">Unhas</option>
+                        <option value="Sobrancelhas e cílios">Sobrancelhas e cílios</option>
+                        <option value="Estética e maquiagem">Estética e maquiagem</option>
+                        <option value="Outros">Outros</option>
+                      </select>
+                    </div>
+                    <div class="space-y-1">
+                      <label for="singleServicePrice" class="block text-slate-300 font-semibold">Valor (R$) *</label>
+                      <input type="number" id="singleServicePrice" step="0.50" min="0" placeholder="0.00" required
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white font-bold placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+                    </div>
+                  </div>
+    
+                  <!-- Duração com Atalhos Rápidos -->
+                  <div class="space-y-1.5">
+                    <div class="flex items-center justify-between">
+                      <label for="singleServiceDuration" class="block text-slate-300 font-semibold">Duração (minutos) *</label>
+                      <span class="text-[11px] text-slate-500">Atalhos rápidos:</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <input type="number" id="singleServiceDuration" min="1" max="1440" step="1" placeholder="Ex: 45" required
+                        class="w-28 px-3.5 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                      <div class="flex flex-wrap items-center gap-1">
+                        <button type="button" data-duration="15" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">15m</button>
+                        <button type="button" data-duration="30" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">30m</button>
+                        <button type="button" data-duration="45" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">45m</button>
+                        <button type="button" data-duration="60" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">60m</button>
+                        <button type="button" data-duration="90" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">90m</button>
+                        <button type="button" data-duration="120" class="btn-duration-shortcut px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 text-xs">120m</button>
+                      </div>
+                    </div>
+                  </div>
+    
+                  <!-- Status Ativo / Inativo -->
+                  <div class="flex items-center justify-between p-3 rounded-xl bg-[#07080c] border border-white/5">
+                    <div>
+                      <span class="font-semibold text-white block">Serviço Ativo</span>
+                      <span class="text-slate-400 text-[11px]">Disponível para a Jéssica agendar novos horários</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" id="singleServiceActive" checked class="sr-only peer">
+                      <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#00F59B]"></div>
+                    </label>
+                  </div>
+    
+                  <!-- Alerta de Agendamentos Históricos -->
+                  <div id="singleServiceAppointmentsAlert" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs flex items-start gap-2">
+                    <i data-lucide="info" class="w-4 h-4 shrink-0 mt-0.5"></i>
+                    <span id="singleServiceAppointmentsAlertText">Este serviço possui agendamentos no histórico. Alterações de duração afetarão apenas novos agendamentos.</span>
+                  </div>
+    
+                  <!-- Botões de Ação -->
+                  <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
+                    <button type="button" id="btnCancelSingleService" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all font-medium">Cancelar</button>
+                    <button type="submit" id="btnSaveSingleService" class="px-5 py-2 rounded-xl bg-[#00F59B] hover:brightness-110 text-[#07080c] font-bold transition-all shadow-sm flex items-center gap-2">
+                      <i data-lucide="check" class="w-4 h-4"></i>
+                      <span id="btnSaveSingleServiceText">Salvar Serviço</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
 
-      <div class="flex items-start gap-4">
-        <div id="modalProductIconBox" class="w-14 h-14 rounded-2xl bg-[#00F59B]/10 border border-[#00F59B]/20 flex items-center justify-center text-[#00F59B] shrink-0">
-          <i data-lucide="bot" class="w-7 h-7"></i>
-        </div>
-        <div>
-          <div id="modalProductStatus" class="mb-1"></div>
-          <h3 id="modalProductName" class="text-xl font-black text-white">Nome do Produto</h3>
-          <p id="modalProductSummary" class="text-xs text-slate-400 mt-1"></p>
+    <div id="modalBatchServices" class="raia-modal-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-3 md:p-6">
+              <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col text-xs shadow-2xl overflow-hidden">
+                <!-- Modal Header -->
+                <div class="p-4 md:p-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-[#11131a]">
+                  <div>
+                    <h3 class="text-sm md:text-base font-bold text-white flex items-center gap-2">
+                      <i data-lucide="layers" class="w-4 h-4 text-[#00F59B]"></i>
+                      <span id="batchModalStepTitle">Adicionar Vários Serviços (Catálogo Inteligente)</span>
+                    </h3>
+                    <p id="batchModalStepSubtitle" class="text-xs text-slate-400 mt-0.5">Selecione os procedimentos que seu salão realiza para configurá-los rapidamente.</p>
+                  </div>
+                  <button type="button" id="btnCloseBatchModal" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                  </button>
+                </div>
+    
+                <!-- PASSO 1: SELEÇÃO DE PROCEDIMENTOS -->
+                <div id="batchStep1" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+                  <!-- Controls: Category Filter & Search -->
+                  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="relative flex-1">
+                      <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
+                      <input type="text" id="batchCatalogSearch" placeholder="Pesquisar procedimentos (ex: corte, escova, barba, unhas)..."
+                        class="w-full pl-9 pr-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <button type="button" id="btnBatchSelectAllCategory" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-semibold border border-white/10">
+                        Selecionar Todos da Categoria
+                      </button>
+                      <button type="button" id="btnBatchClearSelection" class="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">
+                        Limpar
+                      </button>
+                    </div>
+                  </div>
+    
+                  <!-- Category Tabs -->
+                  <div class="flex flex-wrap gap-1.5 border-b border-white/5 pb-2" id="batchCategoryTabs">
+                    <button type="button" data-cat="all" class="batch-cat-tab active px-3 py-1 rounded-lg text-xs font-semibold bg-[#00F59B]/15 text-[#00F59B] border border-[#00F59B]/30">Todos</button>
+                    <button type="button" data-cat="Cabelos" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Cabelos</button>
+                    <button type="button" data-cat="Barbearia" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Barbearia</button>
+                    <button type="button" data-cat="Unhas" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Unhas</button>
+                    <button type="button" data-cat="Sobrancelhas e cílios" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Sobrancelhas e cílios</button>
+                    <button type="button" data-cat="Estética e maquiagem" class="batch-cat-tab px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Estética e maquiagem</button>
+                  </div>
+    
+                  <!-- Grid of Catalog Items -->
+                  <div id="batchCatalogGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[50vh] overflow-y-auto p-1">
+                    <!-- Dynamically populated -->
+                  </div>
+                </div>
+    
+                <!-- PASSO 2: CONFIGURAÇÃO DE VALORES E DURAÇÕES -->
+                <div id="batchStep2" class="hidden flex-1 overflow-y-auto p-4 md:p-6 space-y-4">
+                  <!-- Quick tool: Apply duration to all -->
+                  <div class="p-3.5 rounded-xl bg-[#07080c] border border-white/5 flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center gap-2 text-slate-300">
+                      <i data-lucide="clock" class="w-4 h-4 text-[#00F59B]"></i>
+                      <span class="font-semibold">Aplicar mesma duração a todos:</span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1">
+                      <button type="button" data-duration="15" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">15 min</button>
+                      <button type="button" data-duration="30" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">30 min</button>
+                      <button type="button" data-duration="45" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">45 min</button>
+                      <button type="button" data-duration="60" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">60 min</button>
+                      <button type="button" data-duration="90" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">90 min</button>
+                      <button type="button" data-duration="120" class="btn-batch-apply-duration px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300">120 min</button>
+                    </div>
+                  </div>
+    
+                  <!-- Batch Table -->
+                  <div class="overflow-x-auto border border-white/10 rounded-xl bg-[#07080c]">
+                    <table class="w-full text-left text-xs">
+                      <thead>
+                        <tr class="border-b border-white/10 text-slate-400 bg-white/[0.02]">
+                          <th class="py-3 px-4 font-semibold">Procedimento</th>
+                          <th class="py-3 px-3 font-semibold w-36">Valor (R$) *</th>
+                          <th class="py-3 px-3 font-semibold w-56">Duração (min) *</th>
+                          <th class="py-3 px-3 font-semibold text-center w-16">Remover</th>
+                        </tr>
+                      </thead>
+                      <tbody id="batchTableBody" class="divide-y divide-white/5 text-slate-200">
+                        <!-- Rows generated dynamically -->
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+    
+                <!-- Modal Footer -->
+                <div class="p-4 md:p-5 border-t border-white/10 flex items-center justify-between bg-[#11131a] shrink-0">
+                  <div class="flex items-center gap-2">
+                    <span id="batchSelectedCounterBadge" class="px-3 py-1 rounded-full bg-[#00F59B]/10 text-[#00F59B] border border-[#00F59B]/20 font-bold">
+                      0 selecionados
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button type="button" id="btnBatchBack" class="hidden px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold">
+                      Voltar
+                    </button>
+                    <button type="button" id="btnBatchCancel" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-medium">
+                      Cancelar
+                    </button>
+                    <button type="button" id="btnBatchNext" disabled class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition-all flex items-center gap-2">
+                      <span>Continuar com 0 serviços</span>
+                      <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                    <button type="button" id="btnBatchSaveAll" class="hidden px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 transition-all flex items-center gap-2">
+                      <i data-lucide="save" class="w-4 h-4"></i>
+                      <span id="btnBatchSaveAllText">Salvar Todos os Serviços</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+    <div id="modalDeleteConfirm" class="raia-modal-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+              <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl">
+                <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i>
+                    <span id="deleteModalTitle">Gerenciar Serviço</span>
+                  </h3>
+                  <button type="button" id="btnCloseDeleteModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
+                </div>
+    
+                <input type="hidden" id="deleteServiceId" value="">
+    
+                <div id="deleteModalBody" class="space-y-3 text-slate-300">
+                  <!-- Dynamically populated -->
+                </div>
+    
+                <div class="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-white/5">
+                  <button type="button" id="btnCancelDeleteModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-medium order-2 sm:order-1">Cancelar</button>
+                  <button type="button" id="btnDeactivateServiceRecommended" class="hidden px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 order-1 sm:order-2">Desativar Serviço (Recomendado)</button>
+                  <button type="button" id="btnConfirmDeleteService" class="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-bold order-3">Excluir Definitivamente</button>
+                </div>
+              </div>
+            </div>
+
+    <div id="modalNewAppointment" class="raia-modal-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+              <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-lg p-6 space-y-4 text-xs shadow-2xl max-h-[90vh] min-h-[520px] overflow-y-auto">
+                <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i data-lucide="calendar-plus" class="w-4 h-4 text-[#00F59B]"></i>
+                    <span>Registrar Novo Agendamento</span>
+                  </h3>
+                  <button type="button" id="btnCloseNewAppointmentModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
+                </div>
+    
+                <!-- Sugestões de Horários Alternativos (aparece em caso de conflito) -->
+                <div id="aptSuggestedSlotsContainer" class="hidden p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/30 space-y-2">
+                  <p class="font-bold text-amber-200 text-xs flex items-center gap-1.5">
+                    <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400"></i>
+                    <span id="aptConflictAlertMessage">Horário em conflito com outro agendamento.</span>
+                  </p>
+                  <p class="text-[11px] text-slate-300">Horários disponíveis para este dia:</p>
+                  <div id="aptSuggestedSlotsPills" class="flex flex-wrap gap-1.5 pt-1"></div>
+                </div>
+    
+                <form id="formNewAppointment" class="space-y-3.5 pb-8">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label for="aptClientName" class="block text-slate-300 font-semibold mb-1">Nome do(a) Cliente *</label>
+                      <input type="text" id="aptClientName" placeholder="Ex: Mariana Silva" required
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+                    </div>
+                    <div>
+                      <label for="aptClientPhone" class="block text-slate-300 font-semibold mb-1">WhatsApp do(a) Cliente</label>
+                      <input type="tel" id="aptClientPhone" placeholder="(11) 99999-9999"
+                        class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+                    </div>
+                  </div>
+    
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label for="aptServiceSelect" class="block text-slate-300 font-semibold mb-1">Serviço *</label>
+                      <select id="aptServiceSelect" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                        <option value="">Selecione um serviço...</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label for="aptStaffSelect" class="block text-slate-300 font-semibold mb-1">Profissional *</label>
+                      <select id="aptStaffSelect" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                        <option value="">Automático (primeiro livre)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <p id="aptServiceDurationHint" class="text-[11px] text-slate-400"></p>
+    
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Data com 2 formas de seleção (Digitação DD/MM/AAAA ou Calendário Visual) -->
+                    <div class="relative" id="aptDatePickerWrapper">
+                      <label for="aptDateDisplay" class="block text-slate-300 font-semibold mb-1">Data *</label>
+                      <div class="relative">
+                        <input type="text" id="aptDateDisplay" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" required
+                          class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] text-xs transition-colors">
+                        <button type="button" id="btnOpenAptDatePicker" title="Abrir calendário visual"
+                          class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#00F59B] hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                          <i data-lucide="calendar" class="w-4 h-4"></i>
+                        </button>
+                        <input type="date" id="aptDatePicker" tabindex="-1" class="absolute -z-10 opacity-0 pointer-events-none w-0 h-0">
+                        <input type="hidden" id="aptDate" name="aptDate">
+                      </div>
+                      <p id="aptDateError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
+    
+                      <!-- Popover Calendário Visual Beauty -->
+                      <div id="aptBeautyCalendarPopover" class="hidden absolute left-0 top-full mt-1.5 p-3.5 rounded-2xl bg-[#FFFDFB] border border-[#E6D6CA] shadow-2xl z-[70] w-72 select-none">
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-[#E6D6CA]">
+                          <div class="flex items-center gap-1.5">
+                            <button type="button" id="btnPrevAptCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Mês anterior">
+                              <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                            </button>
+                            <span id="aptCalMonthYearLabel" class="text-xs font-bold text-[#4E3B31]"></span>
+                            <button type="button" id="btnNextAptCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Próximo mês">
+                              <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                            </button>
+                          </div>
+                          <button type="button" id="btnCloseAptCalPopover" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Fechar calendário">
+                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                          </button>
+                        </div>
+                        <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[#AD7B42] mb-1">
+                          <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+                        </div>
+                        <div id="aptCalDaysGrid" class="grid grid-cols-7 gap-1 text-center text-xs"></div>
+                      </div>
+                    </div>
+    
+                    <!-- Horário com 2 formas de seleção (Digitação HH:MM ou Lista de Horários Disponíveis) -->
+                    <div class="relative" id="aptTimePickerWrapper">
+                      <label for="aptTimeInput" class="block text-slate-300 font-semibold mb-1">Horário de Início *</label>
+                      <div class="relative">
+                        <input type="text" id="aptTimeInput" placeholder="HH:MM" maxlength="5" inputmode="numeric" required
+                          class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] text-xs transition-colors">
+                        <button type="button" id="btnToggleAptTimeDropdown" title="Ver horários livres"
+                          class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#00F59B] hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                          <i data-lucide="clock" class="w-4 h-4"></i>
+                        </button>
+                        <input type="hidden" id="aptTime" name="aptTime">
+                      </div>
+                      <p id="aptTimeError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
+    
+                      <!-- Popover Dropdown de Horários Disponíveis -->
+                      <div id="aptTimeDropdown" class="hidden absolute left-0 top-full mt-1.5 p-3 rounded-2xl bg-[#11131a] border border-white/15 shadow-2xl z-[70] space-y-2 w-[280px] max-w-[min(320px,calc(100vw-32px))] select-none">
+                        <div class="flex items-center justify-between text-[11px] font-semibold text-slate-300 border-b border-white/10 pb-1.5">
+                          <span class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i><span>Horários Livres</span></span>
+                          <div class="flex items-center gap-1.5">
+                            <span id="aptSlotsCountBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold"></span>
+                            <button type="button" id="btnCloseAptTimeDropdown" class="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors" title="Fechar horários">
+                              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                            </button>
+                          </div>
+                        </div>
+                        <div id="aptSlotsLoading" class="hidden py-3 text-center text-slate-400 text-xs">
+                          <i data-lucide="loader-2" class="w-4 h-4 animate-spin inline-block text-[#00F59B] mb-1"></i>
+                          <div>Buscando horários disponíveis...</div>
+                        </div>
+                        <div id="aptAvailableSlotsList" class="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto pr-1"></div>
+                        <p id="aptSlotsEmptyMsg" class="hidden text-[11px] text-amber-300/80 text-center py-2">Nenhum horário livre para esta data e serviço.</p>
+                      </div>
+                    </div>
+                  </div>
+    
+                  <div>
+                    <label for="aptStatusSelect" class="block text-slate-300 font-semibold mb-1">Status Inicial</label>
+                    <select id="aptStatusSelect" class="w-full px-3.5 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                      <option value="AGENDADO">AGENDADO</option>
+                      <option value="CONFIRMADO" selected>CONFIRMADO</option>
+                    </select>
+                  </div>
+    
+                  <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
+                    <button type="button" id="btnCancelNewAppointment" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-medium">Cancelar</button>
+                    <button type="submit" id="btnSubmitNewAppointment" disabled class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 shadow-sm flex items-center gap-1.5 opacity-50 cursor-not-allowed" title="Preencha todos os campos obrigatórios (Cliente, Serviço, Data e Horário) para confirmar.">
+                      <span>Confirmar Agendamento</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+    <div id="modalRescheduleAppointment" class="raia-modal-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+              <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl max-h-[90vh] min-h-[460px] overflow-y-auto">
+                <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i data-lucide="calendar-clock" class="w-4 h-4 text-[#00F59B]"></i>
+                    <span>Remarcar Horário</span>
+                  </h3>
+                  <button type="button" id="btnCloseRescheduleModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
+                </div>
+    
+                <div id="rescheduleAptInfo" class="p-3 rounded-xl bg-[#07080c] border border-white/5 text-slate-300 text-xs"></div>
+    
+                <div id="rescheduleSuggestedSlotsContainer" class="hidden p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 space-y-1.5">
+                  <p class="font-bold text-amber-200 text-xs">Horário solicitado em conflito. Alternativas disponíveis:</p>
+                  <div id="rescheduleSuggestedPills" class="flex flex-wrap gap-1.5"></div>
+                </div>
+    
+                <form id="formRescheduleAppointment" class="space-y-3.5">
+                  <input type="hidden" id="rescheduleAptId">
+    
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <!-- Nova Data com 2 formas de seleção -->
+                    <div class="relative" id="rescheduleDatePickerWrapper">
+                      <label for="rescheduleDateDisplay" class="block text-slate-300 font-semibold mb-1">Nova Data *</label>
+                      <div class="relative">
+                        <input type="text" id="rescheduleDateDisplay" placeholder="DD/MM/AAAA" maxlength="10" inputmode="numeric" required
+                          class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] text-xs transition-colors">
+                        <button type="button" id="btnOpenRescheduleDatePicker" title="Abrir calendário visual"
+                          class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#00F59B] hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                          <i data-lucide="calendar" class="w-4 h-4"></i>
+                        </button>
+                        <input type="date" id="rescheduleDatePicker" tabindex="-1" class="absolute -z-10 opacity-0 pointer-events-none w-0 h-0">
+                        <input type="hidden" id="rescheduleDate" name="rescheduleDate">
+                      </div>
+                      <p id="rescheduleDateError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
+    
+                      <!-- Popover Calendário Visual Beauty -->
+                      <div id="rescheduleBeautyCalendarPopover" class="hidden absolute left-0 top-full mt-1.5 p-3.5 rounded-2xl bg-[#FFFDFB] border border-[#E6D6CA] shadow-2xl z-[70] w-72 select-none">
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-[#E6D6CA]">
+                          <div class="flex items-center gap-1.5">
+                            <button type="button" id="btnPrevRescheduleCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Mês anterior">
+                              <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                            </button>
+                            <span id="rescheduleCalMonthYearLabel" class="text-xs font-bold text-[#4E3B31]"></span>
+                            <button type="button" id="btnNextRescheduleCalMonth" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Próximo mês">
+                              <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                            </button>
+                          </div>
+                          <button type="button" id="btnCloseRescheduleCalPopover" class="p-1 rounded-lg hover:bg-[#F3E6DB] text-[#7A6255] hover:text-[#4E3B31] transition-colors" title="Fechar calendário">
+                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                          </button>
+                        </div>
+                        <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-[#AD7B42] mb-1">
+                          <span>Dom</span><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span>
+                        </div>
+                        <div id="rescheduleCalDaysGrid" class="grid grid-cols-7 gap-1 text-center text-xs"></div>
+                      </div>
+                    </div>
+    
+                    <!-- Novo Horário com 2 formas de seleção -->
+                    <div class="relative" id="rescheduleTimePickerWrapper">
+                      <label for="rescheduleTimeInput" class="block text-slate-300 font-semibold mb-1">Novo Horário *</label>
+                      <div class="relative">
+                        <input type="text" id="rescheduleTimeInput" placeholder="HH:MM" maxlength="5" inputmode="numeric" required
+                          class="w-full pl-3.5 pr-10 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B] text-xs transition-colors">
+                        <button type="button" id="btnToggleRescheduleTimeDropdown" title="Ver horários livres"
+                          class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-[#00F59B] hover:text-white hover:bg-white/5 rounded-lg transition-colors cursor-pointer">
+                          <i data-lucide="clock" class="w-4 h-4"></i>
+                        </button>
+                        <input type="hidden" id="rescheduleTime" name="rescheduleTime">
+                      </div>
+                      <p id="rescheduleTimeError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
+    
+                      <!-- Popover Dropdown de Horários Disponíveis (Remarcação) -->
+                      <div id="rescheduleTimeDropdown" class="hidden absolute right-0 top-full mt-1.5 p-3 rounded-2xl bg-[#11131a] border border-white/15 shadow-2xl z-[70] space-y-2 w-[280px] max-w-[min(320px,calc(100vw-32px))] select-none">
+                        <div class="flex items-center justify-between text-[11px] font-semibold text-slate-300 border-b border-white/10 pb-1.5">
+                          <span class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i><span>Horários Livres</span></span>
+                          <div class="flex items-center gap-1.5">
+                            <span id="rescheduleSlotsCountBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold"></span>
+                            <button type="button" id="btnCloseRescheduleTimeDropdown" class="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors" title="Fechar horários">
+                              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                            </button>
+                          </div>
+                        </div>
+                        <div id="rescheduleSlotsLoading" class="hidden py-3 text-center text-slate-400 text-xs">
+                          <i data-lucide="loader-2" class="w-4 h-4 animate-spin inline-block text-[#00F59B] mb-1"></i>
+                          <div>Buscando horários disponíveis...</div>
+                        </div>
+                        <div id="rescheduleAvailableSlotsList" class="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto pr-1"></div>
+                        <p id="rescheduleSlotsEmptyMsg" class="hidden text-[11px] text-amber-300/80 text-center py-2">Nenhum horário livre para esta data.</p>
+                      </div>
+                    </div>
+                  </div>
+    
+                  <div>
+                    <label for="rescheduleStaffSelect" class="block text-slate-300 font-semibold mb-1">Profissional</label>
+                    <select id="rescheduleStaffSelect" class="w-full px-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]"></select>
+                  </div>
+    
+                  <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
+                    <button type="button" id="btnCancelRescheduleModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">Cancelar</button>
+                    <button type="submit" id="btnSubmitRescheduleAppointment" disabled class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110 opacity-50 cursor-not-allowed">Salvar Remarcação</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+    <div id="modalStatusAppointment" class="raia-modal-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+              <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-sm p-6 space-y-4 text-xs shadow-2xl">
+                <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i data-lucide="check-circle" class="w-4 h-4 text-[#00F59B]"></i>
+                    <span>Atualizar Status</span>
+                  </h3>
+                  <button type="button" id="btnCloseStatusModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
+                </div>
+    
+                <form id="formStatusAppointment" class="space-y-3.5">
+                  <input type="hidden" id="statusAptId">
+                  <div>
+                    <label for="statusTargetSelect" class="block text-slate-300 font-semibold mb-1">Novo Status *</label>
+                    <select id="statusTargetSelect" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                      <option value="AGENDADO">AGENDADO (Aguardando)</option>
+                      <option value="CONFIRMADO">CONFIRMADO (Cliente confirmou)</option>
+                      <option value="CONCLUÍDO">CONCLUÍDO (Atendimento realizado)</option>
+                      <option value="NÃO COMPARECEU">NÃO COMPARECEU (Ausência)</option>
+                      <option value="CANCELADO">CANCELADO (Horário liberado)</option>
+                    </select>
+                  </div>
+    
+                  <div>
+                    <label for="statusReasonInput" class="block text-slate-300 font-semibold mb-1">Observação / Motivo</label>
+                    <input type="text" id="statusReasonInput" placeholder="Ex: Cliente confirmou via WhatsApp"
+                      class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+                  </div>
+    
+                  <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
+                    <button type="button" id="btnCancelStatusModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">Fechar</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110">Salvar Status</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+    <div id="modalCancelAppointment" class="raia-modal-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+              <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs shadow-2xl">
+                <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i data-lucide="x-circle" class="w-4 h-4 text-rose-400"></i>
+                    <span>Cancelar Agendamento</span>
+                  </h3>
+                  <button type="button" id="btnCloseCancelModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
+                </div>
+    
+                <p class="text-slate-300">Tem certeza que deseja cancelar este agendamento? O horário será liberado na agenda e o evento correspondente no Google Calendar será removido.</p>
+                <div id="cancelAptInfo" class="p-3 rounded-xl bg-[#07080c] border border-white/5 text-slate-400 text-xs"></div>
+    
+                <form id="formCancelAppointment" class="space-y-3.5">
+                  <input type="hidden" id="cancelAptId">
+                  <div>
+                    <label for="cancelReasonInput" class="block text-slate-300 font-semibold mb-1">Motivo do Cancelamento</label>
+                    <input type="text" id="cancelReasonInput" placeholder="Ex: Pedido da cliente"
+                      class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+                  </div>
+    
+                  <div class="flex justify-end gap-2 pt-2 border-t border-white/5">
+                    <button type="button" id="btnAbortCancelModal" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">Não, manter</button>
+                    <button type="submit" class="px-5 py-2 rounded-xl bg-rose-500 text-white font-bold hover:brightness-110">Sim, Cancelar Horário</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+    <div id="modalHistoricalConflicts" class="raia-modal-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+              <div class="bg-[#11131a] border border-amber-500/30 rounded-2xl w-full max-w-2xl p-6 space-y-4 text-xs shadow-2xl max-h-[85vh] overflow-y-auto">
+                <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                  <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i>
+                    <span>Conflitos Históricos Identificados</span>
+                  </h3>
+                  <button type="button" id="btnCloseHistoricalConflictsModal" class="p-1 rounded-lg text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                  </button>
+                </div>
+    
+                <p class="text-slate-300 text-xs">
+                  Estes agendamentos foram identificados com sobreposição de horários para o mesmo profissional. Conforme as diretrizes de preservação de dados da RAIA, nenhum agendamento foi excluído automaticamente. Você pode remarcar ou cancelar um dos horários abaixo:
+                </p>
+    
+                <div id="conflictsListContainer" class="space-y-3"></div>
+    
+                <div class="flex justify-end pt-3 border-t border-white/10">
+                  <button type="button" id="btnDismissConflictsModal" class="px-5 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110">Entendido</button>
+                </div>
+              </div>
+            </div>
+
+    <div id="modalNewBill" class="raia-modal-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+            <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs">
+              <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <i data-lucide="receipt" class="w-4 h-4 text-[#F59E0B]"></i>
+                  <span>Cadastrar Nova Conta a Pagar</span>
+                </h3>
+                <button type="button" id="btnCloseNewBillModal" class="text-slate-400 hover:text-white">
+                  <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+              </div>
+              <form id="formNewBill" class="space-y-3.5">
+                <div>
+                  <label class="block text-slate-400 font-semibold mb-1">Título / Fornecedor *</label>
+                  <input type="text" id="billTitle" placeholder="Ex: Fornecedor de Produtos, Aluguel, Luz" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Valor Total (R$) *</label>
+                    <input type="number" step="0.01" min="0.01" id="billAmount" placeholder="0,00" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white font-bold">
+                  </div>
+                  <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Data de Vencimento *</label>
+                    <input type="date" id="billDueDate" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Categoria</label>
+                    <select id="billCategory" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+                      <option value="Contas">Contas Básicas</option>
+                      <option value="Fornecedores">Fornecedores / Produtos</option>
+                      <option value="Aluguel">Aluguel / Imóvel</option>
+                      <option value="Tributos">Tributos / Impostos</option>
+                      <option value="Equipe">Comissão / Folha</option>
+                      <option value="Outros">Outros</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Parcelas</label>
+                    <input type="number" min="1" max="60" id="billInstallments" value="1" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+                  </div>
+                </div>
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+                  <button type="button" id="btnCancelNewBill" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold">Cancelar</button>
+                  <button type="submit" id="btnSaveNewBill" class="px-4 py-2 rounded-xl bg-[#F59E0B] text-[#07080c] font-bold hover:brightness-110">Salvar Conta</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+    <div id="modalNewTransaction" class="raia-modal-overlay fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+            <div class="bg-[#11131a] border border-white/10 rounded-2xl w-full max-w-md p-6 space-y-4 text-xs">
+              <div class="flex items-center justify-between border-b border-white/10 pb-3">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <i data-lucide="plus-circle" class="w-4 h-4 text-[#00F59B]"></i>
+                  <span>Lançar Movimentação de Caixa</span>
+                </h3>
+                <button type="button" id="btnCloseNewTxModal" class="text-slate-400 hover:text-white">
+                  <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+              </div>
+              <form id="formNewTransaction" class="space-y-3.5">
+                <div>
+                  <label class="block text-slate-400 font-semibold mb-1">Tipo de Lançamento *</label>
+                  <div class="grid grid-cols-2 gap-2">
+                    <label class="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-white/10 bg-[#07080c] cursor-pointer hover:border-[#00F59B]/50 transition-all text-emerald-400 font-bold">
+                      <input type="radio" name="txType" value="INCOME" checked class="accent-[#00F59B]">
+                      <span>Receita / Entrada</span>
+                    </label>
+                    <label class="flex items-center justify-center gap-2 p-2.5 rounded-xl border border-white/10 bg-[#07080c] cursor-pointer hover:border-rose-500/50 transition-all text-rose-400 font-bold">
+                      <input type="radio" name="txType" value="EXPENSE" class="accent-rose-500">
+                      <span>Despesa / Saída</span>
+                    </label>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-slate-400 font-semibold mb-1">Descrição / Cliente / Fornecedor *</label>
+                  <input type="text" id="txDescription" placeholder="Ex: Procedimento Extra, Compra de Café" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Valor (R$) *</label>
+                    <input type="number" step="0.01" min="0.01" id="txAmount" placeholder="0,00" required class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white font-bold">
+                  </div>
+                  <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Forma de Pagamento</label>
+                    <select id="txPaymentMethod" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+                      <option value="Pix">Pix</option>
+                      <option value="Cartão de Crédito">Cartão de Crédito</option>
+                      <option value="Cartão de Débito">Cartão de Débito</option>
+                      <option value="Dinheiro">Dinheiro</option>
+                      <option value="Boleto">Boleto</option>
+                      <option value="Outro">Outro</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Categoria</label>
+                    <input type="text" id="txCategory" placeholder="Ex: Cortes, Insumos, Manutenção" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+                  </div>
+                  <div>
+                    <label class="block text-slate-400 font-semibold mb-1">Data</label>
+                    <input type="date" id="txDate" class="w-full px-3.5 py-2.5 rounded-xl bg-[#07080c] border border-white/10 text-white">
+                  </div>
+                </div>
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
+                  <button type="button" id="btnCancelNewTx" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold">Cancelar</button>
+                  <button type="submit" id="btnSaveNewTx" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold hover:brightness-110">Salvar Lançamento</button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+    <div id="productDetailsModal" class="raia-modal-overlay hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-[#11131a] border border-white/10 rounded-3xl max-w-xl w-full p-6 md:p-8 space-y-6 max-h-[90vh] overflow-y-auto relative">
+          <button onclick="closeProductDetailsModal()" class="absolute top-5 right-5 p-2 rounded-xl text-slate-400 hover:text-white bg-white/5">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+    
+          <div class="flex items-start gap-4">
+            <div id="modalProductIconBox" class="w-14 h-14 rounded-2xl bg-[#00F59B]/10 border border-[#00F59B]/20 flex items-center justify-center text-[#00F59B] shrink-0">
+              <i data-lucide="bot" class="w-7 h-7"></i>
+            </div>
+            <div>
+              <div id="modalProductStatus" class="mb-1"></div>
+              <h3 id="modalProductName" class="text-xl font-black text-white">Nome do Produto</h3>
+              <p id="modalProductSummary" class="text-xs text-slate-400 mt-1"></p>
+            </div>
+          </div>
+    
+          <div class="p-4 rounded-2xl bg-[#07080c] border border-white/5 space-y-3 text-xs">
+            <div class="flex items-center justify-between text-slate-400">
+              <span>Tipo de Solução:</span>
+              <span id="modalProductType" class="font-bold text-white uppercase"></span>
+            </div>
+            <div class="flex items-center justify-between text-slate-400">
+              <span>Segmentos Recomendados:</span>
+              <span id="modalProductSegments" class="font-bold text-[#8B5CF6]"></span>
+            </div>
+            <div id="modalTargetAudienceRow" class="text-slate-400">
+              <span class="block text-slate-500 mb-0.5 font-semibold">Público-Alvo:</span>
+              <span id="modalProductAudience" class="text-slate-300"></span>
+            </div>
+          </div>
+    
+          <div class="space-y-2">
+            <h4 class="text-xs font-bold text-white uppercase tracking-wider">Recursos & Funcionalidades</h4>
+            <div id="modalFeaturesList" class="space-y-1.5 text-xs text-slate-300"></div>
+          </div>
+    
+          <!-- Pricing / Offer Section -->
+          <div id="modalPricingSection" class="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
+            <h4 class="text-xs font-bold text-white uppercase tracking-wider">Condições Comerciais</h4>
+            <div id="modalPricingContent" class="text-xs text-slate-300"></div>
+          </div>
+    
+          <div id="modalActionFooter" class="flex items-center justify-end gap-3 pt-2">
+            <button onclick="closeProductDetailsModal()" class="px-4 py-2.5 rounded-xl bg-white/5 text-slate-300 hover:text-white text-xs font-bold">Fechar</button>
+            <div id="modalActionBtnContainer"></div>
+          </div>
         </div>
       </div>
-
-      <div class="p-4 rounded-2xl bg-[#07080c] border border-white/5 space-y-3 text-xs">
-        <div class="flex items-center justify-between text-slate-400">
-          <span>Tipo de Solução:</span>
-          <span id="modalProductType" class="font-bold text-white uppercase"></span>
-        </div>
-        <div class="flex items-center justify-between text-slate-400">
-          <span>Segmentos Recomendados:</span>
-          <span id="modalProductSegments" class="font-bold text-[#8B5CF6]"></span>
-        </div>
-        <div id="modalTargetAudienceRow" class="text-slate-400">
-          <span class="block text-slate-500 mb-0.5 font-semibold">Público-Alvo:</span>
-          <span id="modalProductAudience" class="text-slate-300"></span>
-        </div>
-      </div>
-
-      <div class="space-y-2">
-        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Recursos & Funcionalidades</h4>
-        <div id="modalFeaturesList" class="space-y-1.5 text-xs text-slate-300"></div>
-      </div>
-
-      <!-- Pricing / Offer Section -->
-      <div id="modalPricingSection" class="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
-        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Condições Comerciais</h4>
-        <div id="modalPricingContent" class="text-xs text-slate-300"></div>
-      </div>
-
-      <div id="modalActionFooter" class="flex items-center justify-end gap-3 pt-2">
-        <button onclick="closeProductDetailsModal()" class="px-4 py-2.5 rounded-xl bg-white/5 text-slate-300 hover:text-white text-xs font-bold">Fechar</button>
-        <div id="modalActionBtnContainer"></div>
-      </div>
-    </div>
   </div>
+
+
+  <!-- Product Details Modal (Commercial Exploration) -->
+  
 
   <!-- Client Portal JavaScript Engine -->
   <script>
@@ -3526,6 +3641,31 @@
     }
 
     lucide.createIcons();
+
+    // ========================================================
+    // CENTRAL MODAL MANAGER & SCROLL LOCK (Prompt 009)
+    // ========================================================
+    function updateModalScrollLock() {
+      const activeModal = document.querySelector('#modal-root > div:not(.hidden), .raia-modal-overlay:not(.hidden)');
+      if (activeModal) {
+        document.body.classList.add('modal-open');
+        document.documentElement.classList.add('modal-open');
+      } else {
+        document.body.classList.remove('modal-open');
+        document.documentElement.classList.remove('modal-open');
+      }
+    }
+
+    // Auto-sync scroll lock with MutationObserver on #modal-root
+    try {
+      const modalRootEl = document.getElementById('modal-root');
+      if (modalRootEl) {
+        const modalObserver = new MutationObserver(() => {
+          updateModalScrollLock();
+        });
+        modalObserver.observe(modalRootEl, { attributes: true, subtree: true, attributeFilter: ['class'] });
+      }
+    } catch (_) {}
 
     // Cleanse query strings containing tokens immediately on load (Proteção 17)
     if (window.location.search) {
@@ -3635,6 +3775,7 @@
 
     // Normalização universal de abas (suporta #tab-xxx, tab-xxx, #xxx, query params anexados)
     function normalizeTabId(rawTab) {
+      if (typeof tabMeta === 'undefined' || !tabMeta) return null;
       if (!rawTab || typeof rawTab !== 'string') return null;
       let clean = rawTab.trim();
       if (clean.includes('?')) clean = clean.split('?')[0];
