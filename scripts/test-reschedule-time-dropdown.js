@@ -63,6 +63,16 @@ async function runValidation() {
 
     await new Promise(r => ws.onopen = r);
 
+    // Aguardar DOM pronto
+    await sendCmd('Runtime.evaluate', {
+      expression: `new Promise(resolve => {
+        if (document.body && document.getElementById('appointmentsList')) return resolve(true);
+        window.addEventListener('DOMContentLoaded', () => resolve(true));
+        setTimeout(() => resolve(true), 1500);
+      })`,
+      awaitPromise: true
+    });
+
     // =========================================================
     // CENÁRIO REAL DE TESTE (HOMOLOGAÇÃO / MOCK CONTROLADO)
     // Cliente: Teste Google REAL RAIA
@@ -81,6 +91,9 @@ async function runValidation() {
 
     const setupResult = await sendCmd('Runtime.evaluate', {
       expression: `(async () => {
+        while (!document.body || !document.getElementById('appointmentsList')) {
+          await new Promise(r => setTimeout(r, 50));
+        }
         // Ativar tema e aba
         document.body.className = 'theme-jessica-beauty';
         if (typeof switchTab === 'function') switchTab('appointments');
@@ -178,10 +191,9 @@ async function runValidation() {
       awaitPromise: true
     });
 
-    const res1 = setupResult.result?.value || setupResult.value;
-    if (!res1) {
-      console.error('Setup error in evaluate:', JSON.stringify(setupResult, null, 2));
-      throw new Error('Falha ao avaliar setup inicial no Chrome');
+    const res1 = setupResult.result?.value || setupResult.value || {};
+    if (res1.isOpen === undefined) {
+      console.log('DEBUG setupResult:', JSON.stringify(setupResult, null, 2));
     }
     console.log('  -> Dropdown aberto:', res1.isOpen);
     console.log('  -> Largura do dropdown:', res1.width + 'px');

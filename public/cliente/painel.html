@@ -3438,9 +3438,21 @@
       'campaigns-pro': { title: 'Módulo Jéssica • Campanhas Promocionais', subtitle: 'Disparo de novidades com consentimento e opt-out' },
     };
 
+    // Normalização universal de abas (suporta #tab-xxx, tab-xxx, #xxx, query params anexados)
+    function normalizeTabId(rawTab) {
+      if (!rawTab || typeof rawTab !== 'string') return null;
+      let clean = rawTab.trim();
+      if (clean.includes('?')) clean = clean.split('?')[0];
+      if (clean.includes('&')) clean = clean.split('&')[0];
+      clean = clean.replace(/^#+/, '').replace(/^\/+/, '');
+      if (clean.startsWith('tab-')) clean = clean.slice(4);
+      return tabMeta[clean] ? clean : null;
+    }
+
     const isSalonTab = (tabId) => ['overview', 'salon', 'services', 'staff', 'appointments', 'integrations-google', 'integrations-whatsapp', 'dashboard-pro', 'campaigns-pro'].includes(tabId);
 
-    function switchTab(tabId) {
+    function switchTab(rawTabId, updateUrl = true) {
+      const tabId = normalizeTabId(rawTabId) || 'my-products';
       const navButtons = document.querySelectorAll('.nav-btn');
       const tabContents = document.querySelectorAll('.tab-content');
       const pageTitle = document.getElementById('pageTitle');
@@ -3452,6 +3464,23 @@
       const jessicaBanner = document.getElementById('jessicaBeautyHeaderBanner');
 
       const inSalon = isSalonTab(tabId);
+
+      // Persistência ativa no localStorage para sobreviver a recarregamentos
+      try {
+        localStorage.setItem('raia_active_tab', tabId);
+      } catch (_) {}
+
+      // Atualizar o endereço do navegador com a aba ativa (sem recarregar)
+      if (updateUrl) {
+        const targetHash = '#' + tabId;
+        if (window.location.hash !== targetHash) {
+          try {
+            window.history.pushState({ tabId }, '', targetHash);
+          } catch (_) {
+            window.location.hash = targetHash;
+          }
+        }
+      }
 
       const sidebarRaiaBrand = document.getElementById('sidebarRaiaBrand');
       const sidebarJessicaBrand = document.getElementById('sidebarJessicaBrand');
@@ -3619,6 +3648,17 @@
     if (btnBackJessica) btnBackJessica.addEventListener('click', () => switchTab('my-products'));
     const btnBackSidebar = document.getElementById('btnBackToHubInSidebar');
     if (btnBackSidebar) btnBackSidebar.addEventListener('click', () => switchTab('my-products'));
+
+    // Sincronização com histórico do navegador (botões Voltar / Avançar e alteração direta do hash)
+    window.addEventListener('popstate', (e) => {
+      const tab = normalizeTabId(window.location.hash) || (e.state && normalizeTabId(e.state.tabId));
+      if (tab) switchTab(tab, false);
+    });
+
+    window.addEventListener('hashchange', () => {
+      const tab = normalizeTabId(window.location.hash);
+      if (tab) switchTab(tab, false);
+    });
 
     document.getElementById('toggleSalonNavBtn').addEventListener('click', () => {
       const sub = document.getElementById('salonNavSubitems');
@@ -4387,29 +4427,56 @@
         clientData = data.profile;
         renderProfileData(clientData);
 
-        // Check if URL specifies module or tab (via query or hash)
+        // Notificações de retorno OAuth Google Calendar via Query Params
         const urlParams = new URLSearchParams(window.location.search);
         const requestedModulo = urlParams.get('modulo');
-        const hashTab = (window.location.hash || '').replace('#', '');
-        const requestedTab = urlParams.get('tab') || (hashTab && tabMeta[hashTab] ? hashTab : null);
-
-        if (requestedTab && tabMeta[requestedTab]) {
-          switchTab(requestedTab);
-        } else if (requestedModulo === 'jessica') {
-          switchTab('overview');
-        } else {
-          switchTab('my-products');
+        if (urlParams.get('google_connected') === 'true') {
+          const email = urlParams.get('email') || '';
+          showToast(`Google Calendar conectado com sucesso${email ? ` (${email})` : ''}!`);
+        } else if (urlParams.get('google_error')) {
+          showToast(`Aviso na integração Google: ${urlParams.get('google_error')}`, 'error');
         }
+
+        // Resolução com prioridade estrita:
+        // 1. Query param 'tab' (ex: ?tab=appointments)
+        // 2. Hash da URL (ex: #appointments ou #tab-integrations-google)
+        // 3. Query param 'modulo' (ex: ?modulo=jessica -> 'overview')
+        // 4. Última aba persistida no localStorage ('raia_active_tab')
+        // 5. Fallback padrão: 'my-products'
+        const tabFromQuery = normalizeTabId(urlParams.get('tab'));
+        const tabFromHash = normalizeTabId(window.location.hash);
+        let tabFromStorage = null;
+        try {
+          tabFromStorage = normalizeTabId(localStorage.getItem('raia_active_tab'));
+        } catch (_) {}
+
+        let initialTab = 'my-products';
+        if (tabFromQuery) {
+          initialTab = tabFromQuery;
+        } else if (tabFromHash) {
+          initialTab = tabFromHash;
+        } else if (requestedModulo === 'jessica') {
+          initialTab = 'overview';
+        } else if (tabFromStorage) {
+          initialTab = tabFromStorage;
+        }
+
+        switchTab(initialTab, true);
       } catch (err) {
         console.error('Erro ao carregar perfil:', err);
         const footerName = document.getElementById('footerUserName');
         if (footerName && footerName.innerText === 'Carregando...') {
           footerName.innerText = 'Cliente Conectado';
         }
-        const hashTab = (window.location.hash || '').replace('#', '');
         const urlParams = new URLSearchParams(window.location.search);
-        const fallbackTab = urlParams.get('tab') || (hashTab && tabMeta[hashTab] ? hashTab : null);
-        switchTab(fallbackTab || 'my-products');
+        const tabFromQuery = normalizeTabId(urlParams.get('tab'));
+        const tabFromHash = normalizeTabId(window.location.hash);
+        let tabFromStorage = null;
+        try {
+          tabFromStorage = normalizeTabId(localStorage.getItem('raia_active_tab'));
+        } catch (_) {}
+        const fallbackTab = tabFromQuery || tabFromHash || tabFromStorage || 'my-products';
+        switchTab(fallbackTab, true);
       }
     }
 
