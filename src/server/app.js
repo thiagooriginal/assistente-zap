@@ -3558,6 +3558,14 @@ function startServer(port = 3333) {
     console.warn('[OutboxWorker] Aviso ao iniciar worker de outbox:', err.message);
   }
 
+  try {
+    const salonReminderService = require('../services/salonReminderService');
+    const intervalMs = Number(process.env.SALON_REMINDER_INTERVAL_MS) || 60000;
+    salonReminderService.startSalonReminderDaemon(intervalMs);
+  } catch (err) {
+    console.warn('[SalonReminderDaemon] Aviso ao iniciar daemon de lembretes B2C:', err.message);
+  }
+
   return new Promise((resolve) => {
     const server = app.listen(port, () => {
       console.log(`\n📊 Dashboard financeiro Multi-Tenant disponível em: http://localhost:${port}`);

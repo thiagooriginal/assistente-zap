@@ -531,7 +531,8 @@ function bookAppointmentSync(userId, {
   durationMin = null,
   origin = 'painel',
   status = 'AGENDADO',
-  reminderConsent = 1,
+  reminderConsent = 0,
+  reminderConsentOrigin = null,
 }) {
   if (!clientName || !clientName.trim()) {
     throw new Error('O nome do cliente é obrigatório.');
@@ -624,16 +625,19 @@ function bookAppointmentSync(userId, {
       }
     }
 
-    const finalConsent = reminderConsent !== undefined && reminderConsent !== null ? (reminderConsent ? 1 : 0) : 1;
+    const isConsentGiven = reminderConsent === 1 || reminderConsent === true || reminderConsent === '1' || reminderConsent === 'true';
+    const finalConsent = isConsentGiven ? 1 : 0;
+    const finalConsentAt = isConsentGiven ? new Date().toISOString() : null;
+    const finalConsentOrigin = isConsentGiven ? (reminderConsentOrigin || origin || 'painel') : null;
 
     const stmt = db.prepare(`
       INSERT INTO appointments (
         user_id, title, description, start_datetime, end_datetime,
         service_id, staff_id, price, client_name, client_phone,
         duration_min, origin, status, google_sync_status, whatsapp_notified,
-        reminder_24h_status, reminder_consent
+        reminder_24h_status, reminder_consent, reminder_consent_at, reminder_consent_origin
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, 'PENDING', ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, 'PENDING', ?, ?, ?)
     `);
 
     const info = stmt.run(
@@ -650,7 +654,9 @@ function bookAppointmentSync(userId, {
       finalDurationMin,
       origin,
       finalStatus,
-      finalConsent
+      finalConsent,
+      finalConsentAt,
+      finalConsentOrigin
     );
 
     const appointmentId = info.lastInsertRowid;
@@ -929,7 +935,7 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
           sent_at = CURRENT_TIMESTAMP
       WHERE appointment_id = ?
         AND event_type = 'REMINDER_24H'
-        AND status = 'PENDING'
+        AND status IN ('PENDING', 'PROCESSING')
     `).run(appointmentId);
 
     // Auditoria de remarcação sem transição falsa de status (previous_status == preservedStatus, new_status == preservedStatus)
@@ -1082,13 +1088,30 @@ function updateAppointmentStatus(appointmentId, userId, newStatus, reason = '', 
     throw err;
   }
 
+  const isTerminalOrCancelled = ['CANCELADO', 'CONCLUÍDO', 'NÃO COMPARECEU'].includes(cleanStatus);
+
   db.exec('BEGIN IMMEDIATE');
   try {
     db.prepare(`
       UPDATE appointments
-      SET status = ?, updated_at = CURRENT_TIMESTAMP
+      SET status = ?,
+          reminder_24h_status = CASE WHEN ? = 1 THEN 'CANCELLED' ELSE reminder_24h_status END,
+          updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND user_id = ?
-    `).run(cleanStatus, appointmentId, userId);
+    `).run(cleanStatus, isTerminalOrCancelled ? 1 : 0, appointmentId, userId);
+
+    if (isTerminalOrCancelled) {
+      db.prepare(`
+        UPDATE whatsapp_notification_outbox
+        SET status = 'CANCELLED',
+            locked_at = NULL,
+            last_error = 'Agendamento com status terminal: ' || ?,
+            sent_at = CURRENT_TIMESTAMP
+        WHERE appointment_id = ?
+          AND event_type = 'REMINDER_24H'
+          AND status IN ('PENDING', 'PROCESSING')
+      `).run(cleanStatus, appointmentId);
+    }
 
     db.prepare(`
       INSERT INTO appointment_status_history (appointment_id, user_id, previous_status, new_status, changed_by, reason)
@@ -1098,6 +1121,77 @@ function updateAppointmentStatus(appointmentId, userId, newStatus, reason = '', 
     db.exec('COMMIT');
 
     return { success: true, appointmentId, status: cleanStatus };
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    throw err;
+  }
+}
+
+/**
+ * Updates consent for 24h reminders on a specific appointment (LGPD)
+ */
+function updateAppointmentConsent(appointmentId, userId, consent, origin = 'painel', reason = '') {
+  const existing = db.prepare('SELECT * FROM appointments WHERE id = ? AND user_id = ?').get(appointmentId, userId);
+  if (!existing) {
+    const err = new Error('Agendamento não encontrado.');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+
+  const isConsentGiven = consent === 1 || consent === true || consent === '1' || consent === 'true';
+  const finalConsent = isConsentGiven ? 1 : 0;
+  const consentAt = isConsentGiven ? new Date().toISOString() : null;
+  const consentOrigin = isConsentGiven ? (origin || 'painel') : null;
+
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.prepare(`
+      UPDATE appointments
+      SET reminder_consent = ?,
+          reminder_consent_at = ?,
+          reminder_consent_origin = ?,
+          reminder_24h_status = CASE 
+            WHEN ? = 0 THEN 'CANCELLED'
+            WHEN ? = 1 AND reminder_24h_status = 'CANCELLED' THEN 'PENDING'
+            ELSE reminder_24h_status
+          END,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ?
+    `).run(finalConsent, consentAt, consentOrigin, finalConsent, finalConsent, appointmentId, userId);
+
+    if (finalConsent === 0) {
+      // Cancel pending reminders in outbox
+      db.prepare(`
+        UPDATE whatsapp_notification_outbox
+        SET status = 'CANCELLED',
+            locked_at = NULL,
+            last_error = 'Consentimento LGPD revogado pelo cliente/administrador',
+            sent_at = CURRENT_TIMESTAMP
+        WHERE appointment_id = ?
+          AND event_type = 'REMINDER_24H'
+          AND status IN ('PENDING', 'PROCESSING')
+      `).run(appointmentId);
+
+      // Record in suppression list
+      if (existing.client_phone) {
+        db.prepare(`
+          INSERT INTO salon_client_optouts (user_id, phone, reason)
+          VALUES (?, ?, ?)
+          ON CONFLICT(user_id, phone) DO UPDATE SET reason = excluded.reason
+        `).run(userId, existing.client_phone, reason || 'Consentimento revogado no agendamento');
+      }
+    } else {
+      // If re-consented, remove from suppression list if present
+      if (existing.client_phone) {
+        db.prepare(`
+          DELETE FROM salon_client_optouts
+          WHERE user_id = ? AND phone = ?
+        `).run(userId, existing.client_phone);
+      }
+    }
+
+    db.exec('COMMIT');
+    return { success: true, appointmentId, reminderConsent: finalConsent };
   } catch (err) {
     try { db.exec('ROLLBACK'); } catch (_) {}
     throw err;
@@ -1243,6 +1337,7 @@ module.exports = {
   rescheduleAppointment,
   cancelAppointment,
   updateAppointmentStatus,
+  updateAppointmentConsent,
   mapToPortugueseStatus,
   listAppointments,
   detectAndFlagHistoricalConflicts,

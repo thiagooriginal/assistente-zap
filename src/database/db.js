@@ -697,6 +697,20 @@ runVersionedMigration('20261105_01_session_mfa_verification_and_revocation', 'Ad
   `).run();
 });
 
+// Versioned migration: Enforce LGPD explicit consent default 0 and suppress legacy unverified reminders (Comando 023)
+runVersionedMigration('20261109_03_enforce_lgpd_reminder_consent', 'Enforce explicit consent for B2C appointment reminders and default 0', () => {
+  ensureColumnExists('appointments', 'reminder_consent', 'INTEGER DEFAULT 0');
+  ensureColumnExists('appointments', 'reminder_consent_at', 'TEXT');
+  ensureColumnExists('appointments', 'reminder_consent_origin', 'TEXT');
+
+  db.prepare(`
+    UPDATE appointments
+    SET reminder_consent = 0
+    WHERE reminder_consent_at IS NULL
+      AND reminder_consent_origin IS NULL
+  `).run();
+});
+
 // User columns for Client Authentication & Hotmart Subscriptions
 ensureColumnExists('users', 'session_token', 'TEXT');
 ensureColumnExists('users', 'session_expires_at', 'TEXT');
@@ -813,7 +827,9 @@ ensureColumnExists('appointments', 'google_sync_error', 'TEXT');
 ensureColumnExists('appointments', 'has_conflict', 'INTEGER DEFAULT 0');
 ensureColumnExists('appointments', 'whatsapp_notified', 'INTEGER DEFAULT 0');
 ensureColumnExists('appointments', 'reminder_24h_status', "TEXT DEFAULT 'PENDING'");
-ensureColumnExists('appointments', 'reminder_consent', 'INTEGER DEFAULT 1');
+ensureColumnExists('appointments', 'reminder_consent', 'INTEGER DEFAULT 0');
+ensureColumnExists('appointments', 'reminder_consent_at', 'TEXT');
+ensureColumnExists('appointments', 'reminder_consent_origin', 'TEXT');
 ensureColumnExists('appointments', 'updated_at', 'TEXT');
 
 ensureColumnExists('client_staff', 'google_calendar_id', 'TEXT');
@@ -892,6 +908,18 @@ try {
     CREATE INDEX IF NOT EXISTS idx_wa_outbox_status ON whatsapp_notification_outbox(status);
     CREATE INDEX IF NOT EXISTS idx_wa_outbox_apt ON whatsapp_notification_outbox(appointment_id);
     CREATE INDEX IF NOT EXISTS idx_appointments_reminder_24h ON appointments(reminder_24h_status, start_datetime);
+    CREATE INDEX IF NOT EXISTS idx_apt_reminder_scan ON appointments(user_id, status, reminder_consent, reminder_24h_status, start_datetime);
+
+    -- Suppression List for LGPD Client Opt-Outs (Proteção 23)
+    CREATE TABLE IF NOT EXISTS salon_client_optouts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      phone TEXT NOT NULL,
+      reason TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, phone)
+    );
+    CREATE INDEX IF NOT EXISTS idx_salon_client_optouts_lookup ON salon_client_optouts(user_id, phone);
 
     -- Appointment Lifecycle Audit History
     CREATE TABLE IF NOT EXISTS appointment_status_history (

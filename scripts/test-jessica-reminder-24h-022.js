@@ -140,6 +140,7 @@ async function runTests() {
       date: slot1.dateStr,
       time: slot1.timeStr,
       durationMin: 20,
+      reminderConsent: 1,
     });
 
     assert.strictEqual(apt1.status, 'AGENDADO');
@@ -177,6 +178,7 @@ async function runTests() {
       time: slot3.timeStr,
       durationMin: 20,
       staffId: 2,
+      reminderConsent: 1,
     });
 
     const queueRes3 = salonReminderService.checkAndQueue24hReminders({ now: nowRef, userId: userB });
@@ -203,6 +205,7 @@ async function runTests() {
       date: slot4.dateStr,
       time: slot4.timeStr,
       durationMin: 20,
+      reminderConsent: 1,
     });
 
     const queueRes4 = salonReminderService.checkAndQueue24hReminders({ now: nowRef, userId: userA });
@@ -285,6 +288,7 @@ async function runTests() {
       date: slot8.dateStr,
       time: slot8.timeStr,
       durationMin: 20,
+      reminderConsent: 1,
     });
 
     const queueRes8 = salonReminderService.checkAndQueue24hReminders({ now: nowRef, userId: userA });
@@ -323,6 +327,7 @@ async function runTests() {
       date: slot9.dateStr,
       time: slot9.timeStr,
       durationMin: 20,
+      reminderConsent: 1,
     });
 
     const queueRes9 = salonReminderService.checkAndQueue24hReminders({ now: nowRef, userId: userA });
@@ -363,6 +368,7 @@ async function runTests() {
       date: slot10.dateStr,
       time: slot10.timeStr,
       durationMin: 20,
+      reminderConsent: 1,
     });
 
     const queueRes10 = salonReminderService.checkAndQueue24hReminders({ now: nowRef, userId: userA });
@@ -396,6 +402,7 @@ async function runTests() {
       date: slot11.dateStr,
       time: slot11.timeStr,
       durationMin: 20,
+      reminderConsent: 1,
     });
 
     const queueRes11 = salonReminderService.checkAndQueue24hReminders({ now: nowRef, userId: userA });
@@ -440,6 +447,7 @@ async function runTests() {
       date: slot13.dateStr,
       time: slot13.timeStr,
       durationMin: 20,
+      reminderConsent: 1,
     });
 
     const firstQueue13 = salonReminderService.checkAndQueue24hReminders({ now: nowRef, userId: userA });
@@ -470,6 +478,7 @@ async function runTests() {
       date: slot14.dateStr,
       time: slot14.timeStr,
       durationMin: 20,
+      reminderConsent: 1,
     });
 
     const aptB = salonAppointmentService.bookAppointmentSync(userB, {
@@ -479,6 +488,7 @@ async function runTests() {
       date: slot14.dateStr,
       time: slot14.timeStr,
       durationMin: 20,
+      reminderConsent: 1,
     });
 
     const queueResA = salonReminderService.checkAndQueue24hReminders({ now: nowRef, userId: userA });

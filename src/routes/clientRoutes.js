@@ -1325,6 +1325,8 @@ router.post('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA
       durationMin: rawDuration,
       origin: req.body?.origin || 'painel',
       status: req.body?.status || 'AGENDADO',
+      reminderConsent: req.body?.reminderConsent ?? req.body?.reminder_consent,
+      reminderConsentOrigin: req.body?.reminderConsentOrigin || req.body?.reminder_consent_origin || req.body?.origin || 'painel',
     });
 
     res.json({
@@ -1415,6 +1417,34 @@ router.patch('/appointments/:id/status', clientAuthMiddleware, requireProductAcc
   } catch (err) {
     const statusCode = err.code === 'NOT_FOUND' ? 404 : 400;
     res.status(statusCode).json({ success: false, code: err.code || 'INVALID_STATUS', error: err.message });
+  }
+});
+
+router.patch('/appointments/:id/consent', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  try {
+    const { id } = req.params;
+    const consentVal = req.body?.consent !== undefined ? req.body.consent : req.body?.reminderConsent;
+    const origin = req.body?.origin || req.body?.reminderConsentOrigin || 'painel';
+    const reason = req.body?.reason || 'Alteração manual de consentimento';
+    const result = salonAppointmentService.updateAppointmentConsent(id, req.clientUser.id, consentVal, origin, reason);
+    res.json({ success: true, ...result, message: `Consentimento atualizado para ${result.reminderConsent ? 'ATIVO' : 'REVOGADO'}` });
+  } catch (err) {
+    const statusCode = err.code === 'NOT_FOUND' ? 404 : 400;
+    res.status(statusCode).json({ success: false, code: err.code || 'CONSENT_ERROR', error: err.message });
+  }
+});
+
+router.post('/clients/opt-out', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  try {
+    const { phone, reason } = req.body || {};
+    if (!phone) {
+      return res.status(400).json({ success: false, error: 'O telefone é obrigatório para registrar opt-out.' });
+    }
+    const salonReminderService = require('../services/salonReminderService');
+    const result = salonReminderService.revokeClientConsent(req.clientUser.id, phone, reason || 'Opt-out via API');
+    res.json({ success: true, ...result, message: 'Opt-out registrado com sucesso e lembretes futuros cancelados.' });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
   }
 });
 

@@ -156,11 +156,15 @@ function checkAndQueue24hReminders({ now = Date.now(), userId = null } = {}) {
     JOIN client_salons sal ON a.user_id = sal.user_id
     LEFT JOIN client_services cs ON a.service_id = cs.id
     LEFT JOIN client_staff st ON a.staff_id = st.id
-    WHERE (a.reminder_24h_status = 'PENDING' OR a.reminder_24h_status IS NULL)
+    WHERE (a.reminder_24h_status IN ('PENDING', 'QUEUED') OR a.reminder_24h_status IS NULL)
       AND a.status IN ('AGENDADO', 'CONFIRMADO', 'SCHEDULED', 'CONFIRMED')
-      AND COALESCE(a.reminder_consent, 1) = 1
+      AND a.reminder_consent = 1
       AND sal.b2c_reminders_enabled = 1
       AND a.client_phone IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM salon_client_optouts o
+        WHERE o.user_id = a.user_id AND (o.phone = a.client_phone OR o.phone = ('55' || a.client_phone))
+      )
   `;
   const params = [];
 
@@ -228,20 +232,33 @@ function checkAndQueue24hReminders({ now = Date.now(), userId = null } = {}) {
     const rawSignature = `${apt.user_id}:${apt.appointment_id}:REMINDER_24H:${cleanPhone}:${apt.start_datetime}`;
     const dedupHash = crypto.createHash('sha256').update(rawSignature).digest('hex');
 
-    // Check if an outbox record with this dedupHash already exists or active
+    // 1. Invalida lembretes pendentes obsoletos para este mesmo agendamento que tenham dedupHash diferente (remarcações)
+    db.prepare(`
+      UPDATE whatsapp_notification_outbox
+      SET status = 'CANCELLED',
+          last_error = 'Obsoleto: horário do agendamento alterado',
+          locked_at = NULL,
+          sent_at = CURRENT_TIMESTAMP
+      WHERE appointment_id = ?
+        AND event_type = 'REMINDER_24H'
+        AND dedup_hash != ?
+        AND status IN ('PENDING', 'PROCESSING')
+    `).run(apt.appointment_id, dedupHash);
+
+    // 2. Checa se já existe registro com este dedupHash exato (mesmo cliente, salão e horário)
     const existing = db.prepare(`
       SELECT id, status FROM whatsapp_notification_outbox
-      WHERE (dedup_hash = ? OR (appointment_id = ? AND event_type = 'REMINDER_24H'))
+      WHERE dedup_hash = ?
         AND status IN ('PENDING', 'PROCESSING', 'SENT', 'SIMULATED', 'DEDUPLICATED')
       ORDER BY id DESC LIMIT 1
-    `).get(dedupHash, apt.appointment_id);
+    `).get(dedupHash);
 
     if (existing) {
       results.push({ appointmentId: apt.appointment_id, status: 'DEDUPLICATED', outboxId: existing.id });
       continue;
     }
 
-    // Insert into Transactional Outbox
+    // 3. Insere na Transactional Outbox
     const info = db.prepare(`
       INSERT INTO whatsapp_notification_outbox (
         user_id, appointment_id, event_type, recipient_phone, message_text, dedup_hash, status
@@ -249,6 +266,13 @@ function checkAndQueue24hReminders({ now = Date.now(), userId = null } = {}) {
     `).run(apt.user_id, apt.appointment_id, cleanPhone, messageText, dedupHash);
 
     const outboxId = info.lastInsertRowid;
+
+    // Atualiza status do lembrete na tabela appointments
+    db.prepare(`
+      UPDATE appointments
+      SET reminder_24h_status = 'QUEUED', updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(apt.appointment_id);
 
     // Trigger immediate outbox dispatch (asynchronous, non-blocking)
     try {
@@ -269,12 +293,18 @@ function checkAndQueue24hReminders({ now = Date.now(), userId = null } = {}) {
 
 /**
  * Starts the periodic background daemon for Jéssica 24h reminders.
- * Runs checkAndQueue24hReminders every intervalMs (defaults to 60s).
+ * Runs checkAndQueue24hReminders every intervalMs (defaults to 60s or process.env.SALON_REMINDER_INTERVAL_MS).
+ * Guarantees a singleton instance and unrefs the timer so the Node process can terminate cleanly.
  */
-function startSalonReminderDaemon(intervalMs = 60000) {
-  if (reminderDaemonInterval) clearInterval(reminderDaemonInterval);
+function startSalonReminderDaemon(intervalMs) {
+  const configuredInterval = Number(intervalMs) || Number(process.env.SALON_REMINDER_INTERVAL_MS) || 60000;
 
-  console.log(`⏰ [Jéssica Reminders] Daemon de lembretes B2C ativo (verificação a cada ${intervalMs / 1000}s).`);
+  if (reminderDaemonInterval) {
+    console.log(`ℹ️ [Jéssica Reminders] Daemon de lembretes B2C já em execução ativa.`);
+    return reminderDaemonInterval;
+  }
+
+  console.log(`⏰ [Jéssica Reminders] Daemon de lembretes B2C ativo (verificação a cada ${configuredInterval / 1000}s).`);
 
   // Run initial check
   try {
@@ -289,7 +319,13 @@ function startSalonReminderDaemon(intervalMs = 60000) {
     } catch (err) {
       console.error('[Jéssica Reminders] Erro no ciclo periódico de lembretes:', err.message);
     }
-  }, intervalMs);
+  }, configuredInterval);
+
+  if (reminderDaemonInterval && typeof reminderDaemonInterval.unref === 'function') {
+    reminderDaemonInterval.unref();
+  }
+
+  return reminderDaemonInterval;
 }
 
 /**
@@ -299,6 +335,113 @@ function stopSalonReminderDaemon() {
   if (reminderDaemonInterval) {
     clearInterval(reminderDaemonInterval);
     reminderDaemonInterval = null;
+    console.log('🛑 [Jéssica Reminders] Daemon de lembretes B2C finalizado com sucesso.');
+  }
+}
+
+/**
+ * Registers an opt-out in the suppression list and cancels upcoming reminders for that client (LGPD)
+ * 
+ * @param {number} userId 
+ * @param {string} clientPhone 
+ * @param {string} [reason]
+ */
+function revokeClientConsent(userId, clientPhone, reason = 'Opt-out solicitado pelo cliente') {
+  if (!userId || !clientPhone) {
+    throw new Error('userId e clientPhone são obrigatórios para revogar consentimento.');
+  }
+
+  const cleanPhone = normalizePhone(clientPhone);
+  if (!cleanPhone) {
+    throw new Error('Telefone inválido para revogação de consentimento.');
+  }
+
+  try {
+    db.exec('BEGIN IMMEDIATE');
+
+    // 1. Inserir na tabela de supressão salon_client_optouts
+    db.prepare(`
+      INSERT INTO salon_client_optouts (user_id, phone, reason)
+      VALUES (?, ?, ?)
+      ON CONFLICT(user_id, phone) DO UPDATE SET reason = excluded.reason, created_at = CURRENT_TIMESTAMP
+    `).run(userId, cleanPhone, reason);
+
+    // 2. Atualizar agendamentos futuros não concluídos para consent = 0 e reminder_24h_status = 'CANCELLED'
+    db.prepare(`
+      UPDATE appointments
+      SET reminder_consent = 0,
+          reminder_24h_status = 'CANCELLED',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ?
+        AND (client_phone = ? OR client_phone = ?)
+        AND status IN ('AGENDADO', 'CONFIRMADO', 'SCHEDULED', 'CONFIRMED')
+    `).run(userId, clientPhone, cleanPhone);
+
+    // 3. Cancelar itens pendentes na Outbox
+    db.prepare(`
+      UPDATE whatsapp_notification_outbox
+      SET status = 'CANCELLED',
+          locked_at = NULL,
+          last_error = 'Opt-out LGPD: consentimento revogado pelo cliente',
+          sent_at = CURRENT_TIMESTAMP
+      WHERE user_id = ?
+        AND (recipient_phone = ? OR recipient_phone = ?)
+        AND event_type = 'REMINDER_24H'
+        AND status IN ('PENDING', 'PROCESSING')
+    `).run(userId, clientPhone, cleanPhone);
+
+    db.exec('COMMIT');
+    return { success: true, userId, phone: cleanPhone, revoked: true };
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    throw err;
+  }
+}
+
+/**
+ * Registers consent and removes phone from suppression list if present
+ * 
+ * @param {number} userId 
+ * @param {string} clientPhone 
+ * @param {string} [origin]
+ */
+function registerClientConsent(userId, clientPhone, origin = 'painel') {
+  if (!userId || !clientPhone) {
+    throw new Error('userId e clientPhone são obrigatórios para registrar consentimento.');
+  }
+
+  const cleanPhone = normalizePhone(clientPhone);
+  if (!cleanPhone) {
+    throw new Error('Telefone inválido para registro de consentimento.');
+  }
+
+  try {
+    db.exec('BEGIN IMMEDIATE');
+
+    // Remover da lista de supressão se existir
+    db.prepare(`
+      DELETE FROM salon_client_optouts
+      WHERE user_id = ? AND (phone = ? OR phone = ?)
+    `).run(userId, clientPhone, cleanPhone);
+
+    // Atualizar agendamentos futuros com consent = 1
+    db.prepare(`
+      UPDATE appointments
+      SET reminder_consent = 1,
+          reminder_consent_at = CURRENT_TIMESTAMP,
+          reminder_consent_origin = ?,
+          reminder_24h_status = CASE WHEN reminder_24h_status = 'CANCELLED' THEN 'PENDING' ELSE reminder_24h_status END,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ?
+        AND (client_phone = ? OR client_phone = ?)
+        AND status IN ('AGENDADO', 'CONFIRMADO', 'SCHEDULED', 'CONFIRMED')
+    `).run(origin, userId, clientPhone, cleanPhone);
+
+    db.exec('COMMIT');
+    return { success: true, userId, phone: cleanPhone, consented: true };
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    throw err;
   }
 }
 
@@ -311,4 +454,6 @@ module.exports = {
   checkAndQueue24hReminders,
   startSalonReminderDaemon,
   stopSalonReminderDaemon,
+  revokeClientConsent,
+  registerClientConsent,
 };

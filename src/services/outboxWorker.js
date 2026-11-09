@@ -342,6 +342,85 @@ async function _processSingleWhatsAppItem(item) {
       }
     }
 
+    // 1.5. Pre-Flight Guard para Lembretes B2C (REMINDER_24H)
+    // Validação fail-closed antes de qualquer disparo de rede ou simulação:
+    // Reavalia estado real do agendamento, consentimento LGPD, opt-out do cliente,
+    // status ativo e correspondência temporal (contra remarcações concorrentes).
+    if (item.event_type === 'REMINDER_24H' && item.appointment_id) {
+      const apt = db.prepare(`
+        SELECT a.*, sal.b2c_reminders_enabled
+        FROM appointments a
+        JOIN client_salons sal ON a.user_id = sal.user_id
+        WHERE a.id = ?
+      `).get(item.appointment_id);
+
+      if (!apt) {
+        db.prepare(`
+          UPDATE whatsapp_notification_outbox
+          SET status = 'CANCELLED', last_error = 'Pre-flight: Agendamento não encontrado no banco de dados', locked_at = NULL, sent_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(item.id);
+        return { success: true, skipped: true, preflightFailed: true, status: 'CANCELLED', reason: 'APPOINTMENT_NOT_FOUND' };
+      }
+
+      if (apt.b2c_reminders_enabled !== 1) {
+        db.prepare(`
+          UPDATE whatsapp_notification_outbox
+          SET status = 'CANCELLED', last_error = 'Pre-flight: Lembretes B2C desativados nas configurações do salão', locked_at = NULL, sent_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(item.id);
+        return { success: true, skipped: true, preflightFailed: true, status: 'CANCELLED', reason: 'REMINDERS_DISABLED' };
+      }
+
+      if (apt.reminder_consent !== 1) {
+        db.prepare(`
+          UPDATE whatsapp_notification_outbox
+          SET status = 'CANCELLED', last_error = 'Pre-flight: Consentimento LGPD revogado ou ausente', locked_at = NULL, sent_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(item.id);
+        return { success: true, skipped: true, preflightFailed: true, status: 'CANCELLED', reason: 'CONSENT_REVOKED' };
+      }
+
+      // Supressão: checar lista de opt-out
+      const optout = db.prepare(`
+        SELECT id FROM salon_client_optouts
+        WHERE user_id = ? AND (phone = ? OR phone = ('55' || ?))
+        LIMIT 1
+      `).get(apt.user_id, item.recipient_phone, item.recipient_phone.replace(/^55/, ''));
+      if (optout) {
+        db.prepare(`
+          UPDATE whatsapp_notification_outbox
+          SET status = 'CANCELLED', last_error = 'Pre-flight: Cliente cadastrado na lista de supressão (opt-out)', locked_at = NULL, sent_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(item.id);
+        return { success: true, skipped: true, preflightFailed: true, status: 'CANCELLED', reason: 'CLIENT_OPTOUT' };
+      }
+
+      const activeStatuses = ['AGENDADO', 'CONFIRMADO', 'SCHEDULED', 'CONFIRMED'];
+      if (!activeStatuses.includes(apt.status)) {
+        db.prepare(`
+          UPDATE whatsapp_notification_outbox
+          SET status = 'CANCELLED', last_error = 'Pre-flight: Agendamento inativo ou cancelado (' || ? || ')', locked_at = NULL, sent_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(apt.status, item.id);
+        return { success: true, skipped: true, preflightFailed: true, status: 'CANCELLED', reason: 'INACTIVE_STATUS' };
+      }
+
+      // Checar se o horário ainda é o mesmo do lembrete (caso tenha sido remarcado)
+      if (item.dedup_hash) {
+        const expectedSignature = `${apt.user_id}:${apt.id}:REMINDER_24H:${item.recipient_phone}:${apt.start_datetime}`;
+        const expectedHash = crypto.createHash('sha256').update(expectedSignature).digest('hex');
+        if (item.dedup_hash !== expectedHash) {
+          db.prepare(`
+            UPDATE whatsapp_notification_outbox
+            SET status = 'CANCELLED', last_error = 'Pre-flight: Horário do agendamento alterado após criação do lembrete', locked_at = NULL, sent_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(item.id);
+          return { success: true, skipped: true, preflightFailed: true, status: 'CANCELLED', reason: 'SCHEDULE_ALTERED' };
+        }
+      }
+    }
+
     // 2. Disparo via Camada Final de Transporte do WhatsApp
     // O cliente whatsappClient.sendWhatsAppMessage gerencia centralizadamente o Hard Staging Lock
     if (!whatsappClient || typeof whatsappClient.sendWhatsAppMessage !== 'function') {
