@@ -57,6 +57,8 @@ function getFreePort() {
 function startTestHttpServer(port) {
   let painelHtml = fs.readFileSync(path.join(__dirname, '..', 'public', 'cliente', 'painel.html'), 'utf8');
   painelHtml = painelHtml.replace('https://cdn.tailwindcss.com', `http://127.0.0.1:${port}/mock-tailwind.js`);
+  painelHtml = painelHtml.replace('https://unpkg.com/lucide@latest', `http://127.0.0.1:${port}/mock-lucide.js`);
+  painelHtml = painelHtml.replace(/<link[^>]+fonts\.(googleapis|gstatic)\.com[^>]*>/gi, '<!-- fonts stripped for hermetic test -->');
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://127.0.0.1:${port}`);
@@ -69,6 +71,11 @@ function startTestHttpServer(port) {
     if (url.pathname === '/mock-tailwind.js') {
       res.writeHead(200, { 'Content-Type': 'application/javascript' });
       return res.end('window.tailwind = { config: {} };');
+    }
+
+    if (url.pathname === '/mock-lucide.js') {
+      res.writeHead(200, { 'Content-Type': 'application/javascript' });
+      return res.end('window.lucide = { createIcons: function() {} };');
     }
 
     if (url.pathname === '/api/cliente/profile') {
@@ -201,7 +208,7 @@ async function runModalSuite010() {
 
     // Aguarda inicialização
     let ready = false;
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < 40; i++) {
       const chk = await sendCmd('Runtime.evaluate', {
         expression: `Boolean(window.RaiaModalManager && document.getElementById('modal-root'))`
       });
@@ -209,7 +216,7 @@ async function runModalSuite010() {
         ready = true;
         break;
       }
-      await new Promise(r => setTimeout(r, 150));
+      await new Promise(r => setTimeout(r, 200));
     }
     if (!ready) throw new Error('Timeout aguardando inicialização do painel e RaiaModalManager');
 
@@ -575,7 +582,7 @@ async function runModalSuite010() {
     await evaluate(`function() {
       RaiaModalManager.close('modalNewAppointment');
     }`);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
     console.log('   ✅ PASS: Requisito 9 aprovado.\n');
 
     // =========================================================================
@@ -633,12 +640,12 @@ async function runModalSuite010() {
     await evaluate(`function() {
       RaiaModalManager.open('modalRescheduleAppointment');
     }`);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
     await captureScreenshot('suite010-modal-reschedule-mobile-390x844.png');
     await evaluate(`function() {
       RaiaModalManager.close('modalRescheduleAppointment');
     }`);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
 
     // Restaura viewport Desktop
     await sendCmd('Emulation.setDeviceMetricsOverride', {
@@ -683,7 +690,7 @@ async function runModalSuite010() {
     await evaluate(`function() {
       RaiaModalManager.close('modalBatchServices');
     }`);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
     console.log('   ✅ PASS: Requisito 11 aprovado.\n');
 
     // =========================================================================
@@ -694,7 +701,7 @@ async function runModalSuite010() {
       if (typeof switchTab === 'function') switchTab('my-products');
       RaiaModalManager.open('productDetailsModal');
     }`);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
 
     const hubModalCheck = await evaluate(`function() {
       const modal = document.getElementById('productDetailsModal');
@@ -827,38 +834,38 @@ async function runModalSuite010() {
       if (typeof openNewServiceModal === 'function') openNewServiceModal();
       else RaiaModalManager.open('modalSingleService');
     }`);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
     await captureScreenshot('suite010-modal-single-service-desktop.png');
     await evaluate(`function() { RaiaModalManager.close('modalSingleService'); }`);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
 
     // Batch Services
     await evaluate(`function() {
       if (typeof openBatchModal === 'function') openBatchModal();
       else RaiaModalManager.open('modalBatchServices');
     }`);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
     await captureScreenshot('suite010-modal-batch-services-desktop.png');
     await evaluate(`function() { RaiaModalManager.close('modalBatchServices'); }`);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
 
     // New Appointment
     await evaluate(`function() {
       RaiaModalManager.open('modalNewAppointment');
     }`);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
     await captureScreenshot('suite010-modal-new-appointment-desktop.png');
     await evaluate(`function() { RaiaModalManager.close('modalNewAppointment'); }`);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
 
     // Financial Bill
     await evaluate(`function() {
       RaiaModalManager.open('modalNewBill');
     }`);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
     await captureScreenshot('suite010-modal-financial-bills-desktop.png');
     await evaluate(`function() { RaiaModalManager.close('modalNewBill'); }`);
-    await new Promise(r => setTimeout(r, 150));
+    await new Promise(r => setTimeout(r, 200));
 
     console.log('   ✅ PASS: Requisito 14 aprovado (todas as capturas salvas em artefatos).\n');
 

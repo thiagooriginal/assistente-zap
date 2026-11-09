@@ -781,6 +781,47 @@
       box-shadow: 0 25px 60px -15px rgba(78, 59, 49, 0.22) !important;
     }
 
+    /* Discard Confirmation Modal (Prompt 011) */
+    #modalDiscardConfirm {
+      z-index: 100050 !important;
+    }
+    #modalDiscardConfirm.hidden {
+      display: none !important;
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+    #modalDiscardConfirm:not(.hidden) {
+      display: flex !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      pointer-events: auto !important;
+    }
+    body.dark #modalDiscardConfirm .raia-modal-card,
+    body.theme-raia #modalDiscardConfirm .raia-modal-card {
+      background-color: #11131a !important;
+      border-color: rgba(255, 255, 255, 0.1) !important;
+      color: #f1f5f9 !important;
+      box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.7) !important;
+    }
+    body.dark #modalDiscardConfirm h3,
+    body.theme-raia #modalDiscardConfirm h3 {
+      color: #f1f5f9 !important;
+    }
+    body.dark #modalDiscardConfirm p,
+    body.theme-raia #modalDiscardConfirm p,
+    body.dark #modalDiscardConfirm .leading-relaxed,
+    body.theme-raia #modalDiscardConfirm .leading-relaxed {
+      color: #94a3b8 !important;
+      background-color: rgba(255, 255, 255, 0.04) !important;
+      border-color: rgba(255, 255, 255, 0.08) !important;
+    }
+    body.dark #modalDiscardConfirm #btnDiscardStay,
+    body.theme-raia #modalDiscardConfirm #btnDiscardStay {
+      background-color: rgba(255, 255, 255, 0.05) !important;
+      border-color: rgba(255, 255, 255, 0.1) !important;
+      color: #f1f5f9 !important;
+    }
     /* Institutional Dark Modal for HUB Central */
     #productDetailsModal .raia-modal-card,
     #productDetailsModal > div {
@@ -3748,6 +3789,32 @@
       </div>
     </div>
 
+    <!-- Modal: Confirmação de Descarte de Alterações Não Salvas (Prompt 011) -->
+    <div id="modalDiscardConfirm" class="raia-modal-overlay hidden fixed inset-0 z-[100050] items-center justify-center p-3 sm:p-4 md:p-6 select-none" role="dialog" aria-modal="true" aria-labelledby="discardConfirmTitle">
+      <div class="raia-modal-card bg-[#FFFDFB] border border-[#E6D6CA] rounded-2xl md:rounded-3xl w-full max-w-md p-5 sm:p-6 space-y-4 text-xs shadow-2xl shadow-[#4E3B31]/10 text-[#4E3B31] my-auto">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-[#FAF0E7] text-[#AD7B42] flex items-center justify-center shrink-0 border border-[#E6D6CA]">
+            <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 id="discardConfirmTitle" class="text-sm md:text-base font-bold text-[#4E3B31]">Descartar alterações?</h3>
+            <p class="text-xs text-[#7A6255] mt-0.5">As informações preenchidas não foram salvas e serão perdidas.</p>
+          </div>
+        </div>
+        <div class="p-3.5 rounded-xl bg-[#F7EFE7] border border-[#E6D6CA] text-xs text-[#7A6255] leading-relaxed">
+          Você tem dados alterados neste formulário. Deseja realmente sair e descartar as alterações realizadas?
+        </div>
+        <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-[#E6D6CA]">
+          <button type="button" id="btnDiscardStay" class="px-4 py-2.5 rounded-xl border border-[#E6D6CA] bg-white text-[#4E3B31] font-semibold text-xs hover:bg-[#F3E6DB] transition-colors focus:outline-none focus:ring-2 focus:ring-[#C89B6D]/30 cursor-pointer">
+            Continuar Editando
+          </button>
+          <button type="button" id="btnDiscardConfirm" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-bold text-xs shadow-md shadow-amber-600/20 transition-all focus:outline-none focus:ring-2 focus:ring-amber-500/40 cursor-pointer">
+            Descartar Alterações
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
 
@@ -3769,12 +3836,37 @@
     lucide.createIcons();
 
     // ========================================================
-    // RAIA MODAL MANAGER (PROMPT 010 — PADRONIZAÇÃO PREMIUM)
+    // RAIA MODAL MANAGER (PROMPTS 010 & 011 — RESILIÊNCIA E PROTEÇÃO DE DADOS)
     // ========================================================
     window.RaiaModalManager = (function() {
       const openModalsStack = [];
+      const modalStateMap = new Map();
       let isMouseDownOnBackdrop = false;
       let activeMouseDownOverlay = null;
+      let isTouchOnBackdrop = false;
+      let activeTouchOverlay = null;
+      let pendingDiscardTarget = null;
+
+      const EXEMPT_MODALS = [
+        "modalDeleteConfirm",
+        "modalCancelAppointment",
+        "modalHistoricalConflicts",
+        "productDetailsModal",
+        "modalDiscardConfirm"
+      ];
+
+      function getModalState(modalId) {
+        if (!modalStateMap.has(modalId)) {
+          modalStateMap.set(modalId, {
+            closeTimer: null,
+            focusTimer: null,
+            sessionToken: 0,
+            isClosing: false,
+            isOpen: false
+          });
+        }
+        return modalStateMap.get(modalId);
+      }
 
       function getFocusableElements(modal) {
         if (!modal) return [];
@@ -3806,6 +3898,11 @@
         if (!modal) return;
         const focusables = getFocusableElements(modal);
         if (focusables.length === 0) return;
+        // In discard confirm modal, stay on safe "Continuar Editando" button
+        if (modal.id === "modalDiscardConfirm") {
+          const stayBtn = modal.querySelector("#btnDiscardStay");
+          if (stayBtn) { try { stayBtn.focus(); return; } catch (_) {} }
+        }
         // Prioritize first visible text input or select, else close button or first focusable
         const inputToFocus = focusables.find(el => (
           (el.tagName === 'INPUT' && el.type !== 'hidden' && el.type !== 'radio' && el.type !== 'checkbox') ||
@@ -3820,9 +3917,97 @@
         } catch (_) {}
       }
 
+      function captureModalFormSnapshot(modal) {
+        if (!modal) return null;
+        const elements = modal.querySelectorAll('input, select, textarea');
+        const snapshot = {};
+        elements.forEach((el, index) => {
+          if (el.dataset.ignoreDirty === 'true' || el.classList.contains('no-dirty-check')) return;
+          const key = el.id || (el.type === 'radio' ? el.name + '_' + el.value : el.name) || `el_${index}`;
+          if (el.type === 'checkbox' || el.type === 'radio') {
+            snapshot[key] = el.checked;
+          } else {
+            snapshot[key] = el.value !== undefined ? el.value : '';
+          }
+        });
+        return snapshot;
+      }
+
+      function takeSnapshot(modalId) {
+        const modal = typeof modalId === 'string' ? document.getElementById(modalId) : modalId;
+        if (!modal || EXEMPT_MODALS.includes(modal.id)) return;
+        modal._cleanSnapshot = captureModalFormSnapshot(modal);
+        modal._isFormClean = false;
+      }
+
+      function markClean(modalId) {
+        const modal = typeof modalId === 'string' ? document.getElementById(modalId) : modalId;
+        if (!modal) return;
+        modal._isFormClean = true;
+        modal._cleanSnapshot = captureModalFormSnapshot(modal);
+      }
+
+      function isModalDirty(modalId) {
+        const modal = typeof modalId === 'string' ? document.getElementById(modalId) : modalId;
+        if (!modal || EXEMPT_MODALS.includes(modal.id)) return false;
+        if (modal._isFormClean === true) return false;
+
+        // Special case for Batch Services: selected procedures
+        if (modal.id === 'modalBatchServices' && window.batchSelectedMap && window.batchSelectedMap.size > 0) {
+          return true;
+        }
+
+        if (!modal._cleanSnapshot) return false;
+
+        const elements = modal.querySelectorAll('input, select, textarea');
+        for (let i = 0; i < elements.length; i++) {
+          const el = elements[i];
+          if (el.dataset.ignoreDirty === 'true' || el.classList.contains('no-dirty-check')) continue;
+          const key = el.id || (el.type === 'radio' ? el.name + '_' + el.value : el.name) || `el_${i}`;
+          if (!Object.prototype.hasOwnProperty.call(modal._cleanSnapshot, key)) continue;
+
+          const initialVal = modal._cleanSnapshot[key];
+          if (el.type === 'checkbox' || el.type === 'radio') {
+            if (el.checked !== initialVal) return true;
+          } else {
+            const currentVal = el.value !== undefined ? el.value : '';
+            if (String(currentVal).trim() !== String(initialVal).trim()) {
+              return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      function promptDiscardConfirmation(targetModal) {
+        if (!targetModal) return;
+        pendingDiscardTarget = targetModal.id;
+        openModal('modalDiscardConfirm', document.activeElement);
+      }
+
       function openModal(modalId, triggerEl) {
         const modal = typeof modalId === 'string' ? document.getElementById(modalId) : modalId;
         if (!modal) return;
+
+        const state = getModalState(modal.id);
+
+        // 1. Cancel any pending close timer for this modal
+        if (state.closeTimer) {
+          clearTimeout(state.closeTimer);
+          state.closeTimer = null;
+        }
+        state.isClosing = false;
+
+        // 2. Cancel any pending initial focus timer for this modal
+        if (state.focusTimer) {
+          clearTimeout(state.focusTimer);
+          state.focusTimer = null;
+        }
+
+        // 3. Increment session token to invalidate any stale callbacks
+        state.sessionToken++;
+        const currentSession = state.sessionToken;
+        state.isOpen = true;
 
         // Remember trigger for returning focus upon close
         if (triggerEl && typeof triggerEl.focus === 'function') {
@@ -3853,14 +4038,37 @@
 
         // Trigger entrance animation via CSS transition
         requestAnimationFrame(() => {
-          modal.classList.add('raia-modal-active');
+          if (state.sessionToken === currentSession && state.isOpen) {
+            modal.classList.add('raia-modal-active');
+          }
         });
 
         updateBodyScrollLock();
 
-        // Initial focus
-        setTimeout(() => {
-          setInitialFocus(modal);
+        // Baseline snapshot for dirty form protection
+        if (!EXEMPT_MODALS.includes(modal.id)) {
+          modal._userInteracted = false;
+          takeSnapshot(modal);
+          // Retake snapshot after async populate tick if user hasn't interacted
+          setTimeout(() => {
+            if (state.sessionToken === currentSession && state.isOpen && !modal._userInteracted) {
+              takeSnapshot(modal);
+            }
+          }, 120);
+
+          if (!modal._dirtyListenersAttached) {
+            modal._dirtyListenersAttached = true;
+            modal.addEventListener('input', () => { modal._userInteracted = true; }, { passive: true });
+            modal.addEventListener('change', () => { modal._userInteracted = true; }, { passive: true });
+          }
+        }
+
+        // Initial focus with safe session checking
+        state.focusTimer = setTimeout(() => {
+          state.focusTimer = null;
+          if (state.sessionToken === currentSession && state.isOpen && !state.isClosing) {
+            setInitialFocus(modal);
+          }
         }, 50);
 
         // Re-render Lucide icons if any
@@ -3869,11 +4077,40 @@
         }
       }
 
-      function closeModal(modalId) {
+      function closeModal(modalId, force = false) {
         const modal = typeof modalId === 'string' ? document.getElementById(modalId) : modalId;
         if (!modal) return;
 
-        // Remove from stack
+        const state = getModalState(modal.id);
+
+        // If already fully hidden and not currently in closing process, ignore
+        if (modal.classList.contains('hidden') && !state.isOpen && !state.isClosing) {
+          return;
+        }
+
+        // If already undergoing closing for the active session, ignore duplicate close call
+        if (state.isClosing && !state.isOpen) {
+          return;
+        }
+
+        // Dirty form protection check (unless forced or exempt or self-closing confirmation)
+        if (!force && modal.id !== 'modalDiscardConfirm' && isModalDirty(modal)) {
+          promptDiscardConfirmation(modal);
+          return;
+        }
+
+        // Cancel any pending focus timer on this modal
+        if (state.focusTimer) {
+          clearTimeout(state.focusTimer);
+          state.focusTimer = null;
+        }
+
+        // Mark as closing
+        state.isClosing = true;
+        state.isOpen = false;
+        const closeSession = state.sessionToken;
+
+        // Remove from stack immediately so top modal reflects current active dialog
         const idx = openModalsStack.indexOf(modal.id);
         if (idx !== -1) {
           openModalsStack.splice(idx, 1);
@@ -3886,10 +4123,26 @@
         const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         const delay = prefersReduced ? 0 : 150;
 
-        setTimeout(() => {
+        if (state.closeTimer) {
+          clearTimeout(state.closeTimer);
+          state.closeTimer = null;
+        }
+
+        state.closeTimer = setTimeout(() => {
+          state.closeTimer = null;
+
+          // CRITICAL RACE CONDITION GUARD:
+          // If modal was reopened in the meantime, sessionToken changed or isOpen is true!
+          // Abort immediately without hiding the reopened modal!
+          if (state.sessionToken !== closeSession || state.isOpen) {
+            return;
+          }
+
+          state.isClosing = false;
           modal.classList.add('hidden');
           modal.classList.remove('flex');
-          modal.style.removeProperty('z-index'); modal.style.zIndex = '';
+          modal.style.removeProperty('z-index');
+          modal.style.zIndex = '';
 
           // Close any open popovers inside this modal
           const innerPopovers = modal.querySelectorAll('#rescheduleTimeDropdown, #aptTimeDropdown, #aptBeautyCalendarPopover, #rescheduleBeautyCalendarPopover, #catalogSuggestionsDropdown');
@@ -3945,7 +4198,16 @@
             return;
           }
 
-          // Close the topmost modal
+          // If top modal is the discard confirmation itself, cancel discard safely
+          if (topModal.id === 'modalDiscardConfirm') {
+            e.preventDefault();
+            e.stopPropagation();
+            closeModal('modalDiscardConfirm', true);
+            pendingDiscardTarget = null;
+            return;
+          }
+
+          // Close the topmost modal (protected by dirty check)
           e.preventDefault();
           e.stopPropagation();
           closeModal(topModal.id);
@@ -3989,15 +4251,82 @@
 
       document.addEventListener('click', function(e) {
         if (isMouseDownOnBackdrop && e.target === activeMouseDownOverlay && e.target.classList && e.target.classList.contains('raia-modal-overlay')) {
-          // Make sure clicks on internal cards don't close
           const topModal = getTopModal();
           if (topModal && topModal === e.target) {
-            closeModal(topModal.id);
+            if (topModal.id === 'modalDiscardConfirm') {
+              closeModal('modalDiscardConfirm', true);
+              pendingDiscardTarget = null;
+            } else {
+              closeModal(topModal.id);
+            }
           }
         }
         isMouseDownOnBackdrop = false;
         activeMouseDownOverlay = null;
       });
+
+      // Mobile Touch Backdrop Dismiss with tap vs scroll discrimination
+      document.addEventListener('touchstart', function(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('raia-modal-overlay')) {
+          isTouchOnBackdrop = true;
+          activeTouchOverlay = e.target;
+        } else {
+          isTouchOnBackdrop = false;
+          activeTouchOverlay = null;
+        }
+      }, { passive: true });
+
+      document.addEventListener('touchend', function(e) {
+        if (isTouchOnBackdrop && e.target === activeTouchOverlay && e.target.classList && e.target.classList.contains('raia-modal-overlay')) {
+          const topModal = getTopModal();
+          if (topModal && topModal === e.target) {
+            if (topModal.id === 'modalDiscardConfirm') {
+              closeModal('modalDiscardConfirm', true);
+              pendingDiscardTarget = null;
+            } else {
+              closeModal(topModal.id);
+            }
+          }
+        }
+        isTouchOnBackdrop = false;
+        activeTouchOverlay = null;
+      }, { passive: true });
+
+      // Wire Discard Modal Action Buttons
+      document.addEventListener('DOMContentLoaded', function() {
+        wireDiscardButtons();
+      });
+      function wireDiscardButtons() {
+        const btnStay = document.getElementById('btnDiscardStay');
+        const btnConfirm = document.getElementById('btnDiscardConfirm');
+
+        if (btnStay && !btnStay._wired) {
+          btnStay._wired = true;
+          btnStay.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeModal('modalDiscardConfirm', true);
+            pendingDiscardTarget = null;
+          });
+        }
+
+        if (btnConfirm && !btnConfirm._wired) {
+          btnConfirm._wired = true;
+          btnConfirm.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const targetId = pendingDiscardTarget;
+            pendingDiscardTarget = null;
+            closeModal('modalDiscardConfirm', true);
+            if (targetId) {
+              markClean(targetId);
+              closeModal(targetId, true);
+            }
+          });
+        }
+      }
+      // Immediate wire attempt in case DOM is already parsed
+      wireDiscardButtons();
 
       // Auto-sync scroll lock with MutationObserver on #modal-root (zero recursive mutations)
       try {
@@ -4015,7 +4344,11 @@
         close: closeModal,
         getTopModal: getTopModal,
         updateBodyScrollLock: updateBodyScrollLock,
-        openModalsStack: openModalsStack
+        openModalsStack: openModalsStack,
+        takeSnapshot: takeSnapshot,
+        markClean: markClean,
+        isDirty: isModalDirty,
+        getModalState: getModalState
       };
     })();
 
@@ -5765,6 +6098,7 @@
 
         if (data.success) {
           showToast(data.message || (isEdit ? 'Serviço atualizado com sucesso!' : 'Serviço cadastrado com sucesso!'));
+          RaiaModalManager.markClean('modalSingleService');
           closeSingleServiceModal();
           loadServices();
         } else {
@@ -6205,6 +6539,7 @@
         const data = await res.json();
         if (data.success) {
           showToast(data.message || `${data.createdCount} serviços cadastrados com sucesso!`);
+          RaiaModalManager.markClean('modalBatchServices');
           closeBatchModal();
           loadServices();
         } else {
@@ -7932,6 +8267,7 @@
 
         if (data.success) {
           showToast('Agendamento registrado com sucesso!');
+          RaiaModalManager.markClean('modalNewAppointment');
           document.getElementById('formNewAppointment').reset();
           closeNewAppointmentModal();
           loadAppointments();
@@ -8027,6 +8363,7 @@
 
         if (data.success) {
           showToast('Agendamento remarcado com sucesso!');
+          RaiaModalManager.markClean('modalRescheduleAppointment');
           closeRescheduleModal();
           loadAppointments();
         } else {
@@ -8982,6 +9319,7 @@
         const data = await res.json();
         if (data.success) {
           showToast(data.message || 'Conta cadastrada com sucesso!');
+          RaiaModalManager.markClean('modalNewBill');
           document.getElementById('formNewBill').reset();
           closeNewBillModal();
           loadProDashboard();
@@ -9022,6 +9360,7 @@
         const data = await res.json();
         if (data.success) {
           showToast(data.message || 'Movimentação registrada com sucesso!');
+          RaiaModalManager.markClean('modalNewTransaction');
           document.getElementById('formNewTransaction').reset();
           closeNewTxModal();
           loadProDashboard();

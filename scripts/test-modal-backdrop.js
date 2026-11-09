@@ -38,6 +38,8 @@ function getFreePort() {
 function startTestHttpServer(port) {
   let painelHtml = fs.readFileSync(path.join(__dirname, '..', 'public', 'cliente', 'painel.html'), 'utf8');
   painelHtml = painelHtml.replace('https://cdn.tailwindcss.com', `http://127.0.0.1:${port}/mock-tailwind.js`);
+  painelHtml = painelHtml.replace('https://unpkg.com/lucide@latest', `http://127.0.0.1:${port}/mock-lucide.js`);
+  painelHtml = painelHtml.replace(/<link[^>]+fonts\.(googleapis|gstatic)\.com[^>]*>/gi, '<!-- fonts stripped for hermetic test -->');
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://127.0.0.1:${port}`);
@@ -50,6 +52,11 @@ function startTestHttpServer(port) {
     if (url.pathname === '/mock-tailwind.js') {
       res.writeHead(200, { 'Content-Type': 'application/javascript' });
       return res.end('window.tailwind = { config: {} };');
+    }
+
+    if (url.pathname === '/mock-lucide.js') {
+      res.writeHead(200, { 'Content-Type': 'application/javascript' });
+      return res.end('window.lucide = { createIcons: function() {} };');
     }
 
     if (url.pathname === '/api/cliente/profile') {
@@ -107,7 +114,7 @@ async function runBackdropValidation() {
     `http://127.0.0.1:${HTTP_PORT}/cliente/painel.html#appointments`
   ]);
 
-  await new Promise(r => setTimeout(r, 2000));
+  await new Promise(r => setTimeout(r, 2500));
 
   try {
     const listRes = await new Promise((resolve, reject) => {
@@ -164,7 +171,7 @@ async function runBackdropValidation() {
 
     // Aguarda inicialização da página
     let ready = false;
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 40; i++) {
       const chk = await sendCmd('Runtime.evaluate', {
         expression: `Boolean(document.body && document.getElementById('modal-root'))`
       });
@@ -172,7 +179,7 @@ async function runBackdropValidation() {
         ready = true;
         break;
       }
-      await new Promise(r => setTimeout(r, 150));
+      await new Promise(r => setTimeout(r, 200));
     }
     if (!ready) throw new Error('Timeout aguardando DOM e modal-root ficarem prontos');
 

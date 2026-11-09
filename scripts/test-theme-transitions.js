@@ -40,7 +40,10 @@ const testState = {
 };
 
 function startTestHttpServer(port) {
-  const painelHtml = fs.readFileSync(path.join(__dirname, '..', 'public', 'cliente', 'painel.html'), 'utf8');
+  let painelHtml = fs.readFileSync(path.join(__dirname, '..', 'public', 'cliente', 'painel.html'), 'utf8');
+  painelHtml = painelHtml.replace('https://cdn.tailwindcss.com', `http://127.0.0.1:${port}/mock-tailwind.js`);
+  painelHtml = painelHtml.replace('https://unpkg.com/lucide@latest', `http://127.0.0.1:${port}/mock-lucide.js`);
+  painelHtml = painelHtml.replace(/<link[^>]+fonts\.(googleapis|gstatic)\.com[^>]*>/gi, '<!-- fonts stripped for hermetic test -->');
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://127.0.0.1:${port}`);
@@ -48,6 +51,16 @@ function startTestHttpServer(port) {
     if (url.pathname === '/cliente/painel.html') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(painelHtml);
+    }
+
+    if (url.pathname === '/mock-tailwind.js') {
+      res.writeHead(200, { 'Content-Type': 'application/javascript' });
+      return res.end('window.tailwind = { config: {} };');
+    }
+
+    if (url.pathname === '/mock-lucide.js') {
+      res.writeHead(200, { 'Content-Type': 'application/javascript' });
+      return res.end('window.lucide = { createIcons: function() {} };');
     }
 
     if (url.pathname === '/cliente/login') {
