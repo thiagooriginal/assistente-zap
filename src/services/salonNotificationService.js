@@ -7,6 +7,7 @@
  * (uma falha de envio de WhatsApp jamais cancela ou prejudica a reserva da cliente).
  */
 
+const crypto = require('crypto');
 const db = require('../database/db');
 const whatsappClient = require('../whatsapp/client');
 
@@ -236,12 +237,20 @@ function enqueueNotificationTx(userId, appointmentId, eventType, data = {}) {
   }
 
   // Prevenção de duplicação: não enfileirar notificação idêntica para o mesmo compromisso e evento nos últimos 5 minutos
+  const dedupHash = crypto
+    .createHash('sha256')
+    .update(`${userId}:${appointmentId}:${eventType}:${settings.notificationPhone}`)
+    .digest('hex');
+
   const existingRecent = db.prepare(`
     SELECT id FROM whatsapp_notification_outbox
-    WHERE user_id = ? AND appointment_id = ? AND event_type = ?
-      AND created_at >= datetime('now', '-5 minutes')
+    WHERE (
+      (user_id = ? AND appointment_id = ? AND event_type = ?)
+      OR dedup_hash = ?
+    )
+    AND created_at >= datetime('now', '-5 minutes')
     LIMIT 1
-  `).get(userId, appointmentId, eventType);
+  `).get(userId, appointmentId, eventType, dedupHash);
 
   if (existingRecent) {
     return { success: true, deduplicated: true, message: 'Notificação recente já enviada ou enfileirada.' };
@@ -249,10 +258,10 @@ function enqueueNotificationTx(userId, appointmentId, eventType, data = {}) {
 
   const info = db.prepare(`
     INSERT INTO whatsapp_notification_outbox (
-      user_id, appointment_id, event_type, recipient_phone, message_text, status
+      user_id, appointment_id, event_type, recipient_phone, message_text, status, dedup_hash
     )
-    VALUES (?, ?, ?, ?, ?, 'PENDING')
-  `).run(userId, appointmentId, eventType, settings.notificationPhone, messageText);
+    VALUES (?, ?, ?, ?, ?, 'PENDING', ?)
+  `).run(userId, appointmentId, eventType, settings.notificationPhone, messageText, dedupHash);
 
   return { success: true, outboxId: info.lastInsertRowid, messageText };
 }
@@ -270,83 +279,32 @@ async function queueNotification(userId, appointmentId, eventType, data = {}) {
     return enq;
   }
 
+  const outboxWorker = require('./outboxWorker');
+
   try {
     await dispatchOutboxItem(enq.outboxId);
   } catch (err) {
     console.warn(`[SalonNotificationService] Aviso no envio assíncrono do outbox #${enq.outboxId}:`, err.message);
   }
 
+  try {
+    outboxWorker.notify();
+  } catch (_) {}
+
   return enq;
 }
 
 /**
- * Dispatches an item from the notification outbox
+ * Dispatches an item from the notification outbox via the unified worker engine
  */
 async function dispatchOutboxItem(outboxId) {
-  const item = db.prepare('SELECT * FROM whatsapp_notification_outbox WHERE id = ?').get(outboxId);
-  if (!item || item.status === 'SENT') return;
-
   if (mockHandler?.dispatchOutboxItem) {
+    const item = db.prepare('SELECT * FROM whatsapp_notification_outbox WHERE id = ?').get(outboxId);
     return mockHandler.dispatchOutboxItem(item);
   }
 
-  // Regra de Segurança em Homologação/Testes (Proteção 12)
-  const isTestOrHomolog = process.env.APP_MODE === 'staging' 
-    || process.env.HOMOLOGACAO === 'true' 
-    || process.env.NODE_ENV === 'test'
-    || process.env.ALLOW_WHATSAPP_SENDING !== 'true';
-
-  if (isTestOrHomolog) {
-    // Registra entrega simulada segura sem disparar mensagem para números reais
-    db.prepare(`
-      UPDATE whatsapp_notification_outbox
-      SET status = 'SIMULATED', is_simulated = 1, sent_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(outboxId);
-
-    db.prepare(`
-      UPDATE appointments
-      SET whatsapp_notified = 1
-      WHERE id = ?
-    `).run(item.appointment_id);
-
-    recordMockNotification(item);
-
-    return { success: true, simulated: true };
-  }
-
-  // Ambiente com WhatsApp real conectado
-  try {
-    if (whatsappClient?.sendWhatsAppMessage) {
-      const jid = `${item.recipient_phone}@s.whatsapp.net`;
-      await whatsappClient.sendWhatsAppMessage(jid, item.message_text);
-
-      db.prepare(`
-        UPDATE whatsapp_notification_outbox
-        SET status = 'SENT', sent_at = CURRENT_TIMESTAMP, last_error = NULL
-        WHERE id = ?
-      `).run(outboxId);
-
-      db.prepare(`
-        UPDATE appointments
-        SET whatsapp_notified = 1
-        WHERE id = ?
-      `).run(item.appointment_id);
-
-      return { success: true };
-    } else {
-      throw new Error('Cliente WhatsApp offline ou não inicializado no servidor.');
-    }
-  } catch (err) {
-    db.prepare(`
-      UPDATE whatsapp_notification_outbox
-      SET status = 'FAILED', attempts = attempts + 1, last_error = ?
-      WHERE id = ?
-    `).run(err.message, outboxId);
-
-    // Falha isolada: nunca propaga para o agendamento
-    return { success: false, error: err.message };
-  }
+  const outboxWorker = require('./outboxWorker');
+  return await outboxWorker.processWhatsAppOutboxItem(outboxId);
 }
 
 /**

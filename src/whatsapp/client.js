@@ -29,48 +29,65 @@ function getTargetJid() {
 
 async function sendWhatsAppMessage(jid, text) {
   if (!currentSock) {
-    console.warn('Tentativa de envio sem socket ativo.');
-    return;
+    throw new Error('WHATSAPP_SOCKET_NULL: Tentativa de envio sem socket ativo inicializado.');
   }
+
+  if (!currentSock.user || (currentSock.ws && currentSock.ws.readyState !== undefined && currentSock.ws.readyState !== 1)) {
+    throw new Error('WHATSAPP_SOCKET_DISCONNECTED: Socket WhatsApp não está autenticado ou conectado.');
+  }
+
   // Hard security block: never send messages to groups, channels, or broadcasts
   if (
     !jid ||
+    typeof jid !== 'string' ||
     jid.endsWith('@g.us') ||
     jid.includes('@newsletter') ||
     jid.includes('@broadcast')
   ) {
-    console.warn(`[Bloqueio de Segurança] Envio para destinatário inválido/grupo impedido: ${jid}`);
-    return;
+    throw new Error(`INVALID_RECIPIENT_BLOCKED: Envio para destinatário inválido ou grupo impedido: ${jid}`);
   }
 
   let finalJid = jid;
   if (finalJid.includes('@lid')) {
-    const cleanLid = finalJid.split('@')[0].split(':')[0];
-    const resolvedPhone = phoneUtils.resolveLidToPhone(cleanLid, config.authDir);
+    const resolvedPhone = phoneUtils.resolveLidToPhone(finalJid, config.authDir);
     if (resolvedPhone) {
       finalJid = `${resolvedPhone}@s.whatsapp.net`;
     } else {
-      console.warn(`[Bloqueio de Segurança] Envio para WhatsApp LID sem mapeamento seguro impedido: ${jid}`);
-      return;
+      throw new Error(`UNMAPPED_LID_FAIL_CLOSED: Envio para WhatsApp LID sem mapeamento seguro impedido: ${jid}`);
     }
   } else if (!finalJid.endsWith('@s.whatsapp.net')) {
     const clean = phoneUtils.cleanDigits(finalJid.split('@')[0].split(':')[0]);
+    if (!clean) {
+      throw new Error(`INVALID_RECIPIENT_BLOCKED: Destinatário não possui dígitos válidos: ${jid}`);
+    }
     finalJid = `${clean}@s.whatsapp.net`;
   }
 
+  let sent;
   try {
-    const sent = await currentSock.sendMessage(finalJid, { text });
-    if (sent?.key?.id) {
-      try {
-        db.prepare('INSERT OR IGNORE INTO processed_messages (id, sender_jid) VALUES (?, ?)').run(
-          sent.key.id,
-          finalJid
-        );
-      } catch (e) {}
-    }
-  } catch (err) {
-    console.error(`Erro ao enviar mensagem para ${finalJid}:`, err.message);
+    sent = await currentSock.sendMessage(finalJid, { text });
+  } catch (sendErr) {
+    throw new Error(`BAILEYS_TRANSMISSION_ERROR: ${sendErr.message}`);
   }
+
+  if (!sent || !sent.key || !sent.key.id) {
+    throw new Error('BAILEYS_EMPTY_CONFIRMATION: Baileys não retornou confirmação de entrega válida (key.id ausente).');
+  }
+
+  try {
+    db.prepare('INSERT OR IGNORE INTO processed_messages (id, sender_jid) VALUES (?, ?)').run(
+      sent.key.id,
+      finalJid
+    );
+  } catch (e) {}
+
+  return {
+    success: true,
+    messageId: sent.key.id,
+    timestamp: sent.messageTimestamp ? Number(sent.messageTimestamp) : Math.floor(Date.now() / 1000),
+    recipientJid: finalJid,
+    rawSent: sent,
+  };
 }
 
 async function startWhatsAppBot() {
@@ -237,5 +254,7 @@ module.exports = {
   getWhatsAppUser: () => currentSock?.user || null,
   isPersonalAssistantPaused: () => Boolean(config.pausePersonalAssistant),
   setPersonalAssistantPaused: (val) => { config.pausePersonalAssistant = Boolean(val); },
+  _setSocketForTesting: (sock) => { currentSock = sock; },
+  _resetSocketForTesting: () => { currentSock = null; },
 };
 
