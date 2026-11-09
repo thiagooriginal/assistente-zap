@@ -788,7 +788,7 @@ async function bookAppointment(userId, params) {
 /**
  * Reschedules an appointment to a new date/time or staff
  */
-async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, newStaffId = null, reason = 'Remarcado pelo cliente' }) {
+async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, newStaffId = null, reason = 'Remarcado pelo cliente', changedBy = 'SALON_USER' } = {}) {
   const existing = db.prepare('SELECT * FROM appointments WHERE id = ? AND user_id = ?').get(appointmentId, userId);
   if (!existing) {
     const err = new Error('Agendamento não encontrado.');
@@ -796,9 +796,17 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
     throw err;
   }
 
+  // Não permitir remarcar agendamentos cancelados (estado final)
   if (existing.status === 'CANCELADO' || existing.status === 'CANCELLED') {
     const err = new Error('Não é possível remarcar um agendamento cancelado.');
     err.code = 'ALREADY_CANCELLED';
+    throw err;
+  }
+
+  // Não permitir remarcar agendamentos concluídos (estado final)
+  if (existing.status === 'CONCLUÍDO' || existing.status === 'COMPLETED' || existing.status === 'DONE') {
+    const err = new Error('Não é possível remarcar um agendamento já concluído.');
+    err.code = 'ALREADY_COMPLETED';
     throw err;
   }
 
@@ -823,6 +831,15 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
   const endDt = `${endDate.getFullYear()}-${padZero(endDate.getMonth() + 1)}-${padZero(endDate.getDate())}T${padZero(endDate.getHours())}:${padZero(endDate.getMinutes())}:${padZero(endDate.getSeconds())}`;
 
   const targetStaffId = newStaffId !== null ? Number(newStaffId) : existing.staff_id;
+
+  if (targetStaffId) {
+    const staffCheck = db.prepare('SELECT id, name FROM client_staff WHERE id = ? AND user_id = ?').get(targetStaffId, userId);
+    if (!staffCheck) {
+      const err = new Error('Profissional não encontrado para este salão.');
+      err.code = 'STAFF_NOT_FOUND';
+      throw err;
+    }
+  }
 
   // 1. Consulta externa de disponibilidade Google FORA da transação SQLite (sem prender locks)
   const gCheck = await checkGoogleAvailability(userId, {
@@ -879,23 +896,34 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
 
     const oldStart = existing.start_datetime;
     const oldEnd = existing.end_datetime;
+    const preservedStatus = existing.status;
 
+    // Preservar estritamente o status original do agendamento (CONFIRMADO continua CONFIRMADO, AGENDADO continua AGENDADO)
     db.prepare(`
       UPDATE appointments
       SET start_datetime = ?,
           end_datetime = ?,
           staff_id = ?,
-          status = 'AGENDADO',
           has_conflict = 0,
           google_sync_status = 'PENDING',
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND user_id = ?
     `).run(startDt, endDt, targetStaffId, appointmentId, userId);
 
+    // Auditoria de remarcação sem transição falsa de status (previous_status == preservedStatus, new_status == preservedStatus)
+    const staffChanged = targetStaffId !== existing.staff_id;
+    const oldStaffRow = existing.staff_id ? db.prepare('SELECT name FROM client_staff WHERE id = ?').get(existing.staff_id) : null;
+    const newStaffRow = targetStaffId ? db.prepare('SELECT name FROM client_staff WHERE id = ?').get(targetStaffId) : null;
+    const staffAuditPart = staffChanged 
+      ? ` | Profissional: ${oldStaffRow?.name || 'Não atribuído'} -> ${newStaffRow?.name || 'Não atribuído'}`
+      : '';
+    const reasonAuditPart = reason ? ` | Motivo: ${reason}` : '';
+    const auditReason = `Remarcação de horário: ${oldStart} -> ${startDt}${staffAuditPart}${reasonAuditPart}`;
+
     db.prepare(`
       INSERT INTO appointment_status_history (appointment_id, user_id, previous_status, new_status, changed_by, reason)
-      VALUES (?, ?, ?, 'AGENDADO', 'SALON_USER', ?)
-    `).run(appointmentId, userId, existing.status, reason);
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(appointmentId, userId, preservedStatus, preservedStatus, changedBy, auditReason);
 
     // Enfileirar sincronização durável com Google Calendar (UPDATE) no SQLite
     db.prepare(`
@@ -904,13 +932,12 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
     `).run(userId, appointmentId, JSON.stringify({ startDt, endDt, targetStaffId, newDate, newTime, reason }));
 
     // Obter dados complementares e enfileirar notificação WhatsApp durável (RESCHEDULE) no SQLite
-    const staffRow = targetStaffId ? db.prepare('SELECT name FROM client_staff WHERE id = ?').get(targetStaffId) : null;
     const svcRow = existing.service_id ? db.prepare('SELECT name FROM client_services WHERE id = ?').get(existing.service_id) : null;
 
     salonNotificationService.enqueueNotificationTx(userId, appointmentId, 'RESCHEDULE', {
       clientName: existing.client_name,
       serviceName: svcRow?.name || existing.title,
-      staffName: staffRow?.name || 'Profissional',
+      staffName: newStaffRow?.name || 'Profissional',
       newStartDt: startDt,
       newEndDt: endDt,
       oldStartDt: oldStart,
@@ -919,14 +946,13 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
 
     db.exec('COMMIT');
 
-    const updatedAppointment = {
-      ...existing,
-      start_datetime: startDt,
-      end_datetime: endDt,
-      staff_id: targetStaffId,
-      staff_name: staffRow?.name || 'Profissional',
-      service_name: svcRow?.name || existing.title,
-    };
+    const updatedAppointment = db.prepare(`
+      SELECT a.*, cs.name AS service_name, st.name AS staff_name
+      FROM appointments a
+      LEFT JOIN client_services cs ON a.service_id = cs.id
+      LEFT JOIN client_staff st ON a.staff_id = st.id
+      WHERE a.id = ? AND a.user_id = ?
+    `).get(appointmentId, userId);
 
     // Disparar worker resiliente após commit
     const outboxWorker = require('./outboxWorker');

@@ -153,34 +153,44 @@ async function runTransitionsValidation() {
     await sendCmd('Runtime.enable');
     await sendCmd('Emulation.setDeviceMetricsOverride', { width: 1024, height: 768, deviceScaleFactor: 1, mobile: false });
 
-    // Helper para extrair estilos computados e classes completas
+    // Helper para extrair estilos computados e classes completas com tolerância a reload
     async function getThemeState() {
-      const evalRes = await sendCmd('Runtime.evaluate', {
-        expression: `(() => {
-          const doc = document.documentElement;
-          const body = document.body;
-          const cs = window.getComputedStyle(body);
-          const curtain = document.getElementById('appInitCurtain');
-          return {
-            hash: window.location.hash,
-            search: window.location.search,
-            url: window.location.href,
-            htmlClasses: Array.from(doc.classList),
-            bodyClasses: Array.from(body.classList),
-            computedBg: cs.backgroundColor,
-            computedColor: cs.color,
-            curtainPresent: !!curtain,
-            curtainHidden: curtain ? curtain.classList.contains('curtain-hidden') : true,
-            isAppointmentsVisible: !document.getElementById('tab-appointments').classList.contains('hidden'),
-            isMyProductsVisible: !document.getElementById('tab-my-products').classList.contains('hidden')
-          };
-        })()`,
-        returnByValue: true
-      });
-      if (!evalRes || !evalRes.result || !evalRes.result.value) {
-        console.error('DEBUG evalRes is:', JSON.stringify(evalRes, null, 2));
+      let retries = 20;
+      while (retries > 0) {
+        const evalRes = await sendCmd('Runtime.evaluate', {
+          expression: `(() => {
+            const doc = document.documentElement;
+            const body = document.body;
+            if (!body) return null;
+            // Se ainda estiver no estado app-initializing, aguardar o revealInterface()
+            if (body.classList.contains('app-initializing')) return null;
+            const cs = window.getComputedStyle(body);
+            const curtain = document.getElementById('appInitCurtain');
+            const aptEl = document.getElementById('tab-appointments');
+            const hubEl = document.getElementById('tab-my-products');
+            return {
+              hash: window.location.hash,
+              search: window.location.search,
+              url: window.location.href,
+              htmlClasses: Array.from(doc.classList),
+              bodyClasses: Array.from(body.classList),
+              computedBg: cs.backgroundColor,
+              computedColor: cs.color,
+              curtainPresent: !!curtain,
+              curtainHidden: curtain ? curtain.classList.contains('curtain-hidden') : true,
+              isAppointmentsVisible: aptEl ? !aptEl.classList.contains('hidden') : false,
+              isMyProductsVisible: hubEl ? !hubEl.classList.contains('hidden') : false
+            };
+          })()`,
+          returnByValue: true
+        });
+        if (evalRes?.result?.value) {
+          return evalRes.result.value;
+        }
+        retries--;
+        await new Promise(r => setTimeout(r, 150));
       }
-      return evalRes.result.value;
+      throw new Error('Falha ao obter estado do tema: body não disponível a tempo');
     }
 
     // =========================================================
