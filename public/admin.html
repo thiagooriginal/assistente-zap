@@ -4196,32 +4196,37 @@
           return;
         }
 
+        // Cache em memória para acesso seguro sem injeção de strings em atributos inline
+        window._cachedLeadsMap = window._cachedLeadsMap || {};
+        leads.forEach(lead => { window._cachedLeadsMap[lead.id] = lead; });
+
         tbody.innerHTML = leads.map(lead => {
           const cleanPhone = String(lead.phone || '').replace(/\D/g, '');
           const formattedPhone = cleanPhone.replace(/^55/, '').replace(/^(\d{2})(\d{5})(\d{4}).*/, '($1) $2-$3') || lead.phone;
           const date = lead.created_at ? new Date(lead.created_at).toLocaleString('pt-BR') : '-';
-          const safeName = (lead.name || 'Cliente').replace(/'/g, '');
+          const safeName = escapeHtml(lead.name || 'Sem nome');
+          const safeAgent = escapeHtml(lead.agent_name || lead.agent_key || 'Agente RAIA');
 
           return `
             <tr class="hover:bg-zinc-900/50 transition">
-              <td class="py-3 px-3 font-bold text-white">${lead.name || 'Sem nome'}</td>
+              <td class="py-3 px-3 font-bold text-white">${safeName}</td>
               <td class="py-3 px-3 font-mono text-cyan-300 font-semibold">
                 <a href="https://wa.me/${cleanPhone}" target="_blank" class="hover:underline flex items-center gap-1">
-                  <span>${formattedPhone}</span>
+                  <span>${escapeHtml(formattedPhone)}</span>
                   <i data-lucide="message-circle" class="w-3 h-3 text-emerald-400"></i>
                 </a>
               </td>
-              <td class="py-3 px-3 font-bold text-violet-300">${lead.agent_name || lead.agent_key}</td>
+              <td class="py-3 px-3 font-bold text-violet-300">${safeAgent}</td>
               <td class="py-3 px-3">
                 <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">TESTOU</span>
               </td>
-              <td class="py-3 px-3 text-zinc-400 text-[11px]">${date}</td>
+              <td class="py-3 px-3 text-zinc-400 text-[11px]">${escapeHtml(date)}</td>
               <td class="py-3 px-3 text-right">
                 <div class="flex items-center justify-end gap-1.5">
-                  <button onclick="viewLeadConversation(${lead.id}, '${cleanPhone}', '${safeName}', '${(lead.agent_name || lead.agent_key).replace(/'/g, '')}')" class="px-2.5 py-1 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-[10px] transition cursor-pointer flex items-center gap-1">
+                  <button onclick="handleLeadConversationClick(${Number(lead.id)})" class="px-2.5 py-1 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-[10px] transition cursor-pointer flex items-center gap-1">
                     💬 Diálogo
                   </button>
-                  <button onclick="fillPixFromLead('${safeName}', '${cleanPhone}')" class="px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 hover:opacity-90 text-black font-extrabold text-[10px] transition cursor-pointer">
+                  <button onclick="handleLeadPixClick(${Number(lead.id)})" class="px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 hover:opacity-90 text-black font-extrabold text-[10px] transition cursor-pointer">
                     ⚡ Cobrar Pix
                   </button>
                 </div>
@@ -4235,6 +4240,18 @@
         console.error('Erro loadLeadsList:', e);
         tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-rose-400">Erro ao carregar contatos do site.</td></tr>';
       }
+    }
+
+    function handleLeadConversationClick(leadId) {
+      const lead = (window._cachedLeadsMap && window._cachedLeadsMap[leadId]) || {};
+      const cleanPhone = String(lead.phone || '').replace(/\D/g, '');
+      viewLeadConversation(leadId, cleanPhone, lead.name, lead.agent_name || lead.agent_key);
+    }
+
+    function handleLeadPixClick(leadId) {
+      const lead = (window._cachedLeadsMap && window._cachedLeadsMap[leadId]) || {};
+      const cleanPhone = String(lead.phone || '').replace(/\D/g, '');
+      fillPixFromLead(lead.name || 'Cliente', cleanPhone);
     }
 
     function fillPixFromLead(name, phone) {
@@ -4374,15 +4391,22 @@
       const sub = document.getElementById('leadChatSub');
       const body = document.getElementById('leadChatBody');
 
+      if (!name && window._cachedLeadsMap && window._cachedLeadsMap[leadIdOrPhone]) {
+        const cached = window._cachedLeadsMap[leadIdOrPhone];
+        name = cached.name;
+        phone = phone || cached.phone;
+        agentName = agentName || cached.agent_name || cached.agent_key;
+      }
+
       const displayPhone = phone || (typeof leadIdOrPhone === 'string' && leadIdOrPhone.length >= 10 ? leadIdOrPhone : '');
-      if (title) title.innerText = `💬 Diálogo com ${name || 'Lead'} • ${agentName || 'Agente'}`;
-      if (sub) sub.innerText = displayPhone ? `WhatsApp: ${displayPhone}` : `Lead ID: ${leadIdOrPhone}`;
+      if (title) title.textContent = `💬 Diálogo com ${name || 'Lead'} • ${agentName || 'Agente'}`;
+      if (sub) sub.textContent = displayPhone ? `WhatsApp: ${displayPhone}` : `Lead ID: ${leadIdOrPhone}`;
       if (body) body.innerHTML = '<div class="py-8 text-center text-zinc-500">Carregando mensagens da conversa...</div>';
       if (modal) modal.classList.remove('hidden');
 
       try {
         const target = leadIdOrPhone || phone;
-        const res = await fetch(`/api/admin/lead-conversation/${target}`);
+        const res = await fetch(`/api/admin/lead-conversation/${encodeURIComponent(target)}`);
         const json = await res.json();
         const msgs = json.messages || [];
 
@@ -4399,18 +4423,18 @@
 
           return `
             <div class="flex flex-col ${isBot ? 'items-start' : 'items-end'} max-w-[85%] ${isBot ? '' : 'ml-auto'}">
-              <span class="text-[10px] font-bold text-zinc-400 mb-0.5 px-1">${senderLabel}</span>
+              <span class="text-[10px] font-bold text-zinc-400 mb-0.5 px-1">${escapeHtml(senderLabel)}</span>
               <div class="p-3 rounded-2xl ${bg} text-xs leading-relaxed whitespace-pre-wrap shadow-lg">
-                ${m.content}
+                ${escapeHtml(m.content)}
               </div>
-              <span class="text-[9px] text-zinc-500 mt-0.5 px-1">${time}</span>
+              <span class="text-[9px] text-zinc-500 mt-0.5 px-1">${escapeHtml(time)}</span>
             </div>
           `;
         }).join('');
 
         body.scrollTop = body.scrollHeight;
       } catch (err) {
-        body.innerHTML = `<div class="py-8 text-center text-rose-400">Erro ao carregar mensagens: ${err.message}</div>`;
+        body.innerHTML = `<div class="py-8 text-center text-rose-400">Erro ao carregar mensagens: ${escapeHtml(err.message)}</div>`;
       }
     }
 

@@ -1593,6 +1593,20 @@ const NICHE_SLUG_MAP = {
   'veiculos-e-seminovos': { key: 'CAR_DEALERSHIP', name: 'AutoZap (Veículos & Seminovos)' },
 };
 
+const ALLOWED_AGENT_KEYS = [
+  'REAL_ESTATE',
+  'SALON',
+  'CLINIC',
+  'RESTAURANT',
+  'LEGAL',
+  'MECHANIC',
+  'FITNESS',
+  'FINANCE',
+  'RENTAL_MACHINES',
+  'CAR_DEALERSHIP',
+  'OTHER',
+];
+
 async function handleLeadTestRequest(req, res) {
   try {
     const { name, phone, nicheSlug } = req.body || {};
@@ -1607,8 +1621,15 @@ async function handleLeadTestRequest(req, res) {
       }
     }
 
-    if (!name || !name.trim()) {
+    const rawName = String(name || '').trim();
+    if (!rawName) {
       return res.status(400).json({ success: false, error: 'Por favor, informe o seu nome.' });
+    }
+
+    // Defesa em profundidade (Comando 018): corte de comprimento (máx 100 caracteres) e remoção de caracteres de controle
+    const sanitizedName = rawName.slice(0, 100).replace(/[\u0000-\u001F\u007F-\u009F]/g, '').trim();
+    if (!sanitizedName) {
+      return res.status(400).json({ success: false, error: 'Por favor, informe um nome válido.' });
     }
 
     let cleanPhone = String(phone || '').replace(/\D/g, '');
@@ -1620,7 +1641,7 @@ async function handleLeadTestRequest(req, res) {
       cleanPhone = '55' + cleanPhone;
     }
 
-    const safeName = name.trim().split(' ')[0];
+    const safeName = sanitizedName.split(' ')[0].replace(/[*_~`]/g, '');
     const templateFn = AGENT_MESSAGES[agentKey] || ((n) =>
       `Olá, *${n}*! 🚀 Aqui é o assistente virtual da RAIA para o seu negócio!\n\n` +
       `Recebi seu pedido de teste através do nosso site. Estou pronto para atender seus clientes no WhatsApp 24 horas por dia com máxima velocidade e inteligência.\n\n` +
@@ -1630,8 +1651,11 @@ async function handleLeadTestRequest(req, res) {
     const messageText = templateFn(safeName);
     const targetJid = `${cleanPhone}@s.whatsapp.net`;
 
-    const resolvedAgentKey = agentKey || 'OTHER';
-    const resolvedAgentName = agentName || 'Agente RAIA';
+    const resolvedAgentKey = (agentKey && ALLOWED_AGENT_KEYS.includes(agentKey)) ? agentKey : 'OTHER';
+    let resolvedAgentName = 'Agente RAIA';
+    if (agentName && typeof agentName === 'string') {
+      resolvedAgentName = agentName.trim().slice(0, 100).replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+    }
     const phoneCandidates = phoneUtils.getExactPhoneCandidates(cleanPhone);
     if (!phoneCandidates || phoneCandidates.length === 0) {
       return res.status(400).json({
@@ -1659,7 +1683,7 @@ async function handleLeadTestRequest(req, res) {
       const info = db.prepare(`
         INSERT INTO leads (name, phone, agent_key, agent_name, status)
         VALUES (?, ?, ?, ?, 'SENT')
-      `).run(name.trim(), cleanPhone, resolvedAgentKey, resolvedAgentName);
+      `).run(sanitizedName, cleanPhone, resolvedAgentKey, resolvedAgentName);
 
       leadId = info.lastInsertRowid;
       db.exec('COMMIT');
