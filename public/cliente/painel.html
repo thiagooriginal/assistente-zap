@@ -3408,16 +3408,46 @@
       searchQuery: ''
     };
 
-    // Toast Alert
+    // Toast Alert Seguro (Anti-XSS: textContent e criação estrita de elementos DOM)
     function showToast(message, type = 'success') {
       const toast = document.getElementById('toast');
-      toast.className = type === 'success'
+      if (!toast) return;
+
+      const isSuccess = type === 'success';
+      const isInfo = type === 'info';
+
+      toast.className = isSuccess
         ? 'fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl text-xs font-bold shadow-2xl flex items-center gap-3 border border-emerald-500/30 bg-emerald-950/90 text-emerald-200'
-        : 'fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl text-xs font-bold shadow-2xl flex items-center gap-3 border border-red-500/30 bg-red-950/90 text-red-200';
-      toast.innerHTML = `<i data-lucide="${type === 'success' ? 'check-circle' : 'alert-triangle'}" class="w-4 h-4"></i><span>${message}</span>`;
+        : (isInfo
+          ? 'fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl text-xs font-bold shadow-2xl flex items-center gap-3 border border-sky-500/30 bg-sky-950/90 text-sky-200'
+          : 'fixed bottom-6 right-6 z-50 px-5 py-3.5 rounded-xl text-xs font-bold shadow-2xl flex items-center gap-3 border border-red-500/30 bg-red-950/90 text-red-200');
+
+      // Limpar conteúdo anterior com segurança
+      while (toast.firstChild) {
+        toast.removeChild(toast.firstChild);
+      }
+
+      // Ícone Lucide seguro
+      const icon = document.createElement('i');
+      const iconName = isSuccess ? 'check-circle' : (isInfo ? 'info' : 'alert-triangle');
+      icon.setAttribute('data-lucide', iconName);
+      icon.className = 'w-4 h-4 flex-shrink-0';
+      toast.appendChild(icon);
+
+      // Inserção estritamente como texto puro via textContent para prevenir injeção de HTML/scripts
+      const textSpan = document.createElement('span');
+      textSpan.textContent = String(message || '');
+      toast.appendChild(textSpan);
+
       toast.classList.remove('hidden');
-      lucide.createIcons();
-      setTimeout(() => toast.classList.add('hidden'), 4000);
+      if (window.lucide && typeof lucide.createIcons === 'function') {
+        lucide.createIcons();
+      }
+
+      if (toast._toastTimer) clearTimeout(toast._toastTimer);
+      toast._toastTimer = setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 4000);
     }
 
     // Tabs Navigation Meta
@@ -3465,17 +3495,22 @@
 
       const inSalon = isSalonTab(tabId);
 
-      // Persistência ativa no localStorage para sobreviver a recarregamentos
+      // Eliminar chave legada compartilhada e isolar persistência por usuário autenticado
       try {
-        localStorage.setItem('raia_active_tab', tabId);
+        localStorage.removeItem('raia_active_tab');
+        if (clientData && clientData.id) {
+          sessionStorage.setItem(`raia_active_tab_${clientData.id}`, tabId);
+        }
       } catch (_) {}
 
-      // Atualizar o endereço do navegador com a aba ativa (sem recarregar)
+      // Atualizar o endereço do navegador com a aba canônica (sem recarregar)
       if (updateUrl) {
         const targetHash = '#' + tabId;
         if (window.location.hash !== targetHash) {
           try {
-            window.history.pushState({ tabId }, '', targetHash);
+            // Limpar query params legados de navegação (?tab, ?modulo) para evitar conflitos futuros
+            const cleanUrl = window.location.pathname + targetHash;
+            window.history.pushState({ tabId }, '', cleanUrl);
           } catch (_) {
             window.location.hash = targetHash;
           }
@@ -3651,13 +3686,25 @@
 
     // Sincronização com histórico do navegador (botões Voltar / Avançar e alteração direta do hash)
     window.addEventListener('popstate', (e) => {
-      const tab = normalizeTabId(window.location.hash) || (e.state && normalizeTabId(e.state.tabId));
-      if (tab) switchTab(tab, false);
+      const tab = normalizeTabId(window.location.hash) || (e.state && normalizeTabId(e.state.tabId)) || 'my-products';
+      const targetHash = '#' + tab;
+      if (window.location.hash !== targetHash) {
+        try {
+          window.history.replaceState({ tabId: tab }, '', window.location.pathname + (window.location.search ? window.location.search : '') + targetHash);
+        } catch (_) {}
+      }
+      switchTab(tab, false);
     });
 
     window.addEventListener('hashchange', () => {
-      const tab = normalizeTabId(window.location.hash);
-      if (tab) switchTab(tab, false);
+      const tab = normalizeTabId(window.location.hash) || 'my-products';
+      const targetHash = '#' + tab;
+      if (window.location.hash !== targetHash) {
+        try {
+          window.history.replaceState({ tabId: tab }, '', window.location.pathname + (window.location.search ? window.location.search : '') + targetHash);
+        } catch (_) {}
+      }
+      switchTab(tab, false);
     });
 
     document.getElementById('toggleSalonNavBtn').addEventListener('click', () => {
@@ -4411,16 +4458,33 @@
     // 5. PROFILE INITIALIZER & JÉSSICA MODULE DATA
     // ==========================================
     async function loadProfile() {
+      // Limpeza preventiva da chave legada compartilhada
+      try {
+        localStorage.removeItem('raia_active_tab');
+      } catch (_) {}
+
       try {
         const res = await fetch('/api/cliente/profile');
-        if (res.status === 401) {
-          window.location.href = '/cliente/login';
+        if (res.status === 401 || res.status === 403) {
+          clientData = null;
+          try {
+            sessionStorage.clear();
+          } catch (_) {}
+          if (window.location.protocol.startsWith('http')) {
+            window.location.href = '/cliente/login';
+          }
           return;
         }
 
         const data = await res.json();
         if (!data.success || !data.profile) {
-          window.location.href = '/cliente/login';
+          clientData = null;
+          try {
+            sessionStorage.clear();
+          } catch (_) {}
+          if (window.location.protocol.startsWith('http')) {
+            window.location.href = '/cliente/login';
+          }
           return;
         }
 
@@ -4430,53 +4494,75 @@
         // Notificações de retorno OAuth Google Calendar via Query Params
         const urlParams = new URLSearchParams(window.location.search);
         const requestedModulo = urlParams.get('modulo');
-        if (urlParams.get('google_connected') === 'true') {
-          const email = urlParams.get('email') || '';
-          showToast(`Google Calendar conectado com sucesso${email ? ` (${email})` : ''}!`);
-        } else if (urlParams.get('google_error')) {
-          showToast(`Aviso na integração Google: ${urlParams.get('google_error')}`, 'error');
+        const isGoogleConnected = urlParams.get('google_connected') === 'true';
+        const googleError = urlParams.get('google_error');
+        const googleEmail = urlParams.get('email');
+
+        // Notificação segura (texto tratado via textContent dentro de showToast)
+        if (isGoogleConnected) {
+          showToast(`Google Calendar conectado com sucesso${googleEmail ? ` (${googleEmail})` : ''}!`);
+        } else if (googleError) {
+          showToast(`Aviso na integração Google: ${googleError}`, 'error');
         }
 
-        // Resolução com prioridade estrita:
-        // 1. Query param 'tab' (ex: ?tab=appointments)
-        // 2. Hash da URL (ex: #appointments ou #tab-integrations-google)
+        // Resolução com prioridade canônica estrita:
+        // 1. Hash da URL (representa a navegação explícita mais recente do usuário, ex: #appointments ou #tab-integrations-google)
+        // 2. Query param 'tab' (ex: ?tab=appointments em links externos ou legados)
         // 3. Query param 'modulo' (ex: ?modulo=jessica -> 'overview')
-        // 4. Última aba persistida no localStorage ('raia_active_tab')
-        // 5. Fallback padrão: 'my-products'
-        const tabFromQuery = normalizeTabId(urlParams.get('tab'));
+        // 4. Sessão do usuário autenticado (sessionStorage isolado por ID do usuário)
+        // 5. Fallback padrão: 'my-products' (Hub Central)
         const tabFromHash = normalizeTabId(window.location.hash);
-        let tabFromStorage = null;
-        try {
-          tabFromStorage = normalizeTabId(localStorage.getItem('raia_active_tab'));
-        } catch (_) {}
-
-        let initialTab = 'my-products';
-        if (tabFromQuery) {
-          initialTab = tabFromQuery;
-        } else if (tabFromHash) {
-          initialTab = tabFromHash;
-        } else if (requestedModulo === 'jessica') {
-          initialTab = 'overview';
-        } else if (tabFromStorage) {
-          initialTab = tabFromStorage;
+        const tabFromQuery = normalizeTabId(urlParams.get('tab'));
+        let tabFromUserSession = null;
+        if (clientData && clientData.id) {
+          try {
+            tabFromUserSession = normalizeTabId(sessionStorage.getItem(`raia_active_tab_${clientData.id}`));
+          } catch (_) {}
         }
 
-        switchTab(initialTab, true);
+        let canonicalTab = 'my-products';
+        if (tabFromHash) {
+          canonicalTab = tabFromHash;
+        } else if (tabFromQuery) {
+          canonicalTab = tabFromQuery;
+        } else if (requestedModulo === 'jessica') {
+          canonicalTab = 'overview';
+        } else if (tabFromUserSession) {
+          canonicalTab = tabFromUserSession;
+        }
+
+        // Limpeza dos parâmetros temporários do OAuth e de navegação legada
+        urlParams.delete('google_connected');
+        urlParams.delete('google_error');
+        urlParams.delete('email');
+        urlParams.delete('tab');
+        urlParams.delete('modulo');
+
+        const remainingSearch = urlParams.toString();
+        const cleanCanonicalUrl = window.location.pathname + (remainingSearch ? '?' + remainingSearch : '') + '#' + canonicalTab;
+
+        // Normalização inicial via history.replaceState:
+        // - Não duplica histórico no navegador
+        // - Remove parâmetros OAuth e query strings conflitantes
+        // - Garante que F5 mantenha a aba e não repita toasts
+        try {
+          window.history.replaceState({ tabId: canonicalTab }, '', cleanCanonicalUrl);
+        } catch (_) {
+          window.location.hash = '#' + canonicalTab;
+        }
+
+        switchTab(canonicalTab, false);
       } catch (err) {
         console.error('Erro ao carregar perfil:', err);
-        const footerName = document.getElementById('footerUserName');
-        if (footerName && footerName.innerText === 'Carregando...') {
-          footerName.innerText = 'Cliente Conectado';
-        }
-        const urlParams = new URLSearchParams(window.location.search);
-        const tabFromQuery = normalizeTabId(urlParams.get('tab'));
-        const tabFromHash = normalizeTabId(window.location.hash);
-        let tabFromStorage = null;
+        clientData = null;
         try {
-          tabFromStorage = normalizeTabId(localStorage.getItem('raia_active_tab'));
+          localStorage.removeItem('raia_active_tab');
+          sessionStorage.clear();
         } catch (_) {}
-        const fallbackTab = tabFromQuery || tabFromHash || tabFromStorage || 'my-products';
-        switchTab(fallbackTab, true);
+        // Falha crítica de autenticação: redirecionar com segurança sem expor abas operacionais
+        if (window.location.protocol.startsWith('http')) {
+          window.location.href = '/cliente/login';
+        }
       }
     }
 
@@ -8331,10 +8417,20 @@
       document.getElementById('pairingBox').classList.toggle('hidden');
     });
 
-    // Logout
+    // Logout seguro com isolamento estrito
     document.getElementById('logoutBtn').addEventListener('click', async () => {
-      await fetch('/api/cliente/auth/logout', { method: 'POST' });
-      sessionStorage.removeItem('raia_client_token');
+      try {
+        await fetch('/api/cliente/auth/logout', { method: 'POST' });
+      } catch (_) {}
+      try {
+        localStorage.removeItem('raia_active_tab');
+        if (clientData && clientData.id) {
+          sessionStorage.removeItem(`raia_active_tab_${clientData.id}`);
+          localStorage.removeItem(`raia_active_tab_${clientData.id}`);
+        }
+        sessionStorage.clear();
+      } catch (_) {}
+      clientData = null;
       window.location.href = '/cliente/login';
     });
 
