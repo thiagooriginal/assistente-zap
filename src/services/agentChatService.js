@@ -191,7 +191,8 @@ function findActiveLead(phoneNumber, rawJid = '') {
 
   try {
     // =========================================================================
-    // ETAPA 1: MATCH CANÔNICO EXATO (COM / SEM DDI 55, MESMO NÚMERO LOCAL)
+    // MATCH CANÔNICO EXATO (COM / SEM DDI 55, MESMO NÚMERO LOCAL E DDD VÁLIDO)
+    // Sem heurística sintética de 8 vs 9 dígitos (Comando 017 - P0)
     // =========================================================================
     const placeholders = exactCandidates.map(() => '?').join(', ');
     const matches = db.prepare(`
@@ -219,34 +220,9 @@ function findActiveLead(phoneNumber, rawJid = '') {
     }
 
     // =========================================================================
-    // ETAPA 2: VARIAÇÃO DE 9º DÍGITO (FALLBACK SE ETAPA 1 RETORNOU 0 RESULTADOS)
-    // =========================================================================
-    const altCandidates = phoneUtils.getSyntheticAlternativeCandidates(cleanPhone, config.authDir);
-    if (altCandidates && altCandidates.length > 0) {
-      const altPlaceholders = altCandidates.map(() => '?').join(', ');
-      const altMatches = db.prepare(`
-        SELECT * FROM leads
-        WHERE phone IN (${altPlaceholders})
-          AND status IN ('SENT', 'ACTIVE')
-        ORDER BY id DESC
-      `).all(...altCandidates);
-
-      if (altMatches.length === 1) {
-        return altMatches[0];
-      }
-
-      if (altMatches.length > 1) {
-        console.warn(
-          `[Security Audit P0] Colisão detectada na variação sintética de 9º dígito: múltiplos leads encontrados para ${cleanPhone}. Abortando com fail-closed.`
-        );
-        return null;
-      }
-    }
-
-    // =========================================================================
     // ADMIN PHONE CHECK (VERIFICAÇÃO DE TESTADOR AUTORIZADO)
-    // registered explicitly for the admin's own authorized phone number.
-    // NEVER bind the admin to third-party leads!
+    // Registrado explicitamente para o próprio número do admin.
+    // NUNCA vincula o admin a leads de terceiros!
     // =========================================================================
     if (config.authorizedPhone) {
       const authList = config.authorizedPhone
@@ -282,7 +258,7 @@ function findActiveLead(phoneNumber, rawJid = '') {
       }
     }
 
-    // Strict fail-closed: nenhum lead inequívoco encontrado
+    // Strict fail-closed: nenhum lead inequívoco encontrado (sem fallback sintético)
     return null;
   } catch (err) {
     console.error('Erro ao buscar lead ativo:', err.message);

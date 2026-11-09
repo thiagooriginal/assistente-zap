@@ -4218,7 +4218,7 @@
               <td class="py-3 px-3 text-zinc-400 text-[11px]">${date}</td>
               <td class="py-3 px-3 text-right">
                 <div class="flex items-center justify-end gap-1.5">
-                  <button onclick="viewLeadConversation('${cleanPhone}', '${safeName}', '${(lead.agent_name || lead.agent_key).replace(/'/g, '')}')" class="px-2.5 py-1 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-[10px] transition cursor-pointer flex items-center gap-1">
+                  <button onclick="viewLeadConversation(${lead.id}, '${cleanPhone}', '${safeName}', '${(lead.agent_name || lead.agent_key).replace(/'/g, '')}')" class="px-2.5 py-1 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold text-[10px] transition cursor-pointer flex items-center gap-1">
                     💬 Diálogo
                   </button>
                   <button onclick="fillPixFromLead('${safeName}', '${cleanPhone}')" class="px-2.5 py-1 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-400 hover:opacity-90 text-black font-extrabold text-[10px] transition cursor-pointer">
@@ -4368,19 +4368,21 @@
       }
     }
 
-    async function viewLeadConversation(phone, name, agentName) {
+    async function viewLeadConversation(leadIdOrPhone, phone, name, agentName) {
       const modal = document.getElementById('leadChatModal');
       const title = document.getElementById('leadChatTitle');
       const sub = document.getElementById('leadChatSub');
       const body = document.getElementById('leadChatBody');
 
+      const displayPhone = phone || (typeof leadIdOrPhone === 'string' && leadIdOrPhone.length >= 10 ? leadIdOrPhone : '');
       if (title) title.innerText = `💬 Diálogo com ${name || 'Lead'} • ${agentName || 'Agente'}`;
-      if (sub) sub.innerText = `WhatsApp: ${phone}`;
+      if (sub) sub.innerText = displayPhone ? `WhatsApp: ${displayPhone}` : `Lead ID: ${leadIdOrPhone}`;
       if (body) body.innerHTML = '<div class="py-8 text-center text-zinc-500">Carregando mensagens da conversa...</div>';
       if (modal) modal.classList.remove('hidden');
 
       try {
-        const res = await fetch(`/api/admin/lead-conversation/${phone}`);
+        const target = leadIdOrPhone || phone;
+        const res = await fetch(`/api/admin/lead-conversation/${target}`);
         const json = await res.json();
         const msgs = json.messages || [];
 

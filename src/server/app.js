@@ -1425,18 +1425,65 @@ app.get('/api/admin/leads', requireAdmin, (req, res) => {
   }
 });
 
-app.get('/api/admin/lead-conversation/:phone', requireAdmin, (req, res) => {
+app.get('/api/admin/lead-conversation/:identifier', requireAdmin, (req, res) => {
   try {
-    const cleanPhone = String(req.params.phone || '').replace(/\D/g, '');
-    const suffix = cleanPhone.length >= 8 ? cleanPhone.slice(-8) : cleanPhone;
+    const rawId = String(req.params.identifier || '').trim();
+    if (!rawId) {
+      return res.status(400).json({ success: false, error: 'Identificador de lead obrigatório.' });
+    }
+
+    // 1. Prioridade A: Identificador é um lead_id numérico primário
+    const numericId = parseInt(rawId, 10);
+    if (!isNaN(numericId) && numericId > 0 && String(numericId) === rawId) {
+      const lead = db.prepare('SELECT id, name, phone, agent_name, agent_key FROM leads WHERE id = ?').get(numericId);
+      if (lead) {
+        const messages = db.prepare(`
+          SELECT id, lead_id, phone, agent_key, role, content, created_at
+          FROM agent_messages
+          WHERE lead_id = ?
+          ORDER BY id ASC
+        `).all(lead.id);
+
+        return res.json({
+          success: true,
+          mode: 'lead_id',
+          lead,
+          messages,
+        });
+      }
+    }
+
+    // 2. Prioridade B: Identificador é um número de telefone com DDD válido (sem LIKE %suffix)
+    const cleanPhone = phoneUtils.cleanDigits(rawId);
+    if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 13) {
+      return res.status(400).json({
+        success: false,
+        error: 'Número de telefone inválido para consulta (mínimo 10 dígitos com DDD válido).'
+      });
+    }
+
+    const candidates = phoneUtils.getExactPhoneCandidates(cleanPhone);
+    if (!candidates || candidates.length === 0) {
+      return res.json({ success: true, mode: 'phone', messages: [] });
+    }
+
+    const placeholders = candidates.map(() => '?').join(', ');
     const messages = db.prepare(`
-      SELECT * FROM agent_messages
-      WHERE phone = ? OR phone LIKE ?
+      SELECT id, lead_id, phone, agent_key, role, content, created_at
+      FROM agent_messages
+      WHERE phone IN (${placeholders})
       ORDER BY id ASC
-    `).all(cleanPhone, `%${suffix}`);
-    res.json({ success: true, messages });
+    `).all(...candidates);
+
+    return res.json({
+      success: true,
+      mode: 'phone',
+      phone: cleanPhone,
+      messages,
+    });
   } catch (err) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('Erro em /api/admin/lead-conversation:', err);
+    return res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -1583,14 +1630,23 @@ async function handleLeadTestRequest(req, res) {
     const messageText = templateFn(safeName);
     const targetJid = `${cleanPhone}@s.whatsapp.net`;
 
-    let leadId = null;
-    try {
-      const resolvedAgentKey = agentKey || 'OTHER';
-      const resolvedAgentName = agentName || 'Agente RAIA';
-      const phoneCandidates = phoneUtils.getExactPhoneCandidates(cleanPhone);
-      const phonePlaceholders = phoneCandidates.map(() => '?').join(', ');
+    const resolvedAgentKey = agentKey || 'OTHER';
+    const resolvedAgentName = agentName || 'Agente RAIA';
+    const phoneCandidates = phoneUtils.getExactPhoneCandidates(cleanPhone);
+    if (!phoneCandidates || phoneCandidates.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Por favor, informe um WhatsApp válido com DDD válido (ex: 11999998888).'
+      });
+    }
 
-      // Inativar leads anteriores para o mesmo telefone e agente mantendo a base atômica e higienizada
+    const phonePlaceholders = phoneCandidates.map(() => '?').join(', ');
+    let leadId = null;
+
+    // Transação atômica síncrona com BEGIN IMMEDIATE
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      // 1. Inativa leads anteriores concorrentes para o mesmo telefone e agente
       db.prepare(`
         UPDATE leads
         SET status = 'SUPERSEDED'
@@ -1599,13 +1655,22 @@ async function handleLeadTestRequest(req, res) {
           AND status IN ('SENT', 'ACTIVE')
       `).run(...phoneCandidates, resolvedAgentKey);
 
+      // 2. Insere o novo lead com status inicial 'SENT'
       const info = db.prepare(`
         INSERT INTO leads (name, phone, agent_key, agent_name, status)
         VALUES (?, ?, ?, ?, 'SENT')
       `).run(name.trim(), cleanPhone, resolvedAgentKey, resolvedAgentName);
+
       leadId = info.lastInsertRowid;
-    } catch (e) {
-      console.warn('Erro ao salvar lead na tabela leads:', e.message);
+      db.exec('COMMIT');
+    } catch (txErr) {
+      try { db.exec('ROLLBACK'); } catch (_) {}
+      console.error('[handleLeadTestRequest] Erro na transação atômica de leads:', txErr.message);
+      return res.status(500).json({
+        success: false,
+        error: 'Erro interno ao registrar lead no banco de dados.',
+        code: 'LEAD_PERSISTENCE_FAILED'
+      });
     }
 
     const isConnected = whatsappClient.isWhatsAppConnected ? whatsappClient.isWhatsAppConnected() : false;

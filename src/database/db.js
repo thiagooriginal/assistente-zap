@@ -989,7 +989,9 @@ try {
   if (config.authorizedPhone) {
     const phones = config.authorizedPhone.split(',').map(p => p.trim().replace(/\D/g, '')).filter(Boolean);
     for (const p of phones) {
-      db.prepare(`UPDATE users SET role = 'ADMIN', plan = 'PRO' WHERE phone_number LIKE ?`).run(`%${p.slice(-8)}`);
+      const with55 = p.startsWith('55') ? p : `55${p}`;
+      const without55 = p.startsWith('55') ? p.slice(2) : p;
+      db.prepare(`UPDATE users SET role = 'ADMIN', plan = 'PRO' WHERE phone_number = ? OR phone_number = ?`).run(with55, without55);
     }
   }
 } catch (err) {

@@ -149,17 +149,17 @@ async function runTests() {
     assert.ok(matchNoDdi, 'Deveria localizar lead mesmo sem DDI 55');
     assert.equal(matchNoDdi.id, leadCampinas.lastInsertRowid);
 
-    // Consulta enviada sem o 9º dígito (formato antigo 8 dígitos): '551988881111'
+    // Consulta enviada sem o 9º dígito (formato fixo 8 dígitos): '551988881111'
+    // Saneamento Comando 017: A presunção sintética 8 <-> 9 dígitos foi EXTINTA.
+    // Celular 9D e Fixo 8D são identidades distintas -> NUNCA devem colidir.
     const matchNoNine = agentChatService.findActiveLead('551988881111');
-    assert.ok(matchNoNine, 'Deveria localizar lead mesmo com variação do 9º dígito no mesmo DDD');
-    assert.equal(matchNoNine.id, leadCampinas.lastInsertRowid);
+    assert.equal(matchNoNine, null, 'Comando 017: Fixo 8D sem cadastro NÃO pode assumir identidade de celular 9D');
 
     // Consulta enviada sem DDI e sem 9º dígito: '1988881111'
     const matchLocalEight = agentChatService.findActiveLead('1988881111');
-    assert.ok(matchLocalEight, 'Deveria localizar lead sem DDI e sem nono dígito no mesmo DDD');
-    assert.equal(matchLocalEight.id, leadCampinas.lastInsertRowid);
+    assert.equal(matchLocalEight, null, 'Comando 017: Fixo local 8D sem cadastro NÃO pode assumir celular 9D');
 
-    console.log('  ✓ Variações canônicas de DDI e 9º dígito no mesmo DDD identificadas perfeitamente.\n');
+    console.log('  ✓ Variações canônicas de DDI resolvidas e presunção sintética 8 vs 9 dígitos bloqueada com sucesso.\n');
     passedTests++;
 
     // -------------------------------------------------------------
