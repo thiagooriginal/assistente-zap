@@ -19,6 +19,39 @@ const phoneUtils = require('../utils/phoneUtils');
 let currentSock = null;
 let lastKnownUserJid = null;
 
+/**
+ * Verifica se o transporte real de mensagens via WhatsApp (rede Baileys) é autorizado.
+ * Implementa política rigorosamente fail-closed (Proteções 11 e 12 da Matriz RAIA-27).
+ *
+ * @returns {boolean} True se e somente se o ambiente for produção explícita e todas as flags permitirem envio real.
+ */
+function isRealWhatsAppTransportAllowed() {
+  const mode = String(process.env.APP_MODE || '').toLowerCase().trim();
+  const nodeEnv = String(process.env.NODE_ENV || '').toLowerCase().trim();
+  const isHomologacao = process.env.HOMOLOGACAO === 'true';
+  const isAllowSending = process.env.ALLOW_WHATSAPP_SENDING === 'true';
+
+  // 1. Proibição expressa de testes, homologação e staging
+  if (nodeEnv === 'test') return false;
+  if (isHomologacao) return false;
+  if (['staging', 'homologacao', 'test'].includes(mode)) return false;
+
+  // 2. Flags de desativação explícita
+  if (process.env.DISABLE_WHATSAPP === 'true') return false;
+  if (process.env.DISABLE_WHATSAPP_BOT === 'true') return false;
+  if (process.env.DISABLE_WHATSAPP_DISPATCH === 'true') return false;
+  if (process.env.WHATSAPP_ENABLED === 'false') return false;
+
+  // 3. Exigência positiva mandatória de autorização de envio
+  if (!isAllowSending) return false;
+
+  // 4. Exigência positiva de ambiente de produção autorizado
+  const isExplicitProd = mode === 'production' || nodeEnv === 'production';
+  if (!isExplicitProd) return false;
+
+  return true;
+}
+
 function getTargetJid() {
   if (config.authorizedPhone) {
     const clean = config.authorizedPhone.split(',')[0].trim().replace(/[^0-9]/g, '');
@@ -59,19 +92,8 @@ async function sendWhatsAppMessage(jid, text) {
   }
 
   // 2. Hard Staging Lock na Camada Final de Transporte (Proteção 12 / OWASP ASVS 5.0)
-  // Em staging/homologacao ou flags de desativação, NUNCA despachar para o Baileys e NUNCA permitir bypass via ALLOW_WHATSAPP_SENDING
-  const mode = (process.env.APP_MODE || '').toLowerCase();
-  const isStagingEnv =
-    Boolean(config.isStaging) ||
-    mode === 'staging' ||
-    mode === 'homologacao' ||
-    process.env.HOMOLOGACAO === 'true' ||
-    process.env.DISABLE_WHATSAPP === 'true' ||
-    process.env.DISABLE_WHATSAPP_BOT === 'true' ||
-    process.env.DISABLE_WHATSAPP_DISPATCH === 'true' ||
-    process.env.WHATSAPP_ENABLED === 'false';
-
-  if (isStagingEnv) {
+  // Em staging/homologacao/test ou sem autorização explícita, NUNCA despachar para o Baileys
+  if (!isRealWhatsAppTransportAllowed()) {
     const simMessageId = 'sim_wa_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
     const nowTs = Math.floor(Date.now() / 1000);
 
@@ -288,6 +310,7 @@ async function startWhatsAppBot() {
 module.exports = {
   startWhatsAppBot,
   sendWhatsAppMessage,
+  isRealWhatsAppTransportAllowed,
   getTargetJid,
   isWhatsAppConnected: () => Boolean(currentSock && currentSock.user),
   getWhatsAppUser: () => currentSock?.user || null,

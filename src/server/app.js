@@ -1698,81 +1698,105 @@ async function handleLeadTestRequest(req, res) {
     }
 
     const isConnected = whatsappClient.isWhatsAppConnected ? whatsappClient.isWhatsAppConnected() : false;
-    const mode = (process.env.APP_MODE || '').toLowerCase();
-    const isStagingEnv = mode === 'staging' || mode === 'homologacao' || process.env.HOMOLOGACAO === 'true' || process.env.NODE_ENV === 'test' || process.env.ALLOW_WHATSAPP_SENDING !== 'true';
+    const isRealTransportAllowed = whatsappClient.isRealWhatsAppTransportAllowed ? whatsappClient.isRealWhatsAppTransportAllowed() : false;
+    const canAttemptSend = !isRealTransportAllowed || isConnected;
 
-    if (isConnected || isStagingEnv) {
-      let sendResult = null;
+    let sendResult = null;
+    let sendError = null;
+
+    if (canAttemptSend) {
       try {
         sendResult = await whatsappClient.sendWhatsAppMessage(targetJid, messageText);
-        console.log(`[Lead Teste] Mensagem do agente ${agentName || agentKey} processada para ${cleanPhone} (${name}) | Simulado: ${Boolean(sendResult?.simulated)}`);
+        console.log(`[Lead Teste] Mensagem do agente ${agentName || agentKey} processada para ${cleanPhone} (${name}) | Real: ${Boolean(sendResult?.sent)} | Simulado: ${Boolean(sendResult?.simulated)}`);
       } catch (sendErr) {
+        sendError = sendErr;
         console.warn(`[Lead Teste] Falha no envio WhatsApp para ${cleanPhone}:`, sendErr.message);
+        sendResult = null;
       }
-      
-      // Register welcome message in conversation history so the agent continues naturally
+    } else {
+      console.warn(`[Lead Teste] WhatsApp desconectado em produção ao tentar enviar para ${cleanPhone}`);
+    }
+
+    const directUrl = `https://wa.me/5511951364159?text=${encodeURIComponent(`Olá, sou ${name.trim()} (${cleanPhone}). Gostaria de testar o Agente ${agentName || agentKey}!`)}`;
+
+    // Track lead in marketing analytics & Meta CAPI (o lead foi persistido com sucesso)
+    try {
+      analyticsService.recordEvent({
+        eventName: 'demo_requested',
+        utmSource: req.body?.utmSource || 'site',
+        pageUrl: req.headers.referer || `${config.baseUrl}/solucoes/${nicheSlug}`,
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        metadata: { niche: nicheSlug, agentKey, name: name.trim() },
+      });
+
+      metaCapiService.sendMetaCapiEvent({
+        eventName: 'Lead',
+        eventSourceUrl: req.headers.referer || config.baseUrl,
+        userData: {
+          phone: cleanPhone,
+          ip: req.ip,
+          userAgent: req.headers['user-agent'],
+        },
+        customData: {
+          contentName: agentName || agentKey,
+          status: 'DEMO_REQUESTED',
+        },
+      }).catch(() => {});
+    } catch (trackErr) {}
+
+    // Cenário 1: Envio Real Concluído e Confirmado pelo Baileys
+    if (sendResult && sendResult.sent) {
       try {
         agentChatService.recordMessage(leadId, cleanPhone, agentKey || 'OTHER', 'assistant', messageText);
       } catch (errRec) {
         console.warn('Erro ao registrar mensagem inicial no histórico do agente:', errRec.message);
       }
 
-      // Track lead in marketing analytics & Meta CAPI
-      try {
-        analyticsService.recordEvent({
-          eventName: 'demo_requested',
-          utmSource: req.body?.utmSource || 'site',
-          pageUrl: req.headers.referer || `${config.baseUrl}/solucoes/${nicheSlug}`,
-          ip: req.ip,
-          userAgent: req.headers['user-agent'],
-          metadata: { niche: nicheSlug, agentKey, name: name.trim() },
-        });
-
-        metaCapiService.sendMetaCapiEvent({
-          eventName: 'Lead',
-          eventSourceUrl: req.headers.referer || config.baseUrl,
-          userData: {
-            phone: cleanPhone,
-            ip: req.ip,
-            userAgent: req.headers['user-agent'],
-          },
-          customData: {
-            contentName: agentName || agentKey,
-            status: 'DEMO_REQUESTED',
-          },
-        }).catch(() => {});
-      } catch (trackErr) {}
-
-      if (sendResult?.simulated) {
-        return res.json({
-          success: true,
-          sent: false,
-          simulated: true,
-          phone: cleanPhone,
-          message: 'Ambiente de homologação/staging: envio simulado com sucesso (nenhuma mensagem real enviada).'
-        });
-      }
-
       return res.json({
         success: true,
         sent: true,
         simulated: false,
+        leadCreated: true,
         phone: cleanPhone,
         message: `Mensagem enviada com sucesso para o WhatsApp ${cleanPhone}! Verifique seu celular agora.`
       });
-    } else {
-      console.warn(`[Lead Teste] WhatsApp desconectado ao tentar enviar para ${cleanPhone}`);
-      const directUrl = `https://wa.me/5511951364159?text=${encodeURIComponent(`Olá, sou ${name.trim()} (${cleanPhone}). Gostaria de testar o Agente ${agentName || agentKey}!`)}`;
+    }
+
+    // Cenário 2: Envio Simulado Concluído com Sucesso (Homologação / Staging / Testes)
+    if (sendResult && sendResult.simulated) {
+      try {
+        agentChatService.recordMessage(leadId, cleanPhone, agentKey || 'OTHER', 'assistant', messageText);
+      } catch (errRec) {
+        console.warn('Erro ao registrar mensagem inicial simulada no histórico do agente:', errRec.message);
+      }
+
       return res.json({
         success: true,
         sent: false,
-        fallbackUrl: directUrl,
-        message: `Contato registrado com sucesso! O assistente está conectando. Você também pode abrir diretamente.`
+        simulated: true,
+        isSimulated: true,
+        leadCreated: true,
+        phone: cleanPhone,
+        message: 'Ambiente de homologação/staging: envio simulado com sucesso (nenhuma mensagem real enviada).'
       });
     }
+
+    // Cenário 3: Falha de Transporte, Socket Desconectado ou Envio Bloqueado
+    // O lead permanece salvo no banco com seu ID válido, mas NENHUMA mensagem fantasma é gravada em agent_messages!
+    return res.json({
+      success: true,
+      sent: false,
+      simulated: false,
+      leadCreated: true,
+      phone: cleanPhone,
+      fallbackUrl: directUrl,
+      directUrl: directUrl,
+      message: 'Contato registrado com sucesso! O assistente está conectando. Você também pode abrir diretamente no WhatsApp.'
+    });
   } catch (err) {
-    console.error('Erro em /api/test-agent / leads/request-test:', err);
-    return res.status(500).json({ success: false, error: 'Erro interno ao processar envio: ' + err.message });
+    console.error('Erro em /api/test-agent / leads/request-test:', err.message);
+    return res.status(500).json({ success: false, error: 'Erro interno ao processar envio de demonstração.', code: 'LEAD_TEST_INTERNAL_ERROR' });
   }
 }
 
@@ -3542,4 +3566,4 @@ function startServer(port = 3333) {
   });
 }
 
-module.exports = { app, startServer };
+module.exports = { app, startServer, handleLeadTestRequest };

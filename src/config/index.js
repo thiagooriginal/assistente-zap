@@ -38,6 +38,17 @@ const config = {
 
   // Hotmart Integration
   hotmartWebhookSecret: (process.env.HOTMART_WEBHOOK_SECRET || process.env.HOTMART_HOTTOK || '').trim(),
+
+  // Dynamic Environment Helpers (Proteção 11 e 12)
+  get isStaging() {
+    const mode = (process.env.APP_MODE || '').toLowerCase();
+    return mode === 'staging' || mode === 'homologacao' || mode === 'test' || process.env.HOMOLOGACAO === 'true' || process.env.NODE_ENV === 'test';
+  },
+  get isProduction() {
+    const mode = (process.env.APP_MODE || '').toLowerCase();
+    const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
+    return (mode === 'production' || nodeEnv === 'production') && !this.isStaging;
+  },
   hotmartProductId: (process.env.HOTMART_PRODUCT_ID || '8840376').trim(),
   hotmartPlanStartId: (process.env.HOTMART_PLAN_START_ID || '').trim(),
   hotmartPlanProId: (process.env.HOTMART_PLAN_PRO_ID || '').trim(),

@@ -242,14 +242,25 @@ function enqueueNotificationTx(userId, appointmentId, eventType, data = {}) {
   const dedupHash = crypto.createHash('sha256').update(rawSignature).digest('hex');
 
   const existingRecent = db.prepare(`
-    SELECT id FROM whatsapp_notification_outbox
+    SELECT id, status FROM whatsapp_notification_outbox
     WHERE dedup_hash = ?
+      AND status IN ('PENDING', 'PROCESSING', 'SENT', 'SIMULATED', 'DEDUPLICATED')
       AND created_at >= datetime('now', '-5 minutes')
+    ORDER BY id DESC
     LIMIT 1
   `).get(dedupHash);
 
   if (existingRecent) {
-    return { success: true, deduplicated: true, message: 'Notificação recente com conteúdo idêntico já enviada ou enfileirada.' };
+    const isPendingOrProcessing = existingRecent.status === 'PENDING' || existingRecent.status === 'PROCESSING';
+    return {
+      success: true,
+      deduplicated: true,
+      reused: isPendingOrProcessing,
+      outboxId: existingRecent.id,
+      message: isPendingOrProcessing
+        ? 'Notificação idêntica já enfileirada e aguardando processamento.'
+        : 'Notificação recente com conteúdo idêntico já enviada ou enfileirada.'
+    };
   }
 
   const info = db.prepare(`

@@ -361,7 +361,7 @@ async function _processSingleWhatsAppItem(item) {
       if (item.appointment_id && item.appointment_id > 0) {
         db.prepare(`
           UPDATE appointments
-          SET whatsapp_notified = 1, updated_at = CURRENT_TIMESTAMP
+          SET whatsapp_notified = 2, updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `).run(item.appointment_id);
       }
@@ -407,6 +407,11 @@ async function _processSingleWhatsAppItem(item) {
     `).run(isFinal ? 'FAILED' : 'PENDING', newAttempts, sanitizedError, nextRetry, item.id);
 
     // Salvaguarda: NUNCA atualiza whatsapp_notified = 1 em caso de erro!
+    if (item.appointment_id && item.appointment_id > 0) {
+      try {
+        db.prepare('UPDATE appointments SET whatsapp_notified = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(item.appointment_id);
+      } catch (_) {}
+    }
 
     return {
       success: false,

@@ -40,10 +40,11 @@ fs.mkdirSync(tempAuthDir, { recursive: true });
 process.env.DB_PATH = tempDbFile;
 process.env.AUTH_DIR = tempAuthDir;
 
-// Configurações iniciais isoladas
-process.env.APP_MODE = 'test';
-process.env.NODE_ENV = 'test';
-delete process.env.ALLOW_WHATSAPP_SENDING;
+// Configurações iniciais isoladas (habilita transporte de produção com mock para testes 1 a 8)
+process.env.APP_MODE = 'production';
+process.env.NODE_ENV = 'production';
+process.env.ALLOW_WHATSAPP_SENDING = 'true';
+delete process.env.HOMOLOGACAO;
 
 const db = require('../src/database/db');
 const whatsappClient = require('../src/whatsapp/client');
