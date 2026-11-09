@@ -534,8 +534,11 @@
     /* Adaptive Dropdowns and Popovers in Modals */
     #aptTimeDropdown,
     #rescheduleTimeDropdown {
-      max-height: 250px !important;
+      width: 280px;
+      max-width: min(320px, calc(100vw - 32px));
+      max-height: 260px !important;
       overflow-y: auto !important;
+      border-radius: 1rem !important;
     }
     #aptBeautyCalendarPopover,
     #rescheduleBeautyCalendarPopover {
@@ -546,6 +549,13 @@
     #rescheduleAvailableSlotsList {
       max-height: 180px !important;
       overflow-y: auto !important;
+    }
+    #aptAvailableSlotsList button.slot-selected,
+    #rescheduleAvailableSlotsList button.slot-selected {
+      background-color: #00F59B !important;
+      color: #07080c !important;
+      border-color: #00F59B !important;
+      font-weight: 700 !important;
     }
 
     /* Clear Contrast for Disabled vs Enabled Submit Buttons */
@@ -577,19 +587,76 @@
       box-shadow: 0 20px 35px -5px rgba(78, 59, 49, 0.18), 0 0 0 1px rgba(200, 155, 109, 0.15) !important;
     }
 
+    body.theme-jessica-beauty #aptTimeDropdown > div:first-child,
+    body.theme-jessica-beauty #rescheduleTimeDropdown > div:first-child {
+      border-bottom-color: #E6D6CA !important;
+      color: var(--beauty-text-primary) !important;
+    }
+
+    body.theme-jessica-beauty #aptTimeDropdown .lucide-clock,
+    body.theme-jessica-beauty #rescheduleTimeDropdown .lucide-clock {
+      color: #AD7B42 !important;
+    }
+
+    body.theme-jessica-beauty #aptSlotsCountBadge,
+    body.theme-jessica-beauty #rescheduleSlotsCountBadge {
+      background-color: #F3E6DB !important;
+      color: #7A6255 !important;
+      border: 1px solid #D9C8BA !important;
+      font-weight: 600 !important;
+    }
+
+    body.theme-jessica-beauty #btnCloseAptTimeDropdown,
+    body.theme-jessica-beauty #btnCloseRescheduleTimeDropdown {
+      color: #7A6255 !important;
+    }
+    body.theme-jessica-beauty #btnCloseAptTimeDropdown:hover,
+    body.theme-jessica-beauty #btnCloseRescheduleTimeDropdown:hover {
+      background-color: #F3E6DB !important;
+      color: #4E3B31 !important;
+    }
+
+    body.theme-jessica-beauty #aptSlotsLoading,
+    body.theme-jessica-beauty #rescheduleSlotsLoading {
+      color: var(--beauty-text-secondary) !important;
+    }
+    body.theme-jessica-beauty #aptSlotsLoading .lucide-loader-2,
+    body.theme-jessica-beauty #rescheduleSlotsLoading .lucide-loader-2 {
+      color: #AD7B42 !important;
+    }
+
+    body.theme-jessica-beauty #aptSlotsEmptyMsg,
+    body.theme-jessica-beauty #rescheduleSlotsEmptyMsg {
+      color: #8C6239 !important;
+    }
+
     /* Time Slot Buttons inside Dropdown */
     body.theme-jessica-beauty #aptAvailableSlotsList button,
     body.theme-jessica-beauty #rescheduleAvailableSlotsList button {
       background-color: #F7EFE7 !important;
       border: 1px solid var(--beauty-border) !important;
       color: var(--beauty-text-primary) !important;
-      font-weight: 600;
+      font-weight: 600 !important;
+      font-size: 11px !important;
+      padding: 6px 4px !important;
+      border-radius: 8px !important;
+      transition: all 0.15s ease-in-out !important;
     }
     body.theme-jessica-beauty #aptAvailableSlotsList button:hover,
     body.theme-jessica-beauty #rescheduleAvailableSlotsList button:hover {
       background-color: #C89B6D !important;
       color: #FFFFFF !important;
       border-color: #AD7B42 !important;
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(200, 155, 109, 0.3) !important;
+    }
+    body.theme-jessica-beauty #aptAvailableSlotsList button.slot-selected,
+    body.theme-jessica-beauty #rescheduleAvailableSlotsList button.slot-selected {
+      background: linear-gradient(135deg, #C89B6D 0%, #B88554 100%) !important;
+      color: #FFFFFF !important;
+      border-color: #97652E !important;
+      box-shadow: 0 2px 8px rgba(184, 133, 84, 0.4) !important;
+      font-weight: 700 !important;
     }
 
     /* ======================================================== */
@@ -2225,10 +2292,15 @@
                   <p id="aptTimeError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
 
                   <!-- Popover Dropdown de Horários Disponíveis -->
-                  <div id="aptTimeDropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 p-3 rounded-xl bg-[#11131a] border border-white/15 shadow-2xl z-[70] space-y-2">
+                  <div id="aptTimeDropdown" class="hidden absolute left-0 top-full mt-1.5 p-3 rounded-2xl bg-[#11131a] border border-white/15 shadow-2xl z-[70] space-y-2 w-[280px] max-w-[min(320px,calc(100vw-32px))] select-none">
                     <div class="flex items-center justify-between text-[11px] font-semibold text-slate-300 border-b border-white/10 pb-1.5">
-                      <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i> Horários Livres</span>
-                      <span id="aptSlotsCountBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"></span>
+                      <span class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i><span>Horários Livres</span></span>
+                      <div class="flex items-center gap-1.5">
+                        <span id="aptSlotsCountBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold"></span>
+                        <button type="button" id="btnCloseAptTimeDropdown" class="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors" title="Fechar horários">
+                          <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                        </button>
+                      </div>
                     </div>
                     <div id="aptSlotsLoading" class="hidden py-3 text-center text-slate-400 text-xs">
                       <i data-lucide="loader-2" class="w-4 h-4 animate-spin inline-block text-[#00F59B] mb-1"></i>
@@ -2334,10 +2406,16 @@
                   </div>
                   <p id="rescheduleTimeError" class="hidden text-[11px] text-rose-400 mt-1 flex items-center gap-1"></p>
 
-                  <div id="rescheduleTimeDropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 p-3 rounded-xl bg-[#11131a] border border-white/15 shadow-2xl z-[70] space-y-2">
+                  <!-- Popover Dropdown de Horários Disponíveis (Remarcação) -->
+                  <div id="rescheduleTimeDropdown" class="hidden absolute right-0 top-full mt-1.5 p-3 rounded-2xl bg-[#11131a] border border-white/15 shadow-2xl z-[70] space-y-2 w-[280px] max-w-[min(320px,calc(100vw-32px))] select-none">
                     <div class="flex items-center justify-between text-[11px] font-semibold text-slate-300 border-b border-white/10 pb-1.5">
-                      <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i> Horários Livres</span>
-                      <span id="rescheduleSlotsCountBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"></span>
+                      <span class="flex items-center gap-1.5"><i data-lucide="clock" class="w-3.5 h-3.5 text-[#00F59B]"></i><span>Horários Livres</span></span>
+                      <div class="flex items-center gap-1.5">
+                        <span id="rescheduleSlotsCountBadge" class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold"></span>
+                        <button type="button" id="btnCloseRescheduleTimeDropdown" class="p-0.5 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors" title="Fechar horários">
+                          <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                        </button>
+                      </div>
                     </div>
                     <div id="rescheduleSlotsLoading" class="hidden py-3 text-center text-slate-400 text-xs">
                       <i data-lucide="loader-2" class="w-4 h-4 animate-spin inline-block text-[#00F59B] mb-1"></i>
@@ -5692,6 +5770,7 @@
 
           populateStaffSelect(document.getElementById('rescheduleStaffSelect'), apt.staff_id);
           fetchRescheduleSlots(apt.service_id);
+          validateRescheduleFormCompletion();
 
           const modal = document.getElementById('modalRescheduleAppointment');
           modal.classList.remove('hidden');
@@ -5905,7 +5984,7 @@
 
       const isMobile = window.innerWidth < 640;
       const isCalendar = dropdown.id.includes('Calendar') || dropdown.id.includes('Cal');
-      const neededHeight = dropdown.offsetHeight || (isCalendar ? 260 : 200);
+      const neededHeight = dropdown.offsetHeight || (isCalendar ? 260 : 180);
 
       // Limites visíveis seguros dentro do modal e da viewport (evita cortar cabeçalho do modal ou rodapé)
       const topLimit = Math.max(modalRect.top + 45, 12);
@@ -5914,11 +5993,16 @@
       const spaceBelow = bottomLimit - wrapperRect.bottom;
       const spaceAbove = wrapperRect.top - topLimit;
 
-      const canFitBelow = spaceBelow >= (neededHeight + 8);
-      const canFitAbove = spaceAbove >= (neededHeight + 8);
+      const canFitBelow = spaceBelow >= (neededHeight + 6);
+      const canFitAbove = spaceAbove >= (neededHeight + 6);
+
+      // Largura adequada e proporcional ao formulário (aprox. 260 a 320 px em desktop)
+      const targetWidth = isCalendar ? 288 : 280;
+      const calWidthMobile = window.innerWidth < 360 ? 'calc(100vw - 24px)' : (window.innerWidth < 420 ? 'calc(100vw - 32px)' : '300px');
+      const timeWidthMobile = window.innerWidth < 360 ? 'calc(100vw - 24px)' : (window.innerWidth < 420 ? 'calc(100vw - 32px)' : '280px');
 
       // Em dispositivos móveis ou quando não houver espaço suficiente acima ou abaixo sem cortes:
-      // Usar a apresentação centralizada em formato de painel/modal interno seguro
+      // Usar a apresentação centralizada em formato de popover COMPACTO
       if (isMobile || (!canFitBelow && !canFitAbove)) {
         dropdown.style.setProperty('position', 'fixed', 'important');
         dropdown.style.setProperty('top', '50%', 'important');
@@ -5928,38 +6012,47 @@
         dropdown.style.setProperty('transform', 'translate(-50%, -50%)', 'important');
         dropdown.style.setProperty('z-index', '120', 'important');
         dropdown.style.setProperty('margin', '0px', 'important');
-        const calWidth = window.innerWidth < 360 ? 'calc(100vw - 24px)' : (window.innerWidth < 420 ? 'calc(100vw - 32px)' : '300px');
-        dropdown.style.setProperty('width', isCalendar ? calWidth : 'calc(100vw - 32px)', 'important');
-        dropdown.style.setProperty('max-width', '92vw', 'important');
+
+        if (isCalendar) {
+          dropdown.style.setProperty('width', calWidthMobile, 'important');
+          dropdown.style.setProperty('max-width', '92vw', 'important');
+        } else {
+          // Seletor de horários: compacto (280px), NUNCA 100vw em desktop!
+          dropdown.style.setProperty('width', isMobile ? timeWidthMobile : '280px', 'important');
+          dropdown.style.setProperty('max-width', 'min(320px, calc(100vw - 32px))', 'important');
+        }
         dropdown.style.setProperty('box-shadow', '0 25px 60px -15px rgba(78, 59, 49, 0.4), 0 0 0 100vmax rgba(40, 25, 15, 0.45)', 'important');
-      } else if (canFitBelow) {
-        // Abre para baixo com segurança
-        dropdown.style.setProperty('position', 'absolute', 'important');
-        dropdown.style.setProperty('top', 'calc(100% + 6px)', 'important');
-        dropdown.style.setProperty('bottom', 'auto', 'important');
-        dropdown.style.setProperty('left', '0px', 'important');
-        dropdown.style.setProperty('right', 'auto', 'important');
-        dropdown.style.setProperty('transform', 'none', 'important');
-        dropdown.style.setProperty('z-index', '70', 'important');
-        dropdown.style.setProperty('margin-top', '6px', 'important');
-        dropdown.style.setProperty('margin-bottom', '0px', 'important');
-        dropdown.style.setProperty('width', isCalendar ? '18rem' : '100%', 'important');
-        dropdown.style.setProperty('max-width', 'none', 'important');
-        dropdown.style.setProperty('box-shadow', '0 20px 35px -5px rgba(78, 59, 49, 0.22), 0 0 0 1px rgba(200, 155, 109, 0.18)', 'important');
       } else {
-        // Abre para cima com segurança
+        // Posicionamento relativo ao campo (Abaixo ou Acima)
         dropdown.style.setProperty('position', 'absolute', 'important');
-        dropdown.style.setProperty('top', 'auto', 'important');
-        dropdown.style.setProperty('bottom', 'calc(100% + 6px)', 'important');
-        dropdown.style.setProperty('left', '0px', 'important');
-        dropdown.style.setProperty('right', 'auto', 'important');
         dropdown.style.setProperty('transform', 'none', 'important');
         dropdown.style.setProperty('z-index', '70', 'important');
-        dropdown.style.setProperty('margin-top', '0px', 'important');
-        dropdown.style.setProperty('margin-bottom', '6px', 'important');
-        dropdown.style.setProperty('width', isCalendar ? '18rem' : '100%', 'important');
-        dropdown.style.setProperty('max-width', 'none', 'important');
         dropdown.style.setProperty('box-shadow', '0 20px 35px -5px rgba(78, 59, 49, 0.22), 0 0 0 1px rgba(200, 155, 109, 0.18)', 'important');
+
+        // Checar se o popover ultrapassaria o limite direito do modal ou da janela se alinhado à esquerda
+        const willOverflowRight = (wrapperRect.left + targetWidth) > Math.min(modalRect.right, window.innerWidth - 12);
+        if (willOverflowRight) {
+          dropdown.style.setProperty('left', 'auto', 'important');
+          dropdown.style.setProperty('right', '0px', 'important');
+        } else {
+          dropdown.style.setProperty('left', '0px', 'important');
+          dropdown.style.setProperty('right', 'auto', 'important');
+        }
+
+        dropdown.style.setProperty('width', isCalendar ? '18rem' : '280px', 'important');
+        dropdown.style.setProperty('max-width', 'min(320px, calc(100vw - 32px))', 'important');
+
+        if (canFitBelow) {
+          dropdown.style.setProperty('top', 'calc(100% + 6px)', 'important');
+          dropdown.style.setProperty('bottom', 'auto', 'important');
+          dropdown.style.setProperty('margin-top', '6px', 'important');
+          dropdown.style.setProperty('margin-bottom', '0px', 'important');
+        } else {
+          dropdown.style.setProperty('top', 'auto', 'important');
+          dropdown.style.setProperty('bottom', 'calc(100% + 6px)', 'important');
+          dropdown.style.setProperty('margin-top', '0px', 'important');
+          dropdown.style.setProperty('margin-bottom', '6px', 'important');
+        }
       }
     }
 
@@ -6012,16 +6105,23 @@
           if (badgeEl) badgeEl.innerText = `${data.slots.length} livres`;
           if (emptyEl) emptyEl.classList.add('hidden');
 
+          const currentVal = (document.getElementById('aptTimeInput')?.value || document.getElementById('aptTime')?.value || '').trim();
+
           data.slots.forEach(slot => {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'py-1.5 px-2 rounded-lg bg-white/5 hover:bg-[#00F59B] hover:text-[#07080c] text-slate-200 font-semibold text-xs transition-all text-center border border-white/5 hover:border-[#00F59B] cursor-pointer';
+            if (currentVal && slot === currentVal) {
+              btn.classList.add('slot-selected');
+            }
             btn.innerText = slot;
             btn.addEventListener('click', () => {
               const timeInput = document.getElementById('aptTimeInput');
               const timeHidden = document.getElementById('aptTime');
               if (timeInput) timeInput.value = slot;
               if (timeHidden) timeHidden.value = slot;
+              listEl.querySelectorAll('button').forEach(b => b.classList.remove('slot-selected'));
+              btn.classList.add('slot-selected');
               document.getElementById('aptTimeError')?.classList.add('hidden');
               document.getElementById('aptTimeInput')?.classList.remove('border-rose-500');
               document.getElementById('aptTimeDropdown')?.classList.add('hidden');
@@ -6030,6 +6130,10 @@
             });
             listEl.appendChild(btn);
           });
+          const timeDrop = document.getElementById('aptTimeDropdown');
+          if (timeDrop && !timeDrop.classList.contains('hidden')) {
+            positionAdaptiveDropdown(document.getElementById('aptTimePickerWrapper'), timeDrop);
+          }
         } else {
           if (badgeEl) badgeEl.innerText = '0 livres';
           if (emptyEl) {
@@ -6153,23 +6257,35 @@
           if (badgeEl) badgeEl.innerText = `${data.slots.length} livres`;
           if (emptyEl) emptyEl.classList.add('hidden');
 
+          const currentVal = (document.getElementById('rescheduleTimeInput')?.value || document.getElementById('rescheduleTime')?.value || '').trim();
+
           data.slots.forEach(slot => {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'py-1.5 px-2 rounded-lg bg-white/5 hover:bg-[#00F59B] hover:text-[#07080c] text-slate-200 font-semibold text-xs transition-all text-center border border-white/5 hover:border-[#00F59B] cursor-pointer';
+            if (currentVal && slot === currentVal) {
+              btn.classList.add('slot-selected');
+            }
             btn.innerText = slot;
             btn.addEventListener('click', () => {
               const timeInput = document.getElementById('rescheduleTimeInput');
               const timeHidden = document.getElementById('rescheduleTime');
               if (timeInput) timeInput.value = slot;
               if (timeHidden) timeHidden.value = slot;
+              listEl.querySelectorAll('button').forEach(b => b.classList.remove('slot-selected'));
+              btn.classList.add('slot-selected');
               document.getElementById('rescheduleTimeError')?.classList.add('hidden');
               document.getElementById('rescheduleTimeInput')?.classList.remove('border-rose-500');
               document.getElementById('rescheduleTimeDropdown')?.classList.add('hidden');
               checkRescheduleSlot();
+              validateRescheduleFormCompletion();
             });
             listEl.appendChild(btn);
           });
+          const timeDrop = document.getElementById('rescheduleTimeDropdown');
+          if (timeDrop && !timeDrop.classList.contains('hidden')) {
+            positionAdaptiveDropdown(document.getElementById('rescheduleTimePickerWrapper'), timeDrop);
+          }
         } else {
           if (badgeEl) badgeEl.innerText = '0 livres';
           if (emptyEl) {
@@ -6224,6 +6340,7 @@
                   document.getElementById('rescheduleTime').value = slot;
                   if (container) container.classList.add('hidden');
                   checkRescheduleSlot();
+                  validateRescheduleFormCompletion();
                 });
                 pills.appendChild(pill);
               });
@@ -6239,6 +6356,7 @@
             submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
             submitBtn.title = 'Horário indisponível.';
           }
+          validateRescheduleFormCompletion();
         } else if (data.available === true) {
           if (container) container.classList.add('hidden');
           if (submitBtn) {
@@ -6246,6 +6364,7 @@
             submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             submitBtn.removeAttribute('title');
           }
+          validateRescheduleFormCompletion();
         }
       } catch (err) {
         if (err.name === 'AbortError') return;
@@ -6508,6 +6627,48 @@
       }
     }
 
+    // Validador de obrigatoriedade e integridade do formulário de remarcação
+    function validateRescheduleFormCompletion() {
+      const aptId = document.getElementById('rescheduleAptId')?.value;
+      const dateDisplay = document.getElementById('rescheduleDateDisplay')?.value?.trim();
+      const dateIso = document.getElementById('rescheduleDate')?.value?.trim();
+      const timeInput = document.getElementById('rescheduleTimeInput')?.value?.trim();
+      const timeVal = document.getElementById('rescheduleTime')?.value?.trim();
+      const submitBtn = document.getElementById('btnSubmitRescheduleAppointment');
+      if (!submitBtn) return;
+
+      const hasConflict = !document.getElementById('rescheduleSuggestedSlotsContainer')?.classList.contains('hidden');
+      const hasDateErr = !document.getElementById('rescheduleDateError')?.classList.contains('hidden');
+      const hasTimeErr = !document.getElementById('rescheduleTimeError')?.classList.contains('hidden');
+
+      const dateValid = Boolean(dateDisplay && dateDisplay.length === 10 && dateIso && !hasDateErr);
+      const timeValid = Boolean(timeInput && timeInput.length === 5 && timeVal && !hasTimeErr);
+      const isValid = Boolean(aptId && dateValid && timeValid && !hasConflict);
+
+      if (isValid) {
+        submitBtn.disabled = false;
+        submitBtn.removeAttribute('disabled');
+        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        submitBtn.removeAttribute('title');
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.setAttribute('disabled', 'disabled');
+        submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        submitBtn.title = 'Preencha uma data e um horário válidos sem conflito para salvar a remarcação.';
+      }
+    }
+
+    // Fechar seletores de horários pelo botão 'x'
+    document.getElementById('btnCloseAptTimeDropdown')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('aptTimeDropdown')?.classList.add('hidden');
+    });
+
+    document.getElementById('btnCloseRescheduleTimeDropdown')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('rescheduleTimeDropdown')?.classList.add('hidden');
+    });
+
     document.getElementById('aptClientName')?.addEventListener('input', validateAppointmentFormCompletion);
     document.getElementById('aptServiceSelect')?.addEventListener('change', () => {
       validateAppointmentFormCompletion();
@@ -6602,27 +6763,20 @@
           }
           e.target.classList.add('border-rose-500');
           document.getElementById('rescheduleDate').value = '';
-          const submitBtn = document.getElementById('btnSubmitRescheduleAppointment');
-          if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-          }
+          validateRescheduleFormCompletion();
         } else {
           if (errEl) errEl.classList.add('hidden');
           e.target.classList.remove('border-rose-500');
           document.getElementById('rescheduleDate').value = v.iso;
           document.getElementById('rescheduleDatePicker').value = v.iso;
-          const submitBtn = document.getElementById('btnSubmitRescheduleAppointment');
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-          }
+          validateRescheduleFormCompletion();
           fetchRescheduleSlots();
           if (document.getElementById('rescheduleTime')?.value) checkRescheduleSlot();
         }
       } else {
         if (errEl) errEl.classList.add('hidden');
         e.target.classList.remove('border-rose-500');
+        validateRescheduleFormCompletion();
       }
     });
 
@@ -6638,11 +6792,7 @@
       }
       if (errEl) errEl.classList.add('hidden');
       document.getElementById('rescheduleDate').value = iso;
-      const submitBtn = document.getElementById('btnSubmitRescheduleAppointment');
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-      }
+      validateRescheduleFormCompletion();
       fetchRescheduleSlots();
       if (document.getElementById('rescheduleTime')?.value) checkRescheduleSlot();
     });
@@ -6661,20 +6811,19 @@
           }
           e.target.classList.add('border-rose-500');
           document.getElementById('rescheduleTime').value = '';
-          const submitBtn = document.getElementById('btnSubmitRescheduleAppointment');
-          if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
-          }
+          validateRescheduleFormCompletion();
         } else {
           if (errEl) errEl.classList.add('hidden');
           e.target.classList.remove('border-rose-500');
           document.getElementById('rescheduleTime').value = v.time;
           checkRescheduleSlot();
+          validateRescheduleFormCompletion();
         }
       } else {
         if (errEl) errEl.classList.add('hidden');
         e.target.classList.remove('border-rose-500');
+        document.getElementById('rescheduleTime').value = '';
+        validateRescheduleFormCompletion();
       }
     });
 
@@ -6807,6 +6956,8 @@
       const modal = document.getElementById('modalNewAppointment');
       modal.classList.add('hidden');
       modal.classList.remove('flex');
+      document.getElementById('aptTimeDropdown')?.classList.add('hidden');
+      document.getElementById('aptBeautyCalendarPopover')?.classList.add('hidden');
     };
     document.getElementById('btnCloseNewAppointmentModal')?.addEventListener('click', closeNewAppointmentModal);
     document.getElementById('btnCancelNewAppointment')?.addEventListener('click', closeNewAppointmentModal);
@@ -6816,6 +6967,8 @@
       const modal = document.getElementById('modalRescheduleAppointment');
       modal.classList.add('hidden');
       modal.classList.remove('flex');
+      document.getElementById('rescheduleTimeDropdown')?.classList.add('hidden');
+      document.getElementById('rescheduleBeautyCalendarPopover')?.classList.add('hidden');
     };
     document.getElementById('btnCloseRescheduleModal')?.addEventListener('click', closeRescheduleModal);
     document.getElementById('btnCancelRescheduleModal')?.addEventListener('click', closeRescheduleModal);
