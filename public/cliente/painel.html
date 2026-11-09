@@ -6,6 +6,111 @@
   <title>Central do Cliente • RAIA AGENTES | HUB Multiproduto</title>
   <link rel="icon" type="image/png" href="/raia-emblem-small.png">
 
+  <!-- ========================================================================= -->
+  <!-- 🛡️ PRÉ-DETECÇÃO SÍNCRONA DE TEMA E PROTEÇÃO ANTI-FLASH (HEAD EXECUTION)  -->
+  <!-- ========================================================================= -->
+  <script>
+    (function() {
+      try {
+        var h = window.location.hash || '';
+        var s = window.location.search || '';
+        var clean = h.replace(/^#+/, '').replace(/^tab-/, '').split('?')[0].split('&')[0];
+        var jessicaTabs = ['overview', 'salon', 'services', 'staff', 'appointments', 'integrations-google', 'integrations-whatsapp', 'dashboard-pro', 'campaigns-pro'];
+        var isJessica = jessicaTabs.indexOf(clean) !== -1 || s.indexOf('modulo=jessica') !== -1;
+        
+        if (!isJessica && !clean) {
+          for (var i = 0; i < jessicaTabs.length; i++) {
+            if (s.indexOf('tab=' + jessicaTabs[i]) !== -1) {
+              isJessica = true;
+              break;
+            }
+          }
+        }
+
+        var doc = document.documentElement;
+        if (isJessica) {
+          doc.classList.remove('dark');
+          doc.classList.add('theme-jessica-beauty');
+          doc.classList.add('pre-jessica');
+        } else {
+          doc.classList.add('dark');
+          doc.classList.add('theme-raia');
+          doc.classList.add('pre-raia');
+        }
+      } catch (_) {}
+    })();
+  </script>
+
+  <style id="anti-flash-styles">
+    /* Fundo e cores imediatos antes de carregar Tailwind ou renderizar o primeiro frame */
+    html.pre-jessica,
+    html.pre-jessica body {
+      background-color: #F7EFE7 !important;
+      color: #4E3B31 !important;
+    }
+    html.pre-raia,
+    html.pre-raia body {
+      background-color: #07080c !important;
+      color: #F1F5F9 !important;
+    }
+
+    /* Estado de inicialização: esconde o conteúdo operacional e headers desconfigurados */
+    body.app-initializing main,
+    body.app-initializing aside#sidebar {
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+    /* Cortina de inicialização visual suave */
+    #appInitCurtain {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.25s ease-out, visibility 0.25s ease-out;
+    }
+    html.pre-jessica #appInitCurtain {
+      background-color: #F7EFE7 !important;
+      color: #4E3B31 !important;
+    }
+    html.pre-raia #appInitCurtain {
+      background-color: #07080c !important;
+      color: #F1F5F9 !important;
+    }
+    #appInitCurtain.curtain-hidden {
+      opacity: 0 !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+
+    /* Alternância do loader conforme o tema detectado */
+    html.pre-jessica #curtainRaiaContent { display: none !important; }
+    html.pre-jessica #curtainJessicaContent { display: flex !important; }
+    html.pre-raia #curtainRaiaContent { display: flex !important; }
+    html.pre-raia #curtainJessicaContent { display: none !important; }
+
+    @keyframes raiaCurtainPulse {
+      0%, 100% { transform: scale(1); opacity: 0.85; }
+      50% { transform: scale(1.06); opacity: 1; }
+    }
+    .curtain-pulse-logo {
+      animation: raiaCurtainPulse 1.8s ease-in-out infinite;
+    }
+
+    @keyframes raiaDotFlashing {
+      0% { opacity: 0.2; }
+      50% { opacity: 1; }
+      100% { opacity: 0.2; }
+    }
+    .curtain-dot-1 { animation: raiaDotFlashing 1.2s infinite ease-in-out; }
+    .curtain-dot-2 { animation: raiaDotFlashing 1.2s infinite ease-in-out 0.2s; }
+    .curtain-dot-3 { animation: raiaDotFlashing 1.2s infinite ease-in-out 0.4s; }
+  </style>
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -981,7 +1086,49 @@
     }
   </style>
 </head>
-<body class="bg-[#07080c] text-slate-100 min-h-screen flex flex-col md:flex-row antialiased font-sans selection:bg-[#00F59B]/20 selection:text-[#00F59B] theme-raia">
+<body class="min-h-screen flex flex-col md:flex-row antialiased font-sans app-initializing">
+  <script>
+    if (document.documentElement.classList.contains('pre-jessica')) {
+      document.body.className = 'min-h-screen flex flex-col md:flex-row antialiased font-sans theme-jessica-beauty app-initializing';
+    } else {
+      document.body.className = 'bg-[#07080c] text-slate-100 min-h-screen flex flex-col md:flex-row antialiased font-sans selection:bg-[#00F59B]/20 selection:text-[#00F59B] theme-raia app-initializing';
+    }
+  </script>
+
+  <!-- Cortina de Inicialização Controlada Anti-Flash -->
+  <div id="appInitCurtain">
+    <!-- Conteúdo para Módulo Jéssica -->
+    <div id="curtainJessicaContent" class="flex flex-col items-center justify-center text-center p-6 select-none">
+      <div class="w-16 h-16 rounded-full bg-[#FAF0E7] border border-[#EED8C6] shadow-md flex items-center justify-center mb-4 curtain-pulse-logo">
+        <img src="../images/beauty/sidebar-silhouette-trans.png" alt="Módulo Jéssica" class="w-10 h-10 object-contain">
+      </div>
+      <h2 class="text-base font-bold text-[#4E3B31] tracking-tight" style="font-family: 'Playfair Display', Georgia, serif;">Módulo Jéssica</h2>
+      <p class="text-[11px] font-semibold text-[#AD7B42] uppercase tracking-wider mt-1 flex items-center justify-center gap-1.5">
+        <span>Carregando ambiente</span>
+        <span class="inline-flex gap-0.5">
+          <span class="w-1 h-1 rounded-full bg-[#AD7B42] curtain-dot-1"></span>
+          <span class="w-1 h-1 rounded-full bg-[#AD7B42] curtain-dot-2"></span>
+          <span class="w-1 h-1 rounded-full bg-[#AD7B42] curtain-dot-3"></span>
+        </span>
+      </p>
+    </div>
+
+    <!-- Conteúdo para HUB Central RAIA -->
+    <div id="curtainRaiaContent" class="flex flex-col items-center justify-center text-center p-6 select-none">
+      <div class="w-14 h-14 rounded-2xl bg-[#11131a] border border-white/10 shadow-lg flex items-center justify-center mb-4 curtain-pulse-logo">
+        <img src="/raia-emblem-small.png" alt="RAIA" class="w-8 h-8 object-contain">
+      </div>
+      <h2 class="text-base font-extrabold text-white tracking-wide">RAIA AGENTES</h2>
+      <p class="text-[11px] font-semibold text-[#00F59B] uppercase tracking-wider mt-1 flex items-center justify-center gap-1.5">
+        <span>Iniciando central</span>
+        <span class="inline-flex gap-0.5">
+          <span class="w-1 h-1 rounded-full bg-[#00F59B] curtain-dot-1"></span>
+          <span class="w-1 h-1 rounded-full bg-[#00F59B] curtain-dot-2"></span>
+          <span class="w-1 h-1 rounded-full bg-[#00F59B] curtain-dot-3"></span>
+        </span>
+      </p>
+    </div>
+  </div>
 
   <!-- Demo Notice Banner if Demo Account -->
   <div id="demoNoticeBanner" class="hidden fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 text-white text-xs font-bold py-2 px-4 text-center shadow-lg flex items-center justify-center gap-2">
@@ -1355,7 +1502,7 @@
       <!-- ============================================== -->
       <!-- TAB: MEUS PRODUTOS (CENTRAL HUB DEFAULT)       -->
       <!-- ============================================== -->
-      <section id="tab-my-products" class="tab-content space-y-6">
+      <section id="tab-my-products" class="tab-content hidden space-y-6">
         <!-- Welcome Hub Banner -->
         <div class="p-6 rounded-3xl bg-gradient-to-br from-[#11131a] via-[#161a26] to-[#11131a] border border-white/10 relative overflow-hidden">
           <div class="absolute -right-10 -top-10 w-44 h-44 bg-[#00F59B]/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -4454,6 +4601,17 @@
       }
     });
 
+    function revealInterface() {
+      document.body.classList.remove('app-initializing');
+      const curtain = document.getElementById('appInitCurtain');
+      if (curtain) {
+        curtain.classList.add('curtain-hidden');
+        setTimeout(() => {
+          if (curtain && curtain.parentNode) curtain.parentNode.removeChild(curtain);
+        }, 300);
+      }
+    }
+
     // ==========================================
     // 5. PROFILE INITIALIZER & JÉSSICA MODULE DATA
     // ==========================================
@@ -4552,6 +4710,7 @@
         }
 
         switchTab(canonicalTab, false);
+        revealInterface();
       } catch (err) {
         console.error('Erro ao carregar perfil:', err);
         clientData = null;
@@ -4562,6 +4721,8 @@
         // Falha crítica de autenticação: redirecionar com segurança sem expor abas operacionais
         if (window.location.protocol.startsWith('http')) {
           window.location.href = '/cliente/login';
+        } else {
+          revealInterface();
         }
       }
     }
