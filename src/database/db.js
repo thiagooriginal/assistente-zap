@@ -877,6 +877,11 @@ try {
       message_text TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'PENDING',
       attempts INTEGER DEFAULT 0,
+      max_attempts INTEGER DEFAULT 5,
+      next_retry_at TEXT,
+      locked_at TEXT,
+      dedup_hash TEXT,
+      is_simulated INTEGER DEFAULT 0,
       last_error TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       sent_at TEXT
@@ -926,6 +931,7 @@ try {
   ensureColumnExists('whatsapp_notification_outbox', 'locked_at', 'TEXT');
   ensureColumnExists('whatsapp_notification_outbox', 'dedup_hash', 'TEXT');
   ensureColumnExists('whatsapp_notification_outbox', 'is_simulated', 'INTEGER DEFAULT 0');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_wa_outbox_dedup_hash ON whatsapp_notification_outbox(dedup_hash, created_at);');
 } catch (e) {
   console.warn('[Database] Aviso ao inicializar tabelas da Agenda Inteligente:', e.message);
 }

@@ -1698,10 +1698,17 @@ async function handleLeadTestRequest(req, res) {
     }
 
     const isConnected = whatsappClient.isWhatsAppConnected ? whatsappClient.isWhatsAppConnected() : false;
+    const mode = (process.env.APP_MODE || '').toLowerCase();
+    const isStagingEnv = mode === 'staging' || mode === 'homologacao' || process.env.HOMOLOGACAO === 'true' || process.env.NODE_ENV === 'test' || process.env.ALLOW_WHATSAPP_SENDING !== 'true';
 
-    if (isConnected) {
-      await whatsappClient.sendWhatsAppMessage(targetJid, messageText);
-      console.log(`[Lead Teste] Mensagem do agente ${agentName || agentKey} enviada para ${cleanPhone} (${name})`);
+    if (isConnected || isStagingEnv) {
+      let sendResult = null;
+      try {
+        sendResult = await whatsappClient.sendWhatsAppMessage(targetJid, messageText);
+        console.log(`[Lead Teste] Mensagem do agente ${agentName || agentKey} processada para ${cleanPhone} (${name}) | Simulado: ${Boolean(sendResult?.simulated)}`);
+      } catch (sendErr) {
+        console.warn(`[Lead Teste] Falha no envio WhatsApp para ${cleanPhone}:`, sendErr.message);
+      }
       
       // Register welcome message in conversation history so the agent continues naturally
       try {
@@ -1736,9 +1743,20 @@ async function handleLeadTestRequest(req, res) {
         }).catch(() => {});
       } catch (trackErr) {}
 
+      if (sendResult?.simulated) {
+        return res.json({
+          success: true,
+          sent: false,
+          simulated: true,
+          phone: cleanPhone,
+          message: 'Ambiente de homologação/staging: envio simulado com sucesso (nenhuma mensagem real enviada).'
+        });
+      }
+
       return res.json({
         success: true,
         sent: true,
+        simulated: false,
         phone: cleanPhone,
         message: `Mensagem enviada com sucesso para o WhatsApp ${cleanPhone}! Verifique seu celular agora.`
       });
@@ -2828,11 +2846,14 @@ app.post('/api/admin/fix-user-expense', requireAdmin, async (req, res) => {
       `A instabilidade temporária que ocorreu mais cedo na inteligência artificial já foi corrigida, e você já pode continuar utilizando o seu assistente normalmente. Tenha um excelente dia! 🚀`;
 
     const messageText = req.body?.message || defaultMsg;
-    await whatsappClient.sendWhatsAppMessage(targetUser.phone_number, messageText);
+    const sendResult = await whatsappClient.sendWhatsAppMessage(targetUser.phone_number, messageText);
 
     return res.json({
       success: true,
-      message: 'Gasto registrado e mensagem enviada com sucesso ao cliente!',
+      message: sendResult?.simulated
+        ? 'Gasto registrado e mensagem de WhatsApp simulada com sucesso (modo homologação/staging).'
+        : 'Gasto registrado e mensagem enviada com sucesso ao cliente!',
+      whatsapp: sendResult,
       user: {
         id: targetUser.id,
         phone: targetUser.phone_number,

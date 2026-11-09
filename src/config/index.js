@@ -12,7 +12,7 @@ const config = {
   googleCalendarId: process.env.GOOGLE_CALENDAR_ID || 'primary',
   baseUrl: process.env.BASE_URL || 'https://raiaagentes.com.br',
   dbPath: process.env.DB_PATH ? path.resolve(process.env.DB_PATH) : path.resolve(__dirname, '../../data/assistant.db'),
-  authDir: path.resolve(__dirname, '../../auth_info_baileys'),
+  authDir: process.env.AUTH_DIR ? path.resolve(process.env.AUTH_DIR) : path.resolve(__dirname, '../../auth_info_baileys'),
   googleCredentialsPath: path.resolve(__dirname, '../../google_credentials.json'),
   googleTokenPath: path.resolve(__dirname, '../../google_token.json'),
   pixKey: process.env.PIX_KEY || '+5511951364159',

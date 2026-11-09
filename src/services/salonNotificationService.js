@@ -236,24 +236,20 @@ function enqueueNotificationTx(userId, appointmentId, eventType, data = {}) {
       messageText = data.text || 'Notificação RAIA Agentes';
   }
 
-  // Prevenção de duplicação: não enfileirar notificação idêntica para o mesmo compromisso e evento nos últimos 5 minutos
-  const dedupHash = crypto
-    .createHash('sha256')
-    .update(`${userId}:${appointmentId}:${eventType}:${settings.notificationPhone}`)
-    .digest('hex');
+  // Prevenção de duplicação consciente de conteúdo: não enfileirar notificação idêntica para o mesmo compromisso e evento nos últimos 5 minutos
+  const contentNormalized = String(messageText || '').trim().replace(/\s+/g, ' ');
+  const rawSignature = `${userId}:${appointmentId || 0}:${eventType}:${settings.notificationPhone}:${contentNormalized}`;
+  const dedupHash = crypto.createHash('sha256').update(rawSignature).digest('hex');
 
   const existingRecent = db.prepare(`
     SELECT id FROM whatsapp_notification_outbox
-    WHERE (
-      (user_id = ? AND appointment_id = ? AND event_type = ?)
-      OR dedup_hash = ?
-    )
-    AND created_at >= datetime('now', '-5 minutes')
+    WHERE dedup_hash = ?
+      AND created_at >= datetime('now', '-5 minutes')
     LIMIT 1
-  `).get(userId, appointmentId, eventType, dedupHash);
+  `).get(dedupHash);
 
   if (existingRecent) {
-    return { success: true, deduplicated: true, message: 'Notificação recente já enviada ou enfileirada.' };
+    return { success: true, deduplicated: true, message: 'Notificação recente com conteúdo idêntico já enviada ou enfileirada.' };
   }
 
   const info = db.prepare(`
@@ -336,10 +332,18 @@ async function sendTestNotification(userId, customPhone = null) {
   const outboxId = info.lastInsertRowid;
   const dispatchResult = await dispatchOutboxItem(outboxId);
 
+  const isSuccess = Boolean(dispatchResult?.success);
   return {
-    success: true,
+    success: isSuccess,
+    sent: dispatchResult?.sent || false,
+    simulated: dispatchResult?.simulated || false,
     recipient: targetPhone,
-    message: 'Disparo de teste processado com sucesso!',
+    message: isSuccess
+      ? (dispatchResult?.simulated
+          ? 'Disparo de teste simulado com sucesso (Modo Homologação: sem cobrança ou envio real).'
+          : 'Mensagem de teste enviada com sucesso para o WhatsApp configurado!')
+      : 'Falha ao processar disparo de teste no WhatsApp.',
+    error: dispatchResult?.error || null,
     dispatchResult,
   };
 }

@@ -320,35 +320,38 @@ async function _processSingleWhatsAppItem(item) {
   const whatsappClient = require('../whatsapp/client');
 
   try {
-    // 1. Deduplicação persistente (últimos 5 minutos para o mesmo agendamento e evento)
-    if (item.appointment_id && item.appointment_id > 0) {
+    // 1. Deduplicação Fina Baseada em Hash de Conteúdo (dedup_hash nos últimos 5 minutos)
+    // Permite remarcações ou alterações legítimas com conteúdo diferente sem bloqueio espúrio
+    if (item.dedup_hash) {
       const recentDuplicate = db.prepare(`
         SELECT id FROM whatsapp_notification_outbox
-        WHERE user_id = ? AND appointment_id = ? AND event_type = ?
+        WHERE dedup_hash = ?
           AND status IN ('SENT', 'SIMULATED')
           AND datetime(sent_at) >= datetime('now', '-5 minutes')
           AND id != ?
         LIMIT 1
-      `).get(item.user_id, item.appointment_id, item.event_type, item.id);
+      `).get(item.dedup_hash, item.id);
 
       if (recentDuplicate) {
         db.prepare(`
           UPDATE whatsapp_notification_outbox
-          SET status = 'DEDUPLICATED', sent_at = CURRENT_TIMESTAMP, last_error = 'Mensagem recente idêntica já enviada.', locked_at = NULL
+          SET status = 'DEDUPLICATED', sent_at = CURRENT_TIMESTAMP, last_error = 'Mensagem com conteúdo idêntico já entregue recentemente.', locked_at = NULL
           WHERE id = ?
         `).run(item.id);
         return { success: true, deduplicated: true, status: 'DEDUPLICATED' };
       }
     }
 
-    // 2. Hard Staging Lock (Proteção 12 / ASVS 5.0):
-    // Sob staging/homologacao/test/disable, NUNCA despachar para redes reais e NUNCA marcar status='SENT'.
-    // ALLOW_WHATSAPP_SENDING não pode contornar o bloqueio de staging.
-    const isStaging = isHardStagingOrTest();
-    const allowSending = process.env.ALLOW_WHATSAPP_SENDING === 'true';
-    const shouldSimulate = isStaging || !allowSending;
+    // 2. Disparo via Camada Final de Transporte do WhatsApp
+    // O cliente whatsappClient.sendWhatsAppMessage gerencia centralizadamente o Hard Staging Lock
+    if (!whatsappClient || typeof whatsappClient.sendWhatsAppMessage !== 'function') {
+      throw new Error('WHATSAPP_CLIENT_UNAVAILABLE: Cliente WhatsApp offline ou não inicializado no servidor.');
+    }
 
-    if (shouldSimulate) {
+    const jid = `${item.recipient_phone}@s.whatsapp.net`;
+    const sentResult = await whatsappClient.sendWhatsAppMessage(jid, item.message_text);
+
+    if (sentResult?.simulated) {
       db.prepare(`
         UPDATE whatsapp_notification_outbox
         SET status = 'SIMULATED', is_simulated = 1, sent_at = CURRENT_TIMESTAMP, last_error = NULL, locked_at = NULL
@@ -364,16 +367,8 @@ async function _processSingleWhatsAppItem(item) {
       }
 
       salonNotificationService.recordMockNotification(item);
-      return { success: true, simulated: true, status: 'SIMULATED' };
+      return { success: true, simulated: true, is_simulated: true, status: 'SIMULATED', messageId: sentResult.messageId };
     }
-
-    // 3. Disparo Real em Produção com WhatsApp Conectado
-    if (!whatsappClient || typeof whatsappClient.sendWhatsAppMessage !== 'function') {
-      throw new Error('WHATSAPP_CLIENT_UNAVAILABLE: Cliente WhatsApp offline ou não inicializado no servidor.');
-    }
-
-    const jid = `${item.recipient_phone}@s.whatsapp.net`;
-    const sentResult = await whatsappClient.sendWhatsAppMessage(jid, item.message_text);
 
     if (!sentResult || !sentResult.messageId) {
       throw new Error('BAILEYS_EMPTY_CONFIRMATION: Confirmação de entrega vazia do Baileys (sem messageId).');
@@ -393,7 +388,7 @@ async function _processSingleWhatsAppItem(item) {
       `).run(item.appointment_id);
     }
 
-    return { success: true, sent: true, status: 'SENT', messageId: sentResult.messageId };
+    return { success: true, sent: true, simulated: false, status: 'SENT', messageId: sentResult.messageId };
   } catch (err) {
     const sanitizedError = (err.message || 'Erro desconhecido')
       .replace(/Bearer\s+[A-Za-z0-9-_.]+/gi, 'Bearer [REDACTED]')
@@ -425,23 +420,43 @@ async function _processSingleWhatsAppItem(item) {
 }
 
 /**
- * Processes a specific outbox item atomically (used for immediate dispatch or test messages)
+ * Processes a specific outbox item atomically respecting next_retry_at and max_attempts
  */
 async function processWhatsAppOutboxItem(outboxId) {
   const lock = db.prepare(`
     UPDATE whatsapp_notification_outbox
     SET status = 'PROCESSING', locked_at = CURRENT_TIMESTAMP
-    WHERE id = ? AND status = 'PENDING'
+    WHERE id = ?
+      AND status = 'PENDING'
+      AND (next_retry_at IS NULL OR datetime(next_retry_at) <= datetime('now'))
+      AND attempts < COALESCE(max_attempts, 5)
   `).run(outboxId);
 
   if (lock.changes === 0) {
     const current = db.prepare('SELECT * FROM whatsapp_notification_outbox WHERE id = ?').get(outboxId);
-    return {
-      success: current?.status === 'SENT' || current?.status === 'SIMULATED',
-      status: current?.status,
-      skipped: true,
-      item: current,
-    };
+    if (!current) {
+      return { success: false, skipped: true, reason: 'ITEM_NOT_FOUND', status: null };
+    }
+    if (['SENT', 'SIMULATED', 'DEDUPLICATED'].includes(current.status)) {
+      return { success: true, skipped: true, reason: 'ALREADY_PROCESSED', status: current.status, item: current };
+    }
+    if (current.status === 'PROCESSING') {
+      return { success: false, skipped: true, reason: 'ALREADY_IN_FLIGHT', status: current.status, item: current };
+    }
+    if (current.status === 'FAILED' || (current.attempts || 0) >= (current.max_attempts || 5)) {
+      return { success: false, skipped: true, reason: 'MAX_ATTEMPTS_EXCEEDED', status: current.status, item: current };
+    }
+    if (current.next_retry_at && new Date(current.next_retry_at).getTime() > Date.now()) {
+      return {
+        success: false,
+        skipped: true,
+        reason: 'RETRY_NOT_DUE',
+        status: current.status,
+        nextRetryAt: current.next_retry_at,
+        item: current,
+      };
+    }
+    return { success: false, skipped: true, reason: 'LOCK_UNAVAILABLE', status: current.status, item: current };
   }
 
   const item = db.prepare('SELECT * FROM whatsapp_notification_outbox WHERE id = ?').get(outboxId);

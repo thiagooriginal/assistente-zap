@@ -28,12 +28,17 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const assert = require('assert');
+const crypto = require('crypto');
 
 // -------------------------------------------------------------
 // 1. ISOLAMENTO ESTRITO DO BANCO DE DADOS (SQLITE TEMPORÁRIO)
 // -------------------------------------------------------------
 const tempDbFile = path.join(os.tmpdir(), `raia_test_outbox_019_${Date.now()}_${Math.random().toString(36).substring(7)}.db`);
+const tempAuthDir = path.join(os.tmpdir(), `raia_test_auth_019_${Date.now()}_${Math.random().toString(36).substring(7)}`);
+fs.mkdirSync(tempAuthDir, { recursive: true });
+
 process.env.DB_PATH = tempDbFile;
+process.env.AUTH_DIR = tempAuthDir;
 
 // Configurações iniciais isoladas
 process.env.APP_MODE = 'test';
@@ -335,7 +340,7 @@ async function runTests() {
     console.log('\n[Teste 12] Exaustão de tentativas (attempts >= max_attempts) transiciona para FAILED...');
     db.prepare(`
       UPDATE whatsapp_notification_outbox
-      SET attempts = 4, max_attempts = 5, status = 'PENDING'
+      SET attempts = 4, max_attempts = 5, status = 'PENDING', next_retry_at = NULL
       WHERE id = ?
     `).run(failOutboxId);
 
@@ -431,13 +436,17 @@ async function runTests() {
     // =========================================================================
     console.log('\n[Teste 16] Deduplicação em 5 minutos impede notificações repetidas...');
     const aptDedup = createTestAppointment();
-    // Simula primeiro envio concluído
+    // Simula primeiro envio concluído via enqueueNotificationTx
+    const dedupEnq1 = salonNotificationService.enqueueNotificationTx(userId, aptDedup, 'RESCHEDULE', {
+      clientName: 'Cliente VIP',
+      startDt: '2026-11-25 11:00:00',
+    });
+    assert.strictEqual(dedupEnq1.success, true);
     db.prepare(`
-      INSERT INTO whatsapp_notification_outbox (
-        user_id, appointment_id, event_type, recipient_phone, message_text, status, sent_at
-      )
-      VALUES (?, ?, 'RESCHEDULE', '5511999998888', 'Remarcação 1', 'SENT', CURRENT_TIMESTAMP)
-    `).run(userId, aptDedup);
+      UPDATE whatsapp_notification_outbox
+      SET status = 'SENT', sent_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(dedupEnq1.outboxId);
 
     // Tenta enfileirar segundo envio com mesma chave
     const dedupEnq = salonNotificationService.enqueueNotificationTx(userId, aptDedup, 'RESCHEDULE', {
@@ -446,13 +455,14 @@ async function runTests() {
     });
     assert.strictEqual(dedupEnq.deduplicated, true);
 
-    // Tenta processar item na fila com appointment_id recente
+    // Tenta processar item na fila com dedup_hash idêntico recente
+    const rowFirst = db.prepare('SELECT dedup_hash, message_text FROM whatsapp_notification_outbox WHERE id = ?').get(dedupEnq1.outboxId);
     const outboxDedup2 = db.prepare(`
       INSERT INTO whatsapp_notification_outbox (
-        user_id, appointment_id, event_type, recipient_phone, message_text, status
+        user_id, appointment_id, event_type, recipient_phone, message_text, status, dedup_hash
       )
-      VALUES (?, ?, 'RESCHEDULE', '5511999998888', 'Remarcação 2', 'PENDING')
-    `).run(userId, aptDedup);
+      VALUES (?, ?, 'RESCHEDULE', '5511999998888', ?, 'PENDING', ?)
+    `).run(userId, aptDedup, rowFirst.message_text, rowFirst.dedup_hash);
     const dedupOutboxId2 = outboxDedup2.lastInsertRowid;
 
     const dedupProcess = await outboxWorker.processWhatsAppOutboxItem(dedupOutboxId2);
@@ -566,6 +576,13 @@ async function runTests() {
     try {
       if (fs.existsSync(tempDbFile)) {
         fs.unlinkSync(tempDbFile);
+      }
+      const walFile = `${tempDbFile}-wal`;
+      const shmFile = `${tempDbFile}-shm`;
+      if (fs.existsSync(walFile)) { try { fs.unlinkSync(walFile); } catch (_) {} }
+      if (fs.existsSync(shmFile)) { try { fs.unlinkSync(shmFile); } catch (_) {} }
+      if (fs.existsSync(tempAuthDir)) {
+        fs.rmSync(tempAuthDir, { recursive: true, force: true });
       }
     } catch (_) {}
   }

@@ -28,26 +28,21 @@ function getTargetJid() {
 }
 
 async function sendWhatsAppMessage(jid, text) {
-  if (!currentSock) {
-    throw new Error('WHATSAPP_SOCKET_NULL: Tentativa de envio sem socket ativo inicializado.');
+  // 1. Validação estrita de destinatário e proteção contra grupos/broadcasts (executa em todos os ambientes)
+  if (!jid || typeof jid !== 'string' || !jid.trim()) {
+    throw new Error(`INVALID_RECIPIENT_BLOCKED: Envio para destinatário inválido ou grupo impedido: ${jid}`);
   }
 
-  if (!currentSock.user || (currentSock.ws && currentSock.ws.readyState !== undefined && currentSock.ws.readyState !== 1)) {
-    throw new Error('WHATSAPP_SOCKET_DISCONNECTED: Socket WhatsApp não está autenticado ou conectado.');
-  }
-
-  // Hard security block: never send messages to groups, channels, or broadcasts
+  const trimmedJid = jid.trim();
   if (
-    !jid ||
-    typeof jid !== 'string' ||
-    jid.endsWith('@g.us') ||
-    jid.includes('@newsletter') ||
-    jid.includes('@broadcast')
+    trimmedJid.endsWith('@g.us') ||
+    trimmedJid.includes('@newsletter') ||
+    trimmedJid.includes('@broadcast')
   ) {
     throw new Error(`INVALID_RECIPIENT_BLOCKED: Envio para destinatário inválido ou grupo impedido: ${jid}`);
   }
 
-  let finalJid = jid;
+  let finalJid = trimmedJid;
   if (finalJid.includes('@lid')) {
     const resolvedPhone = phoneUtils.resolveLidToPhone(finalJid, config.authDir);
     if (resolvedPhone) {
@@ -61,6 +56,45 @@ async function sendWhatsAppMessage(jid, text) {
       throw new Error(`INVALID_RECIPIENT_BLOCKED: Destinatário não possui dígitos válidos: ${jid}`);
     }
     finalJid = `${clean}@s.whatsapp.net`;
+  }
+
+  // 2. Hard Staging Lock na Camada Final de Transporte (Proteção 12 / OWASP ASVS 5.0)
+  // Em staging/homologacao ou flags de desativação, NUNCA despachar para o Baileys e NUNCA permitir bypass via ALLOW_WHATSAPP_SENDING
+  const mode = (process.env.APP_MODE || '').toLowerCase();
+  const isStagingEnv =
+    Boolean(config.isStaging) ||
+    mode === 'staging' ||
+    mode === 'homologacao' ||
+    process.env.HOMOLOGACAO === 'true' ||
+    process.env.DISABLE_WHATSAPP === 'true' ||
+    process.env.DISABLE_WHATSAPP_BOT === 'true' ||
+    process.env.DISABLE_WHATSAPP_DISPATCH === 'true' ||
+    process.env.WHATSAPP_ENABLED === 'false';
+
+  if (isStagingEnv) {
+    const simMessageId = 'sim_wa_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+    const nowTs = Math.floor(Date.now() / 1000);
+
+    return {
+      success: true,
+      sent: false,
+      simulated: true,
+      isSimulated: true,
+      blocked: false,
+      accepted: true,
+      messageId: simMessageId,
+      timestamp: nowTs,
+      recipientJid: finalJid,
+    };
+  }
+
+  // 3. Em Produção Real com ALLOW_WHATSAPP_SENDING=true: Exigir socket ativo e conectado
+  if (!currentSock) {
+    throw new Error('WHATSAPP_SOCKET_NULL: Tentativa de envio sem socket ativo inicializado.');
+  }
+
+  if (!currentSock.user || (currentSock.ws && currentSock.ws.readyState !== undefined && currentSock.ws.readyState !== 1)) {
+    throw new Error('WHATSAPP_SOCKET_DISCONNECTED: Socket WhatsApp não está autenticado ou conectado.');
   }
 
   let sent;
@@ -83,6 +117,11 @@ async function sendWhatsAppMessage(jid, text) {
 
   return {
     success: true,
+    sent: true,
+    simulated: false,
+    isSimulated: false,
+    blocked: false,
+    accepted: true,
     messageId: sent.key.id,
     timestamp: sent.messageTimestamp ? Number(sent.messageTimestamp) : Math.floor(Date.now() / 1000),
     recipientJid: finalJid,
