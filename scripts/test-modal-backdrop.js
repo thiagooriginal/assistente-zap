@@ -164,7 +164,7 @@ async function runBackdropValidation() {
 
     // Aguarda inicialização da página
     let ready = false;
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 30; i++) {
       const chk = await sendCmd('Runtime.evaluate', {
         expression: `Boolean(document.body && document.getElementById('modal-root'))`
       });
