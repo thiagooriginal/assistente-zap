@@ -359,11 +359,19 @@ async function _processSingleWhatsAppItem(item) {
       `).run(item.id);
 
       if (item.appointment_id && item.appointment_id > 0) {
-        db.prepare(`
-          UPDATE appointments
-          SET whatsapp_notified = 2, updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `).run(item.appointment_id);
+        if (item.event_type === 'REMINDER_24H') {
+          db.prepare(`
+            UPDATE appointments
+            SET reminder_24h_status = 'SIMULATED', updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(item.appointment_id);
+        } else {
+          db.prepare(`
+            UPDATE appointments
+            SET whatsapp_notified = 2, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(item.appointment_id);
+        }
       }
 
       salonNotificationService.recordMockNotification(item);
@@ -381,11 +389,19 @@ async function _processSingleWhatsAppItem(item) {
     `).run(item.id);
 
     if (item.appointment_id && item.appointment_id > 0) {
-      db.prepare(`
-        UPDATE appointments
-        SET whatsapp_notified = 1, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(item.appointment_id);
+      if (item.event_type === 'REMINDER_24H') {
+        db.prepare(`
+          UPDATE appointments
+          SET reminder_24h_status = 'SENT', updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(item.appointment_id);
+      } else {
+        db.prepare(`
+          UPDATE appointments
+          SET whatsapp_notified = 1, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(item.appointment_id);
+      }
     }
 
     return { success: true, sent: true, simulated: false, status: 'SENT', messageId: sentResult.messageId };
@@ -409,7 +425,13 @@ async function _processSingleWhatsAppItem(item) {
     // Salvaguarda: NUNCA atualiza whatsapp_notified = 1 em caso de erro!
     if (item.appointment_id && item.appointment_id > 0) {
       try {
-        db.prepare('UPDATE appointments SET whatsapp_notified = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(item.appointment_id);
+        if (item.event_type === 'REMINDER_24H') {
+          if (isFinal) {
+            db.prepare("UPDATE appointments SET reminder_24h_status = 'FAILED', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(item.appointment_id);
+          }
+        } else {
+          db.prepare('UPDATE appointments SET whatsapp_notified = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(item.appointment_id);
+        }
       } catch (_) {}
     }
 

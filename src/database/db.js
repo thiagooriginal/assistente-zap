@@ -812,6 +812,8 @@ ensureColumnExists('appointments', 'google_sync_status', "TEXT DEFAULT 'NOT_CONN
 ensureColumnExists('appointments', 'google_sync_error', 'TEXT');
 ensureColumnExists('appointments', 'has_conflict', 'INTEGER DEFAULT 0');
 ensureColumnExists('appointments', 'whatsapp_notified', 'INTEGER DEFAULT 0');
+ensureColumnExists('appointments', 'reminder_24h_status', "TEXT DEFAULT 'PENDING'");
+ensureColumnExists('appointments', 'reminder_consent', 'INTEGER DEFAULT 1');
 ensureColumnExists('appointments', 'updated_at', 'TEXT');
 
 ensureColumnExists('client_staff', 'google_calendar_id', 'TEXT');
@@ -824,6 +826,7 @@ ensureColumnExists('client_salons', 'notify_new_appointment', 'INTEGER DEFAULT 1
 ensureColumnExists('client_salons', 'notify_cancellation', 'INTEGER DEFAULT 1');
 ensureColumnExists('client_salons', 'notify_reschedule', 'INTEGER DEFAULT 1');
 ensureColumnExists('client_salons', 'notify_sync_failure', 'INTEGER DEFAULT 1');
+ensureColumnExists('client_salons', 'b2c_reminders_enabled', 'INTEGER DEFAULT 0');
 ensureColumnExists('client_salons', 'google_calendar_mode', "TEXT DEFAULT 'SINGLE'");
 ensureColumnExists('client_salons', 'google_selected_calendar_id', "TEXT DEFAULT 'primary'");
 ensureColumnExists('client_salons', 'google_require_sync_availability', 'INTEGER DEFAULT 0');
@@ -888,6 +891,7 @@ try {
     );
     CREATE INDEX IF NOT EXISTS idx_wa_outbox_status ON whatsapp_notification_outbox(status);
     CREATE INDEX IF NOT EXISTS idx_wa_outbox_apt ON whatsapp_notification_outbox(appointment_id);
+    CREATE INDEX IF NOT EXISTS idx_appointments_reminder_24h ON appointments(reminder_24h_status, start_datetime);
 
     -- Appointment Lifecycle Audit History
     CREATE TABLE IF NOT EXISTS appointment_status_history (

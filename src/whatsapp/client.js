@@ -152,6 +152,11 @@ async function sendWhatsAppMessage(jid, text) {
 }
 
 async function startWhatsAppBot() {
+  if (!isRealWhatsAppTransportAllowed()) {
+    console.log('[WhatsApp Bot] Hard Staging Lock ativo: inicialização do socket Baileys bloqueada (fail-closed).');
+    return null;
+  }
+
   const { state, saveCreds } = await useMultiFileAuthState(config.authDir);
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log(`Usando versão Baileys v${version.join('.')}, isLatest: ${isLatest}`);

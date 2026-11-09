@@ -531,6 +531,7 @@ function bookAppointmentSync(userId, {
   durationMin = null,
   origin = 'painel',
   status = 'AGENDADO',
+  reminderConsent = 1,
 }) {
   if (!clientName || !clientName.trim()) {
     throw new Error('O nome do cliente é obrigatório.');
@@ -623,13 +624,16 @@ function bookAppointmentSync(userId, {
       }
     }
 
+    const finalConsent = reminderConsent !== undefined && reminderConsent !== null ? (reminderConsent ? 1 : 0) : 1;
+
     const stmt = db.prepare(`
       INSERT INTO appointments (
         user_id, title, description, start_datetime, end_datetime,
         service_id, staff_id, price, client_name, client_phone,
-        duration_min, origin, status, google_sync_status, whatsapp_notified
+        duration_min, origin, status, google_sync_status, whatsapp_notified,
+        reminder_24h_status, reminder_consent
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, 'PENDING', ?)
     `);
 
     const info = stmt.run(
@@ -645,7 +649,8 @@ function bookAppointmentSync(userId, {
       clientPhone ? clientPhone.trim() : null,
       finalDurationMin,
       origin,
-      finalStatus
+      finalStatus,
+      finalConsent
     );
 
     const appointmentId = info.lastInsertRowid;
@@ -899,6 +904,7 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
     const preservedStatus = existing.status;
 
     // Preservar estritamente o status original do agendamento (CONFIRMADO continua CONFIRMADO, AGENDADO continua AGENDADO)
+    // e resetar status de lembretes para que a nova data seja notificada
     db.prepare(`
       UPDATE appointments
       SET start_datetime = ?,
@@ -906,9 +912,25 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
           staff_id = ?,
           has_conflict = 0,
           google_sync_status = 'PENDING',
+          reminder_24h_status = 'PENDING',
+          notified_24h = 0,
+          notified_3h = 0,
+          notified_1h = 0,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND user_id = ?
     `).run(startDt, endDt, targetStaffId, appointmentId, userId);
+
+    // Cancelar lembretes 24h pendentes para o horário anterior na outbox
+    db.prepare(`
+      UPDATE whatsapp_notification_outbox
+      SET status = 'CANCELLED',
+          locked_at = NULL,
+          last_error = 'Agendamento remarcado para novo horário',
+          sent_at = CURRENT_TIMESTAMP
+      WHERE appointment_id = ?
+        AND event_type = 'REMINDER_24H'
+        AND status = 'PENDING'
+    `).run(appointmentId);
 
     // Auditoria de remarcação sem transição falsa de status (previous_status == preservedStatus, new_status == preservedStatus)
     const staffChanged = targetStaffId !== existing.staff_id;
@@ -985,10 +1007,23 @@ async function cancelAppointment(appointmentId, userId, { reason = 'Cancelado pe
     db.prepare(`
       UPDATE appointments
       SET status = 'CANCELADO',
+          reminder_24h_status = 'CANCELLED',
           has_conflict = 0,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND user_id = ?
     `).run(appointmentId, userId);
+
+    // Cancelar qualquer lembrete pendente na outbox para este atendimento
+    db.prepare(`
+      UPDATE whatsapp_notification_outbox
+      SET status = 'CANCELLED',
+          locked_at = NULL,
+          last_error = 'Agendamento cancelado',
+          sent_at = CURRENT_TIMESTAMP
+      WHERE appointment_id = ?
+        AND event_type = 'REMINDER_24H'
+        AND status = 'PENDING'
+    `).run(appointmentId);
 
     db.prepare(`
       INSERT INTO appointment_status_history (appointment_id, user_id, previous_status, new_status, changed_by, reason)
@@ -1091,7 +1126,7 @@ function listAppointments(userId, { staffId = null, status = null, startDate = n
     SELECT a.id, a.user_id, a.title, a.description, a.start_datetime, a.end_datetime,
            a.service_id, a.staff_id, a.price, a.client_name, a.client_phone,
            a.duration_min, a.origin, a.status, a.has_conflict, a.google_event_id,
-           a.google_sync_status, a.whatsapp_notified,
+           a.google_sync_status, a.whatsapp_notified, a.reminder_24h_status, a.reminder_consent,
            cs.name AS service_name,
            st.name AS staff_name
     FROM appointments a

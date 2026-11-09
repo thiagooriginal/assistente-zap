@@ -2495,6 +2495,19 @@
                   <input type="checkbox" id="toggleNotifySyncFail" class="accent-[#00F59B] w-4 h-4 rounded" checked>
                   <span>Alertas de falhas de sincronização na agenda Google</span>
                 </label>
+
+                <div class="border-t border-white/5 pt-3 mt-3">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <span class="font-bold text-white text-xs block">Lembrete Automático 24h para Clientes (B2C)</span>
+                      <span class="text-slate-400 text-[11px]">Envia lembrete no WhatsApp da cliente 24 horas antes do agendamento.</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" id="toggleB2cReminders" class="sr-only peer">
+                      <div class="w-9 h-5 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#00F59B]"></div>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -6700,6 +6713,28 @@
       return '';
     }
 
+    function getReminder24hBadgeHtml(reminderStatus) {
+      if (!reminderStatus || reminderStatus === 'PENDING') {
+        return '<span class="apt-badge-reminder-24h inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20" title="Lembrete de 24h programado"><i data-lucide="bell" class="w-2.5 h-2.5"></i> Lembrete 24h: Pendente</span>';
+      }
+      if (reminderStatus === 'SIMULATED') {
+        return '<span class="apt-badge-reminder-24h inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20" title="Lembrete de 24h simulado (Homologação)"><i data-lucide="flask-conical" class="w-2.5 h-2.5 text-purple-400"></i> Lembrete 24h: Simulado</span>';
+      }
+      if (reminderStatus === 'SENT') {
+        return '<span class="apt-badge-reminder-24h inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" title="Lembrete de 24h enviado com sucesso"><i data-lucide="check" class="w-2.5 h-2.5"></i> Lembrete 24h: Enviado</span>';
+      }
+      if (reminderStatus === 'FAILED') {
+        return '<span class="apt-badge-reminder-24h inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20" title="Falha no envio do lembrete"><i data-lucide="alert-circle" class="w-2.5 h-2.5"></i> Lembrete 24h: Falhou</span>';
+      }
+      if (reminderStatus === 'CANCELLED') {
+        return '<span class="apt-badge-reminder-24h inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-slate-500/10 text-slate-500 border border-slate-500/20" title="Lembrete cancelado"><i data-lucide="bell-off" class="w-2.5 h-2.5"></i> Lembrete 24h: Cancelado</span>';
+      }
+      if (reminderStatus === 'DISABLED' || reminderStatus === 'SKIPPED_TOO_CLOSE') {
+        return '<span class="apt-badge-reminder-24h inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-slate-800/40 text-slate-500 border border-slate-700/30" title="Lembrete 24h não aplicável ou desativado">Lembrete: Desativado</span>';
+      }
+      return '';
+    }
+
     async function loadAppointments() {
       const list = document.getElementById('appointmentsList');
       function renderAppointmentList(appointments) {
@@ -6760,6 +6795,7 @@
                 ${getStatusBadgeHtml(a.status)}
                 ${conflictTag}
                 ${getGoogleSyncBadgeHtml(a.google_sync_status, appointmentsState.isGoogleConnected)}
+                ${getReminder24hBadgeHtml(a.reminder_24h_status)}
                 ${originTag}
               </div>
 
@@ -8632,6 +8668,7 @@
           const tCancel = document.getElementById('toggleNotifyCancel');
           const tReschedule = document.getElementById('toggleNotifyReschedule');
           const tSyncFail = document.getElementById('toggleNotifySyncFail');
+          const tB2c = document.getElementById('toggleB2cReminders');
           const navBadge = document.getElementById('navWaStatusBadge');
 
           if (phoneInput) phoneInput.value = s.notificationPhone || '';
@@ -8640,6 +8677,7 @@
           if (tCancel) tCancel.checked = !!s.notifyCancellation;
           if (tReschedule) tReschedule.checked = !!s.notifyReschedule;
           if (tSyncFail) tSyncFail.checked = !!s.notifySyncFailure;
+          if (tB2c) tB2c.checked = !!s.b2cRemindersEnabled;
 
           if (navBadge) {
             navBadge.className = s.notificationsEnabled && s.notificationPhone
@@ -8661,6 +8699,7 @@
       const notifyCancellation = document.getElementById('toggleNotifyCancel').checked;
       const notifyReschedule = document.getElementById('toggleNotifyReschedule').checked;
       const notifySyncFailure = document.getElementById('toggleNotifySyncFail').checked;
+      const b2cRemindersEnabled = document.getElementById('toggleB2cReminders')?.checked || false;
 
       try {
         const res = await fetch('/api/cliente/integrations/whatsapp/settings', {
@@ -8673,6 +8712,7 @@
             notifyCancellation,
             notifyReschedule,
             notifySyncFailure,
+            b2cRemindersEnabled,
           }),
         });
 

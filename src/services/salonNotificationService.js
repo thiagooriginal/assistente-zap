@@ -36,6 +36,7 @@ function getNotificationSettings(userId) {
   const row = db.prepare(`
     SELECT whatsapp_notification_phone, whatsapp_notifications_enabled,
            notify_new_appointment, notify_cancellation, notify_reschedule, notify_sync_failure,
+           b2c_reminders_enabled,
            phone, salon_name
     FROM client_salons
     WHERE user_id = ?
@@ -48,6 +49,7 @@ function getNotificationSettings(userId) {
     notifyCancellation: row?.notify_cancellation !== 0,
     notifyReschedule: row?.notify_reschedule !== 0,
     notifySyncFailure: row?.notify_sync_failure !== 0,
+    b2cRemindersEnabled: row?.b2c_reminders_enabled === 1,
     salonName: row?.salon_name || 'Salão',
   };
 }
@@ -62,6 +64,7 @@ function updateNotificationSettings(userId, {
   notifyCancellation,
   notifyReschedule,
   notifySyncFailure,
+  b2cRemindersEnabled,
 }) {
   if (mockHandler?.updateNotificationSettings) {
     return mockHandler.updateNotificationSettings(userId, {
@@ -71,6 +74,7 @@ function updateNotificationSettings(userId, {
       notifyCancellation,
       notifyReschedule,
       notifySyncFailure,
+      b2cRemindersEnabled,
     });
   }
 
@@ -84,6 +88,7 @@ function updateNotificationSettings(userId, {
         notify_cancellation = COALESCE(?, notify_cancellation),
         notify_reschedule = COALESCE(?, notify_reschedule),
         notify_sync_failure = COALESCE(?, notify_sync_failure),
+        b2c_reminders_enabled = COALESCE(?, b2c_reminders_enabled),
         updated_at = CURRENT_TIMESTAMP
     WHERE user_id = ?
   `).run(
@@ -93,6 +98,7 @@ function updateNotificationSettings(userId, {
     notifyCancellation !== undefined ? (notifyCancellation ? 1 : 0) : null,
     notifyReschedule !== undefined ? (notifyReschedule ? 1 : 0) : null,
     notifySyncFailure !== undefined ? (notifySyncFailure ? 1 : 0) : null,
+    b2cRemindersEnabled !== undefined ? (b2cRemindersEnabled ? 1 : 0) : null,
     userId
   );
 

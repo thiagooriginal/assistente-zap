@@ -1586,7 +1586,25 @@ router.get('/integrations/whatsapp/settings', clientAuthMiddleware, requireProdu
 
 router.put('/integrations/whatsapp/settings', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   try {
-    const updated = salonNotificationService.updateNotificationSettings(req.clientUser.id, req.body || {});
+    const {
+      notificationPhone,
+      notificationsEnabled,
+      notifyNewAppointment,
+      notifyCancellation,
+      notifyReschedule,
+      notifySyncFailure,
+      b2cRemindersEnabled,
+    } = req.body || {};
+
+    const updated = salonNotificationService.updateNotificationSettings(req.clientUser.id, {
+      notificationPhone,
+      notificationsEnabled,
+      notifyNewAppointment,
+      notifyCancellation,
+      notifyReschedule,
+      notifySyncFailure,
+      b2cRemindersEnabled: b2cRemindersEnabled !== undefined ? Boolean(b2cRemindersEnabled) : undefined,
+    });
     res.json({ success: true, settings: updated, message: 'Configurações de notificações WhatsApp atualizadas!' });
   } catch (err) {
     res.status(400).json({ success: false, error: err.message });

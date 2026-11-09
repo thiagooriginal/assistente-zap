@@ -4,6 +4,15 @@ const db = require('../database/db');
 const config = require('../config');
 const phoneUtils = require('../utils/phoneUtils');
 
+function canSendRealWhatsApp() {
+  try {
+    const { isRealWhatsAppTransportAllowed } = require('../whatsapp/client');
+    return typeof isRealWhatsAppTransportAllowed === 'function' ? isRealWhatsAppTransportAllowed() : false;
+  } catch (_) {
+    return false;
+  }
+}
+
 let genAI = null;
 
 function getGenAI() {
@@ -522,7 +531,7 @@ async function handleLeadMessage(sock, msg, senderCleanNumber) {
   }
 
   // Send typing indicator on WhatsApp
-  if (replyJid) {
+  if (replyJid && canSendRealWhatsApp()) {
     try {
       await sock.sendPresenceUpdate('composing', replyJid);
     } catch (e) {}
@@ -557,7 +566,13 @@ async function handleLeadMessage(sock, msg, senderCleanNumber) {
     const targetDestJid = replyJid || `${lead.phone}@s.whatsapp.net`;
 
     // Send text response on WhatsApp directly to the chat where the message arrived
-    let sentMsg = await sock.sendMessage(targetDestJid, { text: cleanReplyText });
+    let sentMsg = null;
+    if (canSendRealWhatsApp()) {
+      sentMsg = await sock.sendMessage(targetDestJid, { text: cleanReplyText });
+    } else {
+      sentMsg = { key: { id: `sim_lead_text_${Date.now()}` } };
+      console.log(`[AgentChat Staging Lock] Resposta simulada para ${targetDestJid}: ${cleanReplyText.substring(0, 60)}...`);
+    }
 
     if (sentMsg?.key?.id) {
       try {
@@ -573,10 +588,16 @@ async function handleLeadMessage(sock, msg, senderCleanNumber) {
       const photos = NICHE_PHOTOS[lead.agent_key];
       for (const item of photos) {
         try {
-          const sentImg = await sock.sendMessage(targetDestJid, {
-            image: { url: item.url },
-            caption: item.caption,
-          });
+          let sentImg = null;
+          if (canSendRealWhatsApp()) {
+            sentImg = await sock.sendMessage(targetDestJid, {
+              image: { url: item.url },
+              caption: item.caption,
+            });
+          } else {
+            sentImg = { key: { id: `sim_lead_img_${Date.now()}` } };
+            console.log(`[AgentChat Staging Lock] Envio simulado de imagem para lead ${targetDestJid}.`);
+          }
           if (sentImg?.key?.id) {
             try {
               db.prepare('INSERT OR IGNORE INTO processed_messages (id, sender_jid) VALUES (?, ?)').run(
