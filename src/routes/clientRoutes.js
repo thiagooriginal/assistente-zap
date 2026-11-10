@@ -13,12 +13,14 @@ const salonNotificationService = require('../services/salonNotificationService')
 const salonAppointmentService = require('../services/salonAppointmentService');
 const { getPlan } = require('../services/planCatalog');
 const whatsappClient = require('../whatsapp/client');
+const salonSessionManager = require('../whatsapp/salonSessionManager');
 const {
   clientLoginLimiter,
   activationLimiter,
   passwordResetRequestLimiter,
   passwordResetSubmitLimiter,
   whatsappTestLimiter,
+  whatsappPairingLimiter,
 } = require('../middlewares/rateLimiter');
 const { AUDIT_EVENTS, logSecurityEvent } = require('../services/securityAuditService');
 
@@ -1649,6 +1651,110 @@ router.post('/integrations/whatsapp/test', whatsappTestLimiter, clientAuthMiddle
     res.status(400).json({ success: false, error: err.message });
   }
 });
+
+// =======================================================
+// CONEXÃO WHATSAPP COMERCIAL DO SALÃO (COMANDO 027)
+// =======================================================
+
+/**
+ * GET /api/cliente/whatsapp/status (e alias /integrations/whatsapp/session-status)
+ * Retorna status de conexão, telefone mascarado e dados efêmeros da sessão
+ */
+const getWhatsAppStatusHandler = (req, res) => {
+  try {
+    const statusData = salonSessionManager.getSessionStatus(req.clientUser.id);
+    return res.json({
+      success: true,
+      ...statusData,
+    });
+  } catch (err) {
+    console.error('[WhatsApp Status Error]:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro ao verificar status da conexão WhatsApp do salão.',
+    });
+  }
+};
+router.get('/whatsapp/status', clientAuthMiddleware, requireProductAccess('JESSICA'), getWhatsAppStatusHandler);
+router.get('/integrations/whatsapp/session-status', clientAuthMiddleware, requireProductAccess('JESSICA'), getWhatsAppStatusHandler);
+
+/**
+ * POST /api/cliente/whatsapp/connect-qr (e alias /integrations/whatsapp/connect-qr)
+ * Inicializa ou recupera sessão QR Code para pareamento
+ */
+const postConnectQrHandler = async (req, res) => {
+  try {
+    const result = await salonSessionManager.startQrSession(req.clientUser.id);
+    return res.json({
+      success: true,
+      ...result,
+    });
+  } catch (err) {
+    console.error('[WhatsApp Connect QR Error]:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Erro ao inicializar sessão QR Code do WhatsApp.',
+    });
+  }
+};
+router.post('/whatsapp/connect-qr', whatsappPairingLimiter, clientAuthMiddleware, requireProductAccess('JESSICA'), postConnectQrHandler);
+router.post('/integrations/whatsapp/connect-qr', whatsappPairingLimiter, clientAuthMiddleware, requireProductAccess('JESSICA'), postConnectQrHandler);
+
+/**
+ * POST /api/cliente/whatsapp/connect-code (e alias /integrations/whatsapp/connect-code e /integrations/whatsapp/pairing-code)
+ * Gera Código de Pareamento de 8 dígitos para o número informado
+ */
+const postConnectCodeHandler = async (req, res) => {
+  try {
+    const { phone } = req.body || {};
+    if (!phone || typeof phone !== 'string') {
+      return res.status(400).json({
+        success: false,
+        error: 'Informe o número de telefone com DDD para gerar o código de pareamento.',
+        code: 'INVALID_PHONE_FORMAT',
+      });
+    }
+
+    const result = await salonSessionManager.requestPairingCode(req.clientUser.id, phone);
+    return res.json({
+      success: true,
+      ...result,
+    });
+  } catch (err) {
+    const isBadPhone = err.message && (
+      err.message.includes('INVALID_PHONE') ||
+      err.message.includes('INVALID_BRAZILIAN_DDD') ||
+      err.message.includes('INVALID_MOBILE_NINTH_DIGIT')
+    );
+    return res.status(isBadPhone ? 400 : 500).json({
+      success: false,
+      error: err.message || 'Erro ao gerar código de pareamento.',
+      code: isBadPhone ? 'INVALID_PHONE_E164' : 'PAIRING_ERROR',
+    });
+  }
+};
+router.post('/whatsapp/connect-code', whatsappPairingLimiter, clientAuthMiddleware, requireProductAccess('JESSICA'), postConnectCodeHandler);
+router.post('/integrations/whatsapp/connect-code', whatsappPairingLimiter, clientAuthMiddleware, requireProductAccess('JESSICA'), postConnectCodeHandler);
+router.post('/integrations/whatsapp/pairing-code', whatsappPairingLimiter, clientAuthMiddleware, requireProductAccess('JESSICA'), postConnectCodeHandler);
+
+/**
+ * POST /api/cliente/whatsapp/disconnect (e alias /integrations/whatsapp/disconnect)
+ * Desconecta o WhatsApp comercial do salão e expurga as credenciais em disco
+ */
+const postDisconnectHandler = async (req, res) => {
+  try {
+    const result = await salonSessionManager.disconnect(req.clientUser.id);
+    return res.json(result);
+  } catch (err) {
+    console.error('[WhatsApp Disconnect Error]:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro ao desconectar WhatsApp do salão.',
+    });
+  }
+};
+router.post('/whatsapp/disconnect', clientAuthMiddleware, requireProductAccess('JESSICA'), postDisconnectHandler);
+router.post('/integrations/whatsapp/disconnect', clientAuthMiddleware, requireProductAccess('JESSICA'), postDisconnectHandler);
 
 // =======================================================
 // DASHBOARD GERENCIAL & FINANCEIRO 2.0 (MÓDULO JÉSSICA)

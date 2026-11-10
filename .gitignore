@@ -5,7 +5,6 @@ data/
 google_credentials.json
 google_token.json
 /qrcode.png
-!public/qrcode.png
 *.log
 cloudflared.exe
 scratch/

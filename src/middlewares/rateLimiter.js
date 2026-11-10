@@ -264,6 +264,19 @@ const adminMfaLimiter = createRateLimiter({
   },
 });
 
+// Dedicated persistent rate limiter for WhatsApp multi-tenant pairing code & QR requests (Comando 027)
+const whatsappPairingLimiter = createRateLimiter({
+  name: 'whatsapp_pairing',
+  windowMs: 15 * 60 * 1000,
+  maxAttempts: 3,
+  message: 'Limite de solicitações de pareamento WhatsApp excedido. Aguarde 15 minutos para tentar novamente.',
+  keyGenerator: (req) => {
+    const ip = req.ip || req.socket?.remoteAddress || '127.0.0.1';
+    const tenantId = req.clientUser?.id ? `salon_${req.clientUser.id}` : 'anon';
+    return `${ip}:${tenantId}:whatsapp_pairing`;
+  },
+});
+
 module.exports = {
   createRateLimiter,
   adminLoginLimiter,
@@ -277,5 +290,6 @@ module.exports = {
   analyticsLimiter,
   adminActionLimiter,
   whatsappTestLimiter,
+  whatsappPairingLimiter,
   cspReportLimiter,
 };

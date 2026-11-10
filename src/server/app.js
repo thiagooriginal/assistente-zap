@@ -362,6 +362,11 @@ app.use((req, res, next) => {
     /\.(log|env|env.*)$/i,              // Logs and environment files
     /\/package\.json$/i,                // Package manifests
     /\/google_.*\.json$/i,              // Google credentials
+    /\/sessions\//i,                    // WhatsApp multi-tenant session storage
+    /\/auth_info/i,                     // WhatsApp Baileys credentials
+    /\/creds\.json$/i,                  // Baileys credential files
+    /\/app-state-sync/i,                // Baileys sync states
+    /\/qrcode\.png$/i,                  // Discontinued legacy public QR code file
   ];
   for (const pattern of forbiddenPatterns) {
     if (pattern.test(urlPath)) {
@@ -431,14 +436,13 @@ function stagingProtectionMiddleware(req, res, next) {
     return next();
   }
 
-  // Bypass health checks, diagnostics, webhooks and static asset /qrcode.png
+  // Bypass health checks, diagnostics and webhooks
   const bypassPaths = [
     '/api/health',
     '/api/health/ready',
     '/api/webhooks/asaas',
     '/api/webhooks/hotmart',
-    '/api/analytics/event',
-    '/qrcode.png'
+    '/api/analytics/event'
   ];
   if (bypassPaths.includes(req.path) || req.path.startsWith('/api/webhooks/')) {
     return next();
@@ -514,18 +518,14 @@ function stagingProtectionMiddleware(req, res, next) {
 app.use(stagingProtectionMiddleware);
 app.use(express.static(path.resolve(__dirname, '../../public')));
 
-// QR code route: serve active WhatsApp pairing QR code if present at root, or fallback to public image
+// Rota legada /qrcode.png desativada (Comando 027 - Proteção OWASP ASVS 5.0)
+// QR Codes são servidos exclusivamente sob autenticação de tenant em /api/cliente/whatsapp/*
 app.get('/qrcode.png', (req, res) => {
-  const fs = require('fs');
-  const rootQr = path.resolve(__dirname, '../../qrcode.png');
-  if (fs.existsSync(rootQr)) {
-    return res.sendFile(rootQr);
-  }
-  const publicQr = path.resolve(__dirname, '../../public/qrcode.png');
-  if (fs.existsSync(publicQr)) {
-    return res.sendFile(publicQr);
-  }
-  return res.redirect('https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=RAIA_HOMOLOGACAO_SIMULATOR');
+  res.status(404).json({
+    success: false,
+    error: 'Esta rota pública foi descontinuada por segurança. Acesse seu painel em /cliente/painel.html para conectar o WhatsApp.',
+    code: 'PUBLIC_QR_DISCONTINUED',
+  });
 });
 
 // Mount Client Portal APIs

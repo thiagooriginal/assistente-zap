@@ -711,6 +711,66 @@ runVersionedMigration('20261109_03_enforce_lgpd_reminder_consent', 'Enforce expl
   `).run();
 });
 
+// Versioned migration: Multi-Tenant WhatsApp Sessions & Connection Logs (Comando 027)
+runVersionedMigration('20261110_01_salon_whatsapp_sessions', 'Create client_salon_whatsapp_sessions and client_salon_whatsapp_logs tables for multi-tenant WhatsApp integration', () => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS client_salon_whatsapp_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+      session_status TEXT NOT NULL DEFAULT 'DISCONNECTED' 
+        CHECK(session_status IN ('DISCONNECTED', 'WAITING_QR', 'WAITING_CODE', 'CONNECTING', 'CONNECTED', 'CONNECTION_LOST', 'ERROR')),
+      connected_phone TEXT,
+      connected_phone_jid TEXT,
+      connected_at TEXT,
+      last_seen_at TEXT,
+      last_error TEXT,
+      pairing_method TEXT CHECK(pairing_method IN ('QR', 'CODE') OR pairing_method IS NULL),
+      qr_code_cached TEXT,
+      qr_code_expires_at TEXT,
+      pairing_code_cached TEXT,
+      pairing_code_expires_at TEXT,
+      auth_dir_path TEXT,
+      reconnect_attempts INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_salon_wa_sessions_user ON client_salon_whatsapp_sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_salon_wa_sessions_status ON client_salon_whatsapp_sessions(session_status);
+    CREATE INDEX IF NOT EXISTS idx_salon_wa_sessions_phone ON client_salon_whatsapp_sessions(connected_phone);
+
+    CREATE TABLE IF NOT EXISTS client_salon_whatsapp_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER REFERENCES client_salon_whatsapp_sessions(id) ON DELETE SET NULL,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      event_type TEXT NOT NULL CHECK(event_type IN (
+        'STATUS_CHANGE', 'QR_GENERATED', 'PAIRING_CODE_REQUESTED', 
+        'CONNECTED', 'DISCONNECTED', 'RECONNECTING', 'AUTH_FAILURE', 
+        'ERROR', 'LOGOUT_USER'
+      )),
+      old_status TEXT,
+      new_status TEXT,
+      pairing_method TEXT,
+      connected_phone TEXT,
+      reason TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      metadata_json TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_salon_wa_logs_user_created ON client_salon_whatsapp_logs(user_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_salon_wa_logs_session ON client_salon_whatsapp_logs(session_id);
+    CREATE INDEX IF NOT EXISTS idx_salon_wa_logs_event ON client_salon_whatsapp_logs(event_type);
+  `);
+
+  ensureColumnExists('client_salons', 'whatsapp_status', "TEXT DEFAULT 'DISCONNECTED'");
+  ensureColumnExists('client_salons', 'whatsapp_phone', 'TEXT');
+  ensureColumnExists('client_salons', 'whatsapp_last_connected_at', 'TEXT');
+  ensureColumnExists('client_salons', 'whatsapp_last_error', 'TEXT');
+  ensureColumnExists('client_salons', 'whatsapp_pairing_method', 'TEXT');
+});
+
 // User columns for Client Authentication & Hotmart Subscriptions
 ensureColumnExists('users', 'session_token', 'TEXT');
 ensureColumnExists('users', 'session_expires_at', 'TEXT');
@@ -846,6 +906,11 @@ ensureColumnExists('client_salons', 'b2c_reminders_enabled', 'INTEGER DEFAULT 0'
 ensureColumnExists('client_salons', 'google_calendar_mode', "TEXT DEFAULT 'SINGLE'");
 ensureColumnExists('client_salons', 'google_selected_calendar_id', "TEXT DEFAULT 'primary'");
 ensureColumnExists('client_salons', 'google_require_sync_availability', 'INTEGER DEFAULT 0');
+ensureColumnExists('client_salons', 'whatsapp_status', "TEXT DEFAULT 'DISCONNECTED'");
+ensureColumnExists('client_salons', 'whatsapp_phone', 'TEXT');
+ensureColumnExists('client_salons', 'whatsapp_last_connected_at', 'TEXT');
+ensureColumnExists('client_salons', 'whatsapp_last_error', 'TEXT');
+ensureColumnExists('client_salons', 'whatsapp_pairing_method', 'TEXT');
 
 try {
   db.exec(`

@@ -3116,6 +3116,15 @@
             <td class="py-2.5 px-3">
               <div class="font-bold text-white">${escapeHtml(sub.userName || 'Cliente')}</div>
               <div class="text-[11px] text-zinc-400">${escapeHtml(sub.userEmail || '')}</div>
+              ${sub.salonName ? `<div class="text-[10px] text-amber-300 font-semibold mt-0.5">Salão: ${escapeHtml(sub.salonName)}</div>` : ''}
+              ${sub.productCode === 'JESSICA' ? `
+                <div class="mt-1 flex items-center gap-1.5 text-[10px]">
+                  <span class="inline-block w-1.5 h-1.5 rounded-full ${sub.salonWhatsappStatus === 'CONNECTED' ? 'bg-emerald-400' : 'bg-zinc-500'}"></span>
+                  <span class="${sub.salonWhatsappStatus === 'CONNECTED' ? 'text-emerald-400 font-bold' : 'text-zinc-400'}">
+                    WhatsApp: ${sub.salonWhatsappStatus === 'CONNECTED' ? (sub.salonWhatsappPhoneMasked || 'Conectado') : 'Desconectado'}
+                  </span>
+                </div>
+              ` : ''}
             </td>
             <td class="py-2.5 px-3">
               <span class="font-bold text-amber-400">${sub.productName}</span>

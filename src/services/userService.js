@@ -1,6 +1,7 @@
 const db = require('../database/db');
 const crypto = require('crypto');
 const { AUDIT_EVENTS, logSecurityEvent } = require('./securityAuditService');
+const phoneUtils = require('../utils/phoneUtils');
 
 /**
  * Clean phone number to digits only
@@ -291,24 +292,31 @@ function isUserActive(user) {
 function getAllUsers(filter = {}) {
   const origin = filter && typeof filter === 'object' ? filter.origin : (typeof filter === 'string' ? filter : null);
   let query = `
-    SELECT id, phone_number, name, email, role, plan, plan_tier, subscription_status,
-           subscription_origin, paid_until, asaas_customer_id, asaas_subscription_id,
-           hotmart_subscriber_code, hotmart_product_id, is_demo, trial_ends_at, created_at,
-           (SELECT COUNT(*) FROM expenses WHERE expenses.user_id = users.id) as total_expenses,
-           (SELECT COUNT(*) FROM scheduled_payments WHERE scheduled_payments.user_id = users.id) as total_bills
-    FROM users
+    SELECT u.id, u.phone_number, u.name, u.email, u.role, u.plan, u.plan_tier, u.subscription_status,
+           u.subscription_origin, u.paid_until, u.asaas_customer_id, u.asaas_subscription_id,
+           u.hotmart_subscriber_code, u.hotmart_product_id, u.is_demo, u.trial_ends_at, u.created_at,
+           (SELECT COUNT(*) FROM expenses WHERE expenses.user_id = u.id) as total_expenses,
+           (SELECT COUNT(*) FROM scheduled_payments WHERE scheduled_payments.user_id = u.id) as total_bills,
+           cs.salon_name,
+           cs.whatsapp_status as salon_whatsapp_status,
+           cs.whatsapp_phone as salon_whatsapp_phone,
+           cs.whatsapp_last_connected_at as salon_whatsapp_last_connected,
+           cs.whatsapp_last_error as salon_whatsapp_last_error
+    FROM users u
+    LEFT JOIN client_salons cs ON cs.user_id = u.id
   `;
   if (origin === 'HOTMART') {
-    query += ` WHERE subscription_origin = 'HOTMART' OR (subscription_origin = 'LEGACY' AND hotmart_product_id IS NOT NULL) OR hotmart_subscriber_code IS NOT NULL`;
+    query += ` WHERE u.subscription_origin = 'HOTMART' OR (u.subscription_origin = 'LEGACY' AND u.hotmart_product_id IS NOT NULL) OR u.hotmart_subscriber_code IS NOT NULL`;
   } else if (origin === 'ASAAS') {
-    query += ` WHERE subscription_origin IN ('ASAAS', 'DIRECT') OR asaas_customer_id IS NOT NULL`;
+    query += ` WHERE u.subscription_origin IN ('ASAAS', 'DIRECT') OR u.asaas_customer_id IS NOT NULL`;
   }
-  query += ` ORDER BY id DESC`;
+  query += ` ORDER BY u.id DESC`;
 
   const rows = db.prepare(query).all();
   return rows.map(u => ({
     ...u,
     phone: formatPhone(u.phone_number),
+    salonWhatsappPhoneMasked: u.salon_whatsapp_phone ? phoneUtils.maskPhoneNumber(u.salon_whatsapp_phone) : null,
     subscriptionOrigin: (u.subscription_origin === 'LEGACY' && u.hotmart_product_id) || u.hotmart_subscriber_code ? 'HOTMART' : (u.subscription_origin || 'ASAAS'),
   }));
 }

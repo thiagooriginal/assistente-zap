@@ -2,6 +2,7 @@
 
 const db = require('../database/db');
 const asaasService = require('./asaasService');
+const phoneUtils = require('../utils/phoneUtils');
 
 function safeJsonParse(val, fallback = null) {
   if (!val) return fallback;
@@ -1413,11 +1414,17 @@ function listAllSubscriptions({ productId, status, origin, limit = 100 } = {}) {
     SELECT cs.*,
            u.name AS user_name, u.email AS user_email, u.phone_number AS user_phone,
            p.code AS product_code, p.name AS product_name,
-           pp.name AS plan_name, pp.code AS plan_code
+           pp.name AS plan_name, pp.code AS plan_code,
+           salon.salon_name,
+           salon.whatsapp_status AS salon_whatsapp_status,
+           salon.whatsapp_phone AS salon_whatsapp_phone,
+           salon.whatsapp_last_connected_at AS salon_whatsapp_last_connected,
+           salon.whatsapp_last_error AS salon_whatsapp_last_error
     FROM customer_subscriptions cs
     JOIN users u ON u.id = cs.user_id
     JOIN products p ON p.id = cs.product_id
     LEFT JOIN product_plans pp ON pp.id = cs.plan_id
+    LEFT JOIN client_salons salon ON salon.user_id = cs.user_id
     WHERE 1=1
   `;
   const params = [];
@@ -1443,6 +1450,11 @@ function listAllSubscriptions({ productId, status, origin, limit = 100 } = {}) {
     userName: r.user_name,
     userEmail: r.user_email,
     userPhone: r.user_phone,
+    salonName: r.salon_name || null,
+    salonWhatsappStatus: r.salon_whatsapp_status || 'DISCONNECTED',
+    salonWhatsappPhoneMasked: r.salon_whatsapp_phone ? phoneUtils.maskPhoneNumber(r.salon_whatsapp_phone) : null,
+    salonWhatsappLastConnected: r.salon_whatsapp_last_connected || null,
+    salonWhatsappLastError: r.salon_whatsapp_last_error || null,
   }));
 }
 

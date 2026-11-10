@@ -205,6 +205,22 @@ function getPhoneCandidates(phone, authDir) {
   return getExactPhoneCandidates(phone, authDir);
 }
 
+/**
+ * Mascara número telefônico brasileiro para conformidade LGPD e ASVS 5.0 (ex: +55 (11) 9****-8888)
+ *
+ * @param {string|number|null|undefined} phone - Telefone bruto
+ * @returns {string} Telefone mascarado ou string vazia
+ */
+function maskPhoneNumber(phone) {
+  if (!phone) return '';
+  const digits = cleanDigits(phone);
+  if (digits.length < 10) return '****' + digits.slice(-4);
+  const norm = digits.startsWith('55') ? digits : `55${digits}`;
+  const ddd = norm.slice(2, 4);
+  const last4 = norm.slice(-4);
+  return `+55 (${ddd}) 9****-${last4}`;
+}
+
 module.exports = {
   cleanDigits,
   isValidBrazilianDdd,
@@ -212,4 +228,5 @@ module.exports = {
   extractCleanPhone,
   getExactPhoneCandidates,
   getPhoneCandidates,
+  maskPhoneNumber,
 };

@@ -422,13 +422,23 @@ async function _processSingleWhatsAppItem(item) {
     }
 
     // 2. Disparo via Camada Final de Transporte do WhatsApp
-    // O cliente whatsappClient.sendWhatsAppMessage gerencia centralizadamente o Hard Staging Lock
-    if (!whatsappClient || typeof whatsappClient.sendWhatsAppMessage !== 'function') {
-      throw new Error('WHATSAPP_CLIENT_UNAVAILABLE: Cliente WhatsApp offline ou não inicializado no servidor.');
-    }
-
+    // Roteamento inteligente: utiliza a sessão conectada do próprio salão quando disponível
     const jid = `${item.recipient_phone}@s.whatsapp.net`;
-    const sentResult = await whatsappClient.sendWhatsAppMessage(jid, item.message_text);
+    let sentResult;
+    try {
+      const salonSessionManager = require('../whatsapp/salonSessionManager');
+      const salonStatus = salonSessionManager.getSessionStatus(item.user_id);
+      if (salonStatus.status === 'CONNECTED') {
+        sentResult = await salonSessionManager.sendSalonMessage(item.user_id, jid, item.message_text);
+      }
+    } catch (_) {}
+
+    if (!sentResult) {
+      if (!whatsappClient || typeof whatsappClient.sendWhatsAppMessage !== 'function') {
+        throw new Error('WHATSAPP_CLIENT_UNAVAILABLE: Cliente WhatsApp offline ou não inicializado no servidor.');
+      }
+      sentResult = await whatsappClient.sendWhatsAppMessage(jid, item.message_text);
+    }
 
     if (sentResult?.simulated) {
       db.prepare(`

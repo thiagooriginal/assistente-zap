@@ -2051,44 +2051,19 @@
           </div>
         </div>
 
-        <!-- WhatsApp Pairing & Testing Block -->
-        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-4">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                <i data-lucide="qr-code" class="w-4 h-4 text-[#00F59B]"></i>
-                <span>Conexão do WhatsApp Comercial</span>
-              </h3>
-              <p class="text-xs text-slate-400 mt-0.5">Vincule o WhatsApp do salão para a Jéssica responder imediatamente.</p>
-            </div>
-            <button id="btnPairWhatsApp" class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs border border-white/10 transition-all flex items-center gap-2 w-fit">
-              <i data-lucide="smartphone" class="w-4 h-4"></i>
-              <span>Gerar QR Code de Conexão</span>
-            </button>
+        <!-- WhatsApp Pairing & Testing Block (Redirecionamento para a Aba de Conexão Oficial) -->
+        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i data-lucide="message-circle" class="w-4 h-4 text-[#C89B6D]"></i>
+              <span>WhatsApp Comercial do Salão</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">Conecte o WhatsApp do seu salão via QR Code ou Código de Pareamento de 8 dígitos para a Jéssica atender suas clientes.</p>
           </div>
-
-          <!-- Pairing Box (Hidden initially) -->
-          <div id="pairingBox" class="hidden p-6 rounded-xl bg-[#07080c] border border-white/5 flex flex-col md:flex-row items-center gap-6">
-            <div class="w-48 h-48 bg-white rounded-xl p-2 flex items-center justify-center">
-              <img id="qrCodeImg" src="/qrcode.png" alt="QR Code WhatsApp" class="w-full h-full object-contain" onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=RAIA_HOMOLOGACAO_SIMULATOR'">
-            </div>
-            <div class="space-y-2 text-xs text-slate-300">
-              <p class="font-bold text-white">Instruções de Conexão:</p>
-              <ol class="list-decimal pl-4 space-y-1 text-slate-400">
-                <li>Abra o WhatsApp no celular do salão.</li>
-                <li>Acesse <strong>Aparelhos Conectados</strong>.</li>
-                <li>Toque em <strong>Conectar um Aparelho</strong> e aponte para o QR Code.</li>
-              </ol>
-            </div>
-          </div>
-
-          <!-- Test WhatsApp message dispatch -->
-          <div class="pt-4 border-t border-white/5 flex flex-col sm:flex-row sm:items-center gap-3">
-            <input type="text" id="testPhoneInput" placeholder="DDD + Telefone (ex: 11999998888)" class="px-3.5 py-2 rounded-xl bg-[#07080c] border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
-            <button id="btnSendTestMessage" class="px-4 py-2 rounded-xl bg-[#00F59B]/20 hover:bg-[#00F59B]/30 text-[#00F59B] font-bold text-xs border border-[#00F59B]/30 transition-all">
-              Enviar Mensagem de Teste
-            </button>
-          </div>
+          <button type="button" onclick="switchTab('integrations-whatsapp')" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#AD7B42] to-[#C89B6D] hover:opacity-95 text-white font-bold text-xs transition-all flex items-center gap-2 w-fit shrink-0 shadow-lg shadow-[#AD7B42]/20">
+            <i data-lucide="smartphone" class="w-4 h-4"></i>
+            <span>Gerenciar Conexão WhatsApp</span>
+          </button>
         </div>
       </section>
 
@@ -2457,14 +2432,223 @@
       </section>
 
       <!-- ============================================== -->
-      <!-- TAB: NOTIFICAÇÕES WHATSAPP DO SALÃO            -->
+      <!-- TAB: INTEGRAÇÃO WHATSAPP DO SALÃO (JÉSSICA)    -->
       <!-- ============================================== -->
       <section id="tab-integrations-whatsapp" class="tab-content hidden space-y-6">
+
+        <!-- ======================================================== -->
+        <!-- BLOCO 1: CONEXÃO DO WHATSAPP COMERCIAL (QR CODE & CÓDIGO) -->
+        <!-- ======================================================== -->
+        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+            <div>
+              <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <i data-lucide="smartphone" class="w-5 h-5 text-[#C89B6D]"></i>
+                <span>Conecte o WhatsApp do seu salão</span>
+              </h3>
+              <p class="text-xs text-slate-400 mt-0.5">Conecte seu número para que a Jéssica atenda suas clientes, organize agendamentos e envie notificações automaticamente.</p>
+            </div>
+            <!-- Indicador de Status Real -->
+            <div id="salonWaStatusBadgeContainer" class="flex items-center gap-2 shrink-0">
+              <span id="salonWaStatusBadge" class="px-3.5 py-1.5 rounded-full text-xs font-bold bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-2">
+                <span id="salonWaStatusDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                <span id="salonWaStatusLabel">Desconectado</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- MODO 1: DESCONECTADO (Escolha entre QR Code e Código de Pareamento) -->
+          <div id="waConnectChoiceBox" class="space-y-4">
+            <p class="text-xs text-slate-300">Escolha como prefere vincular o WhatsApp da Jéssica ao seu salão:</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <!-- Opção A: QR Code -->
+              <button type="button" id="btnChooseQrMode" onclick="openSalonQrConnection()"
+                class="p-5 rounded-2xl bg-[#07080c] hover:bg-[#161822] border border-white/10 hover:border-[#C89B6D]/50 transition-all text-left group space-y-3 cursor-pointer">
+                <div class="flex items-center justify-between">
+                  <div class="w-10 h-10 rounded-xl bg-[#AD7B42]/10 border border-[#AD7B42]/30 flex items-center justify-center text-[#C89B6D]">
+                    <i data-lucide="qr-code" class="w-5 h-5"></i>
+                  </div>
+                  <span class="text-[11px] font-bold text-[#C89B6D] flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                    Conectar <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                  </span>
+                </div>
+                <div>
+                  <h4 class="text-sm font-bold text-white group-hover:text-[#EED8C6] transition-colors">Conectar com QR Code</h4>
+                  <p class="text-xs text-slate-400 mt-1">Aponte a câmera do WhatsApp para o código na tela do computador.</p>
+                </div>
+              </button>
+
+              <!-- Opção B: Código de Pareamento -->
+              <button type="button" id="btnChooseCodeMode" onclick="openSalonCodeConnection()"
+                class="p-5 rounded-2xl bg-[#07080c] hover:bg-[#161822] border border-white/10 hover:border-[#C89B6D]/50 transition-all text-left group space-y-3 cursor-pointer">
+                <div class="flex items-center justify-between">
+                  <div class="w-10 h-10 rounded-xl bg-[#AD7B42]/10 border border-[#AD7B42]/30 flex items-center justify-center text-[#C89B6D]">
+                    <i data-lucide="hash" class="w-5 h-5"></i>
+                  </div>
+                  <span class="text-[11px] font-bold text-[#C89B6D] flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                    Conectar <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                  </span>
+                </div>
+                <div>
+                  <h4 class="text-sm font-bold text-white group-hover:text-[#EED8C6] transition-colors">Conectar com Código</h4>
+                  <p class="text-xs text-slate-400 mt-1">Gere um código de 8 dígitos para digitar no WhatsApp direto pelo celular.</p>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <!-- MODO 2: CONTAINER DO QR CODE (Interativo com Auto-Refresh) -->
+          <div id="waQrCodeBox" class="hidden p-6 rounded-2xl bg-[#07080c] border border-white/10 space-y-5">
+            <div class="flex items-center justify-between border-b border-white/5 pb-3">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <i data-lucide="qr-code" class="w-4 h-4 text-[#C89B6D]"></i>
+                <span>Escaneie o QR Code no seu WhatsApp</span>
+              </span>
+              <button type="button" onclick="cancelSalonConnectMode()" class="text-xs text-slate-400 hover:text-white transition-colors">
+                Trocar método
+              </button>
+            </div>
+
+            <div class="flex flex-col md:flex-row items-center gap-8">
+              <!-- Quadro do QR Code -->
+              <div class="w-56 h-56 bg-white rounded-2xl p-3 flex items-center justify-center shrink-0 shadow-2xl relative">
+                <div id="waQrCodeSpinner" class="hidden absolute inset-0 bg-white/90 rounded-2xl flex flex-col items-center justify-center gap-2 text-xs text-[#4E3B31] font-bold">
+                  <div class="w-6 h-6 border-2 border-[#AD7B42] border-t-transparent rounded-full animate-spin"></div>
+                  <span>Atualizando código...</span>
+                </div>
+                <img id="salonQrCodeImg" src="" alt="QR Code WhatsApp do Salão" class="w-full h-full object-contain">
+              </div>
+
+              <!-- Instruções de Conexão -->
+              <div class="space-y-3 text-xs text-slate-300 max-w-md">
+                <h5 class="font-bold text-white text-sm">Instruções para a responsável:</h5>
+                <ol class="space-y-2 list-decimal pl-4 text-slate-400 leading-relaxed">
+                  <li>Abra o WhatsApp no celular comercial do seu salão.</li>
+                  <li>Toque em <strong class="text-slate-200">Aparelhos conectados</strong>.</li>
+                  <li>Selecione <strong class="text-slate-200">Conectar um aparelho</strong>.</li>
+                  <li>Aponte a câmera do celular para o QR Code ao lado.</li>
+                  <li>Aguarde a confirmação na tela. A página atualizará automaticamente.</li>
+                </ol>
+                <div class="pt-2 flex items-center gap-3">
+                  <button type="button" onclick="refreshSalonQrCode()" class="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white font-medium text-xs border border-white/10 transition-all flex items-center gap-1.5">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                    <span>Atualizar QR Code</span>
+                  </button>
+                  <span class="text-[11px] text-slate-500">Expira e renova automaticamente.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- MODO 3: CONTAINER DO CÓDIGO DE PAREAMENTO (Pairing Code) -->
+          <div id="waPairingCodeBox" class="hidden p-6 rounded-2xl bg-[#07080c] border border-white/10 space-y-5">
+            <div class="flex items-center justify-between border-b border-white/5 pb-3">
+              <span class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                <i data-lucide="smartphone" class="w-4 h-4 text-[#C89B6D]"></i>
+                <span>Conectar pelo número de telefone</span>
+              </span>
+              <button type="button" onclick="cancelSalonConnectMode()" class="text-xs text-slate-400 hover:text-white transition-colors">
+                Trocar método
+              </button>
+            </div>
+
+            <!-- Formulário para Inserir Telefone e Gerar Código -->
+            <div id="waPairingFormArea" class="space-y-4 max-w-md">
+              <label for="waPairingPhoneInput" class="block text-xs font-bold text-white">Número do WhatsApp do salão com DDD:</label>
+              <div class="flex gap-2">
+                <input type="tel" id="waPairingPhoneInput" placeholder="Ex: (11) 98765-4321"
+                  class="flex-1 px-4 py-2.5 rounded-xl bg-[#11131a] border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-[#C89B6D]">
+                <button type="button" id="btnGeneratePairingCode" onclick="submitSalonPairingCode()"
+                  class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#AD7B42] to-[#C89B6D] hover:opacity-95 text-white font-bold text-xs transition-all flex items-center gap-2 shrink-0">
+                  <span id="btnPairingSpinner" class="hidden w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <span id="btnPairingText">Gerar código</span>
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400">Insira os 11 dígitos com DDD. Não é necessário digitar o código do país (+55).</p>
+            </div>
+
+            <!-- Exibição do Código de 8 Dígitos Gerado -->
+            <div id="waPairingDisplayArea" class="hidden p-6 rounded-xl bg-[#11131a] border border-[#C89B6D]/30 space-y-4">
+              <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <span class="text-xs font-bold text-[#EED8C6]">Seu código de conexão do WhatsApp:</span>
+                <span id="waPairingTimer" class="text-xs text-amber-400 font-mono">Válido por 3 minutos</span>
+              </div>
+
+              <!-- Display com destaque tipográfico -->
+              <div class="flex items-center gap-3">
+                <div id="waPairingCodeValue" class="px-6 py-4 rounded-xl bg-[#07080c] border border-white/10 font-mono text-2xl sm:text-3xl font-extrabold tracking-widest text-[#EED8C6] select-all">
+                  ---- - ----
+                </div>
+                <button type="button" onclick="copyPairingCode()" class="px-4 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs border border-white/10 transition-all flex items-center gap-2">
+                  <i data-lucide="copy" class="w-4 h-4"></i>
+                  <span>Copiar</span>
+                </button>
+              </div>
+
+              <!-- Orientações para a cliente -->
+              <div class="space-y-2 text-xs text-slate-300 pt-2 border-t border-white/5">
+                <p class="font-bold text-white">Orientações para conectar:</p>
+                <ol class="space-y-1.5 list-decimal pl-4 text-slate-400 leading-relaxed">
+                  <li>Abra o WhatsApp no celular do seu salão.</li>
+                  <li>Toque em <strong class="text-slate-200">Aparelhos conectados</strong>.</li>
+                  <li>Selecione <strong class="text-slate-200">Conectar um aparelho</strong>.</li>
+                  <li>Escolha <strong class="text-slate-200">Conectar com número de telefone</strong> (na parte inferior da tela).</li>
+                  <li>Digite o código de 8 dígitos exibido acima.</li>
+                </ol>
+                <p class="text-[11px] text-slate-500 italic mt-2">
+                  ⚠️ Importante: Este código é exclusivo para pareamento de aparelho vinculado, não é um SMS de verificação.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- MODO 4: CARD DE SUCESSO CONECTADO -->
+          <div id="waConnectedCard" class="hidden p-6 rounded-2xl bg-[#07080c] border border-emerald-500/30 space-y-5">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                  <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+                </div>
+                <div>
+                  <h4 class="text-sm font-bold text-white flex items-center gap-2">
+                    <span>WhatsApp Conectado com Sucesso</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">OPERACIONAL</span>
+                  </h4>
+                  <p id="waConnectedPhoneDisplay" class="text-xs text-emerald-400 font-mono mt-0.5">+55 (11) 9****-****</p>
+                </div>
+              </div>
+
+              <button type="button" id="btnDisconnectWhatsApp" onclick="confirmDisconnectWhatsApp()"
+                class="px-4 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-xs border border-red-500/30 transition-all flex items-center gap-2 w-fit">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+                <span>Desconectar WhatsApp</span>
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div class="p-4 rounded-xl bg-[#11131a] border border-white/5 space-y-1">
+                <span class="text-slate-500 text-[11px] block">Última conexão confirmada:</span>
+                <span id="waConnectedAtDisplay" class="text-white font-medium">--/--/---- às --:--</span>
+              </div>
+              <div class="p-4 rounded-xl bg-[#11131a] border border-white/5 space-y-1">
+                <span class="text-slate-500 text-[11px] block">Status do Atendimento da Jéssica:</span>
+                <span class="text-emerald-400 font-medium flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Pronta para responder clientes e agendar</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ======================================================== -->
+        <!-- BLOCO 2: NOTIFICAÇÕES AUTOMÁTICAS NO WHATSAPP (EXISTENTE) -->
+        <!-- ======================================================== -->
         <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-6">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
             <div>
               <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                <i data-lucide="message-square" class="w-4 h-4 text-emerald-400"></i>
+                <i data-lucide="bell" class="w-4 h-4 text-emerald-400"></i>
                 <span>Notificações Automáticas no WhatsApp do Salão</span>
               </h3>
               <p class="text-xs text-slate-400 mt-0.5">Receba alertas instantâneos no WhatsApp da dona ou responsável sempre que houver um novo agendamento, cancelamento ou remarcação.</p>
@@ -4709,7 +4893,10 @@
       else if (tabId === 'staff') loadStaff();
       else if (tabId === 'appointments') loadAppointments();
       else if (tabId === 'integrations-google') loadGoogleCalendarSettings();
-      else if (tabId === 'integrations-whatsapp') loadWhatsAppNotificationSettings();
+      else if (tabId === 'integrations-whatsapp') {
+        loadWhatsAppNotificationSettings();
+        loadSalonWhatsAppStatus();
+      }
       else if (tabId === 'dashboard-pro') loadProDashboard();
       else if (tabId === 'campaigns-pro') loadProCampaigns();
     }
@@ -5617,6 +5804,7 @@
         }
 
         switchTab(canonicalTab, false);
+        loadSalonWhatsAppStatus();
         revealInterface();
       } catch (err) {
         console.error('Erro ao carregar perfil:', err);
@@ -8874,6 +9062,287 @@
       }
     });
 
+    // ========================================================
+    // GESTÃO DA CONEXÃO WHATSAPP DO SALÃO (COMANDO 027)
+    // ========================================================
+    let salonWaPollTimer = null;
+    let salonWaPairingCountdown = null;
+
+    async function loadSalonWhatsAppStatus() {
+      try {
+        const res = await fetch('/api/cliente/whatsapp/status');
+        const data = await res.json();
+        if (!data.success) return;
+
+        renderSalonWhatsAppUI(data);
+
+        // Se estiver em estado transitório (aguardando leitura ou conectando), agenda polling
+        if (['WAITING_QR', 'WAITING_CODE', 'CONNECTING', 'RECONNECTING'].includes(data.status)) {
+          if (!salonWaPollTimer) {
+            salonWaPollTimer = setTimeout(() => {
+              salonWaPollTimer = null;
+              loadSalonWhatsAppStatus();
+            }, 3000);
+          }
+        } else if (salonWaPollTimer) {
+          clearTimeout(salonWaPollTimer);
+          salonWaPollTimer = null;
+        }
+      } catch (err) {
+        console.error('Erro ao verificar status do WhatsApp:', err);
+      }
+    }
+
+    function renderSalonWhatsAppUI(statusData) {
+      const status = statusData.status || 'DISCONNECTED';
+      const badge = document.getElementById('salonWaStatusBadge');
+      const dot = document.getElementById('salonWaStatusDot');
+      const label = document.getElementById('salonWaStatusLabel');
+
+      // Overview Card Update
+      const ovBadge = document.getElementById('waStatusBadge');
+      const ovText = document.getElementById('waStatusText');
+
+      // Containers dos Modos
+      const choiceBox = document.getElementById('waConnectChoiceBox');
+      const qrBox = document.getElementById('waQrCodeBox');
+      const pairingBox = document.getElementById('waPairingCodeBox');
+      const connectedCard = document.getElementById('waConnectedCard');
+
+      // Mapeamento de Cores e Rótulos do Status
+      const statusMap = {
+        DISCONNECTED: { label: 'Desconectado', color: 'bg-slate-500', text: 'text-slate-400', border: 'border-slate-700', bg: 'bg-slate-800/80', ov: 'bg-red-500/10 text-red-400 border-red-500/30' },
+        WAITING_QR: { label: 'Aguardando Leitura do QR', color: 'bg-amber-400 animate-pulse', text: 'text-amber-400', border: 'border-amber-500/40', bg: 'bg-amber-500/10', ov: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+        WAITING_CODE: { label: 'Aguardando Código', color: 'bg-amber-400 animate-pulse', text: 'text-amber-400', border: 'border-amber-500/40', bg: 'bg-amber-500/10', ov: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+        CONNECTING: { label: 'Conectando...', color: 'bg-sky-400 animate-pulse', text: 'text-sky-400', border: 'border-sky-500/40', bg: 'bg-sky-500/10', ov: 'bg-sky-500/10 text-sky-400 border-sky-500/30' },
+        CONNECTED: { label: 'WhatsApp Conectado', color: 'bg-emerald-400 animate-pulse', text: 'text-emerald-400', border: 'border-emerald-500/40', bg: 'bg-emerald-500/10', ov: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
+        RECONNECTING: { label: 'Reconectando...', color: 'bg-amber-400 animate-pulse', text: 'text-amber-400', border: 'border-amber-500/40', bg: 'bg-amber-500/10', ov: 'bg-amber-500/10 text-amber-400 border-amber-500/30' },
+        CONNECTION_LOST: { label: 'Conexão Perdida', color: 'bg-orange-400', text: 'text-orange-400', border: 'border-orange-500/40', bg: 'bg-orange-500/10', ov: 'bg-orange-500/10 text-orange-400 border-orange-500/30' },
+        ERROR: { label: 'Erro na Conexão', color: 'bg-red-400', text: 'text-red-400', border: 'border-red-500/40', bg: 'bg-red-500/10', ov: 'bg-red-500/10 text-red-400 border-red-500/30' },
+      };
+
+      const meta = statusMap[status] || statusMap.DISCONNECTED;
+      if (badge && dot && label) {
+        badge.className = `px-3.5 py-1.5 rounded-full text-xs font-bold ${meta.bg} ${meta.text} border ${meta.border} flex items-center gap-2`;
+        dot.className = `w-2 h-2 rounded-full ${meta.color}`;
+        label.innerText = meta.label;
+      }
+
+      if (ovBadge && ovText) {
+        ovBadge.className = `text-[10px] px-2 py-0.5 rounded-full font-bold border ${meta.ov}`;
+        ovBadge.innerText = status === 'CONNECTED' ? 'CONECTADO' : (status === 'DISCONNECTED' ? 'DESCONECTADO' : 'CONECTANDO');
+        ovText.innerText = status === 'CONNECTED' ? (statusData.connectedPhone || 'WhatsApp Ativo') : meta.label;
+      }
+
+      // Alternância de Telas
+      if (status === 'CONNECTED') {
+        choiceBox?.classList.add('hidden');
+        qrBox?.classList.add('hidden');
+        pairingBox?.classList.add('hidden');
+        connectedCard?.classList.remove('hidden');
+
+        const phoneDisplay = document.getElementById('waConnectedPhoneDisplay');
+        if (phoneDisplay) phoneDisplay.innerText = statusData.connectedPhone || 'Número Conectado';
+
+        const atDisplay = document.getElementById('waConnectedAtDisplay');
+        if (atDisplay && statusData.lastConnectedAt) {
+          try {
+            const dt = new Date(statusData.lastConnectedAt);
+            atDisplay.innerText = dt.toLocaleString('pt-BR');
+          } catch (_) {
+            atDisplay.innerText = statusData.lastConnectedAt;
+          }
+        }
+      } else if (status === 'WAITING_QR' && statusData.qrCode) {
+        choiceBox?.classList.add('hidden');
+        qrBox?.classList.remove('hidden');
+        pairingBox?.classList.add('hidden');
+        connectedCard?.classList.add('hidden');
+
+        const img = document.getElementById('salonQrCodeImg');
+        if (img) img.src = statusData.qrCode;
+      } else if (status === 'WAITING_CODE' && statusData.pairingCode) {
+        choiceBox?.classList.add('hidden');
+        qrBox?.classList.add('hidden');
+        pairingBox?.classList.remove('hidden');
+        connectedCard?.classList.add('hidden');
+
+        const formArea = document.getElementById('waPairingFormArea');
+        const displayArea = document.getElementById('waPairingDisplayArea');
+        formArea?.classList.add('hidden');
+        displayArea?.classList.remove('hidden');
+
+        const valElem = document.getElementById('waPairingCodeValue');
+        if (valElem) valElem.innerText = statusData.pairingCode;
+      } else {
+        if (qrBox?.classList.contains('hidden') && pairingBox?.classList.contains('hidden')) {
+          choiceBox?.classList.remove('hidden');
+          connectedCard?.classList.add('hidden');
+        }
+      }
+    }
+
+    // Ação: Iniciar Conexão via QR Code
+    async function openSalonQrConnection() {
+      const choiceBox = document.getElementById('waConnectChoiceBox');
+      const qrBox = document.getElementById('waQrCodeBox');
+      const spinner = document.getElementById('waQrCodeSpinner');
+
+      choiceBox?.classList.add('hidden');
+      qrBox?.classList.remove('hidden');
+      spinner?.classList.remove('hidden');
+
+      try {
+        const res = await fetch('/api/cliente/whatsapp/connect-qr', { method: 'POST' });
+        const data = await res.json();
+        spinner?.classList.add('hidden');
+
+        if (data.success && data.qrCode) {
+          const img = document.getElementById('salonQrCodeImg');
+          if (img) img.src = data.qrCode;
+          loadSalonWhatsAppStatus();
+        } else if (data.status === 'CONNECTED') {
+          showToast('WhatsApp já conectado!');
+          loadSalonWhatsAppStatus();
+        } else {
+          showToast(data.error || 'Erro ao gerar QR Code.', 'error');
+          cancelSalonConnectMode();
+        }
+      } catch (err) {
+        spinner?.classList.add('hidden');
+        showToast('Erro de comunicação com o servidor.', 'error');
+        cancelSalonConnectMode();
+      }
+    }
+
+    async function refreshSalonQrCode() {
+      await openSalonQrConnection();
+    }
+
+    // Ação: Iniciar Conexão via Código
+    function openSalonCodeConnection() {
+      const choiceBox = document.getElementById('waConnectChoiceBox');
+      const qrBox = document.getElementById('waQrCodeBox');
+      const pairingBox = document.getElementById('waPairingCodeBox');
+      const formArea = document.getElementById('waPairingFormArea');
+      const displayArea = document.getElementById('waPairingDisplayArea');
+
+      choiceBox?.classList.add('hidden');
+      qrBox?.classList.add('hidden');
+      pairingBox?.classList.remove('hidden');
+      formArea?.classList.remove('hidden');
+      displayArea?.classList.add('hidden');
+
+      const input = document.getElementById('waPairingPhoneInput');
+      if (input) {
+        input.value = '';
+        setTimeout(() => input.focus(), 100);
+      }
+    }
+
+    // Submissão do Telefone para Geração de Código de Pareamento
+    async function submitSalonPairingCode() {
+      const input = document.getElementById('waPairingPhoneInput');
+      const phone = input ? input.value.trim() : '';
+      if (!phone) {
+        showToast('Informe o número com DDD.', 'error');
+        return;
+      }
+
+      const btnSpinner = document.getElementById('btnPairingSpinner');
+      const btnText = document.getElementById('btnPairingText');
+      btnSpinner?.classList.remove('hidden');
+      if (btnText) btnText.innerText = 'Gerando...';
+
+      try {
+        const res = await fetch('/api/cliente/whatsapp/connect-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone }),
+        });
+        const data = await res.json();
+        btnSpinner?.classList.add('hidden');
+        if (btnText) btnText.innerText = 'Gerar código';
+
+        if (data.success && data.pairingCode) {
+          const formArea = document.getElementById('waPairingFormArea');
+          const displayArea = document.getElementById('waPairingDisplayArea');
+          formArea?.classList.add('hidden');
+          displayArea?.classList.remove('hidden');
+
+          const codeElem = document.getElementById('waPairingCodeValue');
+          if (codeElem) codeElem.innerText = data.pairingCode;
+
+          startPairingCountdown(data.expiresAt || (Date.now() + 180000));
+          loadSalonWhatsAppStatus();
+        } else {
+          showToast(data.error || 'Erro ao gerar código de pareamento.', 'error');
+        }
+      } catch (err) {
+        btnSpinner?.classList.add('hidden');
+        if (btnText) btnText.innerText = 'Gerar código';
+        showToast('Erro de conexão ao gerar código.', 'error');
+      }
+    }
+
+    function startPairingCountdown(expiresAt) {
+      if (salonWaPairingCountdown) clearInterval(salonWaPairingCountdown);
+      const timerElem = document.getElementById('waPairingTimer');
+
+      salonWaPairingCountdown = setInterval(() => {
+        const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+        if (remaining <= 0) {
+          clearInterval(salonWaPairingCountdown);
+          if (timerElem) timerElem.innerText = 'Código expirado. Gere um novo.';
+        } else {
+          const mins = Math.floor(remaining / 60);
+          const secs = remaining % 60;
+          if (timerElem) timerElem.innerText = `Expira em ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+      }, 1000);
+    }
+
+    function copyPairingCode() {
+      const codeElem = document.getElementById('waPairingCodeValue');
+      const code = codeElem ? codeElem.innerText.replace(/\s+/g, '') : '';
+      if (!code) return;
+
+      navigator.clipboard.writeText(code).then(() => {
+        showToast('Código copiado para a área de transferência!');
+      }).catch(() => {
+        showToast('Código: ' + code);
+      });
+    }
+
+    function cancelSalonConnectMode() {
+      const choiceBox = document.getElementById('waConnectChoiceBox');
+      const qrBox = document.getElementById('waQrCodeBox');
+      const pairingBox = document.getElementById('waPairingCodeBox');
+
+      choiceBox?.classList.remove('hidden');
+      qrBox?.classList.add('hidden');
+      pairingBox?.classList.add('hidden');
+    }
+
+    async function confirmDisconnectWhatsApp() {
+      if (!confirm('Deseja realmente desconectar o WhatsApp do seu salão? A Jéssica não poderá responder suas clientes até uma nova conexão.')) {
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/cliente/whatsapp/disconnect', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+          showToast('WhatsApp do salão desconectado com sucesso.');
+          loadSalonWhatsAppStatus();
+        } else {
+          showToast(data.error || 'Erro ao desconectar WhatsApp.', 'error');
+        }
+      } catch (_) {
+        showToast('Erro ao contactar o servidor.', 'error');
+      }
+    }
+
     // ==========================================
     // DASHBOARD GERENCIAL & FINANCEIRO 2.0
     // ==========================================
@@ -9568,9 +10037,9 @@
       }
     });
 
-    // WhatsApp Pairing Simulation
-    document.getElementById('btnPairWhatsApp').addEventListener('click', () => {
-      document.getElementById('pairingBox').classList.toggle('hidden');
+    // WhatsApp Pairing Shortcut (Legacy fallback)
+    document.getElementById('btnPairWhatsApp')?.addEventListener('click', () => {
+      switchTab('integrations-whatsapp');
     });
 
     // Logout seguro com isolamento estrito
