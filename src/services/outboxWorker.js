@@ -422,20 +422,18 @@ async function _processSingleWhatsAppItem(item) {
     }
 
     // 2. Disparo via Camada Final de Transporte do WhatsApp
-    // Roteamento inteligente: utiliza a sessão conectada do próprio salão quando disponível
+    // CORREÇÃO 1 (COMANDO 028): Eliminação definitiva de fallback global (Fail-Closed)
     const jid = `${item.recipient_phone}@s.whatsapp.net`;
     let sentResult;
-    try {
-      const salonSessionManager = require('../whatsapp/salonSessionManager');
-      const salonStatus = salonSessionManager.getSessionStatus(item.user_id);
-      if (salonStatus.status === 'CONNECTED') {
-        sentResult = await salonSessionManager.sendSalonMessage(item.user_id, jid, item.message_text);
-      }
-    } catch (_) {}
 
-    if (!sentResult) {
+    if (item.user_id && item.user_id > 0) {
+      // Notificações de salão são despachadas exclusivamente pela sessão do próprio salão
+      const salonSessionManager = require('../whatsapp/salonSessionManager');
+      sentResult = await salonSessionManager.sendSalonMessage(item.user_id, jid, item.message_text);
+    } else {
+      // Apenas mensagens administrativas do sistema (sem salão associado) utilizam o cliente global
       if (!whatsappClient || typeof whatsappClient.sendWhatsAppMessage !== 'function') {
-        throw new Error('WHATSAPP_CLIENT_UNAVAILABLE: Cliente WhatsApp offline ou não inicializado no servidor.');
+        throw new Error('WHATSAPP_CLIENT_UNAVAILABLE: Cliente WhatsApp global offline ou não inicializado no servidor.');
       }
       sentResult = await whatsappClient.sendWhatsAppMessage(jid, item.message_text);
     }

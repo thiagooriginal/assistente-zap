@@ -5,7 +5,14 @@
  * e credenciais no filesystem dentro de data/sessions/salon_<userId>/.
  *
  * Suporta conexão via QR Code dinâmico em memória e Código de Pareamento de 8 dígitos.
- * Em conformidade com a Matriz RAIA-27 (OWASP ASVS 5.0) e Hard Staging Lock.
+ * Em conformidade estrita com a Matriz RAIA-27 (OWASP ASVS 5.0) e Hard Staging Lock.
+ *
+ * CORREÇÕES DO COMANDO 028:
+ * 1. Zero Fallback Global: Envio exclusivo pelo socket do salão; falha estrita (fail-closed) se offline.
+ * 2. Roteamento Segregado: Mensagens recebidas no socket do salão despachadas para salonIncomingDispatcher.js.
+ * 3. Restauração Automática: restoreActiveSalonSessions() reidrata sessões válidas no startup.
+ * 4. Pareamento Seguro: Aguarda prontidão do socket antes de chamar requestPairingCode com mutex unificado.
+ * 5. Efemeridade Total: QR Code e Pairing Code mantidos 100% em memória (RAM com TTL), nunca no SQLite.
  *
  * @module whatsapp/salonSessionManager
  */
@@ -24,6 +31,7 @@ const db = require('../database/db');
 const SalonWhatsAppRepository = require('../database/salonWhatsAppRepository');
 const phoneUtils = require('../utils/phoneUtils');
 const clientModule = require('./client');
+const salonIncomingDispatcher = require('./salonIncomingDispatcher');
 
 // Raiz padrão das credenciais persistentes
 let SESSIONS_ROOT = path.resolve(__dirname, '../../data/sessions');
@@ -31,8 +39,8 @@ let SESSIONS_ROOT = path.resolve(__dirname, '../../data/sessions');
 // Mapa em memória de sessões ativas: userId => SessionInstance
 const activeSessions = new Map();
 
-// Mutex de conexão para prevenir cliques concorrentes: userId => Promise
-const connectionLocks = new Map();
+// Mutex unificado por tenant para serializar operações de conexão/desconexão: userId => Promise
+const tenantLocks = new Map();
 
 /**
  * Sanitiza e retorna o caminho absoluto seguro do diretório de credenciais do salão
@@ -103,7 +111,57 @@ function validateBrazilianPhoneForPairing(rawPhone) {
 }
 
 /**
- * Retorna o status de conexão atual do salão
+ * Aguarda a prontidão operacional do socket antes de requisitar emparelhamento
+ * Previne race conditions no handshake WebSocket/Noise
+ *
+ * @private
+ * @param {object} sock
+ * @param {number} [timeoutMs=15000]
+ * @returns {Promise<void>}
+ */
+function waitForSocketReady(sock, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    let resolved = false;
+
+    const timer = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        reject(new Error('SOCKET_NOT_READY_TIMEOUT: O socket WhatsApp não inicializou a tempo para pareamento.'));
+      }
+    }, timeoutMs);
+
+    function cleanup() {
+      clearTimeout(timer);
+      if (sock?.ev?.off) {
+        sock.ev.off('connection.update', onUpdate);
+      }
+    }
+
+    function onUpdate(update) {
+      const { connection, lastDisconnect, qr } = update || {};
+      if (qr || connection === 'connecting') {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
+          resolve();
+        }
+      } else if (connection === 'close') {
+        if (!resolved) {
+          resolved = true;
+          cleanup();
+          reject(new Error(`SOCKET_CLOSED_BEFORE_PAIRING: ${lastDisconnect?.error?.message || 'Conexão fechada precocemente.'}`));
+        }
+      }
+    }
+
+    sock.ev.on('connection.update', onUpdate);
+  });
+}
+
+/**
+ * Retorna o status de conexão atual do salão.
+ * CORREÇÃO 5: Limpeza ativa de segredos expirados em memória.
  *
  * @param {number} userId
  * @returns {object}
@@ -114,7 +172,21 @@ function getSessionStatus(userId) {
 
   if (memSession) {
     const now = Date.now();
-    const hasPairing = Boolean(memSession.pairingCode && memSession.pairingExpiresAt && memSession.pairingExpiresAt > now);
+
+    // Expiração ativa do código de pareamento em memória
+    if (memSession.pairingExpiresAt && memSession.pairingExpiresAt < now) {
+      memSession.pairingCode = null;
+      memSession.pairingExpiresAt = null;
+    }
+
+    // Expiração ativa do QR Code em memória
+    if (memSession.qrExpiresAt && memSession.qrExpiresAt < now) {
+      memSession.qrCode = null;
+      memSession.qrExpiresAt = null;
+    }
+
+    const hasPairing = Boolean(memSession.pairingCode);
+    const hasQr = Boolean(memSession.qrCode);
 
     return {
       status: memSession.status,
@@ -123,15 +195,15 @@ function getSessionStatus(userId) {
       lastConnectedAt: memSession.lastConnectedAt || null,
       lastError: memSession.lastError || null,
       pairingMethod: memSession.pairingMethod || null,
-      hasQr: Boolean(memSession.qrCode),
-      qrCode: memSession.qrCode,
+      hasQr,
+      qrCode: memSession.qrCode || null,
       hasPairingCode: hasPairing,
-      pairingCode: hasPairing ? memSession.pairingCode : null,
+      pairingCode: memSession.pairingCode || null,
       pairingExpiresAt: memSession.pairingExpiresAt || null,
     };
   }
 
-  // Consulta no repositório persistido
+  // Consulta no repositório persistido (garantido sem segredos no SQLite)
   const repoSession = SalonWhatsAppRepository.getSessionByUserId(uid);
   if (repoSession) {
     return {
@@ -141,8 +213,8 @@ function getSessionStatus(userId) {
       lastConnectedAt: repoSession.connected_at || null,
       lastError: repoSession.last_error || null,
       pairingMethod: repoSession.pairing_method || null,
-      hasQr: Boolean(repoSession.qr_code_cached),
-      qrCode: repoSession.qr_code_cached || null,
+      hasQr: false,
+      qrCode: null,
       hasPairingCode: false,
       pairingCode: null,
       pairingExpiresAt: null,
@@ -165,6 +237,118 @@ function getSessionStatus(userId) {
 }
 
 /**
+ * Registra listeners comuns do socket Baileys do salão
+ * CORREÇÃO 2: Roteamento de mensagens de entrada para salonIncomingDispatcher.js
+ * CORREÇÃO 5: Queima imediata de QR Code e Pairing Code ao conectar
+ *
+ * @private
+ * @param {number} uid
+ * @param {object} sock
+ * @param {object} session
+ * @param {Function} saveCreds
+ */
+function _attachSocketListeners(uid, sock, session, saveCreds) {
+  sock.ev.on('creds.update', saveCreds);
+
+  // CORREÇÃO 2: Mensagens recebidas no WhatsApp comercial do salão
+  sock.ev.on('messages.upsert', async (m) => {
+    try {
+      if (m.type === 'notify' && Array.isArray(m.messages)) {
+        for (const msg of m.messages) {
+          if (!msg.message || !msg.key?.remoteJid || msg.key.fromMe) continue;
+          await salonIncomingDispatcher.dispatchMessage(uid, sock, msg);
+        }
+      }
+    } catch (err) {
+      console.error(`[salonSessionManager] Erro no despachante da Jéssica #${uid}:`, err.message);
+    }
+  });
+
+  sock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect, qr } = update;
+
+    if (qr) {
+      try {
+        const qrDataUrl = await QRCode.toDataURL(qr, {
+          margin: 2,
+          width: 280,
+          color: { dark: '#4E3B31', light: '#FFFDFB' },
+        });
+        session.qrCode = qrDataUrl;
+        session.qrExpiresAt = Date.now() + 60000; // 60 segundos
+        session.status = 'WAITING_QR';
+
+        // Atualiza banco sem persistir imagem bruta
+        SalonWhatsAppRepository.updateQrCode(uid, null, 60);
+
+        SalonWhatsAppRepository.createLog(uid, {
+          eventType: 'QR_GENERATED',
+          newStatus: 'WAITING_QR',
+          pairingMethod: 'QR',
+        });
+      } catch (err) {
+        session.lastError = 'Falha ao codificar imagem do QR Code.';
+      }
+    }
+
+    if (connection === 'open') {
+      const jid = sock.user?.id || '';
+      const cleanPhone = phoneUtils.cleanDigits(jid.split('@')[0].split(':')[0]);
+      session.status = 'CONNECTED';
+      session.connectedPhone = cleanPhone;
+      session.lastConnectedAt = new Date().toISOString();
+      session.lastError = null;
+
+      // CORREÇÃO 5: Queima imediata de segredos efêmeros ao conectar
+      session.qrCode = null;
+      session.qrExpiresAt = null;
+      session.pairingCode = null;
+      session.pairingExpiresAt = null;
+
+      SalonWhatsAppRepository.markSessionConnected(uid, {
+        phone: cleanPhone,
+        phoneJid: `${cleanPhone}@s.whatsapp.net`,
+        pairingMethod: session.pairingMethod || 'QR',
+      });
+
+      SalonWhatsAppRepository.createLog(uid, {
+        eventType: 'CONNECTED',
+        newStatus: 'CONNECTED',
+        pairingMethod: session.pairingMethod || 'QR',
+        connectedPhone: cleanPhone,
+        reason: 'WhatsApp comercial do salão conectado com sucesso.',
+      });
+    }
+
+    if (connection === 'close') {
+      const statusCode = lastDisconnect?.error?.output?.statusCode;
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+
+      // Limpa segredos em memória
+      session.qrCode = null;
+      session.pairingCode = null;
+
+      if (isLoggedOut) {
+        await disconnect(uid);
+      } else {
+        session.status = 'CONNECTION_LOST';
+        session.lastError = lastDisconnect?.error?.message || 'Conexão temporariamente interrompida.';
+        SalonWhatsAppRepository.markSessionDisconnected(uid, {
+          status: 'CONNECTION_LOST',
+          error: session.lastError,
+        });
+
+        SalonWhatsAppRepository.createLog(uid, {
+          eventType: 'DISCONNECTED',
+          newStatus: 'CONNECTION_LOST',
+          reason: session.lastError,
+        });
+      }
+    }
+  });
+}
+
+/**
  * Inicializa ou recupera a sessão QR Code do salão
  *
  * @param {number} userId
@@ -173,9 +357,9 @@ function getSessionStatus(userId) {
 async function startQrSession(userId) {
   const uid = Number(userId);
 
-  // Trava de concorrência
-  if (connectionLocks.has(uid)) {
-    return connectionLocks.get(uid);
+  // Mutex unificado por tenant (CORREÇÃO 4)
+  if (tenantLocks.has(uid)) {
+    return tenantLocks.get(uid);
   }
 
   const connectPromise = (async () => {
@@ -192,7 +376,7 @@ async function startQrSession(userId) {
     const sessionDir = getSalonSessionDir(uid);
     SalonWhatsAppRepository.ensureSessionExists(uid, `data/sessions/salon_${uid}`);
 
-    // Hard Staging Lock: em staging/homologacao sem autorização, opera modo simulado limpo
+    // Hard Staging Lock: em staging/homologação sem autorização, opera modo simulado limpo
     const isRealAllowed = clientModule.isRealWhatsAppTransportAllowed();
     if (!isRealAllowed) {
       const simQrDataUrl = await QRCode.toDataURL(`RAIA_HOMOLOGACAO_SALON_${uid}_MOCK_QR_${Date.now()}`, {
@@ -206,6 +390,7 @@ async function startQrSession(userId) {
         sock: null,
         status: 'WAITING_QR',
         qrCode: simQrDataUrl,
+        qrExpiresAt: Date.now() + 60000,
         pairingCode: null,
         pairingExpiresAt: null,
         connectedPhone: null,
@@ -214,7 +399,9 @@ async function startQrSession(userId) {
         pairingMethod: 'QR',
       };
       activeSessions.set(uid, session);
-      SalonWhatsAppRepository.updateQrCode(uid, simQrDataUrl, 120);
+
+      // Banco recebe NULL para dados brutos do QR Code (CORREÇÃO 5)
+      SalonWhatsAppRepository.updateQrCode(uid, null, 60);
 
       SalonWhatsAppRepository.createLog(uid, {
         eventType: 'QR_GENERATED',
@@ -226,7 +413,11 @@ async function startQrSession(userId) {
       return { success: true, qrCode: simQrDataUrl, status: 'WAITING_QR' };
     }
 
-    // Em produção com autorização real: conecta ao Baileys
+    // Modo Real Baileys: encerra socket prévio pendente
+    if (session && session.sock) {
+      try { session.sock.end(undefined); } catch (_) {}
+    }
+
     if (!fs.existsSync(sessionDir)) {
       fs.mkdirSync(sessionDir, { recursive: true });
     }
@@ -249,6 +440,7 @@ async function startQrSession(userId) {
       sock,
       status: 'CONNECTING',
       qrCode: null,
+      qrExpiresAt: null,
       pairingCode: null,
       pairingExpiresAt: null,
       connectedPhone: null,
@@ -258,27 +450,11 @@ async function startQrSession(userId) {
     };
     activeSessions.set(uid, session);
 
-    sock.ev.on('creds.update', saveCreds);
-
-    // Listener para mensagens recebidas da cliente final no WhatsApp comercial do salão
-    sock.ev.on('messages.upsert', async (m) => {
-      try {
-        if (m.type === 'notify' && Array.isArray(m.messages)) {
-          const { handleIncomingMessage } = require('./messageHandler');
-          for (const msg of m.messages) {
-            if (!msg.message || !msg.key?.remoteJid || msg.key.fromMe) continue;
-            await handleIncomingMessage(sock, msg, { salonUserId: uid });
-          }
-        }
-      } catch (err) {
-        console.error(`[salonSessionManager] Erro no processamento de mensagem recebida #${uid}:`, err.message);
-      }
-    });
+    _attachSocketListeners(uid, sock, session, saveCreds);
 
     return new Promise((resolve) => {
       let resolved = false;
 
-      // Timeout defensivo de 25 segundos para retorno da requisição inicial
       const initialTimeout = setTimeout(() => {
         if (!resolved) {
           resolved = true;
@@ -286,106 +462,39 @@ async function startQrSession(userId) {
         }
       }, 25000);
 
-      sock.ev.on('connection.update', async (update) => {
-        const { connection, lastDisconnect, qr } = update;
-
-        if (qr) {
-          try {
-            session.qrCode = await QRCode.toDataURL(qr, {
-              margin: 2,
-              width: 280,
-              color: { dark: '#4E3B31', light: '#FFFDFB' },
-            });
-            session.status = 'WAITING_QR';
-            SalonWhatsAppRepository.updateQrCode(uid, session.qrCode, 60);
-
-            SalonWhatsAppRepository.createLog(uid, {
-              eventType: 'QR_GENERATED',
-              newStatus: 'WAITING_QR',
-              pairingMethod: 'QR',
-            });
-          } catch (err) {
-            session.lastError = 'Falha ao codificar imagem do QR Code.';
-          }
-
-          if (!resolved) {
-            resolved = true;
-            clearTimeout(initialTimeout);
-            resolve({ success: true, qrCode: session.qrCode, status: 'WAITING_QR' });
-          }
+      sock.ev.on('connection.update', (update) => {
+        const { connection, qr } = update;
+        if (qr && !resolved) {
+          resolved = true;
+          clearTimeout(initialTimeout);
+          resolve({ success: true, qrCode: session.qrCode, status: 'WAITING_QR' });
         }
-
-        if (connection === 'open') {
-          const jid = sock.user?.id || '';
-          const cleanPhone = phoneUtils.cleanDigits(jid.split('@')[0].split(':')[0]);
-          session.status = 'CONNECTED';
-          session.connectedPhone = cleanPhone;
-          session.lastConnectedAt = new Date().toISOString();
-          session.qrCode = null;
-          session.pairingCode = null;
-          session.lastError = null;
-
-          SalonWhatsAppRepository.markSessionConnected(uid, {
-            phone: cleanPhone,
-            phoneJid: `${cleanPhone}@s.whatsapp.net`,
-            pairingMethod: 'QR',
+        if (connection === 'open' && !resolved) {
+          resolved = true;
+          clearTimeout(initialTimeout);
+          resolve({
+            success: true,
+            status: 'CONNECTED',
+            qrCode: null,
+            connectedPhone: session.connectedPhone ? phoneUtils.maskPhoneNumber(session.connectedPhone) : null,
           });
-
-          SalonWhatsAppRepository.createLog(uid, {
-            eventType: 'CONNECTED',
-            newStatus: 'CONNECTED',
-            pairingMethod: 'QR',
-            connectedPhone: cleanPhone,
-            reason: 'WhatsApp comercial do salão conectado com sucesso via QR Code.',
-          });
-
-          if (!resolved) {
-            resolved = true;
-            clearTimeout(initialTimeout);
-            resolve({
-              success: true,
-              status: 'CONNECTED',
-              qrCode: null,
-              connectedPhone: phoneUtils.maskPhoneNumber(cleanPhone),
-            });
-          }
-        }
-
-        if (connection === 'close') {
-          const statusCode = lastDisconnect?.error?.output?.statusCode;
-          const isLoggedOut = statusCode === DisconnectReason.loggedOut;
-
-          if (isLoggedOut) {
-            await disconnect(uid);
-          } else {
-            session.status = 'CONNECTION_LOST';
-            session.lastError = lastDisconnect?.error?.message || 'Conexão temporariamente interrompida.';
-            SalonWhatsAppRepository.markSessionDisconnected(uid, {
-              status: 'CONNECTION_LOST',
-              error: session.lastError,
-            });
-
-            SalonWhatsAppRepository.createLog(uid, {
-              eventType: 'DISCONNECTED',
-              newStatus: 'CONNECTION_LOST',
-              reason: session.lastError,
-            });
-          }
         }
       });
     });
   })();
 
-  connectionLocks.set(uid, connectPromise);
+  tenantLocks.set(uid, connectPromise);
   try {
     return await connectPromise;
   } finally {
-    connectionLocks.delete(uid);
+    tenantLocks.delete(uid);
   }
 }
 
 /**
- * Solicita Código de Pareamento de 8 dígitos para o número informado
+ * Solicita Código de Pareamento de 8 dígitos para o número informado.
+ * CORREÇÃO 4: Aguarda prontidão do socket antes de chamar requestPairingCode.
+ * CORREÇÃO 5: Código mantido estritamente em memória com TTL.
  *
  * @param {number} userId
  * @param {string} rawPhone
@@ -395,8 +504,9 @@ async function requestPairingCode(userId, rawPhone) {
   const uid = Number(userId);
   const formattedPhone = validateBrazilianPhoneForPairing(rawPhone);
 
-  if (connectionLocks.has(uid)) {
-    return connectionLocks.get(uid);
+  // Mutex unificado por tenant (CORREÇÃO 4)
+  if (tenantLocks.has(uid)) {
+    return tenantLocks.get(uid);
   }
 
   const pairingPromise = (async () => {
@@ -416,6 +526,7 @@ async function requestPairingCode(userId, rawPhone) {
         sock: null,
         status: 'WAITING_CODE',
         qrCode: null,
+        qrExpiresAt: null,
         pairingCode: simCode,
         pairingExpiresAt: expiresAt,
         connectedPhone: null,
@@ -424,7 +535,9 @@ async function requestPairingCode(userId, rawPhone) {
         pairingMethod: 'CODE',
       };
       activeSessions.set(uid, session);
-      SalonWhatsAppRepository.updatePairingCode(uid, simCode, 180);
+
+      // Banco recebe NULL para segredo bruto (CORREÇÃO 5)
+      SalonWhatsAppRepository.updatePairingCode(uid, null, 180);
 
       SalonWhatsAppRepository.createLog(uid, {
         eventType: 'PAIRING_CODE_REQUESTED',
@@ -437,7 +550,12 @@ async function requestPairingCode(userId, rawPhone) {
       return { success: true, pairingCode: simCode, expiresAt, status: 'WAITING_CODE' };
     }
 
-    // Modo Real Baileys
+    // Modo Real Baileys: encerra socket prévio se houver
+    const prevSession = activeSessions.get(uid);
+    if (prevSession && prevSession.sock) {
+      try { prevSession.sock.end(undefined); } catch (_) {}
+    }
+
     if (!fs.existsSync(sessionDir)) {
       fs.mkdirSync(sessionDir, { recursive: true });
     }
@@ -454,20 +572,14 @@ async function requestPairingCode(userId, rawPhone) {
       syncFullHistory: false,
     });
 
-    const rawPairingCode = await sock.requestPairingCode(formattedPhone);
-    const formattedCode = rawPairingCode && rawPairingCode.length === 8
-      ? `${rawPairingCode.slice(0, 4)}-${rawPairingCode.slice(4)}`
-      : rawPairingCode;
-
-    const expiresAt = Date.now() + 180000; // 3 minutos
-
     const session = {
       userId: uid,
       sock,
       status: 'WAITING_CODE',
       qrCode: null,
-      pairingCode: formattedCode,
-      pairingExpiresAt: expiresAt,
+      qrExpiresAt: null,
+      pairingCode: null,
+      pairingExpiresAt: null,
       connectedPhone: null,
       lastConnectedAt: null,
       lastError: null,
@@ -475,7 +587,24 @@ async function requestPairingCode(userId, rawPhone) {
     };
     activeSessions.set(uid, session);
 
-    SalonWhatsAppRepository.updatePairingCode(uid, formattedCode, 180);
+    _attachSocketListeners(uid, sock, session, saveCreds);
+
+    // CORREÇÃO 4: Aguarda prontidão do socket antes de solicitar código de pareamento
+    await waitForSocketReady(sock, 15000);
+
+    const rawPairingCode = await sock.requestPairingCode(formattedPhone);
+    const formattedCode = rawPairingCode && rawPairingCode.length === 8
+      ? `${rawPairingCode.slice(0, 4)}-${rawPairingCode.slice(4)}`
+      : rawPairingCode;
+
+    const expiresAt = Date.now() + 180000; // 3 minutos
+
+    session.pairingCode = formattedCode;
+    session.pairingExpiresAt = expiresAt;
+
+    // Atualiza SQLite sem gravar código bruto (CORREÇÃO 5)
+    SalonWhatsAppRepository.updatePairingCode(uid, null, 180);
+
     SalonWhatsAppRepository.createLog(uid, {
       eventType: 'PAIRING_CODE_REQUESTED',
       newStatus: 'WAITING_CODE',
@@ -483,65 +612,14 @@ async function requestPairingCode(userId, rawPhone) {
       connectedPhone: formattedPhone,
     });
 
-    sock.ev.on('creds.update', saveCreds);
-
-    // Listener para mensagens recebidas da cliente final no WhatsApp comercial do salão
-    sock.ev.on('messages.upsert', async (m) => {
-      try {
-        if (m.type === 'notify' && Array.isArray(m.messages)) {
-          const { handleIncomingMessage } = require('./messageHandler');
-          for (const msg of m.messages) {
-            if (!msg.message || !msg.key?.remoteJid || msg.key.fromMe) continue;
-            await handleIncomingMessage(sock, msg, { salonUserId: uid });
-          }
-        }
-      } catch (err) {
-        console.error(`[salonSessionManager] Erro no processamento de mensagem recebida #${uid}:`, err.message);
-      }
-    });
-
-    sock.ev.on('connection.update', async (update) => {
-      const { connection, lastDisconnect } = update;
-      if (connection === 'open') {
-        const jid = sock.user?.id || '';
-        const cleanConnPhone = phoneUtils.cleanDigits(jid.split('@')[0].split(':')[0]);
-        session.status = 'CONNECTED';
-        session.connectedPhone = cleanConnPhone;
-        session.lastConnectedAt = new Date().toISOString();
-        session.pairingCode = null;
-        session.lastError = null;
-
-        SalonWhatsAppRepository.markSessionConnected(uid, {
-          phone: cleanConnPhone,
-          phoneJid: `${cleanConnPhone}@s.whatsapp.net`,
-          pairingMethod: 'CODE',
-        });
-
-        SalonWhatsAppRepository.createLog(uid, {
-          eventType: 'CONNECTED',
-          newStatus: 'CONNECTED',
-          pairingMethod: 'CODE',
-          connectedPhone: cleanConnPhone,
-          reason: 'WhatsApp comercial do salão conectado via código de pareamento.',
-        });
-      }
-
-      if (connection === 'close') {
-        const statusCode = lastDisconnect?.error?.output?.statusCode;
-        if (statusCode === DisconnectReason.loggedOut) {
-          await disconnect(uid);
-        }
-      }
-    });
-
     return { success: true, pairingCode: formattedCode, expiresAt, status: 'WAITING_CODE' };
   })();
 
-  connectionLocks.set(uid, pairingPromise);
+  tenantLocks.set(uid, pairingPromise);
   try {
     return await pairingPromise;
   } finally {
-    connectionLocks.delete(uid);
+    tenantLocks.delete(uid);
   }
 }
 
@@ -588,7 +666,8 @@ async function disconnect(userId) {
 }
 
 /**
- * Despacha mensagem via sessão WhatsApp comercial conectada do próprio salão
+ * CORREÇÃO 1: Despacha mensagem via sessão WhatsApp comercial conectada do salão.
+ * Padrão Fail-Closed: NUNCA recorre ao WhatsApp global do sistema.
  *
  * @param {number} userId
  * @param {string} recipientJid
@@ -602,7 +681,6 @@ async function sendSalonMessage(userId, recipientJid, text, options = {}) {
     throw new Error('INVALID_TENANT_ID: Identificador de salão inválido.');
   }
 
-  // Sanitização e validação de destinatário
   const cleanRecipient = String(recipientJid || '').trim();
   const finalJid = cleanRecipient.includes('@') ? cleanRecipient : `${cleanRecipient}@s.whatsapp.net`;
 
@@ -634,16 +712,21 @@ async function sendSalonMessage(userId, recipientJid, text, options = {}) {
     };
   }
 
-  // 2. Modo Real: Validação de sessão conectada
+  // 2. Modo Real: Validação estrita de sessão conectada (FAIL-CLOSED: ZERO FALLBACK GLOBAL)
   const session = activeSessions.get(uid);
   if (!session || session.status !== 'CONNECTED' || !session.sock) {
-    // Se a sessão do salão não está ativa, fallback para o cliente WhatsApp padrão
-    return await clientModule.sendWhatsAppMessage(finalJid, text);
+    const err = new Error(`SALON_WHATSAPP_DISCONNECTED: WhatsApp do salão #${uid} não está conectado.`);
+    err.code = 'SALON_WHATSAPP_DISCONNECTED';
+    err.userId = uid;
+    throw err;
   }
 
   const sock = session.sock;
   if (!sock.user || (sock.ws && sock.ws.readyState !== undefined && sock.ws.readyState !== 1)) {
-    return await clientModule.sendWhatsAppMessage(finalJid, text);
+    const err = new Error(`SALON_WHATSAPP_SOCKET_NOT_READY: Socket WhatsApp do salão #${uid} não está pronto para transmissão.`);
+    err.code = 'SALON_WHATSAPP_SOCKET_NOT_READY';
+    err.userId = uid;
+    throw err;
   }
 
   let sent;
@@ -679,6 +762,99 @@ async function sendSalonMessage(userId, recipientJid, text, options = {}) {
 }
 
 /**
+ * CORREÇÃO 3: Restaura automaticamente as sessões ativas no boot do servidor.
+ * Verifica a existência física das credenciais e evita duplicação de sockets.
+ * Em staging/homologação, respeita o Hard Staging Lock e não abre conexões externas.
+ *
+ * @returns {Promise<{ restored: number, total: number, skippedStaging?: boolean }>}
+ */
+async function restoreActiveSalonSessions() {
+  if (!clientModule.isRealWhatsAppTransportAllowed()) {
+    return { restored: 0, total: 0, skippedStaging: true };
+  }
+
+  const candidates = SalonWhatsAppRepository.getActiveSessionsForRestore({ limit: 100 });
+  let restored = 0;
+
+  for (const cand of candidates) {
+    const uid = cand.user_id;
+
+    // Evita duplicidade se a sessão já estiver instanciada
+    if (activeSessions.has(uid)) {
+      continue;
+    }
+
+    try {
+      const sessionDir = getSalonSessionDir(uid);
+      const credsFile = path.join(sessionDir, 'creds.json');
+
+      if (!fs.existsSync(credsFile)) {
+        // Credenciais ausentes em disco: marca desconectado
+        SalonWhatsAppRepository.markSessionDisconnected(uid, {
+          status: 'DISCONNECTED',
+          error: 'Credenciais ausentes em disco após inicialização.',
+          resetCredentials: false,
+        });
+        continue;
+      }
+
+      // Valida se o creds.json contém JSON válido
+      try {
+        const rawCreds = fs.readFileSync(credsFile, 'utf8');
+        JSON.parse(rawCreds);
+      } catch (_) {
+        SalonWhatsAppRepository.markSessionDisconnected(uid, {
+          status: 'CONNECTION_LOST',
+          error: 'Arquivo de credenciais corrompido no disco.',
+          resetCredentials: false,
+        });
+        continue;
+      }
+
+      const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+      const { version } = await fetchLatestBaileysVersion();
+
+      const sock = makeWASocket({
+        version,
+        logger: pino({ level: 'silent' }),
+        auth: state,
+        browser: ['Jéssica Beauty', 'Desktop', '1.0.0'],
+        generateHighQualityLinkPreview: false,
+        printQRInTerminal: false,
+        syncFullHistory: false,
+      });
+
+      const session = {
+        userId: uid,
+        sock,
+        status: 'CONNECTING',
+        qrCode: null,
+        qrExpiresAt: null,
+        pairingCode: null,
+        pairingExpiresAt: null,
+        connectedPhone: cand.connected_phone || null,
+        lastConnectedAt: null,
+        lastError: null,
+        pairingMethod: cand.pairing_method || 'QR',
+      };
+      activeSessions.set(uid, session);
+
+      _attachSocketListeners(uid, sock, session, saveCreds);
+      restored++;
+    } catch (err) {
+      console.error(`[salonSessionManager] Erro ao restaurar sessão #${uid}:`, err.message);
+      SalonWhatsAppRepository.markSessionDisconnected(uid, {
+        status: 'CONNECTION_LOST',
+        error: `Falha na restauração: ${err.message}`,
+        resetCredentials: false,
+      });
+    }
+  }
+
+  return { restored, total: candidates.length };
+}
+
+/**
  * Hook de injeção de mock para testes herméticos
  * @param {number} userId
  * @param {object} mockSock
@@ -690,6 +866,7 @@ function _setSocketForTesting(userId, mockSock) {
     sock: mockSock,
     status: mockSock.user ? 'CONNECTED' : 'WAITING_QR',
     qrCode: null,
+    qrExpiresAt: null,
     pairingCode: null,
     pairingExpiresAt: null,
     connectedPhone: mockSock.user ? phoneUtils.cleanDigits(mockSock.user.id.split('@')[0]) : null,
@@ -704,7 +881,7 @@ function _setSocketForTesting(userId, mockSock) {
  */
 function _resetForTesting() {
   activeSessions.clear();
-  connectionLocks.clear();
+  tenantLocks.clear();
 }
 
 /**
@@ -721,6 +898,7 @@ module.exports = {
   requestPairingCode,
   disconnect,
   sendSalonMessage,
+  restoreActiveSalonSessions,
   getSalonSessionDir,
   validateBrazilianPhoneForPairing,
   _setSocketForTesting,

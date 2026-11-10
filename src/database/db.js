@@ -771,6 +771,17 @@ runVersionedMigration('20261110_01_salon_whatsapp_sessions', 'Create client_salo
   ensureColumnExists('client_salons', 'whatsapp_pairing_method', 'TEXT');
 });
 
+// Versioned migration: Security Hardening - Purge ephemeral WhatsApp pairing credentials from SQLite (Comando 028)
+runVersionedMigration('20261110_02_purge_whatsapp_credentials_from_db', 'Purge legacy cached QR codes and pairing codes to prevent disk persistence of ephemeral secrets', () => {
+  db.exec(`
+    UPDATE client_salon_whatsapp_sessions
+    SET qr_code_cached = NULL,
+        qr_code_expires_at = NULL,
+        pairing_code_cached = NULL,
+        pairing_code_expires_at = NULL;
+  `);
+});
+
 // User columns for Client Authentication & Hotmart Subscriptions
 ensureColumnExists('users', 'session_token', 'TEXT');
 ensureColumnExists('users', 'session_expires_at', 'TEXT');

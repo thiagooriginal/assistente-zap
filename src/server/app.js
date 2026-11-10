@@ -3566,6 +3566,16 @@ function startServer(port = 3333) {
     console.warn('[SalonReminderDaemon] Aviso ao iniciar daemon de lembretes B2C:', err.message);
   }
 
+  // CORREÇÃO 3 (COMANDO 028): Restauração segura e automática das sessões de salão autorizadas
+  try {
+    const salonSessionManager = require('../whatsapp/salonSessionManager');
+    salonSessionManager.restoreActiveSalonSessions().catch((err) => {
+      console.warn('[SalonSessionManager] Aviso ao restaurar sessões ativas:', err.message);
+    });
+  } catch (err) {
+    console.warn('[SalonSessionManager] Aviso ao inicializar restauração de sessões:', err.message);
+  }
+
   return new Promise((resolve) => {
     const server = app.listen(port, () => {
       console.log(`\n📊 Dashboard financeiro Multi-Tenant disponível em: http://localhost:${port}`);
