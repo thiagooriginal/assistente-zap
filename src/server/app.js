@@ -203,11 +203,13 @@ app.use((req, res, next) => {
       'Content-Security-Policy',
       "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https: blob:; connect-src 'self' https://staging.raiaagentes.com.br https://seguranca.raiaagentes.com.br https://raiaagentes.com.br; frame-ancestors 'self'; base-uri 'self'; object-src 'none'; upgrade-insecure-requests;"
     );
-    // Report-Only CSP preparing transition away from unsafe-inline
-    res.setHeader(
-      'Content-Security-Policy-Report-Only',
-      "default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://staging.raiaagentes.com.br https://seguranca.raiaagentes.com.br https://raiaagentes.com.br; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; report-uri /api/security/csp-report;"
-    );
+    // Report-Only CSP preparing transition away from unsafe-inline (active only when explicitly configured)
+    if (process.env.ENABLE_CSP_STRICT_REPORT === 'true') {
+      res.setHeader(
+        'Content-Security-Policy-Report-Only',
+        "default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://unpkg.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https: blob:; connect-src 'self' https://staging.raiaagentes.com.br https://seguranca.raiaagentes.com.br https://raiaagentes.com.br; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; report-uri /api/security/csp-report;"
+      );
+    }
   }
 
   next();

@@ -148,8 +148,15 @@
       }
     };
   </script>
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Lucide Icons (Local com Fallback Seguro) -->
+  <script src="/js/lucide.min.js"></script>
+  <script>
+    if (typeof window.lucide === 'undefined') {
+      var s = document.createElement('script');
+      s.src = 'https://unpkg.com/lucide@latest';
+      document.head.appendChild(s);
+    }
+  </script>
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1377,6 +1384,27 @@
           <span class="w-1 h-1 rounded-full bg-[#00F59B] curtain-dot-3"></span>
         </span>
       </p>
+    </div>
+
+    <!-- Conteúdo de Erro / Falha de Carregamento Amigável com Opção Tentar Novamente -->
+    <div id="curtainErrorContent" class="hidden flex-col items-center justify-center text-center p-6 max-w-sm select-none">
+      <div class="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-4 text-amber-500">
+        <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      </div>
+      <h3 id="curtainErrorTitle" class="text-base font-bold text-[#4E3B31]">Não foi possível carregar o ambiente</h3>
+      <p id="curtainErrorMessage" class="text-xs text-[#7A6255] mt-2 mb-5">
+        Houve uma instabilidade temporária ao consultar os dados da sua conta.
+      </p>
+      <div class="flex items-center gap-3 w-full">
+        <button type="button" id="btnRetryCurtain" class="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#AD7B42] to-[#C89B6D] text-white font-bold text-xs hover:opacity-95 transition-all shadow-md">
+          Tentar Novamente
+        </button>
+        <a href="/cliente/login" class="px-4 py-2.5 rounded-xl bg-black/5 hover:bg-black/10 text-[#4E3B31] font-semibold text-xs transition-all border border-[#EED8C6]">
+          Ir para Login
+        </a>
+      </div>
     </div>
   </div>
 
@@ -4061,10 +4089,21 @@
         .replace(/'/g, '&#39;');
     }
 
-    lucide.createIcons();
+    // Abstração defensiva universal para renderização de ícones Lucide
+    window.safeLucideCreateIcons = function(options) {
+      try {
+        if (typeof window.lucide !== 'undefined' && window.lucide && typeof window.lucide.createIcons === 'function') {
+          window.lucide.createIcons(options);
+        }
+      } catch (err) {
+        console.warn('[Lucide] Aviso ao instanciar ícones:', err?.message || err);
+      }
+    };
+    if (typeof window.lucide === 'undefined') {
+      window.lucide = { createIcons: function() {} };
+    }
 
-    // ========================================================
-    // RAIA MODAL MANAGER (PROMPTS 010 & 011 — RESILIÊNCIA E PROTEÇÃO DE DADOS)
+    safeLucideCreateIcons();
     // ========================================================
     window.RaiaModalManager = (function() {
       const openModalsStack = [];
@@ -4664,7 +4703,7 @@
 
       toast.classList.remove('hidden');
       if (window.lucide && typeof lucide.createIcons === 'function') {
-        lucide.createIcons();
+        safeLucideCreateIcons();
       }
 
       if (toast._toastTimer) clearTimeout(toast._toastTimer);
@@ -4881,7 +4920,7 @@
 
       // Close mobile sidebar if open
       document.getElementById('sidebar').classList.add('-translate-x-full');
-      lucide.createIcons();
+      safeLucideCreateIcons();
 
       // Trigger data loads
       if (tabId === 'my-products') loadMyProducts();
@@ -5107,7 +5146,7 @@
           });
         }
 
-        lucide.createIcons();
+        safeLucideCreateIcons();
       } catch (err) {
         console.error('Erro ao carregar Meus Produtos:', err);
         if (grid) {
@@ -5129,7 +5168,7 @@
             </div>
           `;
         }
-        lucide.createIcons();
+        safeLucideCreateIcons();
       }
     }
 
@@ -5178,7 +5217,7 @@
         if (segBar && (!catalogState.segments || catalogState.segments.length === 0)) {
           segBar.innerHTML = `<span class="text-xs text-slate-500 italic">Segmentos temporariamente indisponíveis.</span>`;
         }
-        lucide.createIcons();
+        safeLucideCreateIcons();
       }
     }
 
@@ -5208,7 +5247,7 @@
         });
       });
 
-      lucide.createIcons();
+      safeLucideCreateIcons();
     }
 
     // Bind Solution Type filter clicks
@@ -5263,7 +5302,7 @@
             <p>Tente selecionar outro segmento ou limpar o campo de busca.</p>
           </div>
         `;
-        lucide.createIcons();
+        safeLucideCreateIcons();
         return;
       }
 
@@ -5357,7 +5396,7 @@
         grid.appendChild(card);
       });
 
-      lucide.createIcons();
+      safeLucideCreateIcons();
     }
 
     // Product Details Modal
@@ -5461,7 +5500,7 @@
         }
 
         RaiaModalManager.open('productDetailsModal');
-        lucide.createIcons();
+        safeLucideCreateIcons();
       } catch (err) {
         showToast('Erro ao carregar detalhes.', 'error');
       }
@@ -5544,7 +5583,7 @@
             </tbody>
           </table>
         `;
-        lucide.createIcons();
+        safeLucideCreateIcons();
       } catch (err) {
         console.error('Erro ao carregar assinaturas:', err);
         const container = document.getElementById('subscriptionsTableContainer');
@@ -5556,7 +5595,7 @@
             </div>
           `;
         }
-        lucide.createIcons();
+        safeLucideCreateIcons();
       }
     }
 
@@ -5629,7 +5668,7 @@
           `;
         }).join('');
 
-        lucide.createIcons();
+        safeLucideCreateIcons();
       } catch (err) {
         console.error('Erro ao carregar faturas:', err);
         const container = document.getElementById('invoicesListContainer');
@@ -5641,7 +5680,7 @@
             </div>
           `;
         }
-        lucide.createIcons();
+        safeLucideCreateIcons();
       }
     }
 
@@ -5685,7 +5724,45 @@
       }
     });
 
+    function showCurtainError(msg) {
+      const jContent = document.getElementById('curtainJessicaContent');
+      const rContent = document.getElementById('curtainRaiaContent');
+      const errContent = document.getElementById('curtainErrorContent');
+      const errMsg = document.getElementById('curtainErrorMessage');
+      if (jContent) jContent.style.setProperty('display', 'none', 'important');
+      if (rContent) rContent.style.setProperty('display', 'none', 'important');
+      if (errContent) {
+        errContent.classList.remove('hidden');
+        errContent.style.setProperty('display', 'flex', 'important');
+      }
+      if (errMsg && msg) {
+        errMsg.textContent = msg;
+      }
+    }
+
+    function hideCurtainError() {
+      const errContent = document.getElementById('curtainErrorContent');
+      const jContent = document.getElementById('curtainJessicaContent');
+      const rContent = document.getElementById('curtainRaiaContent');
+      if (errContent) {
+        errContent.classList.add('hidden');
+        errContent.style.removeProperty('display');
+      }
+      if (jContent) jContent.style.removeProperty('display');
+      if (rContent) rContent.style.removeProperty('display');
+    }
+
+    function retryAppInit() {
+      hideCurtainError();
+      loadProfile();
+    }
+
     function revealInterface() {
+      if (window._appInitWatchdog) {
+        clearTimeout(window._appInitWatchdog);
+        window._appInitWatchdog = null;
+      }
+
       // 1. Desativar completamente as classes de pré-inicialização do html e body
       document.documentElement.classList.remove('pre-jessica', 'pre-raia', 'app-initializing');
       document.body.classList.remove('pre-jessica', 'pre-raia', 'app-initializing');
@@ -5715,54 +5792,92 @@
         localStorage.removeItem('raia_active_tab');
       } catch (_) {}
 
+      // Watchdog de 7 segundos: previne bloqueio infinito se a requisição ou renderização travar
+      if (!window._appInitWatchdog) {
+        window._appInitWatchdog = setTimeout(() => {
+          console.warn('[Watchdog] Timeout ao carregar dados do ambiente.');
+          showCurtainError('A inicialização do ambiente demorou mais que o esperado. Clique em tentar novamente.');
+        }, 7000);
+      }
+
+      let res;
       try {
-        const res = await fetch('/api/cliente/profile');
-        if (res.status === 401 || res.status === 403) {
-          clientData = null;
-          try {
-            sessionStorage.clear();
-          } catch (_) {}
-          if (window.location.protocol.startsWith('http')) {
-            window.location.href = '/cliente/login';
-          }
-          return;
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 6500);
+        res = await fetch('/api/cliente/profile', { signal: controller.signal });
+        clearTimeout(fetchTimeout);
+      } catch (netErr) {
+        console.error('Erro de conexão ao buscar perfil:', netErr);
+        if (window._appInitWatchdog) {
+          clearTimeout(window._appInitWatchdog);
+          window._appInitWatchdog = null;
         }
+        showCurtainError('Falha de conexão com o servidor. Verifique sua rede e tente novamente.');
+        return;
+      }
 
-        const data = await res.json();
-        if (!data.success || !data.profile) {
-          clientData = null;
-          try {
-            sessionStorage.clear();
-          } catch (_) {}
-          if (window.location.protocol.startsWith('http')) {
-            window.location.href = '/cliente/login';
-          }
-          return;
+      if (res.status === 401 || res.status === 403) {
+        clientData = null;
+        try {
+          sessionStorage.clear();
+        } catch (_) {}
+        if (window._appInitWatchdog) {
+          clearTimeout(window._appInitWatchdog);
+          window._appInitWatchdog = null;
         }
+        if (window.location.protocol.startsWith('http')) {
+          window.location.href = '/cliente/login';
+        }
+        return;
+      }
 
-        clientData = data.profile;
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        console.error('Erro ao interpretar resposta do perfil:', parseErr);
+        if (window._appInitWatchdog) {
+          clearTimeout(window._appInitWatchdog);
+          window._appInitWatchdog = null;
+        }
+        showCurtainError('Resposta inesperada do servidor.');
+        return;
+      }
+
+      if (!data || !data.success || !data.profile) {
+        clientData = null;
+        if (window._appInitWatchdog) {
+          clearTimeout(window._appInitWatchdog);
+          window._appInitWatchdog = null;
+        }
+        showCurtainError(data?.error || 'Não foi possível carregar os dados da sua conta.');
+        return;
+      }
+
+      clientData = data.profile;
+
+      // 1. Renderizar dados do perfil com isolamento defensivo
+      try {
         renderProfileData(clientData);
+      } catch (renderErr) {
+        console.error('Erro defensivo ao renderizar dados do perfil:', renderErr);
+      }
 
-        // Notificações de retorno OAuth Google Calendar via Query Params
+      // 2. Notificações de retorno OAuth Google Calendar e Resolução de Aba Canônica
+      let canonicalTab = 'my-products';
+      try {
         const urlParams = new URLSearchParams(window.location.search);
         const requestedModulo = urlParams.get('modulo');
         const isGoogleConnected = urlParams.get('google_connected') === 'true';
         const googleError = urlParams.get('google_error');
         const googleEmail = urlParams.get('email');
 
-        // Notificação segura (texto tratado via textContent dentro de showToast)
         if (isGoogleConnected) {
           showToast(`Google Calendar conectado com sucesso${googleEmail ? ` (${googleEmail})` : ''}!`);
         } else if (googleError) {
           showToast(`Aviso na integração Google: ${googleError}`, 'error');
         }
 
-        // Resolução com prioridade canônica estrita:
-        // 1. Hash da URL (representa a navegação explícita mais recente do usuário, ex: #appointments ou #tab-integrations-google)
-        // 2. Query param 'tab' (ex: ?tab=appointments em links externos ou legados)
-        // 3. Query param 'modulo' (ex: ?modulo=jessica -> 'overview')
-        // 4. Sessão do usuário autenticado (sessionStorage isolado por ID do usuário)
-        // 5. Fallback padrão: 'my-products' (Hub Central)
         const tabFromHash = normalizeTabId(window.location.hash);
         const tabFromQuery = normalizeTabId(urlParams.get('tab'));
         let tabFromUserSession = null;
@@ -5772,7 +5887,6 @@
           } catch (_) {}
         }
 
-        let canonicalTab = 'my-products';
         if (tabFromHash) {
           canonicalTab = tabFromHash;
         } else if (tabFromQuery) {
@@ -5783,7 +5897,6 @@
           canonicalTab = tabFromUserSession;
         }
 
-        // Limpeza dos parâmetros temporários do OAuth e de navegação legada
         urlParams.delete('google_connected');
         urlParams.delete('google_error');
         urlParams.delete('email');
@@ -5793,10 +5906,6 @@
         const remainingSearch = urlParams.toString();
         const cleanCanonicalUrl = window.location.pathname + (remainingSearch ? '?' + remainingSearch : '') + '#' + canonicalTab;
 
-        // Normalização inicial via history.replaceState:
-        // - Não duplica histórico no navegador
-        // - Remove parâmetros OAuth e query strings conflitantes
-        // - Garante que F5 mantenha a aba e não repita toasts
         try {
           window.history.replaceState({ tabId: canonicalTab }, '', cleanCanonicalUrl);
         } catch (_) {
@@ -5804,22 +5913,19 @@
         }
 
         switchTab(canonicalTab, false);
-        loadSalonWhatsAppStatus();
-        revealInterface();
-      } catch (err) {
-        console.error('Erro ao carregar perfil:', err);
-        clientData = null;
-        try {
-          localStorage.removeItem('raia_active_tab');
-          sessionStorage.clear();
-        } catch (_) {}
-        // Falha crítica de autenticação: redirecionar com segurança sem expor abas operacionais
-        if (window.location.protocol.startsWith('http')) {
-          window.location.href = '/cliente/login';
-        } else {
-          revealInterface();
-        }
+      } catch (navErr) {
+        console.error('Erro defensivo ao resolver aba inicial:', navErr);
       }
+
+      // 3. Status WhatsApp em segundo plano (não bloqueante)
+      try {
+        loadSalonWhatsAppStatus();
+      } catch (waErr) {
+        console.warn('Aviso defensivo ao carregar status do WhatsApp:', waErr);
+      }
+
+      // 4. Revelação garantida da interface
+      revealInterface();
     }
 
     function renderProfileData(p) {
@@ -5886,11 +5992,13 @@
 
     function renderHoursInputs(hours = {}) {
       const list = document.getElementById('openingHoursList');
+      if (!list) return;
       list.innerHTML = '';
+      const safeHours = (hours && typeof hours === 'object') ? hours : {};
       const defaultDays = ['seg', 'ter', 'qua', 'qui', 'sex', 'sab', 'dom'];
 
       defaultDays.forEach(day => {
-        const item = hours[day] || { open: day === 'dom' ? 'FECHADO' : '09:00', close: day === 'dom' ? 'FECHADO' : '19:00' };
+        const item = safeHours[day] || { open: day === 'dom' ? 'FECHADO' : '09:00', close: day === 'dom' ? 'FECHADO' : '19:00' };
         const isClosed = item.open === 'FECHADO' || item.close === 'FECHADO';
 
         const row = document.createElement('div');
@@ -5898,9 +6006,9 @@
         row.innerHTML = `
           <span class="w-32 font-bold text-white">${dayNames[day]}</span>
           <div class="flex items-center gap-2">
-            <input type="text" data-day="${day}" data-field="open" value="${item.open}" class="hour-input w-20 px-2 py-1 rounded bg-[#11131a] border border-white/10 text-center font-mono">
+            <input type="text" data-day="${day}" data-field="open" value="${escapeHtml(item.open)}" class="hour-input w-20 px-2 py-1 rounded bg-[#11131a] border border-white/10 text-center font-mono">
             <span class="text-slate-500">às</span>
-            <input type="text" data-day="${day}" data-field="close" value="${item.close}" class="hour-input w-20 px-2 py-1 rounded bg-[#11131a] border border-white/10 text-center font-mono">
+            <input type="text" data-day="${day}" data-field="close" value="${escapeHtml(item.close)}" class="hour-input w-20 px-2 py-1 rounded bg-[#11131a] border border-white/10 text-center font-mono">
           </div>
         `;
         list.appendChild(row);
@@ -6037,7 +6145,7 @@
             <p class="text-[11px] text-slate-500">Cadastre procedimentos individualmente ou utilize a seleção rápida em lote.</p>
           </div>
         `;
-        lucide.createIcons();
+        safeLucideCreateIcons();
         return;
       }
 
@@ -6096,7 +6204,7 @@
         `;
         list.appendChild(card);
       });
-      lucide.createIcons();
+      safeLucideCreateIcons();
     }
 
     // Filtros de Status (Todos, Ativos, Inativos)
@@ -6142,7 +6250,7 @@
       closeCatalogDropdown();
 
       RaiaModalManager.open('modalSingleService');
-      lucide.createIcons();
+      safeLucideCreateIcons();
     }
 
     function openEditServiceModalById(id) {
@@ -6175,7 +6283,7 @@
       }
 
       RaiaModalManager.open('modalSingleService');
-      lucide.createIcons();
+      safeLucideCreateIcons();
     }
 
     function closeSingleServiceModal() {
@@ -6396,7 +6504,7 @@
       }
 
       RaiaModalManager.open('modalDeleteConfirm');
-      lucide.createIcons();
+      safeLucideCreateIcons();
     }
 
     function closeDeleteModal() {
@@ -6452,7 +6560,7 @@
       updateBatchCounterUI();
 
       RaiaModalManager.open('modalBatchServices');
-      lucide.createIcons();
+      safeLucideCreateIcons();
     }
 
     function closeBatchModal() {
@@ -6591,7 +6699,7 @@
       if (nextBtn) {
         nextBtn.disabled = count === 0;
         nextBtn.innerHTML = `<span>Continuar com ${count} serviço(s)</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>`;
-        lucide.createIcons();
+        safeLucideCreateIcons();
       }
     }
 
@@ -6609,7 +6717,7 @@
       document.getElementById('batchModalStepSubtitle').innerText = 'Defina o valor e o tempo de atendimento para cada procedimento selecionado.';
 
       renderBatchStep2Table();
-      lucide.createIcons();
+      safeLucideCreateIcons();
     });
 
     // Voltar para o Passo 1
@@ -6624,7 +6732,7 @@
       document.getElementById('batchModalStepSubtitle').innerText = 'Selecione os procedimentos que seu salão realiza para configurá-los rapidamente.';
 
       renderBatchStep1();
-      lucide.createIcons();
+      safeLucideCreateIcons();
     });
 
     function renderBatchStep2Table() {
@@ -6676,7 +6784,7 @@
         `;
         tbody.appendChild(row);
       });
-      lucide.createIcons();
+      safeLucideCreateIcons();
     }
 
     window.updateBatchItemPrice = function(itemKey, value) {
@@ -6819,7 +6927,7 @@
           `;
           list.appendChild(item);
         });
-        lucide.createIcons();
+        safeLucideCreateIcons();
       } catch (e) {
         showToast('Erro ao carregar equipe.', 'error');
       }
@@ -7078,7 +7186,7 @@
         });
 
         bindAppointmentActions();
-        lucide.createIcons();
+        safeLucideCreateIcons();
       }
 
       try {
@@ -7229,7 +7337,7 @@
           validateRescheduleFormCompletion();
 
           RaiaModalManager.open('modalRescheduleAppointment');
-          lucide.createIcons();
+          safeLucideCreateIcons();
         });
       });
 
@@ -7243,7 +7351,7 @@
           document.getElementById('statusReasonInput').value = '';
 
           RaiaModalManager.open('modalStatusAppointment');
-          lucide.createIcons();
+          safeLucideCreateIcons();
         });
       });
 
@@ -7263,7 +7371,7 @@
           document.getElementById('cancelReasonInput').value = '';
 
           RaiaModalManager.open('modalCancelAppointment');
-          lucide.createIcons();
+          safeLucideCreateIcons();
         });
       });
 
@@ -7356,7 +7464,7 @@
       }
 
       RaiaModalManager.open('modalHistoricalConflicts');
-      lucide.createIcons();
+      safeLucideCreateIcons();
     });
 
     const closeHistoricalConflictsModal = () => {
@@ -7561,7 +7669,7 @@
         if (emptyEl) {
           emptyEl.innerHTML = '<span class="text-amber-800 font-semibold flex items-center justify-center gap-1.5 py-1 text-xs"><i data-lucide="info" class="w-3.5 h-3.5 text-[#AD7B42]"></i> Selecione um serviço primeiro para calcular os horários livres com base na duração.</span>';
           emptyEl.classList.remove('hidden');
-          lucide.createIcons();
+          safeLucideCreateIcons();
         }
         return;
       }
@@ -7680,7 +7788,7 @@
                 });
                 pills.appendChild(pill);
               });
-              lucide.createIcons();
+              safeLucideCreateIcons();
             } else {
               pills.innerHTML = '<span class="text-slate-400 text-xs">Não há outros horários livres nesta data. Tente outro dia.</span>';
             }
@@ -7831,7 +7939,7 @@
                 });
                 pills.appendChild(pill);
               });
-              lucide.createIcons();
+              safeLucideCreateIcons();
             } else {
               pills.innerHTML = '<span class="text-slate-400 text-xs">Não há outros horários livres nesta data.</span>';
             }
@@ -8437,7 +8545,7 @@
       fetchNewAppointmentSlots();
 
       RaiaModalManager.open('modalNewAppointment');
-      lucide.createIcons();
+      safeLucideCreateIcons();
     });
 
     const closeNewAppointmentModal = () => {
@@ -8537,7 +8645,7 @@
       const submitBtn = document.getElementById('btnSubmitNewAppointment');
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Verificando...</span>';
-      lucide.createIcons();
+      safeLucideCreateIcons();
 
       const reminderConsentChecked = Boolean(document.getElementById('aptReminderConsent')?.checked);
       const appointmentPayload = {
@@ -8593,7 +8701,7 @@
                 pills.appendChild(pill);
               });
               if (container) container.classList.remove('hidden');
-              lucide.createIcons();
+              safeLucideCreateIcons();
             } else {
               if (container) container.classList.remove('hidden');
               pills.innerHTML = '<span class="text-slate-400 text-xs">Não há outros horários livres nesta data. Tente outro dia.</span>';
@@ -8650,7 +8758,7 @@
       if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Salvando...</span>';
-        lucide.createIcons();
+        safeLucideCreateIcons();
       }
 
       try {
@@ -8856,7 +8964,7 @@
           btnDisconnect.classList.add('hidden');
           settingsSection.classList.add('hidden');
         }
-        lucide.createIcons();
+        safeLucideCreateIcons();
       } catch (err) {
         showToast('Erro ao carregar status do Google Calendar.', 'error');
       }
@@ -9782,7 +9890,7 @@
         renderBills(data.bills || {}, data.isPro);
         renderTransactions(data.transactions || []);
 
-        lucide.createIcons();
+        safeLucideCreateIcons();
       } catch (e) {
         console.error('[Dashboard Load Error]:', e);
         showToast('Erro de comunicação ao carregar dashboard.', 'error');
@@ -9847,7 +9955,7 @@
           `;
           list.appendChild(card);
         });
-        lucide.createIcons();
+        safeLucideCreateIcons();
       } catch (e) {}
     }
 
@@ -9921,7 +10029,7 @@
     // New Bill Modal
     document.getElementById('btnOpenNewBillModal')?.addEventListener('click', () => {
       RaiaModalManager.open('modalNewBill');
-      lucide.createIcons();
+      safeLucideCreateIcons();
     });
     const closeNewBillModal = () => {
       RaiaModalManager.close('modalNewBill');
@@ -9961,7 +10069,7 @@
     // New Transaction Modal
     document.getElementById('btnOpenNewTxModal')?.addEventListener('click', () => {
       RaiaModalManager.open('modalNewTransaction');
-      lucide.createIcons();
+      safeLucideCreateIcons();
     });
     const closeNewTxModal = () => {
       RaiaModalManager.close('modalNewTransaction');
@@ -10013,9 +10121,9 @@
       });
     });
 
-    // Test WhatsApp
-    document.getElementById('btnSendTestMessage').addEventListener('click', async () => {
-      const targetPhone = document.getElementById('testPhoneInput').value;
+    // Test WhatsApp (com verificação opcional defensiva)
+    document.getElementById('btnSendTestMessage')?.addEventListener('click', async () => {
+      const targetPhone = document.getElementById('testPhoneInput')?.value;
       if (!targetPhone) {
         showToast('Informe o telefone para teste.', 'error');
         return;
@@ -10042,8 +10150,11 @@
       switchTab('integrations-whatsapp');
     });
 
+    // Botão de retentativa da cortina de carregamento
+    document.getElementById('btnRetryCurtain')?.addEventListener('click', retryAppInit);
+
     // Logout seguro com isolamento estrito
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
+    document.getElementById('logoutBtn')?.addEventListener('click', async () => {
       try {
         await fetch('/api/cliente/auth/logout', { method: 'POST' });
       } catch (_) {}
