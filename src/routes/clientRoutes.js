@@ -1697,8 +1697,8 @@ const postConnectQrHandler = async (req, res) => {
     });
   }
 };
-router.post('/whatsapp/connect-qr', whatsappPairingLimiter, clientAuthMiddleware, requireProductAccess('JESSICA'), postConnectQrHandler);
-router.post('/integrations/whatsapp/connect-qr', whatsappPairingLimiter, clientAuthMiddleware, requireProductAccess('JESSICA'), postConnectQrHandler);
+router.post('/whatsapp/connect-qr', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postConnectQrHandler);
+router.post('/integrations/whatsapp/connect-qr', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postConnectQrHandler);
 
 /**
  * POST /api/cliente/whatsapp/connect-code (e alias /integrations/whatsapp/connect-code e /integrations/whatsapp/pairing-code)
@@ -1733,9 +1733,9 @@ const postConnectCodeHandler = async (req, res) => {
     });
   }
 };
-router.post('/whatsapp/connect-code', whatsappPairingLimiter, clientAuthMiddleware, requireProductAccess('JESSICA'), postConnectCodeHandler);
-router.post('/integrations/whatsapp/connect-code', whatsappPairingLimiter, clientAuthMiddleware, requireProductAccess('JESSICA'), postConnectCodeHandler);
-router.post('/integrations/whatsapp/pairing-code', whatsappPairingLimiter, clientAuthMiddleware, requireProductAccess('JESSICA'), postConnectCodeHandler);
+router.post('/whatsapp/connect-code', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postConnectCodeHandler);
+router.post('/integrations/whatsapp/connect-code', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postConnectCodeHandler);
+router.post('/integrations/whatsapp/pairing-code', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postConnectCodeHandler);
 
 /**
  * POST /api/cliente/whatsapp/disconnect (e alias /integrations/whatsapp/disconnect)

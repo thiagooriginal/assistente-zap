@@ -429,4 +429,41 @@ test('COMANDO 028 — SUÍTE HERMÉTICA DE CORREÇÕES CRÍTICAS MULTI-TENANT', 
     const status = salonSessionManager.getSessionStatus(101);
     assert.strictEqual(status.status, 'DISCONNECTED');
   });
+
+  await t.test('TC-028-15: Isolamento multi-tenant concorrente sem vazamento de estado entre salões', async () => {
+    salonSessionManager._resetForTesting();
+
+    const dir101 = salonSessionManager.getSalonSessionDir(101);
+    const dir102 = salonSessionManager.getSalonSessionDir(102);
+
+    assert.notStrictEqual(dir101, dir102);
+    assert.ok(dir101.endsWith('salon_101'));
+    assert.ok(dir102.endsWith('salon_102'));
+
+    // Simula sockets distintos para 101 e 102
+    salonSessionManager._setSocketForTesting(101, {
+      user: { id: '5511911112222@s.whatsapp.net' }
+    });
+    salonSessionManager._setSocketForTesting(102, {
+      user: { id: '5511933334444@s.whatsapp.net' }
+    });
+
+    const status101 = salonSessionManager.getSessionStatus(101);
+    const status102 = salonSessionManager.getSessionStatus(102);
+
+    assert.strictEqual(status101.status, 'CONNECTED');
+    assert.strictEqual(status101.rawPhone, '5511911112222');
+    assert.strictEqual(status102.status, 'CONNECTED');
+    assert.strictEqual(status102.rawPhone, '5511933334444');
+
+    // Desconectar o salão 101 não deve afetar de forma alguma o salão 102
+    await salonSessionManager.disconnect(101);
+
+    const postStatus101 = salonSessionManager.getSessionStatus(101);
+    const postStatus102 = salonSessionManager.getSessionStatus(102);
+
+    assert.strictEqual(postStatus101.status, 'DISCONNECTED');
+    assert.strictEqual(postStatus102.status, 'CONNECTED');
+    assert.strictEqual(postStatus102.rawPhone, '5511933334444');
+  });
 });

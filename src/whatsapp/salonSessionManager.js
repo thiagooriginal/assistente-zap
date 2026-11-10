@@ -43,6 +43,96 @@ const activeSessions = new Map();
 const tenantLocks = new Map();
 
 /**
+ * Verifica autorização com Triplo Bloqueio Fail-Closed para Staging (Proteções 11 e 12)
+ *
+ * Bloqueio 1: Kill-Switch ALLOW_SALON_WHATSAPP_TESTING === 'true'
+ * Bloqueio 2: SALON_TEST_ALLOWED_TENANTS obrigatoriamente contém o userId
+ * Bloqueio 3: SALON_TEST_ALLOWED_PHONES obrigatoriamente contém o telefone do salão/teste
+ *
+ * Se QUALQUER um dos três falhar em staging/homologação, o retorno é false (caindo estritamente em mock simulado).
+ * Em produção explícita, respeita clientModule.isRealWhatsAppTransportAllowed().
+ *
+ * @param {number} userId
+ * @param {string|null} [candidatePhone=null]
+ * @returns {boolean}
+ */
+function isSalonRealWhatsAppAllowed(userId, candidatePhone = null) {
+  if (clientModule.isRealWhatsAppTransportAllowed()) {
+    return true; // Produção explícita
+  }
+
+  const isHomologacao = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging' || process.env.APP_MODE === 'homologacao';
+
+  // Bloqueio 1 / Kill-Switch Atômico
+  if (!isHomologacao || process.env.ALLOW_SALON_WHATSAPP_TESTING !== 'true') {
+    return false;
+  }
+
+  const uid = Number(userId);
+  if (!uid || isNaN(uid) || uid <= 0) {
+    return false;
+  }
+
+  // Bloqueio 2: Tenant Whitelist Obrigatória
+  const rawAllowedTenants = process.env.SALON_TEST_ALLOWED_TENANTS || '';
+  const allowedTenants = rawAllowedTenants
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  if (!allowedTenants.includes(String(uid))) {
+    return false;
+  }
+
+  // Bloqueio 3: Phone Whitelist Obrigatória (se configurada)
+  const rawAllowedPhones = process.env.SALON_TEST_ALLOWED_PHONES || '';
+  const allowedPhones = rawAllowedPhones
+    .split(',')
+    .map((p) => phoneUtils.cleanDigits(p))
+    .filter(Boolean);
+
+  if (allowedPhones.length === 0) {
+    return false; // Fail-closed: se a lista de telefones não estiver preenchida, bloqueia conexões reais
+  }
+
+  let phoneToVerify = candidatePhone ? phoneUtils.cleanDigits(candidatePhone) : null;
+  if (!phoneToVerify) {
+    const memSession = activeSessions.get(uid);
+    if (memSession?.connectedPhone) {
+      phoneToVerify = phoneUtils.cleanDigits(memSession.connectedPhone);
+    }
+  }
+
+  if (!phoneToVerify) {
+    try {
+      const salon = db.prepare('SELECT phone FROM client_salons WHERE user_id = ?').get(uid);
+      if (salon?.phone) {
+        phoneToVerify = phoneUtils.cleanDigits(salon.phone);
+      }
+    } catch (_) {}
+  }
+
+  if (!phoneToVerify) {
+    try {
+      const repoSession = SalonWhatsAppRepository.getSessionByUserId(uid);
+      if (repoSession?.connected_phone) {
+        phoneToVerify = phoneUtils.cleanDigits(repoSession.connected_phone);
+      }
+    } catch (_) {}
+  }
+
+  if (!phoneToVerify) {
+    return false; // Fail-closed se telefone indeterminado
+  }
+
+  const isPhoneAuthorized = allowedPhones.some((ap) => {
+    return phoneToVerify === ap || phoneToVerify.endsWith(ap) || ap.endsWith(phoneToVerify);
+  });
+
+  return isPhoneAuthorized;
+}
+
+/**
  * Sanitiza e retorna o caminho absoluto seguro do diretório de credenciais do salão
  * Proteção 23 (OWASP ASVS 5.0): Defesa contra Directory Traversal
  *
@@ -376,8 +466,8 @@ async function startQrSession(userId) {
     const sessionDir = getSalonSessionDir(uid);
     SalonWhatsAppRepository.ensureSessionExists(uid, `data/sessions/salon_${uid}`);
 
-    // Hard Staging Lock: em staging/homologação sem autorização, opera modo simulado limpo
-    const isRealAllowed = clientModule.isRealWhatsAppTransportAllowed();
+    // Hard Staging Lock com Whitelist Granular Cirúrgica
+    const isRealAllowed = isSalonRealWhatsAppAllowed(uid);
     if (!isRealAllowed) {
       const simQrDataUrl = await QRCode.toDataURL(`RAIA_HOMOLOGACAO_SALON_${uid}_MOCK_QR_${Date.now()}`, {
         margin: 2,
@@ -513,8 +603,8 @@ async function requestPairingCode(userId, rawPhone) {
     const sessionDir = getSalonSessionDir(uid);
     SalonWhatsAppRepository.ensureSessionExists(uid, `data/sessions/salon_${uid}`);
 
-    // Hard Staging Lock: modo simulado em homologação/staging
-    const isRealAllowed = clientModule.isRealWhatsAppTransportAllowed();
+    // Hard Staging Lock com Whitelist Granular Cirúrgica
+    const isRealAllowed = isSalonRealWhatsAppAllowed(uid, formattedPhone);
     if (!isRealAllowed) {
       const part1 = Math.random().toString(36).substring(2, 6).toUpperCase();
       const part2 = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -695,8 +785,9 @@ async function sendSalonMessage(userId, recipientJid, text, options = {}) {
 
   const nowTs = Math.floor(Date.now() / 1000);
 
-  // 1. Hard Staging Lock: Modo Simulado fail-closed em testes, homologação e staging
-  const isRealAllowed = clientModule.isRealWhatsAppTransportAllowed();
+  // 1. Hard Staging Lock com Whitelist Granular Cirúrgica
+  const cleanRecipientDigits = phoneUtils.cleanDigits(finalJid.split('@')[0]);
+  const isRealAllowed = isSalonRealWhatsAppAllowed(uid, cleanRecipientDigits);
   if (!isRealAllowed) {
     const simMessageId = `sim_salon_${uid}_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     return {
@@ -769,7 +860,10 @@ async function sendSalonMessage(userId, recipientJid, text, options = {}) {
  * @returns {Promise<{ restored: number, total: number, skippedStaging?: boolean }>}
  */
 async function restoreActiveSalonSessions() {
-  if (!clientModule.isRealWhatsAppTransportAllowed()) {
+  const isGlobalReal = clientModule.isRealWhatsAppTransportAllowed();
+  const isStagingTesting = (process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging') && process.env.ALLOW_SALON_WHATSAPP_TESTING === 'true';
+
+  if (!isGlobalReal && !isStagingTesting) {
     return { restored: 0, total: 0, skippedStaging: true };
   }
 
@@ -778,6 +872,11 @@ async function restoreActiveSalonSessions() {
 
   for (const cand of candidates) {
     const uid = cand.user_id;
+
+    // Em staging com flag cirúrgica, reidrata apenas os salões estritamente autorizados
+    if (!isGlobalReal && !isSalonRealWhatsAppAllowed(uid, cand.connected_phone)) {
+      continue;
+    }
 
     // Evita duplicidade se a sessão já estiver instanciada
     if (activeSessions.has(uid)) {
@@ -893,6 +992,7 @@ function _setBaseDirForTesting(dir) {
 }
 
 module.exports = {
+  isSalonRealWhatsAppAllowed,
   getSessionStatus,
   startQrSession,
   requestPairingCode,
