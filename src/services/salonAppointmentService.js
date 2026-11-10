@@ -1141,7 +1141,7 @@ function updateAppointmentConsent(appointmentId, userId, consent, origin = 'pain
   const isConsentGiven = consent === 1 || consent === true || consent === '1' || consent === 'true';
   const finalConsent = isConsentGiven ? 1 : 0;
   const consentAt = isConsentGiven ? new Date().toISOString() : null;
-  const consentOrigin = isConsentGiven ? (origin || 'painel') : null;
+  const consentOrigin = isConsentGiven ? (origin || 'painel') : 'revogado';
 
   db.exec('BEGIN IMMEDIATE');
   try {
@@ -1191,7 +1191,7 @@ function updateAppointmentConsent(appointmentId, userId, consent, origin = 'pain
     }
 
     db.exec('COMMIT');
-    return { success: true, appointmentId, reminderConsent: finalConsent };
+    return { success: true, appointmentId, reminderConsent: finalConsent, reminderConsentOrigin: consentOrigin };
   } catch (err) {
     try { db.exec('ROLLBACK'); } catch (_) {}
     throw err;
@@ -1221,6 +1221,7 @@ function listAppointments(userId, { staffId = null, status = null, startDate = n
            a.service_id, a.staff_id, a.price, a.client_name, a.client_phone,
            a.duration_min, a.origin, a.status, a.has_conflict, a.google_event_id,
            a.google_sync_status, a.whatsapp_notified, a.reminder_24h_status, a.reminder_consent,
+           a.reminder_consent_origin, a.reminder_consent_at,
            cs.name AS service_name,
            st.name AS staff_name
     FROM appointments a

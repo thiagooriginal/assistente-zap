@@ -1313,6 +1313,27 @@
       font-weight: 700 !important;
       padding: 6px 14px !important;
     }
+    body.theme-jessica-beauty .apt-badge-consent,
+    body.theme-jessica-beauty .apt-badge-reminder-24h {
+      border-radius: 9999px !important;
+      padding: 3px 10px !important;
+      font-size: 10px !important;
+    }
+    body.theme-jessica-beauty .btn-apt-toggle-consent {
+      background-color: #FFFDFB !important;
+      border: 1px solid #EED8C6 !important;
+      color: #7A6255 !important;
+      border-radius: 10px !important;
+      font-weight: 600 !important;
+      padding: 6px 14px !important;
+      box-shadow: 0 1px 3px rgba(78, 59, 49, 0.05) !important;
+      transition: all 0.2s ease !important;
+    }
+    body.theme-jessica-beauty .btn-apt-toggle-consent:hover {
+      background-color: #F6EDE6 !important;
+      color: #4E3B31 !important;
+      border-color: #D9B8AE !important;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col md:flex-row antialiased font-sans app-initializing">
@@ -3396,6 +3417,16 @@
               <option value="AGENDADO">AGENDADO</option>
               <option value="CONFIRMADO" selected>CONFIRMADO</option>
             </select>
+          </div>
+
+          <div class="p-3 rounded-xl bg-[#F7EFE7]/60 border border-[#E6D6CA] space-y-1.5">
+            <label class="flex items-start gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" id="aptReminderConsent" class="mt-0.5 w-4 h-4 rounded text-[#AD7B42] border-[#E6D6CA] focus:ring-[#C89B6D]/30 accent-[#AD7B42]">
+              <div class="text-[11px] leading-tight text-[#4E3B31]">
+                <span class="font-medium">A cliente autorizou receber lembretes deste agendamento pelo WhatsApp.</span>
+                <p class="text-[10px] text-[#7A6255] mt-0.5">Confirmação expressa registrada pelo operador do salão (LGPD Art. 7º e 8º).</p>
+              </div>
+            </label>
           </div>
 
           <div class="flex justify-end gap-2.5 pt-3 border-t border-[#E6D6CA]">
@@ -6735,6 +6766,16 @@
       return '';
     }
 
+    function getReminderConsentBadgeHtml(reminderConsent, reminderStatus, consentOrigin) {
+      if (reminderConsent === 1 || reminderConsent === '1') {
+        return '<span class="apt-badge-consent inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" title="Consentimento LGPD ativo para lembretes WhatsApp"><i data-lucide="shield-check" class="w-2.5 h-2.5 text-emerald-400"></i> Consentimento: ATIVO</span>';
+      }
+      if (consentOrigin === 'revogado' || consentOrigin === 'painel_revogado' || reminderStatus === 'CANCELLED') {
+        return '<span class="apt-badge-consent inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20" title="Consentimento de lembretes revogado"><i data-lucide="shield-alert" class="w-2.5 h-2.5 text-amber-400"></i> Consentimento: REVOGADO</span>';
+      }
+      return '<span class="apt-badge-consent inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/20" title="Sem autorização prévia de lembretes WhatsApp"><i data-lucide="shield-off" class="w-2.5 h-2.5 text-slate-400"></i> Consentimento: SEM CONSENTIMENTO</span>';
+    }
+
     async function loadAppointments() {
       const list = document.getElementById('appointmentsList');
       function renderAppointmentList(appointments) {
@@ -6768,6 +6809,25 @@
             : '<span class="apt-badge-origin-panel inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-slate-400 border border-white/10">Painel</span>';
 
           const isCancelled = ['CANCELLED', 'CANCELADO', 'CANCEL'].includes(String(a.status || '').toUpperCase());
+          let consentActionBtn = '';
+          if (!isCancelled) {
+            if (a.reminder_consent === 1 || a.reminder_consent === '1') {
+              consentActionBtn = `
+                <button type="button" class="btn-apt-toggle-consent px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-amber-300 font-semibold transition-all flex items-center gap-1.5" data-id="${a.id}" data-action="revoke" title="Revogar autorização de lembrete WhatsApp">
+                  <i data-lucide="bell-off" class="w-3.5 h-3.5 text-amber-400"></i>
+                  <span>Revogar Lembrete</span>
+                </button>
+              `;
+            } else {
+              consentActionBtn = `
+                <button type="button" class="btn-apt-toggle-consent px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-emerald-300 font-semibold transition-all flex items-center gap-1.5" data-id="${a.id}" data-action="grant" title="Conceder autorização de lembrete WhatsApp">
+                  <i data-lucide="bell-ring" class="w-3.5 h-3.5 text-emerald-400"></i>
+                  <span>Ativar Lembrete</span>
+                </button>
+              `;
+            }
+          }
+
           const actionsHtml = isCancelled
             ? '<span class="apt-cancelled-tag inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 font-bold border border-rose-500/20 text-xs"><i data-lucide="ban" class="w-3.5 h-3.5"></i> Atendimento Cancelado</span>'
             : `
@@ -6780,6 +6840,8 @@
                 <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
                 <span>Status</span>
               </button>
+
+              ${consentActionBtn}
 
               <button type="button" class="btn-apt-cancel px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-semibold transition-all flex items-center gap-1.5" data-id="${a.id}">
                 <i data-lucide="x" class="w-3.5 h-3.5"></i>
@@ -6795,6 +6857,7 @@
                 ${getStatusBadgeHtml(a.status)}
                 ${conflictTag}
                 ${getGoogleSyncBadgeHtml(a.google_sync_status, appointmentsState.isGoogleConnected)}
+                ${getReminderConsentBadgeHtml(a.reminder_consent, a.reminder_24h_status, a.reminder_consent_origin)}
                 ${getReminder24hBadgeHtml(a.reminder_24h_status)}
                 ${originTag}
               </div>
@@ -7013,6 +7076,47 @@
 
           RaiaModalManager.open('modalCancelAppointment');
           lucide.createIcons();
+        });
+      });
+
+      // Alternar Consentimento de Lembrete WhatsApp (Revogar / Ativar)
+      document.querySelectorAll('.btn-apt-toggle-consent').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = Number(btn.dataset.id);
+          const action = btn.dataset.action;
+          const apt = appointmentsState.appointments.find(a => a.id === id);
+          if (!apt) return;
+
+          const isRevoking = action === 'revoke';
+          const confirmMsg = isRevoking
+            ? `Deseja revogar o consentimento de lembretes por WhatsApp para ${apt.client_name}? Lembretes pendentes serão cancelados.`
+            : `Confirmar autorização expressa de lembretes por WhatsApp para ${apt.client_name}?`;
+
+          if (!confirm(confirmMsg)) return;
+
+          btn.disabled = true;
+          try {
+            const res = await fetch(`/api/cliente/appointments/${id}/consent`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                consent: isRevoking ? 0 : 1,
+                reason: isRevoking ? 'Revogado pelo operador do salão' : 'Autorizado pelo cliente no salão',
+                origin: isRevoking ? undefined : 'painel_confirmacao_manual'
+              })
+            });
+            const data = await res.json();
+            if (data.success) {
+              showToast(isRevoking ? 'Consentimento de lembrete revogado.' : 'Consentimento de lembrete ativado!');
+              await loadAppointments();
+            } else {
+              showToast(data.error || 'Erro ao atualizar consentimento.', 'error');
+              btn.disabled = false;
+            }
+          } catch (err) {
+            showToast('Erro de conexão ao alterar consentimento.', 'error');
+            btn.disabled = false;
+          }
         });
       });
     }
@@ -8136,6 +8240,9 @@
       const statusSelect = document.getElementById('aptStatusSelect');
       if (statusSelect) statusSelect.value = 'CONFIRMADO';
 
+      const reminderConsent = document.getElementById('aptReminderConsent');
+      if (reminderConsent) reminderConsent.checked = false;
+
       // Inicia desabilitado até preencher todos os campos obrigatórios
       validateAppointmentFormCompletion();
 
@@ -8149,6 +8256,8 @@
       RaiaModalManager.close('modalNewAppointment');
       document.getElementById('aptTimeDropdown')?.classList.add('hidden');
       document.getElementById('aptBeautyCalendarPopover')?.classList.add('hidden');
+      const reminderConsent = document.getElementById('aptReminderConsent');
+      if (reminderConsent) reminderConsent.checked = false;
     };
     document.getElementById('btnCloseNewAppointmentModal')?.addEventListener('click', closeNewAppointmentModal);
     document.getElementById('btnCancelNewAppointment')?.addEventListener('click', closeNewAppointmentModal);
@@ -8242,19 +8351,26 @@
       submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i><span>Verificando...</span>';
       lucide.createIcons();
 
+      const reminderConsentChecked = Boolean(document.getElementById('aptReminderConsent')?.checked);
+      const appointmentPayload = {
+        clientName,
+        clientPhone,
+        serviceId: Number(serviceId),
+        staffId: staffId ? Number(staffId) : null,
+        date,
+        time,
+        status,
+        reminderConsent: reminderConsentChecked,
+      };
+      if (reminderConsentChecked) {
+        appointmentPayload.reminderConsentOrigin = 'painel_confirmacao_manual';
+      }
+
       try {
         const res = await fetch('/api/cliente/appointments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clientName,
-            clientPhone,
-            serviceId: Number(serviceId),
-            staffId: staffId ? Number(staffId) : null,
-            date,
-            time,
-            status,
-          }),
+          body: JSON.stringify(appointmentPayload),
         });
 
         const data = await res.json();
@@ -8305,6 +8421,8 @@
           showToast('Agendamento registrado com sucesso!');
           RaiaModalManager.markClean('modalNewAppointment');
           document.getElementById('formNewAppointment').reset();
+          const reminderConsent = document.getElementById('aptReminderConsent');
+          if (reminderConsent) reminderConsent.checked = false;
           closeNewAppointmentModal();
           loadAppointments();
         } else {
