@@ -9171,10 +9171,23 @@
     });
 
     // ========================================================
-    // GESTÃO DA CONEXÃO WHATSAPP DO SALÃO (COMANDO 027)
+    // GESTÃO DA CONEXÃO WHATSAPP DO SALÃO (COMANDO 032)
+    // Máquina de Estados: DISCONNECTED | QR_SELECTED | QR_WAITING | CODE_SELECTED | CODE_WAITING | CONNECTING | CONNECTED | ERROR
     // ========================================================
+    let salonWaClientState = 'DISCONNECTED';
+    let salonWaActiveMethod = null; // null | 'QR' | 'CODE'
     let salonWaPollTimer = null;
     let salonWaPairingCountdown = null;
+    let salonWaSessionSeq = 0; // Monotônico para invalidar respostas assíncronas obsoletas
+    let isSalonWaSubmitting = false; // Mutex local de interface
+
+    function scheduleSalonWaPoll() {
+      if (salonWaPollTimer) clearTimeout(salonWaPollTimer);
+      salonWaPollTimer = setTimeout(() => {
+        salonWaPollTimer = null;
+        loadSalonWhatsAppStatus();
+      }, 3000);
+    }
 
     async function loadSalonWhatsAppStatus() {
       try {
@@ -9202,7 +9215,7 @@
     }
 
     function renderSalonWhatsAppUI(statusData) {
-      const status = statusData.status || 'DISCONNECTED';
+      const serverStatus = statusData.status || 'DISCONNECTED';
       const badge = document.getElementById('salonWaStatusBadge');
       const dot = document.getElementById('salonWaStatusDot');
       const label = document.getElementById('salonWaStatusLabel');
@@ -9229,21 +9242,27 @@
         ERROR: { label: 'Erro na Conexão', color: 'bg-red-400', text: 'text-red-400', border: 'border-red-500/40', bg: 'bg-red-500/10', ov: 'bg-red-500/10 text-red-400 border-red-500/30' },
       };
 
-      const meta = statusMap[status] || statusMap.DISCONNECTED;
-      if (badge && dot && label) {
-        badge.className = `px-3.5 py-1.5 rounded-full text-xs font-bold ${meta.bg} ${meta.text} border ${meta.border} flex items-center gap-2`;
-        dot.className = `w-2 h-2 rounded-full ${meta.color}`;
-        label.innerText = meta.label;
-      }
+      // REGRA DE OURO 1: Se o servidor estiver CONECTADO, transiciona incondicionalmente
+      if (serverStatus === 'CONNECTED') {
+        salonWaClientState = 'CONNECTED';
+        salonWaActiveMethod = null;
+        if (salonWaPairingCountdown) {
+          clearInterval(salonWaPairingCountdown);
+          salonWaPairingCountdown = null;
+        }
 
-      if (ovBadge && ovText) {
-        ovBadge.className = `text-[10px] px-2 py-0.5 rounded-full font-bold border ${meta.ov}`;
-        ovBadge.innerText = status === 'CONNECTED' ? 'CONECTADO' : (status === 'DISCONNECTED' ? 'DESCONECTADO' : 'CONECTANDO');
-        ovText.innerText = status === 'CONNECTED' ? (statusData.connectedPhone || 'WhatsApp Ativo') : meta.label;
-      }
+        const meta = statusMap.CONNECTED;
+        if (badge && dot && label) {
+          badge.className = `px-3.5 py-1.5 rounded-full text-xs font-bold ${meta.bg} ${meta.text} border ${meta.border} flex items-center gap-2`;
+          dot.className = `w-2 h-2 rounded-full ${meta.color}`;
+          label.innerText = meta.label;
+        }
+        if (ovBadge && ovText) {
+          ovBadge.className = `text-[10px] px-2 py-0.5 rounded-full font-bold border ${meta.ov}`;
+          ovBadge.innerText = 'CONECTADO';
+          ovText.innerText = statusData.connectedPhone || 'WhatsApp Ativo';
+        }
 
-      // Alternância de Telas
-      if (status === 'CONNECTED') {
         choiceBox?.classList.add('hidden');
         qrBox?.classList.add('hidden');
         pairingBox?.classList.add('hidden');
@@ -9261,65 +9280,145 @@
             atDisplay.innerText = statusData.lastConnectedAt;
           }
         }
-      } else if (status === 'WAITING_QR' && statusData.qrCode) {
-        choiceBox?.classList.add('hidden');
-        qrBox?.classList.remove('hidden');
-        pairingBox?.classList.add('hidden');
-        connectedCard?.classList.add('hidden');
+        return;
+      }
 
-        const img = document.getElementById('salonQrCodeImg');
-        if (img) img.src = statusData.qrCode;
-      } else if (status === 'WAITING_CODE' && statusData.pairingCode) {
+      // REGRA DE OURO 2: Se o usuário selecionou CÓDIGO (CODE_SELECTED ou CODE_WAITING),
+      // o polling NUNCA pode forçar a tela para QR, mesmo se o backend estiver em WAITING_QR!
+      if (salonWaActiveMethod === 'CODE') {
         choiceBox?.classList.add('hidden');
         qrBox?.classList.add('hidden');
         pairingBox?.classList.remove('hidden');
         connectedCard?.classList.add('hidden');
 
-        const formArea = document.getElementById('waPairingFormArea');
-        const displayArea = document.getElementById('waPairingDisplayArea');
-        formArea?.classList.add('hidden');
-        displayArea?.classList.remove('hidden');
-
-        const valElem = document.getElementById('waPairingCodeValue');
-        if (valElem) valElem.innerText = statusData.pairingCode;
-      } else {
-        if (qrBox?.classList.contains('hidden') && pairingBox?.classList.contains('hidden')) {
-          choiceBox?.classList.remove('hidden');
-          connectedCard?.classList.add('hidden');
+        // Se o backend gerou código e estiver em WAITING_CODE, atualiza
+        if (serverStatus === 'WAITING_CODE' && statusData.pairingCode) {
+          salonWaClientState = 'CODE_WAITING';
+          const formArea = document.getElementById('waPairingFormArea');
+          const displayArea = document.getElementById('waPairingDisplayArea');
+          formArea?.classList.add('hidden');
+          displayArea?.classList.remove('hidden');
+          const valElem = document.getElementById('waPairingCodeValue');
+          if (valElem) valElem.innerText = statusData.pairingCode;
         }
+
+        const effectiveStatus = (salonWaClientState === 'CODE_WAITING') ? 'WAITING_CODE' : 'DISCONNECTED';
+        const meta = statusMap[effectiveStatus] || statusMap.DISCONNECTED;
+        if (badge && dot && label) {
+          badge.className = `px-3.5 py-1.5 rounded-full text-xs font-bold ${meta.bg} ${meta.text} border ${meta.border} flex items-center gap-2`;
+          dot.className = `w-2 h-2 rounded-full ${meta.color}`;
+          label.innerText = meta.label;
+        }
+        if (ovBadge && ovText) {
+          ovBadge.className = `text-[10px] px-2 py-0.5 rounded-full font-bold border ${meta.ov}`;
+          ovBadge.innerText = (salonWaClientState === 'CODE_WAITING') ? 'CONECTANDO' : 'DESCONECTADO';
+          ovText.innerText = meta.label;
+        }
+        return;
       }
+
+      // REGRA DE OURO 3: Se o usuário selecionou QR (QR_SELECTED ou QR_WAITING),
+      // mantém a tela em QR e atualiza a imagem se houver renovação do código
+      if (salonWaActiveMethod === 'QR') {
+        choiceBox?.classList.add('hidden');
+        qrBox?.classList.remove('hidden');
+        pairingBox?.classList.add('hidden');
+        connectedCard?.classList.add('hidden');
+
+        if (statusData.qrCode) {
+          salonWaClientState = 'QR_WAITING';
+          const img = document.getElementById('salonQrCodeImg');
+          if (img) img.src = statusData.qrCode;
+        }
+
+        const meta = statusMap.WAITING_QR;
+        if (badge && dot && label) {
+          badge.className = `px-3.5 py-1.5 rounded-full text-xs font-bold ${meta.bg} ${meta.text} border ${meta.border} flex items-center gap-2`;
+          dot.className = `w-2 h-2 rounded-full ${meta.color}`;
+          label.innerText = meta.label;
+        }
+        if (ovBadge && ovText) {
+          ovBadge.className = `text-[10px] px-2 py-0.5 rounded-full font-bold border ${meta.ov}`;
+          ovBadge.innerText = 'CONECTANDO';
+          ovText.innerText = meta.label;
+        }
+        return;
+      }
+
+      // REGRA DE OURO 4: Sem método ativo (DISCONNECTED ou primeira carga sem escolha explícita)
+      salonWaClientState = (serverStatus === 'ERROR' || serverStatus === 'CONNECTION_LOST') ? 'ERROR' : 'DISCONNECTED';
+      const meta = statusMap[serverStatus] || statusMap.DISCONNECTED;
+
+      if (badge && dot && label) {
+        badge.className = `px-3.5 py-1.5 rounded-full text-xs font-bold ${meta.bg} ${meta.text} border ${meta.border} flex items-center gap-2`;
+        dot.className = `w-2 h-2 rounded-full ${meta.color}`;
+        label.innerText = meta.label;
+      }
+      if (ovBadge && ovText) {
+        ovBadge.className = `text-[10px] px-2 py-0.5 rounded-full font-bold border ${meta.ov}`;
+        ovBadge.innerText = 'DESCONECTADO';
+        ovText.innerText = meta.label;
+      }
+
+      choiceBox?.classList.remove('hidden');
+      qrBox?.classList.add('hidden');
+      pairingBox?.classList.add('hidden');
+      connectedCard?.classList.add('hidden');
     }
 
     // Ação: Iniciar Conexão via QR Code
     async function openSalonQrConnection() {
+      if (isSalonWaSubmitting) return;
+      isSalonWaSubmitting = true;
+      const seq = ++salonWaSessionSeq;
+
+      salonWaActiveMethod = 'QR';
+      salonWaClientState = 'QR_SELECTED';
+
       const choiceBox = document.getElementById('waConnectChoiceBox');
       const qrBox = document.getElementById('waQrCodeBox');
+      const pairingBox = document.getElementById('waPairingCodeBox');
       const spinner = document.getElementById('waQrCodeSpinner');
+      const img = document.getElementById('salonQrCodeImg');
 
       choiceBox?.classList.add('hidden');
+      pairingBox?.classList.add('hidden');
       qrBox?.classList.remove('hidden');
       spinner?.classList.remove('hidden');
+      if (img) img.src = '';
 
       try {
         const res = await fetch('/api/cliente/whatsapp/connect-qr', { method: 'POST' });
         const data = await res.json();
+
+        // Se o usuário trocou de método enquanto a requisição rodava, descarta a resposta
+        if (seq !== salonWaSessionSeq || salonWaActiveMethod !== 'QR') {
+          return;
+        }
+
         spinner?.classList.add('hidden');
 
         if (data.success && data.qrCode) {
-          const img = document.getElementById('salonQrCodeImg');
+          salonWaClientState = 'QR_WAITING';
           if (img) img.src = data.qrCode;
-          loadSalonWhatsAppStatus();
+          scheduleSalonWaPoll();
         } else if (data.status === 'CONNECTED') {
+          salonWaClientState = 'CONNECTED';
           showToast('WhatsApp já conectado!');
           loadSalonWhatsAppStatus();
         } else {
+          salonWaClientState = 'ERROR';
           showToast(data.error || 'Erro ao gerar QR Code.', 'error');
           cancelSalonConnectMode();
         }
       } catch (err) {
+        if (seq !== salonWaSessionSeq) return;
         spinner?.classList.add('hidden');
-        showToast('Erro de comunicação com o servidor.', 'error');
+        salonWaClientState = 'ERROR';
+        showToast('Erro de comunicação ao gerar QR Code.', 'error');
         cancelSalonConnectMode();
+      } finally {
+        isSalonWaSubmitting = false;
       }
     }
 
@@ -9329,6 +9428,10 @@
 
     // Ação: Iniciar Conexão via Código
     function openSalonCodeConnection() {
+      const seq = ++salonWaSessionSeq;
+      salonWaActiveMethod = 'CODE';
+      salonWaClientState = 'CODE_SELECTED';
+
       const choiceBox = document.getElementById('waConnectChoiceBox');
       const qrBox = document.getElementById('waQrCodeBox');
       const pairingBox = document.getElementById('waPairingCodeBox');
@@ -9350,12 +9453,17 @@
 
     // Submissão do Telefone para Geração de Código de Pareamento
     async function submitSalonPairingCode() {
+      if (isSalonWaSubmitting) return;
       const input = document.getElementById('waPairingPhoneInput');
       const phone = input ? input.value.trim() : '';
       if (!phone) {
         showToast('Informe o número com DDD.', 'error');
         return;
       }
+
+      const seq = ++salonWaSessionSeq;
+      isSalonWaSubmitting = true;
+      salonWaClientState = 'CODE_WAITING';
 
       const btnSpinner = document.getElementById('btnPairingSpinner');
       const btnText = document.getElementById('btnPairingText');
@@ -9369,10 +9477,17 @@
           body: JSON.stringify({ phone }),
         });
         const data = await res.json();
+
+        // Se o usuário cancelou ou mudou de método, descarta resposta
+        if (seq !== salonWaSessionSeq || salonWaActiveMethod !== 'CODE') {
+          return;
+        }
+
         btnSpinner?.classList.add('hidden');
         if (btnText) btnText.innerText = 'Gerar código';
 
         if (data.success && data.pairingCode) {
+          salonWaClientState = 'CODE_WAITING';
           const formArea = document.getElementById('waPairingFormArea');
           const displayArea = document.getElementById('waPairingDisplayArea');
           formArea?.classList.add('hidden');
@@ -9382,14 +9497,19 @@
           if (codeElem) codeElem.innerText = data.pairingCode;
 
           startPairingCountdown(data.expiresAt || (Date.now() + 180000));
-          loadSalonWhatsAppStatus();
+          scheduleSalonWaPoll();
         } else {
+          salonWaClientState = 'CODE_SELECTED';
           showToast(data.error || 'Erro ao gerar código de pareamento.', 'error');
         }
       } catch (err) {
+        if (seq !== salonWaSessionSeq) return;
         btnSpinner?.classList.add('hidden');
         if (btnText) btnText.innerText = 'Gerar código';
+        salonWaClientState = 'CODE_SELECTED';
         showToast('Erro de conexão ao gerar código.', 'error');
+      } finally {
+        isSalonWaSubmitting = false;
       }
     }
 
@@ -9401,6 +9521,7 @@
         const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
         if (remaining <= 0) {
           clearInterval(salonWaPairingCountdown);
+          salonWaPairingCountdown = null;
           if (timerElem) timerElem.innerText = 'Código expirado. Gere um novo.';
         } else {
           const mins = Math.floor(remaining / 60);
@@ -9423,13 +9544,33 @@
     }
 
     function cancelSalonConnectMode() {
+      ++salonWaSessionSeq; // Invalida qualquer resposta assíncrona pendente
+      salonWaActiveMethod = null;
+      salonWaClientState = 'DISCONNECTED';
+      isSalonWaSubmitting = false;
+
+      if (salonWaPairingCountdown) {
+        clearInterval(salonWaPairingCountdown);
+        salonWaPairingCountdown = null;
+      }
+
       const choiceBox = document.getElementById('waConnectChoiceBox');
       const qrBox = document.getElementById('waQrCodeBox');
       const pairingBox = document.getElementById('waPairingCodeBox');
+      const formArea = document.getElementById('waPairingFormArea');
+      const displayArea = document.getElementById('waPairingDisplayArea');
+      const img = document.getElementById('salonQrCodeImg');
 
       choiceBox?.classList.remove('hidden');
       qrBox?.classList.add('hidden');
       pairingBox?.classList.add('hidden');
+      formArea?.classList.remove('hidden');
+      displayArea?.classList.add('hidden');
+      if (img) img.src = '';
+
+      // Notifica o backend em background para abortar qualquer tentativa/socket pendente
+      fetch('/api/cliente/whatsapp/cancel-pairing', { method: 'POST' }).catch(() => {});
+      loadSalonWhatsAppStatus();
     }
 
     async function confirmDisconnectWhatsApp() {
@@ -9442,6 +9583,8 @@
         const data = await res.json();
         if (data.success) {
           showToast('WhatsApp do salão desconectado com sucesso.');
+          salonWaActiveMethod = null;
+          salonWaClientState = 'DISCONNECTED';
           loadSalonWhatsAppStatus();
         } else {
           showToast(data.error || 'Erro ao desconectar WhatsApp.', 'error');

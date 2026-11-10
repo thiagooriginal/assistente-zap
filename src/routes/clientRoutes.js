@@ -1756,6 +1756,25 @@ const postDisconnectHandler = async (req, res) => {
 router.post('/whatsapp/disconnect', clientAuthMiddleware, requireProductAccess('JESSICA'), postDisconnectHandler);
 router.post('/integrations/whatsapp/disconnect', clientAuthMiddleware, requireProductAccess('JESSICA'), postDisconnectHandler);
 
+/**
+ * POST /api/cliente/whatsapp/cancel-pairing (e alias /integrations/whatsapp/cancel-pairing)
+ * Cancela tentativa pendente de pareamento por QR Code ou Código, liberando o socket
+ */
+const postCancelPairingHandler = async (req, res) => {
+  try {
+    const result = await salonSessionManager.cancelPendingPairing(req.clientUser.id);
+    return res.json(result);
+  } catch (err) {
+    console.error('[WhatsApp Cancel Pairing Error]:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro ao cancelar pareamento.',
+    });
+  }
+};
+router.post('/whatsapp/cancel-pairing', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postCancelPairingHandler);
+router.post('/integrations/whatsapp/cancel-pairing', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postCancelPairingHandler);
+
 // =======================================================
 // DASHBOARD GERENCIAL & FINANCEIRO 2.0 (MÓDULO JÉSSICA)
 // =======================================================

@@ -84,7 +84,7 @@ function isSalonRealWhatsAppAllowed(userId, candidatePhone = null) {
     return false;
   }
 
-  // Bloqueio 3: Phone Whitelist Obrigatória (se configurada)
+  // Bloqueio 3: Phone Whitelist Obrigatória
   const rawAllowedPhones = process.env.SALON_TEST_ALLOWED_PHONES || '';
   const allowedPhones = rawAllowedPhones
     .split(',')
@@ -95,41 +95,20 @@ function isSalonRealWhatsAppAllowed(userId, candidatePhone = null) {
     return false; // Fail-closed: se a lista de telefones não estiver preenchida, bloqueia conexões reais
   }
 
-  let phoneToVerify = candidatePhone ? phoneUtils.cleanDigits(candidatePhone) : null;
-  if (!phoneToVerify) {
-    const memSession = activeSessions.get(uid);
-    if (memSession?.connectedPhone) {
-      phoneToVerify = phoneUtils.cleanDigits(memSession.connectedPhone);
-    }
+  // Se candidatePhone foi informado (ex: Pareamento por Código), valida imediatamente contra a whitelist
+  if (candidatePhone) {
+    const phoneToVerify = phoneUtils.cleanDigits(candidatePhone);
+    return allowedPhones.some((ap) => {
+      return phoneToVerify === ap || phoneToVerify.endsWith(ap) || ap.endsWith(phoneToVerify);
+    });
   }
 
-  if (!phoneToVerify) {
-    try {
-      const salon = db.prepare('SELECT phone FROM client_salons WHERE user_id = ?').get(uid);
-      if (salon?.phone) {
-        phoneToVerify = phoneUtils.cleanDigits(salon.phone);
-      }
-    } catch (_) {}
-  }
-
-  if (!phoneToVerify) {
-    try {
-      const repoSession = SalonWhatsAppRepository.getSessionByUserId(uid);
-      if (repoSession?.connected_phone) {
-        phoneToVerify = phoneUtils.cleanDigits(repoSession.connected_phone);
-      }
-    } catch (_) {}
-  }
-
-  if (!phoneToVerify) {
-    return false; // Fail-closed se telefone indeterminado
-  }
-
-  const isPhoneAuthorized = allowedPhones.some((ap) => {
-    return phoneToVerify === ap || phoneToVerify.endsWith(ap) || ap.endsWith(phoneToVerify);
-  });
-
-  return isPhoneAuthorized;
+  // Se candidatePhone for null (ex: Início de sessão para emissão de QR Code):
+  // O aparelho do usuário ainda é desconhecido neste momento inicial.
+  // Permite iniciar a emissão do QR real do Baileys para o tenant autorizado em staging.
+  // A validação estrita fail-closed do telefone é executada no evento 'connection === open'
+  // assim que o Baileys decodificar o JID do aparelho conectado.
+  return true;
 }
 
 /**
@@ -343,6 +322,9 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
   // CORREÇÃO 2: Mensagens recebidas no WhatsApp comercial do salão
   sock.ev.on('messages.upsert', async (m) => {
     try {
+      // Guarda de segurança: apenas despacha se a sessão estiver formalmente conectada
+      if (session.status !== 'CONNECTED') return;
+
       if (m.type === 'notify' && Array.isArray(m.messages)) {
         for (const msg of m.messages) {
           if (!msg.message || !msg.key?.remoteJid || msg.key.fromMe) continue;
@@ -361,8 +343,9 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
       try {
         const qrDataUrl = await QRCode.toDataURL(qr, {
           margin: 2,
-          width: 280,
-          color: { dark: '#4E3B31', light: '#FFFDFB' },
+          width: 320,
+          errorCorrectionLevel: 'M',
+          color: { dark: '#000000', light: '#FFFFFF' },
         });
         session.qrCode = qrDataUrl;
         session.qrExpiresAt = Date.now() + 60000; // 60 segundos
@@ -384,6 +367,39 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
     if (connection === 'open') {
       const jid = sock.user?.id || '';
       const cleanPhone = phoneUtils.cleanDigits(jid.split('@')[0].split(':')[0]);
+
+      // Staging Hard Lock: Validação imediata pós-scan do aparelho conectado (Proteções 11 e 12)
+      if (!clientModule.isRealWhatsAppTransportAllowed()) {
+        const isAllowed = isSalonRealWhatsAppAllowed(uid, cleanPhone);
+        if (!isAllowed) {
+          console.warn(`[salonSessionManager] SEGURANÇA: Conexão rejeitada para tenant #${uid}. Telefone ${phoneUtils.maskPhoneNumber(cleanPhone)} não consta em SALON_TEST_ALLOWED_PHONES.`);
+          try { sock.end(undefined); } catch (_) {}
+          try {
+            const sDir = getSalonSessionDir(uid);
+            if (fs.existsSync(sDir)) fs.rmSync(sDir, { recursive: true, force: true });
+          } catch (_) {}
+          session.sock = null;
+          session.status = 'DISCONNECTED';
+          session.connectedPhone = null;
+          session.lastError = 'Telefone não autorizado no ambiente de homologação.';
+          session.qrCode = null;
+          session.pairingCode = null;
+
+          SalonWhatsAppRepository.markSessionDisconnected(uid, {
+            status: 'DISCONNECTED',
+            error: session.lastError,
+            resetCredentials: true,
+          });
+
+          SalonWhatsAppRepository.createLog(uid, {
+            eventType: 'AUTH_FAILURE',
+            newStatus: 'DISCONNECTED',
+            reason: `Tentativa de conexão não autorizada com telefone: ${phoneUtils.maskPhoneNumber(cleanPhone)}`,
+          });
+          return; // Aborta antes de prosseguir
+        }
+      }
+
       session.status = 'CONNECTED';
       session.connectedPhone = cleanPhone;
       session.lastConnectedAt = new Date().toISOString();
@@ -471,8 +487,9 @@ async function startQrSession(userId) {
     if (!isRealAllowed) {
       const simQrDataUrl = await QRCode.toDataURL(`RAIA_HOMOLOGACAO_SALON_${uid}_MOCK_QR_${Date.now()}`, {
         margin: 2,
-        width: 280,
-        color: { dark: '#4E3B31', light: '#FFFDFB' },
+        width: 320,
+        errorCorrectionLevel: 'M',
+        color: { dark: '#000000', light: '#FFFFFF' },
       });
 
       session = {
@@ -552,12 +569,29 @@ async function startQrSession(userId) {
         }
       }, 25000);
 
-      sock.ev.on('connection.update', (update) => {
+      sock.ev.on('connection.update', async (update) => {
         const { connection, qr } = update;
         if (qr && !resolved) {
-          resolved = true;
-          clearTimeout(initialTimeout);
-          resolve({ success: true, qrCode: session.qrCode, status: 'WAITING_QR' });
+          try {
+            if (!session.qrCode) {
+              const qrDataUrl = await QRCode.toDataURL(qr, {
+                margin: 2,
+                width: 320,
+                errorCorrectionLevel: 'M',
+                color: { dark: '#000000', light: '#FFFFFF' },
+              });
+              session.qrCode = qrDataUrl;
+              session.qrExpiresAt = Date.now() + 60000;
+              session.status = 'WAITING_QR';
+            }
+          } catch (err) {
+            session.lastError = 'Falha ao codificar imagem do QR Code.';
+          }
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(initialTimeout);
+            resolve({ success: true, qrCode: session.qrCode, status: 'WAITING_QR' });
+          }
         }
         if (connection === 'open' && !resolved) {
           resolved = true;
@@ -753,6 +787,64 @@ async function disconnect(userId) {
   });
 
   return { success: true, message: 'WhatsApp comercial do salão desconectado e credenciais removidas com sucesso.' };
+}
+
+/**
+ * Cancela qualquer tentativa de pareamento em andamento (QR ou Código)
+ * e redefine o status em memória para DISCONNECTED, sem afetar conexões ativas (CONNECTED).
+ *
+ * @param {number} userId
+ * @returns {Promise<{ success: boolean, status: string, message?: string }>}
+ */
+async function cancelPendingPairing(userId) {
+  const uid = Number(userId);
+  if (!uid || isNaN(uid) || uid <= 0) {
+    throw new Error('INVALID_TENANT_ID: Identificador de salão inválido.');
+  }
+
+  const session = activeSessions.get(uid);
+
+  // Não cancela se já estiver conectado (exige disconnect formal)
+  if (session && session.status === 'CONNECTED') {
+    return {
+      success: false,
+      error: 'CANNOT_CANCEL_ACTIVE_CONNECTION',
+      message: 'Sessão já está conectada. Utilize a desconexão formal para desvincular.',
+      status: 'CONNECTED',
+    };
+  }
+
+  if (session) {
+    if (session.sock) {
+      try {
+        session.sock.end(undefined);
+      } catch (_) {}
+      session.sock = null;
+    }
+    session.status = 'DISCONNECTED';
+    session.qrCode = null;
+    session.qrExpiresAt = null;
+    session.pairingCode = null;
+    session.pairingExpiresAt = null;
+    session.lastError = null;
+    session.pairingMethod = null;
+  }
+
+  // Libera locks pendentes se houver
+  tenantLocks.delete(uid);
+
+  SalonWhatsAppRepository.markSessionDisconnected(uid, {
+    status: 'DISCONNECTED',
+    error: 'Tentativa de pareamento cancelada pelo usuário.',
+  });
+
+  SalonWhatsAppRepository.createLog(uid, {
+    eventType: 'DISCONNECTED',
+    newStatus: 'DISCONNECTED',
+    reason: 'Cancelado pelo usuário no painel.',
+  });
+
+  return { success: true, status: 'DISCONNECTED' };
 }
 
 /**
@@ -996,6 +1088,7 @@ module.exports = {
   getSessionStatus,
   startQrSession,
   requestPairingCode,
+  cancelPendingPairing,
   disconnect,
   sendSalonMessage,
   restoreActiveSalonSessions,
