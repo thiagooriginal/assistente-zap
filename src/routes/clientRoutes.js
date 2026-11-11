@@ -1778,6 +1778,25 @@ const postCancelPairingHandler = async (req, res) => {
 router.post('/whatsapp/cancel-pairing', clientAuthMiddleware, requireProductAccess('JESSICA'), postCancelPairingHandler);
 router.post('/integrations/whatsapp/cancel-pairing', clientAuthMiddleware, requireProductAccess('JESSICA'), postCancelPairingHandler);
 
+/**
+ * GET /api/cliente/whatsapp/diagnostics (e alias /integrations/whatsapp/diagnostics)
+ * Retorna telemetria sanitizada de conexão e auditoria de credenciais em disco (Comando 034).
+ */
+const getWhatsAppDiagnosticsHandler = (req, res) => {
+  try {
+    const diagnostics = salonSessionManager.getSalonDiagnostics(req.clientUser.id);
+    return res.json({ success: true, diagnostics });
+  } catch (err) {
+    console.error('[WhatsApp Diagnostics Error]:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro ao obter telemetria de diagnóstico WhatsApp do salão.',
+    });
+  }
+};
+router.get('/whatsapp/diagnostics', clientAuthMiddleware, requireProductAccess('JESSICA'), getWhatsAppDiagnosticsHandler);
+router.get('/integrations/whatsapp/diagnostics', clientAuthMiddleware, requireProductAccess('JESSICA'), getWhatsAppDiagnosticsHandler);
+
 // =======================================================
 // DASHBOARD GERENCIAL & FINANCEIRO 2.0 (MÓDULO JÉSSICA)
 // =======================================================

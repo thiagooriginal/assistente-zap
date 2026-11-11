@@ -859,7 +859,9 @@ app.get('/api/health/ready', (req, res) => {
       uptime: Math.floor(process.uptime()),
       mode: process.env.APP_MODE || (process.env.HOMOLOGACAO === 'true' ? 'homologacao' : 'standard'),
       database: 'connected',
-      version: '1.0.0-staging'
+      version: '1.0.0-staging',
+      commit: process.env.GIT_COMMIT || process.env.COMMIT_SHA || '034-stg',
+      baileysVersion: '7.0.0-rc14',
     });
   } catch (err) {
     return res.status(503).json({

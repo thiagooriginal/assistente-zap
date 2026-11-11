@@ -22,6 +22,7 @@ const {
   useMultiFileAuthState,
   DisconnectReason,
   fetchLatestBaileysVersion,
+  Browsers,
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const QRCode = require('qrcode');
@@ -41,6 +42,129 @@ const activeSessions = new Map();
 
 // Mutex unificado por tenant para serializar operações de conexão/desconexão: userId => Promise
 const tenantLocks = new Map();
+
+// Telemetria sanitizada de diagnóstico de conexão: userId => Array<{ timestamp: string, event: string, details?: object }>
+const salonDiagnostics = new Map();
+const MAX_DIAGNOSTIC_EVENTS = 30;
+
+/**
+ * Registra evento de diagnóstico sanitizado em memória (sem segredos, tokens ou dados desmascarados).
+ * @param {number} userId
+ * @param {string} event
+ * @param {object} [details]
+ */
+function recordDiagnosticEvent(userId, event, details = {}) {
+  const uid = Number(userId);
+  if (!salonDiagnostics.has(uid)) {
+    salonDiagnostics.set(uid, []);
+  }
+  const events = salonDiagnostics.get(uid);
+  events.push({
+    timestamp: new Date().toISOString(),
+    event,
+    details,
+  });
+  if (events.length > MAX_DIAGNOSTIC_EVENTS) {
+    events.shift();
+  }
+}
+
+/**
+ * Inspeciona o diretório de credenciais persistentes do salão sem modificar arquivos (Comando 034).
+ * @param {number} userId
+ * @returns {object} Metadados sanitizados da pasta de autenticação
+ */
+function inspectSalonAuthCredentials(userId) {
+  const uid = Number(userId);
+  if (!uid || isNaN(uid) || uid <= 0) {
+    return {
+      exists: false,
+      hasCreds: false,
+      credsValid: false,
+      credsMe: null,
+      filesCount: 0,
+      keyFilesCount: 0,
+    };
+  }
+  const sessionDir = path.resolve(SESSIONS_ROOT, `salon_${uid}`);
+  if (!fs.existsSync(sessionDir)) {
+    return {
+      exists: false,
+      hasCreds: false,
+      credsValid: false,
+      credsMe: null,
+      filesCount: 0,
+      keyFilesCount: 0,
+    };
+  }
+  try {
+    const files = fs.readdirSync(sessionDir);
+    const hasCreds = files.includes('creds.json');
+    let credsValid = false;
+    let credsMe = null;
+    if (hasCreds) {
+      try {
+        const raw = fs.readFileSync(path.join(sessionDir, 'creds.json'), 'utf8');
+        const parsed = JSON.parse(raw);
+        credsValid = Boolean(parsed && typeof parsed === 'object');
+        if (parsed?.me?.id) {
+          credsMe = phoneUtils.maskPhoneNumber(parsed.me.id.split('@')[0].split(':')[0]);
+        }
+      } catch (_) {}
+    }
+    return {
+      exists: true,
+      hasCreds,
+      credsValid,
+      credsMe,
+      filesCount: files.length,
+      keyFilesCount: files.filter((f) => f.endsWith('.json')).length,
+    };
+  } catch (err) {
+    return {
+      exists: true,
+      hasCreds: false,
+      credsValid: false,
+      credsMe: null,
+      filesCount: 0,
+      keyFilesCount: 0,
+      error: err.message,
+    };
+  }
+}
+
+/**
+ * Retorna telemetria sanitizada do salão para diagnóstico operacional seguro.
+ * @param {number} userId
+ * @returns {object}
+ */
+function getSalonDiagnostics(userId) {
+  const uid = Number(userId);
+  const session = activeSessions.get(uid);
+  const repo = SalonWhatsAppRepository.getSessionByUserId(uid);
+  const events = salonDiagnostics.get(uid) || [];
+  const credentialsAudit = inspectSalonAuthCredentials(uid);
+
+  return {
+    userId: uid,
+    status: session ? session.status : (repo ? repo.session_status : 'DISCONNECTED'),
+    pairingMethod: session ? session.pairingMethod : (repo ? repo.pairing_method : null),
+    hasSocket: Boolean(session && session.sock),
+    qrActive: Boolean(session && session.qrCode && session.qrExpiresAt > Date.now()),
+    qrVersion: session?.qrVersion || 0,
+    qrExpiresInMs: session?.qrExpiresAt ? Math.max(0, session.qrExpiresAt - Date.now()) : 0,
+    pairingActive: Boolean(session && session.pairingCode && session.pairingExpiresAt > Date.now()),
+    connectedPhone: session?.connectedPhone ? phoneUtils.maskPhoneNumber(session.connectedPhone) : (repo?.connected_phone ? phoneUtils.maskPhoneNumber(repo.connected_phone) : null),
+    environment: {
+      isHomologacao: process.env.HOMOLOGACAO === 'true',
+      allowSalonWhatsAppTesting: process.env.ALLOW_SALON_WHATSAPP_TESTING === 'true',
+      isTenantAllowed: (process.env.SALON_TEST_ALLOWED_TENANTS || '').split(',').map((s) => s.trim()).includes(String(uid)),
+      allowedPhonesCount: (process.env.SALON_TEST_ALLOWED_PHONES || '').split(',').map((s) => s.trim()).filter(Boolean).length,
+    },
+    credentialsAudit,
+    recentEvents: events.slice(-20),
+  };
+}
 
 /**
  * Verifica autorização com Triplo Bloqueio Fail-Closed para Staging (Proteções 11 e 12)
@@ -342,17 +466,23 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
     if (qr) {
       try {
         const qrDataUrl = await QRCode.toDataURL(qr, {
-          margin: 2,
+          margin: 4,
           width: 320,
           errorCorrectionLevel: 'M',
           color: { dark: '#000000', light: '#FFFFFF' },
         });
         session.qrCode = qrDataUrl;
-        session.qrExpiresAt = Date.now() + 60000; // 60 segundos
+        session.qrExpiresAt = Date.now() + 25000; // 25s alinhado ao ciclo de rotação da Meta
+        session.qrVersion = (session.qrVersion || 0) + 1;
         session.status = 'WAITING_QR';
 
+        recordDiagnosticEvent(uid, session.qrVersion === 1 ? 'QR_RECEIVED' : 'QR_ROTATED', {
+          version: session.qrVersion,
+          expiresInMs: 25000,
+        });
+
         // Atualiza banco sem persistir imagem bruta
-        SalonWhatsAppRepository.updateQrCode(uid, null, 60);
+        SalonWhatsAppRepository.updateQrCode(uid, null, 25);
 
         SalonWhatsAppRepository.createLog(uid, {
           eventType: 'QR_GENERATED',
@@ -361,6 +491,7 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
         });
       } catch (err) {
         session.lastError = 'Falha ao codificar imagem do QR Code.';
+        recordDiagnosticEvent(uid, 'QR_ERROR', { error: 'Falha ao codificar imagem do QR Code' });
       }
     }
 
@@ -373,6 +504,10 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
         const isAllowed = isSalonRealWhatsAppAllowed(uid, cleanPhone);
         if (!isAllowed) {
           console.warn(`[salonSessionManager] SEGURANÇA: Conexão rejeitada para tenant #${uid}. Telefone ${phoneUtils.maskPhoneNumber(cleanPhone)} não consta em SALON_TEST_ALLOWED_PHONES.`);
+          recordDiagnosticEvent(uid, 'PHONE_VALIDATION', {
+            authorized: false,
+            maskedPhone: phoneUtils.maskPhoneNumber(cleanPhone),
+          });
           try { sock.end(undefined); } catch (_) {}
           try {
             const sDir = getSalonSessionDir(uid);
@@ -399,6 +534,14 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
           return; // Aborta antes de prosseguir
         }
       }
+
+      recordDiagnosticEvent(uid, 'PHONE_VALIDATION', {
+        authorized: true,
+        maskedPhone: phoneUtils.maskPhoneNumber(cleanPhone),
+      });
+      recordDiagnosticEvent(uid, 'WS_OPEN', {
+        maskedPhone: phoneUtils.maskPhoneNumber(cleanPhone),
+      });
 
       session.status = 'CONNECTED';
       session.connectedPhone = cleanPhone;
@@ -430,9 +573,16 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const isLoggedOut = statusCode === DisconnectReason.loggedOut;
 
-      // Limpa segredos em memória
+      // Limpa segredos em memória e desvincula socket fechado
       session.qrCode = null;
       session.pairingCode = null;
+      session.sock = null;
+
+      recordDiagnosticEvent(uid, 'WS_CLOSED', {
+        statusCode: statusCode || null,
+        reason: lastDisconnect?.error?.message ? String(lastDisconnect.error.message).slice(0, 100) : 'Closed',
+        isLoggedOut,
+      });
 
       if (isLoggedOut) {
         await disconnect(uid);
@@ -479,6 +629,21 @@ async function startQrSession(userId) {
       };
     }
 
+    // Se já existe sessão WAITING_QR ativa com QR Code válido dentro do TTL, reaproveita sem reiniciar socket
+    if (
+      session &&
+      session.status === 'WAITING_QR' &&
+      session.qrCode &&
+      session.qrExpiresAt &&
+      session.qrExpiresAt > Date.now()
+    ) {
+      return {
+        success: true,
+        qrCode: session.qrCode,
+        status: 'WAITING_QR',
+      };
+    }
+
     const sessionDir = getSalonSessionDir(uid);
     SalonWhatsAppRepository.ensureSessionExists(uid, `data/sessions/salon_${uid}`);
 
@@ -486,7 +651,7 @@ async function startQrSession(userId) {
     const isRealAllowed = isSalonRealWhatsAppAllowed(uid);
     if (!isRealAllowed) {
       const simQrDataUrl = await QRCode.toDataURL(`RAIA_HOMOLOGACAO_SALON_${uid}_MOCK_QR_${Date.now()}`, {
-        margin: 2,
+        margin: 4,
         width: 320,
         errorCorrectionLevel: 'M',
         color: { dark: '#000000', light: '#FFFFFF' },
@@ -497,7 +662,8 @@ async function startQrSession(userId) {
         sock: null,
         status: 'WAITING_QR',
         qrCode: simQrDataUrl,
-        qrExpiresAt: Date.now() + 60000,
+        qrExpiresAt: Date.now() + 25000,
+        qrVersion: 1,
         pairingCode: null,
         pairingExpiresAt: null,
         connectedPhone: null,
@@ -507,8 +673,10 @@ async function startQrSession(userId) {
       };
       activeSessions.set(uid, session);
 
+      recordDiagnosticEvent(uid, 'QR_SIMULATED', { version: 1, expiresInMs: 25000 });
+
       // Banco recebe NULL para dados brutos do QR Code (CORREÇÃO 5)
-      SalonWhatsAppRepository.updateQrCode(uid, null, 60);
+      SalonWhatsAppRepository.updateQrCode(uid, null, 25);
 
       SalonWhatsAppRepository.createLog(uid, {
         eventType: 'QR_GENERATED',
@@ -532,11 +700,17 @@ async function startQrSession(userId) {
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
     const { version } = await fetchLatestBaileysVersion();
 
+    recordDiagnosticEvent(uid, 'SOCKET_INIT', {
+      method: 'QR',
+      browser: 'macOS Desktop (14.4.1)',
+      baileysVersion: Array.isArray(version) ? version.join('.') : '7.0.0-rc14',
+    });
+
     const sock = makeWASocket({
       version,
       logger: pino({ level: 'silent' }),
       auth: state,
-      browser: ['Jéssica Beauty', 'Desktop', '1.0.0'],
+      browser: Browsers.macOS('Desktop'),
       generateHighQualityLinkPreview: false,
       printQRInTerminal: false,
       syncFullHistory: false,
@@ -548,6 +722,7 @@ async function startQrSession(userId) {
       status: 'CONNECTING',
       qrCode: null,
       qrExpiresAt: null,
+      qrVersion: 0,
       pairingCode: null,
       pairingExpiresAt: null,
       connectedPhone: null,
@@ -575,13 +750,14 @@ async function startQrSession(userId) {
           try {
             if (!session.qrCode) {
               const qrDataUrl = await QRCode.toDataURL(qr, {
-                margin: 2,
+                margin: 4,
                 width: 320,
                 errorCorrectionLevel: 'M',
                 color: { dark: '#000000', light: '#FFFFFF' },
               });
               session.qrCode = qrDataUrl;
-              session.qrExpiresAt = Date.now() + 60000;
+              session.qrExpiresAt = Date.now() + 25000;
+              session.qrVersion = (session.qrVersion || 0) + 1;
               session.status = 'WAITING_QR';
             }
           } catch (err) {
@@ -704,11 +880,17 @@ async function requestPairingCode(userId, rawPhone) {
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
     const { version } = await fetchLatestBaileysVersion();
 
+    recordDiagnosticEvent(uid, 'SOCKET_INIT', {
+      method: 'CODE',
+      browser: 'macOS Desktop (14.4.1)',
+      baileysVersion: Array.isArray(version) ? version.join('.') : '7.0.0-rc14',
+    });
+
     const sock = makeWASocket({
       version,
       logger: pino({ level: 'silent' }),
       auth: state,
-      browser: ['Jéssica Beauty', 'Desktop', '1.0.0'],
+      browser: Browsers.macOS('Desktop'),
       printQRInTerminal: false,
       syncFullHistory: false,
     });
@@ -781,6 +963,7 @@ async function disconnect(userId) {
   }
 
   activeSessions.delete(uid);
+  recordDiagnosticEvent(uid, 'DISCONNECTED', { reason: 'Desconexão formal solicitada pelo usuário.' });
 
   // Expurgo seguro das credenciais em disco
   try {
@@ -849,6 +1032,7 @@ async function cancelPendingPairing(userId) {
 
   // Libera locks pendentes se houver
   tenantLocks.delete(uid);
+  recordDiagnosticEvent(uid, 'PAIRING_CANCELLED', { reason: 'Cancelado pelo usuário no painel.' });
 
   SalonWhatsAppRepository.markSessionDisconnected(uid, {
     status: 'DISCONNECTED',
@@ -1022,11 +1206,17 @@ async function restoreActiveSalonSessions() {
       const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
       const { version } = await fetchLatestBaileysVersion();
 
+      recordDiagnosticEvent(uid, 'SOCKET_INIT', {
+        method: cand.pairing_method || 'QR',
+        browser: 'macOS Desktop (14.4.1)',
+        baileysVersion: Array.isArray(version) ? version.join('.') : '7.0.0-rc14',
+      });
+
       const sock = makeWASocket({
         version,
         logger: pino({ level: 'silent' }),
         auth: state,
-        browser: ['Jéssica Beauty', 'Desktop', '1.0.0'],
+        browser: Browsers.macOS('Desktop'),
         generateHighQualityLinkPreview: false,
         printQRInTerminal: false,
         syncFullHistory: false,
@@ -1111,6 +1301,8 @@ module.exports = {
   restoreActiveSalonSessions,
   getSalonSessionDir,
   validateBrazilianPhoneForPairing,
+  getSalonDiagnostics,
+  inspectSalonAuthCredentials,
   _setSocketForTesting,
   _resetForTesting,
   _setBaseDirForTesting,

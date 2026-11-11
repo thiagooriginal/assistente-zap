@@ -9343,10 +9343,18 @@
         pairingBox?.classList.add('hidden');
         connectedCard?.classList.add('hidden');
 
+        const img = document.getElementById('salonQrCodeImg');
+        const spinner = document.getElementById('waQrCodeSpinner');
+
         if (statusData.qrCode) {
           salonWaClientState = 'QR_WAITING';
-          const img = document.getElementById('salonQrCodeImg');
           if (img) img.src = statusData.qrCode;
+          spinner?.classList.add('hidden');
+        } else {
+          // Quando o código expirou no servidor ou está sendo rotacionado pelo Baileys,
+          // limpa a imagem e exibe o spinner para que o usuário jamais escaneie código expirado
+          if (img) img.src = '';
+          spinner?.classList.remove('hidden');
         }
 
         const meta = statusMap.WAITING_QR;
