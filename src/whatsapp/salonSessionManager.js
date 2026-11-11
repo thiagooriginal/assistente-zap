@@ -110,9 +110,7 @@ function inspectSalonAuthCredentials(userId) {
       try {
         const raw = fs.readFileSync(path.join(sessionDir, 'creds.json'), 'utf8');
         const parsed = JSON.parse(raw);
-        const isRegistered = Boolean(parsed && typeof parsed === 'object' && parsed.registered === true);
-        const hasMeId = Boolean(parsed?.me?.id);
-        credsValid = Boolean(isRegistered && hasMeId);
+        credsValid = Boolean(parsed && typeof parsed === 'object' && parsed.me?.id && parsed.account);
         if (parsed?.me?.id) {
           credsMe = phoneUtils.maskPhoneNumber(parsed.me.id.split('@')[0].split(':')[0]);
         }
@@ -1439,14 +1437,14 @@ async function restoreActiveSalonSessions() {
         continue;
       }
 
-      // Valida se o creds.json contém credenciais autenticadas e registradas
+      // Valida se o creds.json contém credenciais autenticadas (me.id + account)
       try {
         const rawCreds = fs.readFileSync(credsFile, 'utf8');
         const parsedCreds = JSON.parse(rawCreds);
-        if (!parsedCreds || parsedCreds.registered !== true || !parsedCreds.me?.id) {
+        if (!parsedCreds || !parsedCreds.me?.id || !parsedCreds.account) {
           SalonWhatsAppRepository.markSessionDisconnected(uid, {
             status: 'DISCONNECTED',
-            error: 'Credenciais incompletas ou não registradas.',
+            error: 'Credenciais incompletas ou não autenticadas.',
             resetCredentials: false,
           });
           continue;

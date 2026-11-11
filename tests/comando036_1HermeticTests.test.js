@@ -250,47 +250,66 @@ test('4. Lock de tenant pertencente a nova operação não é removido por opera
 });
 
 // ==============================================================================
-// CENÁRIO 5: Validação real de credenciais (registered: true) vs incompletas
+// CENÁRIO 5: Validação real de credenciais QR (me + account, registered: false) vs código pendente
 // ==============================================================================
-test('5. Credenciais incompletas (registered: false) vs registradas em inspectSalonAuthCredentials e restoreActiveSalonSessions', async () => {
+test('5. Credenciais reais de login por QR (me + account, registered: false) vs código pendente (me + pairingCode, sem account)', async () => {
   const uid = 13;
   const sessionDir = salonSessionManager.getSalonSessionDir(uid);
   fs.mkdirSync(sessionDir, { recursive: true });
   const credsFile = path.join(sessionDir, 'creds.json');
 
-  // Caso A: Arquivo creds.json existe mas registered === false ou me.id ausente
+  // Caso A: Código de pareamento pendente (me + pairingCode, sem account, registered: false)
   fs.writeFileSync(credsFile, JSON.stringify({
     noiseKey: { private: 'foo', public: 'bar' },
+    me: { id: '5511999990011:1@s.whatsapp.net' },
+    pairingCode: '1234-5678',
     registered: false,
   }), 'utf8');
 
   let audit = salonSessionManager.inspectSalonAuthCredentials(uid);
   assert.equal(audit.exists, true);
   assert.equal(audit.hasCreds, true);
-  assert.equal(audit.credsValid, false, 'Credencial com registered: false deve ser inválida');
+  assert.equal(audit.credsValid, false, 'Código de pareamento pendente (sem account) DEVE ser inválido');
 
-  // Restauração não deve restaurar credencial não registrada
+  SalonWhatsAppRepository.markSessionConnected(uid, {
+    phone: '5511999990011',
+    phoneJid: '5511999990011@s.whatsapp.net',
+    pairingMethod: 'CODE',
+  });
+
+  let restoreResult = await salonSessionManager.restoreActiveSalonSessions();
+  assert.equal(restoreResult.restored, 0, 'Sessão sem account não deve ser restaurada');
+  assert.equal(salonSessionManager._getActiveSessionForTesting(uid), undefined);
+
+  // Caso B: Formato real de login por QR no Baileys (me + account, registered: false)
+  fs.writeFileSync(credsFile, JSON.stringify({
+    noiseKey: { private: 'foo', public: 'bar' },
+    registered: false, // Baileys nunca define true no QR!
+    me: { id: '5511999990011:1@s.whatsapp.net', name: 'Bella Vista' },
+    account: { details: 'BufferOrObjectAuthData' },
+  }), 'utf8');
+
+  audit = salonSessionManager.inspectSalonAuthCredentials(uid);
+  assert.equal(audit.exists, true);
+  assert.equal(audit.hasCreds, true);
+  assert.equal(audit.credsValid, true, 'Login real por QR (me.id + account) DEVE ser válido mesmo com registered: false');
+
+  // Reativa no banco como candidata à restauração
   SalonWhatsAppRepository.markSessionConnected(uid, {
     phone: '5511999990011',
     phoneJid: '5511999990011@s.whatsapp.net',
     pairingMethod: 'QR',
   });
 
-  let restoreResult = await salonSessionManager.restoreActiveSalonSessions();
-  assert.equal(restoreResult.restored, 0, 'Sessão com registered: false não deve ser restaurada');
-  assert.equal(salonSessionManager._getActiveSessionForTesting(uid), undefined);
+  // Configura factory para retorno de socket de restauração
+  salonSessionManager._setBaileysSocketFactoryForTesting(async () => {
+    return createMockBaileysSocket(uid);
+  });
 
-  // Caso B: Arquivo creds.json com registered === true e me.id válido
-  fs.writeFileSync(credsFile, JSON.stringify({
-    noiseKey: { private: 'foo', public: 'bar' },
-    registered: true,
-    me: { id: '5511999990011:1@s.whatsapp.net', name: 'Bella Vista' },
-  }), 'utf8');
-
-  audit = salonSessionManager.inspectSalonAuthCredentials(uid);
-  assert.equal(audit.exists, true);
-  assert.equal(audit.hasCreds, true);
-  assert.equal(audit.credsValid, true, 'Credencial com registered: true e me.id deve ser válida');
+  restoreResult = await salonSessionManager.restoreActiveSalonSessions();
+  assert.equal(restoreResult.restored, 1, 'Sessão QR com me.id + account deve ser restaurada com sucesso');
+  const restoredSession = salonSessionManager._getActiveSessionForTesting(uid);
+  assert.ok(restoredSession, 'Sessão ativa deve existir em memória após restauração');
 });
 
 // ==============================================================================
@@ -442,8 +461,9 @@ test('12. Erro 515 (restartRequired) reconecta socket preservando credenciais sa
   fs.mkdirSync(sessionDir, { recursive: true });
   const credsFile = path.join(sessionDir, 'creds.json');
   fs.writeFileSync(credsFile, JSON.stringify({
-    registered: true,
+    registered: false,
     me: { id: '5511999990011:1@s.whatsapp.net' },
+    account: { details: 'qr_auth_details' },
   }), 'utf8');
 
   let reconnectCount = 0;
@@ -476,4 +496,79 @@ test('12. Erro 515 (restartRequired) reconecta socket preservando credenciais sa
 
   assert.ok(reconnectCount >= 1, 'Reconexão controlada deve ter sido acionada para erro 515');
   assert.ok(fs.existsSync(credsFile), 'Credenciais não devem ter sido apagadas em erro 515');
+});
+
+// ==============================================================================
+// CENÁRIO 13: Sessão QR sofre queda, primeira reconexão falha e backoff continua
+// ==============================================================================
+test('13. Sessão QR conectada sofre queda, primeira reconexão falha e backoff continua sem ir para DISCONNECTED', async () => {
+  const uid = 13;
+  const sessionDir = salonSessionManager.getSalonSessionDir(uid);
+  fs.mkdirSync(sessionDir, { recursive: true });
+  const credsFile = path.join(sessionDir, 'creds.json');
+
+  // Grava credencial no formato real de QR do Baileys (me + account, registered: false)
+  fs.writeFileSync(credsFile, JSON.stringify({
+    noiseKey: { private: 'foo', public: 'bar' },
+    registered: false,
+    me: { id: '5511999990011:1@s.whatsapp.net', name: 'Bella Vista' },
+    account: { details: 'BufferOrObjectAuthData' },
+  }), 'utf8');
+
+  let reconnectAttempts = 0;
+  let secondSocket = null;
+
+  salonSessionManager._setBaileysSocketFactoryForTesting(async () => {
+    reconnectAttempts++;
+    secondSocket = createMockBaileysSocket(uid);
+    return secondSocket;
+  });
+
+  const firstSocket = createMockBaileysSocket(uid);
+  const session = salonSessionManager._setSocketForTesting(uid, firstSocket, {
+    status: 'CONNECTED',
+    pairingMethod: 'QR',
+    connectedPhone: '5511999990011',
+    socketGen: 1,
+    attachListeners: true,
+  });
+
+  // 1. Primeira queda: socket original fecha com erro 500
+  firstSocket.ev.emit('connection.update', {
+    connection: 'close',
+    lastDisconnect: {
+      error: { output: { statusCode: 500 }, message: 'Server dropped connection' },
+    },
+  });
+
+  // Status deve continuar em reconexão (NÃO ir para DISCONNECTED) com retryCount = 1
+  assert.notEqual(session.status, 'DISCONNECTED', 'Status não deve ir para DISCONNECTED na primeira queda');
+  assert.equal(session.retryCount, 1, 'retryCount deve ser 1');
+  assert.equal(session.reconnecting, true, 'reconnecting deve estar ativo');
+
+  // Aguarda o backoff inicial (1500ms) + margem para que a reconexão execute
+  await new Promise((r) => setTimeout(r, 1600));
+
+  assert.equal(reconnectAttempts, 1, 'Primeira tentativa de reconexão deve ter sido executada');
+  assert.ok(secondSocket, 'Segundo socket foi instanciado pela reconexão');
+
+  // 2. Segunda queda: o segundo socket falha imediatamente com erro 500
+  secondSocket.ev.emit('connection.update', {
+    connection: 'close',
+    lastDisconnect: {
+      error: { output: { statusCode: 500 }, message: 'Network unreachable on retry' },
+    },
+  });
+
+  // Mesmo após a primeira reconexão falhar, graças à validação de me.id + account,
+  // o backoff DEVE continuar (retryCount = 2) e NÃO ir para DISCONNECTED!
+  assert.notEqual(session.status, 'DISCONNECTED', 'Status não pode ir para DISCONNECTED na segunda queda');
+  assert.equal(session.retryCount, 2, 'retryCount deve avançar para 2');
+  assert.equal(session.reconnecting, true, 'reconnecting deve permanecer agendado');
+
+  // Limpa timer pendente para encerrar hermeticamente
+  if (session.reconnectTimer) {
+    clearTimeout(session.reconnectTimer);
+    session.reconnectTimer = null;
+  }
 });
