@@ -23,6 +23,7 @@ const {
   whatsappPairingLimiter,
   whatsappQrLimiter,
   whatsappPairingCodeLimiter,
+  whatsappActionLimiter,
 } = require('../middlewares/rateLimiter');
 const { AUDIT_EVENTS, logSecurityEvent } = require('../services/securityAuditService');
 
@@ -1665,6 +1666,7 @@ router.post('/integrations/whatsapp/test', whatsappTestLimiter, clientAuthMiddle
 const getWhatsAppStatusHandler = (req, res) => {
   try {
     const statusData = salonSessionManager.getSessionStatus(req.clientUser.id);
+    delete statusData.rawPhone;
     return res.json({
       success: true,
       ...statusData,
@@ -1755,8 +1757,8 @@ const postDisconnectHandler = async (req, res) => {
     });
   }
 };
-router.post('/whatsapp/disconnect', clientAuthMiddleware, requireProductAccess('JESSICA'), postDisconnectHandler);
-router.post('/integrations/whatsapp/disconnect', clientAuthMiddleware, requireProductAccess('JESSICA'), postDisconnectHandler);
+router.post('/whatsapp/disconnect', clientAuthMiddleware, whatsappActionLimiter, requireProductAccess('JESSICA'), postDisconnectHandler);
+router.post('/integrations/whatsapp/disconnect', clientAuthMiddleware, whatsappActionLimiter, requireProductAccess('JESSICA'), postDisconnectHandler);
 
 /**
  * POST /api/cliente/whatsapp/cancel-pairing (e alias /integrations/whatsapp/cancel-pairing)
@@ -1775,8 +1777,8 @@ const postCancelPairingHandler = async (req, res) => {
     });
   }
 };
-router.post('/whatsapp/cancel-pairing', clientAuthMiddleware, requireProductAccess('JESSICA'), postCancelPairingHandler);
-router.post('/integrations/whatsapp/cancel-pairing', clientAuthMiddleware, requireProductAccess('JESSICA'), postCancelPairingHandler);
+router.post('/whatsapp/cancel-pairing', clientAuthMiddleware, whatsappActionLimiter, requireProductAccess('JESSICA'), postCancelPairingHandler);
+router.post('/integrations/whatsapp/cancel-pairing', clientAuthMiddleware, whatsappActionLimiter, requireProductAccess('JESSICA'), postCancelPairingHandler);
 
 /**
  * GET /api/cliente/whatsapp/diagnostics (e alias /integrations/whatsapp/diagnostics)

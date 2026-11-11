@@ -128,7 +128,7 @@ function inspectSalonAuthCredentials(userId) {
       credsMe: null,
       filesCount: 0,
       keyFilesCount: 0,
-      error: err.message,
+      error: 'FS_READ_ERROR',
     };
   }
 }
@@ -159,7 +159,6 @@ function getSalonDiagnostics(userId) {
       isHomologacao: process.env.HOMOLOGACAO === 'true',
       allowSalonWhatsAppTesting: process.env.ALLOW_SALON_WHATSAPP_TESTING === 'true',
       isTenantAllowed: (process.env.SALON_TEST_ALLOWED_TENANTS || '').split(',').map((s) => s.trim()).includes(String(uid)),
-      allowedPhonesCount: (process.env.SALON_TEST_ALLOWED_PHONES || '').split(',').map((s) => s.trim()).filter(Boolean).length,
     },
     credentialsAudit,
     recentEvents: events.slice(-20),
@@ -223,7 +222,7 @@ function isSalonRealWhatsAppAllowed(userId, candidatePhone = null) {
   if (candidatePhone) {
     const phoneToVerify = phoneUtils.cleanDigits(candidatePhone);
     return allowedPhones.some((ap) => {
-      return phoneToVerify === ap || phoneToVerify.endsWith(ap) || ap.endsWith(phoneToVerify);
+      return ap === phoneToVerify;
     });
   }
 
@@ -384,15 +383,16 @@ function getSessionStatus(userId) {
     return {
       status: memSession.status,
       connectedPhone: memSession.connectedPhone ? phoneUtils.maskPhoneNumber(memSession.connectedPhone) : null,
-      rawPhone: memSession.connectedPhone || null,
       lastConnectedAt: memSession.lastConnectedAt || null,
       lastError: memSession.lastError || null,
       pairingMethod: memSession.pairingMethod || null,
       hasQr,
       qrCode: memSession.qrCode || null,
+      qrVersion: memSession.qrVersion || 0,
       hasPairingCode: hasPairing,
       pairingCode: memSession.pairingCode || null,
       pairingExpiresAt: memSession.pairingExpiresAt || null,
+      simulated: Boolean(memSession.simulated),
     };
   }
 
@@ -402,31 +402,110 @@ function getSessionStatus(userId) {
     return {
       status: repoSession.session_status || 'DISCONNECTED',
       connectedPhone: repoSession.connected_phone ? phoneUtils.maskPhoneNumber(repoSession.connected_phone) : null,
-      rawPhone: repoSession.connected_phone || null,
       lastConnectedAt: repoSession.connected_at || null,
       lastError: repoSession.last_error || null,
       pairingMethod: repoSession.pairing_method || null,
       hasQr: false,
       qrCode: null,
+      qrVersion: 0,
       hasPairingCode: false,
       pairingCode: null,
       pairingExpiresAt: null,
+      simulated: false,
     };
   }
 
   return {
     status: 'DISCONNECTED',
     connectedPhone: null,
-    rawPhone: null,
     lastConnectedAt: null,
     lastError: null,
     pairingMethod: null,
     hasQr: false,
     qrCode: null,
+    qrVersion: 0,
     hasPairingCode: false,
     pairingCode: null,
     pairingExpiresAt: null,
+    simulated: false,
   };
+}
+
+/**
+ * Criação centralizada do socket Baileys com configuração unificada
+ * Reutilizada por startQrSession, requestPairingCode e restoreActiveSalonSessions.
+ *
+ * @private
+ * @param {number} uid
+ * @param {string} sessionDir
+ * @param {object} session
+ * @returns {Promise<{ sock: object, saveCreds: Function }>}
+ */
+async function _createBaileysSocket(uid, sessionDir, session) {
+  if (!fs.existsSync(sessionDir)) {
+    fs.mkdirSync(sessionDir, { recursive: true });
+  }
+
+  const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+  const { version } = await fetchLatestBaileysVersion();
+
+  recordDiagnosticEvent(uid, 'SOCKET_INIT', {
+    method: session.pairingMethod || 'QR',
+    browser: 'macOS Desktop (14.4.1)',
+    baileysVersion: Array.isArray(version) ? version.join('.') : '7.0.0-rc14',
+  });
+
+  const sock = makeWASocket({
+    version,
+    logger: pino({ level: 'silent' }),
+    auth: state,
+    browser: Browsers.macOS('Desktop'),
+    generateHighQualityLinkPreview: false,
+    printQRInTerminal: false,
+    syncFullHistory: false,
+  });
+
+  session.sock = sock;
+  _attachSocketListeners(uid, sock, session, saveCreds);
+
+  return { sock, saveCreds };
+}
+
+/**
+ * Executa reconexão controlada do socket preservando credenciais salvas em disco.
+ *
+ * @private
+ * @param {number} uid
+ * @param {object} session
+ * @param {number} [delayMs=500]
+ */
+async function _reconnectSalonSocket(uid, session, delayMs = 500) {
+  if (activeSessions.get(uid) !== session) return;
+
+  if (session.sock) {
+    try { session.sock.end(undefined); } catch (_) {}
+    session.sock = null;
+  }
+
+  session.reconnecting = true;
+  session.status = 'CONNECTING';
+
+  if (delayMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+
+  if (activeSessions.get(uid) !== session) return;
+
+  try {
+    const sessionDir = getSalonSessionDir(uid);
+    await _createBaileysSocket(uid, sessionDir, session);
+    session.reconnecting = false;
+  } catch (err) {
+    session.reconnecting = false;
+    session.status = 'CONNECTION_LOST';
+    session.lastError = `Falha na reconexão: ${err.message}`;
+    recordDiagnosticEvent(uid, 'RECONNECT_ERROR', { error: err.message });
+  }
 }
 
 /**
@@ -441,10 +520,14 @@ function getSessionStatus(userId) {
  * @param {Function} saveCreds
  */
 function _attachSocketListeners(uid, sock, session, saveCreds) {
-  sock.ev.on('creds.update', saveCreds);
+  sock.ev.on('creds.update', async (...args) => {
+    if (activeSessions.get(uid) !== session) return;
+    await saveCreds(...args);
+  });
 
   // CORREÇÃO 2: Mensagens recebidas no WhatsApp comercial do salão
   sock.ev.on('messages.upsert', async (m) => {
+    if (activeSessions.get(uid) !== session) return;
     try {
       // Guarda de segurança: apenas despacha se a sessão estiver formalmente conectada
       if (session.status !== 'CONNECTED') return;
@@ -461,10 +544,15 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
   });
 
   sock.ev.on('connection.update', async (update) => {
+    if (activeSessions.get(uid) !== session) return;
+
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
       try {
+        const isFirstQr = (session.qrVersion || 0) === 0;
+        const qrTtlMs = isFirstQr ? 65000 : 25000;
+
         const qrDataUrl = await QRCode.toDataURL(qr, {
           margin: 4,
           width: 320,
@@ -472,17 +560,17 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
           color: { dark: '#000000', light: '#FFFFFF' },
         });
         session.qrCode = qrDataUrl;
-        session.qrExpiresAt = Date.now() + 25000; // 25s alinhado ao ciclo de rotação da Meta
+        session.qrExpiresAt = Date.now() + qrTtlMs;
         session.qrVersion = (session.qrVersion || 0) + 1;
         session.status = 'WAITING_QR';
 
         recordDiagnosticEvent(uid, session.qrVersion === 1 ? 'QR_RECEIVED' : 'QR_ROTATED', {
           version: session.qrVersion,
-          expiresInMs: 25000,
+          expiresInMs: qrTtlMs,
         });
 
         // Atualiza banco sem persistir imagem bruta
-        SalonWhatsAppRepository.updateQrCode(uid, null, 25);
+        SalonWhatsAppRepository.updateQrCode(uid, null, Math.round(qrTtlMs / 1000));
 
         SalonWhatsAppRepository.createLog(uid, {
           eventType: 'QR_GENERATED',
@@ -508,6 +596,7 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
             authorized: false,
             maskedPhone: phoneUtils.maskPhoneNumber(cleanPhone),
           });
+          try { await sock.logout(); } catch (_) {}
           try { sock.end(undefined); } catch (_) {}
           try {
             const sDir = getSalonSessionDir(uid);
@@ -547,6 +636,8 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
       session.connectedPhone = cleanPhone;
       session.lastConnectedAt = new Date().toISOString();
       session.lastError = null;
+      session.retryCount = 0;
+      session.reconnecting = false;
 
       // CORREÇÃO 5: Queima imediata de segredos efêmeros ao conectar
       session.qrCode = null;
@@ -571,7 +662,9 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
 
     if (connection === 'close') {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+      const isLoggedOut = statusCode === DisconnectReason.loggedOut || statusCode === 401;
+      const isBadSession = statusCode === DisconnectReason.badSession || statusCode === 500;
+      const isRestartRequired = statusCode === DisconnectReason.restartRequired || statusCode === 515;
 
       // Limpa segredos em memória e desvincula socket fechado
       session.qrCode = null;
@@ -582,21 +675,70 @@ function _attachSocketListeners(uid, sock, session, saveCreds) {
         statusCode: statusCode || null,
         reason: lastDisconnect?.error?.message ? String(lastDisconnect.error.message).slice(0, 100) : 'Closed',
         isLoggedOut,
+        isBadSession,
+        isRestartRequired,
       });
 
-      if (isLoggedOut) {
+      if (isLoggedOut || isBadSession) {
         await disconnect(uid);
-      } else {
+        return;
+      }
+
+      if (isRestartRequired) {
+        recordDiagnosticEvent(uid, 'RESTART_REQUIRED', { statusCode });
+        await _reconnectSalonSocket(uid, session, 500);
+        return;
+      }
+
+      // Falha transitória
+      const authAudit = inspectSalonAuthCredentials(uid);
+      const wasConnectedOrHasCreds = session.status === 'CONNECTED' || (authAudit.exists && authAudit.hasCreds && authAudit.credsValid);
+
+      if (wasConnectedOrHasCreds) {
+        session.retryCount = (session.retryCount || 0) + 1;
+        const maxRetries = 5;
+
+        if (session.retryCount <= maxRetries) {
+          session.reconnecting = true;
+          session.status = 'CONNECTION_LOST';
+          const backoffDelay = Math.min(24000, 1500 * Math.pow(2, session.retryCount - 1)); // 1.5s, 3s, 6s, 12s, 24s
+
+          recordDiagnosticEvent(uid, 'RECONNECT_ATTEMPT', {
+            attempt: session.retryCount,
+            maxRetries,
+            delayMs: backoffDelay,
+          });
+
+          await _reconnectSalonSocket(uid, session, backoffDelay);
+          return;
+        }
+
+        // Excedeu tentativas
+        session.reconnecting = false;
         session.status = 'CONNECTION_LOST';
-        session.lastError = lastDisconnect?.error?.message || 'Conexão temporariamente interrompida.';
+        session.lastError = 'Limite de tentativas de reconexão excedido.';
         SalonWhatsAppRepository.markSessionDisconnected(uid, {
           status: 'CONNECTION_LOST',
           error: session.lastError,
         });
-
         SalonWhatsAppRepository.createLog(uid, {
           eventType: 'DISCONNECTED',
           newStatus: 'CONNECTION_LOST',
+          reason: session.lastError,
+        });
+      } else {
+        // Estava em WAITING_QR ou sem credenciais salvas e fechou por timeout/interrupção
+        session.reconnecting = false;
+        session.status = 'QR_EXPIRED';
+        session.lastError = 'QR Code expirado ou conexão fechada antes da leitura.';
+        SalonWhatsAppRepository.markSessionDisconnected(uid, {
+          status: 'QR_EXPIRED',
+          error: session.lastError,
+        });
+
+        SalonWhatsAppRepository.createLog(uid, {
+          eventType: 'QR_EXPIRED',
+          newStatus: 'QR_EXPIRED',
           reason: session.lastError,
         });
       }
@@ -670,6 +812,7 @@ async function startQrSession(userId) {
         lastConnectedAt: null,
         lastError: null,
         pairingMethod: 'QR',
+        simulated: true,
       };
       activeSessions.set(uid, session);
 
@@ -685,40 +828,18 @@ async function startQrSession(userId) {
         reason: 'QR Code de homologação gerado com sucesso.',
       });
 
-      return { success: true, qrCode: simQrDataUrl, status: 'WAITING_QR' };
+      return { success: true, qrCode: simQrDataUrl, status: 'WAITING_QR', simulated: true };
     }
 
     // Modo Real Baileys: encerra socket prévio pendente
     if (session && session.sock) {
       try { session.sock.end(undefined); } catch (_) {}
+      session.sock = null;
     }
-
-    if (!fs.existsSync(sessionDir)) {
-      fs.mkdirSync(sessionDir, { recursive: true });
-    }
-
-    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-    const { version } = await fetchLatestBaileysVersion();
-
-    recordDiagnosticEvent(uid, 'SOCKET_INIT', {
-      method: 'QR',
-      browser: 'macOS Desktop (14.4.1)',
-      baileysVersion: Array.isArray(version) ? version.join('.') : '7.0.0-rc14',
-    });
-
-    const sock = makeWASocket({
-      version,
-      logger: pino({ level: 'silent' }),
-      auth: state,
-      browser: Browsers.macOS('Desktop'),
-      generateHighQualityLinkPreview: false,
-      printQRInTerminal: false,
-      syncFullHistory: false,
-    });
 
     session = {
       userId: uid,
-      sock,
+      sock: null,
       status: 'CONNECTING',
       qrCode: null,
       qrExpiresAt: null,
@@ -729,57 +850,55 @@ async function startQrSession(userId) {
       lastConnectedAt: null,
       lastError: null,
       pairingMethod: 'QR',
+      simulated: false,
     };
     activeSessions.set(uid, session);
 
-    _attachSocketListeners(uid, sock, session, saveCreds);
+    const { sock } = await _createBaileysSocket(uid, sessionDir, session);
 
     return new Promise((resolve) => {
       let resolved = false;
 
+      function cleanup() {
+        clearTimeout(initialTimeout);
+        if (sock?.ev?.off) {
+          sock.ev.off('connection.update', onInitUpdate);
+        }
+      }
+
       const initialTimeout = setTimeout(() => {
         if (!resolved) {
           resolved = true;
-          resolve({ success: true, qrCode: session.qrCode, status: session.status });
+          cleanup();
+          resolve({ success: true, qrCode: session.qrCode, status: session.status, simulated: false });
         }
       }, 25000);
 
-      sock.ev.on('connection.update', async (update) => {
+      function onInitUpdate(update) {
+        if (activeSessions.get(uid) !== session) {
+          cleanup();
+          return;
+        }
         const { connection, qr } = update;
         if (qr && !resolved) {
-          try {
-            if (!session.qrCode) {
-              const qrDataUrl = await QRCode.toDataURL(qr, {
-                margin: 4,
-                width: 320,
-                errorCorrectionLevel: 'M',
-                color: { dark: '#000000', light: '#FFFFFF' },
-              });
-              session.qrCode = qrDataUrl;
-              session.qrExpiresAt = Date.now() + 25000;
-              session.qrVersion = (session.qrVersion || 0) + 1;
-              session.status = 'WAITING_QR';
-            }
-          } catch (err) {
-            session.lastError = 'Falha ao codificar imagem do QR Code.';
-          }
-          if (!resolved) {
-            resolved = true;
-            clearTimeout(initialTimeout);
-            resolve({ success: true, qrCode: session.qrCode, status: 'WAITING_QR' });
-          }
+          resolved = true;
+          cleanup();
+          resolve({ success: true, qrCode: session.qrCode, status: session.status || 'WAITING_QR', simulated: false });
         }
         if (connection === 'open' && !resolved) {
           resolved = true;
-          clearTimeout(initialTimeout);
+          cleanup();
           resolve({
             success: true,
             status: 'CONNECTED',
             qrCode: null,
             connectedPhone: session.connectedPhone ? phoneUtils.maskPhoneNumber(session.connectedPhone) : null,
+            simulated: false,
           });
         }
-      });
+      }
+
+      sock.ev.on('connection.update', onInitUpdate);
     });
   })();
 
@@ -850,6 +969,7 @@ async function requestPairingCode(userId, rawPhone) {
         lastConnectedAt: null,
         lastError: null,
         pairingMethod: 'CODE',
+        simulated: true,
       };
       activeSessions.set(uid, session);
 
@@ -864,40 +984,19 @@ async function requestPairingCode(userId, rawPhone) {
         reason: 'Código de pareamento simulado gerado em ambiente de homologação.',
       });
 
-      return { success: true, pairingCode: simCode, expiresAt, status: 'WAITING_CODE' };
+      return { success: true, pairingCode: simCode, expiresAt, status: 'WAITING_CODE', simulated: true };
     }
 
     // Modo Real Baileys: encerra socket prévio se houver
     const prevSession = activeSessions.get(uid);
     if (prevSession && prevSession.sock) {
       try { prevSession.sock.end(undefined); } catch (_) {}
+      prevSession.sock = null;
     }
-
-    if (!fs.existsSync(sessionDir)) {
-      fs.mkdirSync(sessionDir, { recursive: true });
-    }
-
-    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-    const { version } = await fetchLatestBaileysVersion();
-
-    recordDiagnosticEvent(uid, 'SOCKET_INIT', {
-      method: 'CODE',
-      browser: 'macOS Desktop (14.4.1)',
-      baileysVersion: Array.isArray(version) ? version.join('.') : '7.0.0-rc14',
-    });
-
-    const sock = makeWASocket({
-      version,
-      logger: pino({ level: 'silent' }),
-      auth: state,
-      browser: Browsers.macOS('Desktop'),
-      printQRInTerminal: false,
-      syncFullHistory: false,
-    });
 
     const session = {
       userId: uid,
-      sock,
+      sock: null,
       status: 'WAITING_CODE',
       qrCode: null,
       qrExpiresAt: null,
@@ -907,10 +1006,11 @@ async function requestPairingCode(userId, rawPhone) {
       lastConnectedAt: null,
       lastError: null,
       pairingMethod: 'CODE',
+      simulated: false,
     };
     activeSessions.set(uid, session);
 
-    _attachSocketListeners(uid, sock, session, saveCreds);
+    const { sock } = await _createBaileysSocket(uid, sessionDir, session);
 
     // CORREÇÃO 4: Aguarda prontidão do socket antes de solicitar código de pareamento
     await waitForSocketReady(sock, 15000);
@@ -934,6 +1034,14 @@ async function requestPairingCode(userId, rawPhone) {
       pairingMethod: 'CODE',
       connectedPhone: formattedPhone,
     });
+
+    return {
+      success: true,
+      pairingCode: formattedCode,
+      expiresAt,
+      status: 'WAITING_CODE',
+      simulated: false,
+    };
 
     return { success: true, pairingCode: formattedCode, expiresAt, status: 'WAITING_CODE' };
   })();
@@ -1203,28 +1311,9 @@ async function restoreActiveSalonSessions() {
         continue;
       }
 
-      const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-      const { version } = await fetchLatestBaileysVersion();
-
-      recordDiagnosticEvent(uid, 'SOCKET_INIT', {
-        method: cand.pairing_method || 'QR',
-        browser: 'macOS Desktop (14.4.1)',
-        baileysVersion: Array.isArray(version) ? version.join('.') : '7.0.0-rc14',
-      });
-
-      const sock = makeWASocket({
-        version,
-        logger: pino({ level: 'silent' }),
-        auth: state,
-        browser: Browsers.macOS('Desktop'),
-        generateHighQualityLinkPreview: false,
-        printQRInTerminal: false,
-        syncFullHistory: false,
-      });
-
       const session = {
         userId: uid,
-        sock,
+        sock: null,
         status: 'CONNECTING',
         qrCode: null,
         qrExpiresAt: null,
@@ -1234,10 +1323,11 @@ async function restoreActiveSalonSessions() {
         lastConnectedAt: null,
         lastError: null,
         pairingMethod: cand.pairing_method || 'QR',
+        simulated: false,
       };
       activeSessions.set(uid, session);
 
-      _attachSocketListeners(uid, sock, session, saveCreds);
+      await _createBaileysSocket(uid, sessionDir, session);
       restored++;
     } catch (err) {
       console.error(`[salonSessionManager] Erro ao restaurar sessão #${uid}:`, err.message);
@@ -1257,21 +1347,37 @@ async function restoreActiveSalonSessions() {
  * @param {number} userId
  * @param {object} mockSock
  */
-function _setSocketForTesting(userId, mockSock) {
+function _setSocketForTesting(userId, mockSock, options = {}) {
   const uid = Number(userId);
-  activeSessions.set(uid, {
+  const session = {
     userId: uid,
     sock: mockSock,
-    status: mockSock.user ? 'CONNECTED' : 'WAITING_QR',
-    qrCode: null,
-    qrExpiresAt: null,
-    pairingCode: null,
-    pairingExpiresAt: null,
-    connectedPhone: mockSock.user ? phoneUtils.cleanDigits(mockSock.user.id.split('@')[0]) : null,
-    lastConnectedAt: mockSock.user ? new Date().toISOString() : null,
+    status: options.status || (mockSock?.user ? 'CONNECTED' : 'WAITING_QR'),
+    qrCode: options.qrCode || null,
+    qrExpiresAt: options.qrExpiresAt || null,
+    qrVersion: options.qrVersion || 0,
+    pairingCode: options.pairingCode || null,
+    pairingExpiresAt: options.pairingExpiresAt || null,
+    connectedPhone: mockSock?.user ? phoneUtils.cleanDigits(mockSock.user.id.split('@')[0].split(':')[0]) : (options.connectedPhone || null),
+    lastConnectedAt: mockSock?.user ? new Date().toISOString() : null,
     lastError: null,
-    pairingMethod: 'QR',
-  });
+    pairingMethod: options.pairingMethod || 'QR',
+    simulated: Boolean(options.simulated),
+    retryCount: options.retryCount || 0,
+  };
+  activeSessions.set(uid, session);
+  if (options.attachListeners && mockSock?.ev?.on) {
+    _attachSocketListeners(uid, mockSock, session, options.saveCreds || (() => {}));
+  }
+  return session;
+}
+
+/**
+ * Hook de inspeção de sessão em memória para testes herméticos
+ * @param {number} userId
+ */
+function _getActiveSessionForTesting(userId) {
+  return activeSessions.get(Number(userId));
 }
 
 /**
@@ -1303,7 +1409,10 @@ module.exports = {
   validateBrazilianPhoneForPairing,
   getSalonDiagnostics,
   inspectSalonAuthCredentials,
+  _attachSocketListeners,
+  _reconnectSalonSocket,
   _setSocketForTesting,
+  _getActiveSessionForTesting,
   _resetForTesting,
   _setBaseDirForTesting,
 };

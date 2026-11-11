@@ -169,6 +169,15 @@ config.validateEnvironment = function validateEnvironment({ throwOnError = false
       errors.push('CONFLITO CRÍTICO DE AMBIENTE: Endpoint de produção do Asaas (api.asaas.com) estritamente proibido em ambiente de homologação/staging. Configure ASAAS_API_URL=https://sandbox.asaas.com/api/v3.');
     }
 
+    if (process.env.ALLOW_SALON_WHATSAPP_TESTING === 'true') {
+      if (!config.sessionSecret || config.sessionSecret.length < 16) {
+        errors.push('SESSION_SECRET obrigatório e com no mínimo 16 caracteres quando ALLOW_SALON_WHATSAPP_TESTING=true em staging.');
+      }
+      if (!config.clientAuthSecret || config.clientAuthSecret.length < 16) {
+        errors.push('CLIENT_AUTH_SECRET obrigatório e com no mínimo 16 caracteres quando ALLOW_SALON_WHATSAPP_TESTING=true em staging.');
+      }
+    }
+
     if (process.env.STAGING_PROTECTION_ENABLED === 'true' || process.env.STAGING_AUTH_ENABLED === 'true') {
       if (!process.env.STAGING_PASSWORD || process.env.STAGING_PASSWORD.trim().length < 6) {
         errors.push('STAGING_PASSWORD ausente ou insuficiente com STAGING_PROTECTION_ENABLED ativado.');

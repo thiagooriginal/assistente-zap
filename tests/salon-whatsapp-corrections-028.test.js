@@ -452,9 +452,11 @@ test('COMANDO 028 — SUÍTE HERMÉTICA DE CORREÇÕES CRÍTICAS MULTI-TENANT', 
     const status102 = salonSessionManager.getSessionStatus(102);
 
     assert.strictEqual(status101.status, 'CONNECTED');
-    assert.strictEqual(status101.rawPhone, '5511911112222');
+    assert.strictEqual(status101.connectedPhone, phoneUtils.maskPhoneNumber('5511911112222'));
+    assert.strictEqual(status101.rawPhone, undefined);
     assert.strictEqual(status102.status, 'CONNECTED');
-    assert.strictEqual(status102.rawPhone, '5511933334444');
+    assert.strictEqual(status102.connectedPhone, phoneUtils.maskPhoneNumber('5511933334444'));
+    assert.strictEqual(status102.rawPhone, undefined);
 
     // Desconectar o salão 101 não deve afetar de forma alguma o salão 102
     await salonSessionManager.disconnect(101);
@@ -464,6 +466,7 @@ test('COMANDO 028 — SUÍTE HERMÉTICA DE CORREÇÕES CRÍTICAS MULTI-TENANT', 
 
     assert.strictEqual(postStatus101.status, 'DISCONNECTED');
     assert.strictEqual(postStatus102.status, 'CONNECTED');
-    assert.strictEqual(postStatus102.rawPhone, '5511933334444');
+    assert.strictEqual(postStatus102.connectedPhone, phoneUtils.maskPhoneNumber('5511933334444'));
+    assert.strictEqual(postStatus102.rawPhone, undefined);
   });
 });

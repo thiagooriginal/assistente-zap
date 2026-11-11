@@ -289,6 +289,19 @@ const whatsappPairingCodeLimiter = createRateLimiter({
   },
 });
 
+// Dedicated rate limiter for WhatsApp state actions (disconnect & cancel) (Comando 035 / F15)
+const whatsappActionLimiter = createRateLimiter({
+  name: 'whatsapp_action',
+  windowMs: 5 * 60 * 1000,
+  maxAttempts: 30,
+  message: 'Limite de ações do WhatsApp excedido. Aguarde alguns minutos para tentar novamente.',
+  keyGenerator: (req) => {
+    const ip = req.ip || req.socket?.remoteAddress || '127.0.0.1';
+    const tenantId = req.clientUser?.id ? `salon_${req.clientUser.id}` : 'anon';
+    return `${ip}:${tenantId}:whatsapp_action`;
+  },
+});
+
 // Alias for backwards compatibility
 const whatsappPairingLimiter = whatsappPairingCodeLimiter;
 
@@ -308,5 +321,6 @@ module.exports = {
   whatsappPairingLimiter,
   whatsappQrLimiter,
   whatsappPairingCodeLimiter,
+  whatsappActionLimiter,
   cspReportLimiter,
 };
