@@ -2558,11 +2558,19 @@
                   <li>Aguarde a confirmação na tela. A página atualizará automaticamente.</li>
                 </ol>
                 <div class="pt-2 flex items-center gap-3">
-                  <button type="button" onclick="refreshSalonQrCode()" class="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white font-medium text-xs border border-white/10 transition-all flex items-center gap-1.5">
+                  <button type="button" id="btnRefreshSalonQr" onclick="refreshSalonQrCode()" class="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white font-medium text-xs border border-white/10 transition-all flex items-center gap-1.5 disabled:opacity-50 disabled:pointer-events-none">
                     <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
                     <span>Atualizar QR Code</span>
                   </button>
                   <span class="text-[11px] text-slate-500">Expira e renova automaticamente.</span>
+                </div>
+                <!-- Alerta de Rate Limit QR Code com Contagem Regressiva -->
+                <div id="waQrRateLimitAlert" class="hidden p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
+                  <i data-lucide="clock" class="w-4 h-4 shrink-0 text-amber-400"></i>
+                  <div>
+                    <p class="font-bold text-amber-200">Limite temporário atingido</p>
+                    <p class="text-[11px] text-amber-300/80">Aguarde <strong id="waQrRateLimitCountdown" class="font-mono text-white font-bold">--:--</strong> para atualizar o QR Code.</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2585,14 +2593,22 @@
               <label for="waPairingPhoneInput" class="block text-xs font-bold text-white">Número do WhatsApp do salão com DDD:</label>
               <div class="flex gap-2">
                 <input type="tel" id="waPairingPhoneInput" placeholder="Ex: (11) 98765-4321"
-                  class="flex-1 px-4 py-2.5 rounded-xl bg-[#11131a] border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-[#C89B6D]">
+                  class="flex-1 px-4 py-2.5 rounded-xl bg-[#11131a] border border-white/10 text-white text-xs placeholder-slate-500 focus:outline-none focus:border-[#C89B6D] disabled:opacity-50">
                 <button type="button" id="btnGeneratePairingCode" onclick="submitSalonPairingCode()"
-                  class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#AD7B42] to-[#C89B6D] hover:opacity-95 text-white font-bold text-xs transition-all flex items-center gap-2 shrink-0">
+                  class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#AD7B42] to-[#C89B6D] hover:opacity-95 text-white font-bold text-xs transition-all flex items-center gap-2 shrink-0 disabled:opacity-50 disabled:pointer-events-none">
                   <span id="btnPairingSpinner" class="hidden w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                   <span id="btnPairingText">Gerar código</span>
                 </button>
               </div>
               <p class="text-[11px] text-slate-400">Insira os 11 dígitos com DDD. Não é necessário digitar o código do país (+55).</p>
+              <!-- Alerta de Rate Limit Código com Contagem Regressiva -->
+              <div id="waPairingRateLimitAlert" class="hidden p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
+                <i data-lucide="clock" class="w-4 h-4 shrink-0 text-amber-400"></i>
+                <div>
+                  <p class="font-bold text-amber-200">Limite temporário atingido</p>
+                  <p class="text-[11px] text-amber-300/80">Aguarde <strong id="waPairingRateLimitCountdown" class="font-mono text-white font-bold">--:--</strong> para gerar um novo código.</p>
+                </div>
+              </div>
             </div>
 
             <!-- Exibição do Código de 8 Dígitos Gerado -->
@@ -9178,6 +9194,8 @@
     let salonWaActiveMethod = null; // null | 'QR' | 'CODE'
     let salonWaPollTimer = null;
     let salonWaPairingCountdown = null;
+    let salonWaPairingRateLimitTimer = null;
+    let salonWaQrRateLimitTimer = null;
     let salonWaSessionSeq = 0; // Monotônico para invalidar respostas assíncronas obsoletas
     let isSalonWaSubmitting = false; // Mutex local de interface
 
@@ -9380,6 +9398,9 @@
       const pairingBox = document.getElementById('waPairingCodeBox');
       const spinner = document.getElementById('waQrCodeSpinner');
       const img = document.getElementById('salonQrCodeImg');
+      const refreshBtn = document.getElementById('btnRefreshSalonQr');
+
+      if (refreshBtn) refreshBtn.disabled = true;
 
       choiceBox?.classList.add('hidden');
       pairingBox?.classList.add('hidden');
@@ -9406,6 +9427,11 @@
           salonWaClientState = 'CONNECTED';
           showToast('WhatsApp já conectado!');
           loadSalonWhatsAppStatus();
+        } else if (data.code === 'RATE_LIMIT_EXCEEDED') {
+          salonWaClientState = 'RATE_LIMITED';
+          showToast(data.error || 'Limite de renovação de QR Code excedido.', 'error');
+          startQrRateLimitCountdown(data.retryAfter || 300);
+          return;
         } else {
           salonWaClientState = 'ERROR';
           showToast(data.error || 'Erro ao gerar QR Code.', 'error');
@@ -9419,6 +9445,9 @@
         cancelSalonConnectMode();
       } finally {
         isSalonWaSubmitting = false;
+        if (salonWaClientState !== 'RATE_LIMITED' && refreshBtn) {
+          refreshBtn.disabled = false;
+        }
       }
     }
 
@@ -9461,12 +9490,16 @@
         return;
       }
 
+      const btn = document.getElementById('btnGeneratePairingCode');
+      const btnSpinner = document.getElementById('btnPairingSpinner');
+      const btnText = document.getElementById('btnPairingText');
+
       const seq = ++salonWaSessionSeq;
       isSalonWaSubmitting = true;
       salonWaClientState = 'CODE_WAITING';
 
-      const btnSpinner = document.getElementById('btnPairingSpinner');
-      const btnText = document.getElementById('btnPairingText');
+      if (btn) btn.disabled = true;
+      if (input) input.disabled = true;
       btnSpinner?.classList.remove('hidden');
       if (btnText) btnText.innerText = 'Gerando...';
 
@@ -9498,6 +9531,11 @@
 
           startPairingCountdown(data.expiresAt || (Date.now() + 180000));
           scheduleSalonWaPoll();
+        } else if (data.code === 'RATE_LIMIT_EXCEEDED') {
+          salonWaClientState = 'RATE_LIMITED';
+          showToast(data.error || 'Limite de solicitações excedido.', 'error');
+          startPairingRateLimitCountdown(data.retryAfter || 300);
+          return;
         } else {
           salonWaClientState = 'CODE_SELECTED';
           showToast(data.error || 'Erro ao gerar código de pareamento.', 'error');
@@ -9510,7 +9548,76 @@
         showToast('Erro de conexão ao gerar código.', 'error');
       } finally {
         isSalonWaSubmitting = false;
+        if (salonWaClientState !== 'RATE_LIMITED') {
+          if (btn) btn.disabled = false;
+          if (input) input.disabled = false;
+        }
       }
+    }
+
+    function startPairingRateLimitCountdown(retryAfterSec) {
+      if (salonWaPairingRateLimitTimer) clearInterval(salonWaPairingRateLimitTimer);
+      const alertElem = document.getElementById('waPairingRateLimitAlert');
+      const timerElem = document.getElementById('waPairingRateLimitCountdown');
+      const btn = document.getElementById('btnGeneratePairingCode');
+      const input = document.getElementById('waPairingPhoneInput');
+
+      alertElem?.classList.remove('hidden');
+      if (btn) btn.disabled = true;
+      if (input) input.disabled = true;
+
+      let remaining = Math.max(1, retryAfterSec || 300);
+      const updateDisplay = () => {
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        if (timerElem) timerElem.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+      };
+      updateDisplay();
+
+      salonWaPairingRateLimitTimer = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(salonWaPairingRateLimitTimer);
+          salonWaPairingRateLimitTimer = null;
+          alertElem?.classList.add('hidden');
+          if (btn) btn.disabled = false;
+          if (input) input.disabled = false;
+          salonWaClientState = 'CODE_SELECTED';
+        } else {
+          updateDisplay();
+        }
+      }, 1000);
+    }
+
+    function startQrRateLimitCountdown(retryAfterSec) {
+      if (salonWaQrRateLimitTimer) clearInterval(salonWaQrRateLimitTimer);
+      const alertElem = document.getElementById('waQrRateLimitAlert');
+      const timerElem = document.getElementById('waQrRateLimitCountdown');
+      const refreshBtn = document.getElementById('btnRefreshSalonQr');
+
+      alertElem?.classList.remove('hidden');
+      if (refreshBtn) refreshBtn.disabled = true;
+
+      let remaining = Math.max(1, retryAfterSec || 300);
+      const updateDisplay = () => {
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        if (timerElem) timerElem.innerText = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+      };
+      updateDisplay();
+
+      salonWaQrRateLimitTimer = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(salonWaQrRateLimitTimer);
+          salonWaQrRateLimitTimer = null;
+          alertElem?.classList.add('hidden');
+          if (refreshBtn) refreshBtn.disabled = false;
+          salonWaClientState = 'QR_SELECTED';
+        } else {
+          updateDisplay();
+        }
+      }, 1000);
     }
 
     function startPairingCountdown(expiresAt) {
@@ -9553,6 +9660,26 @@
         clearInterval(salonWaPairingCountdown);
         salonWaPairingCountdown = null;
       }
+      if (salonWaPairingRateLimitTimer) {
+        clearInterval(salonWaPairingRateLimitTimer);
+        salonWaPairingRateLimitTimer = null;
+      }
+      if (salonWaQrRateLimitTimer) {
+        clearInterval(salonWaQrRateLimitTimer);
+        salonWaQrRateLimitTimer = null;
+      }
+
+      const pAlert = document.getElementById('waPairingRateLimitAlert');
+      const qrAlert = document.getElementById('waQrRateLimitAlert');
+      pAlert?.classList.add('hidden');
+      qrAlert?.classList.add('hidden');
+
+      const pBtn = document.getElementById('btnGeneratePairingCode');
+      const pInput = document.getElementById('waPairingPhoneInput');
+      const qrRefreshBtn = document.getElementById('btnRefreshSalonQr');
+      if (pBtn) pBtn.disabled = false;
+      if (pInput) pInput.disabled = false;
+      if (qrRefreshBtn) qrRefreshBtn.disabled = false;
 
       const choiceBox = document.getElementById('waConnectChoiceBox');
       const qrBox = document.getElementById('waQrCodeBox');

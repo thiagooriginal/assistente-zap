@@ -628,6 +628,23 @@ async function requestPairingCode(userId, rawPhone) {
   const uid = Number(userId);
   const formattedPhone = validateBrazilianPhoneForPairing(rawPhone);
 
+  // Idempotência: se já existe um código ativo e válido em memória para este tenant, reutiliza (Comando 033)
+  const existingSession = activeSessions.get(uid);
+  if (
+    existingSession &&
+    existingSession.status === 'WAITING_CODE' &&
+    existingSession.pairingCode &&
+    existingSession.pairingExpiresAt > Date.now() &&
+    (!existingSession.connectedPhone || existingSession.connectedPhone === formattedPhone)
+  ) {
+    return {
+      success: true,
+      pairingCode: existingSession.pairingCode,
+      expiresAt: existingSession.pairingExpiresAt,
+      status: 'WAITING_CODE',
+    };
+  }
+
   // Mutex unificado por tenant (CORREÇÃO 4)
   if (tenantLocks.has(uid)) {
     return tenantLocks.get(uid);

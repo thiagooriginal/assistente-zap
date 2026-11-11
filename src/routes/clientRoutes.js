@@ -21,6 +21,8 @@ const {
   passwordResetSubmitLimiter,
   whatsappTestLimiter,
   whatsappPairingLimiter,
+  whatsappQrLimiter,
+  whatsappPairingCodeLimiter,
 } = require('../middlewares/rateLimiter');
 const { AUDIT_EVENTS, logSecurityEvent } = require('../services/securityAuditService');
 
@@ -1697,8 +1699,8 @@ const postConnectQrHandler = async (req, res) => {
     });
   }
 };
-router.post('/whatsapp/connect-qr', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postConnectQrHandler);
-router.post('/integrations/whatsapp/connect-qr', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postConnectQrHandler);
+router.post('/whatsapp/connect-qr', clientAuthMiddleware, whatsappQrLimiter, requireProductAccess('JESSICA'), postConnectQrHandler);
+router.post('/integrations/whatsapp/connect-qr', clientAuthMiddleware, whatsappQrLimiter, requireProductAccess('JESSICA'), postConnectQrHandler);
 
 /**
  * POST /api/cliente/whatsapp/connect-code (e alias /integrations/whatsapp/connect-code e /integrations/whatsapp/pairing-code)
@@ -1733,9 +1735,9 @@ const postConnectCodeHandler = async (req, res) => {
     });
   }
 };
-router.post('/whatsapp/connect-code', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postConnectCodeHandler);
-router.post('/integrations/whatsapp/connect-code', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postConnectCodeHandler);
-router.post('/integrations/whatsapp/pairing-code', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postConnectCodeHandler);
+router.post('/whatsapp/connect-code', clientAuthMiddleware, whatsappPairingCodeLimiter, requireProductAccess('JESSICA'), postConnectCodeHandler);
+router.post('/integrations/whatsapp/connect-code', clientAuthMiddleware, whatsappPairingCodeLimiter, requireProductAccess('JESSICA'), postConnectCodeHandler);
+router.post('/integrations/whatsapp/pairing-code', clientAuthMiddleware, whatsappPairingCodeLimiter, requireProductAccess('JESSICA'), postConnectCodeHandler);
 
 /**
  * POST /api/cliente/whatsapp/disconnect (e alias /integrations/whatsapp/disconnect)
@@ -1758,7 +1760,8 @@ router.post('/integrations/whatsapp/disconnect', clientAuthMiddleware, requirePr
 
 /**
  * POST /api/cliente/whatsapp/cancel-pairing (e alias /integrations/whatsapp/cancel-pairing)
- * Cancela tentativa pendente de pareamento por QR Code ou Código, liberando o socket
+ * Cancela tentativa pendente de pareamento por QR Code ou Código, liberando o socket.
+ * Operação de limpeza sem retenção de rate limit (Comando 033).
  */
 const postCancelPairingHandler = async (req, res) => {
   try {
@@ -1772,8 +1775,8 @@ const postCancelPairingHandler = async (req, res) => {
     });
   }
 };
-router.post('/whatsapp/cancel-pairing', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postCancelPairingHandler);
-router.post('/integrations/whatsapp/cancel-pairing', clientAuthMiddleware, whatsappPairingLimiter, requireProductAccess('JESSICA'), postCancelPairingHandler);
+router.post('/whatsapp/cancel-pairing', clientAuthMiddleware, requireProductAccess('JESSICA'), postCancelPairingHandler);
+router.post('/integrations/whatsapp/cancel-pairing', clientAuthMiddleware, requireProductAccess('JESSICA'), postCancelPairingHandler);
 
 // =======================================================
 // DASHBOARD GERENCIAL & FINANCEIRO 2.0 (MÓDULO JÉSSICA)

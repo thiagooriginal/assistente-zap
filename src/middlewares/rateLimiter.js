@@ -264,18 +264,33 @@ const adminMfaLimiter = createRateLimiter({
   },
 });
 
-// Dedicated persistent rate limiter for WhatsApp multi-tenant pairing code & QR requests (Comando 027)
-const whatsappPairingLimiter = createRateLimiter({
-  name: 'whatsapp_pairing',
-  windowMs: 15 * 60 * 1000,
-  maxAttempts: 3,
-  message: 'Limite de solicitações de pareamento WhatsApp excedido. Aguarde 15 minutos para tentar novamente.',
+// Dedicated persistent rate limiter for WhatsApp multi-tenant pairing code & QR requests (Comando 027 & Comando 033)
+const whatsappQrLimiter = createRateLimiter({
+  name: 'whatsapp_qr',
+  windowMs: 5 * 60 * 1000,
+  maxAttempts: 10,
+  message: 'Limite de solicitações de QR Code excedido. Aguarde alguns minutos para tentar novamente.',
   keyGenerator: (req) => {
     const ip = req.ip || req.socket?.remoteAddress || '127.0.0.1';
     const tenantId = req.clientUser?.id ? `salon_${req.clientUser.id}` : 'anon';
-    return `${ip}:${tenantId}:whatsapp_pairing`;
+    return `${ip}:${tenantId}:whatsapp_qr`;
   },
 });
+
+const whatsappPairingCodeLimiter = createRateLimiter({
+  name: 'whatsapp_code',
+  windowMs: 5 * 60 * 1000,
+  maxAttempts: 5,
+  message: 'Limite de solicitações de código de pareamento excedido. Aguarde alguns minutos para tentar novamente.',
+  keyGenerator: (req) => {
+    const ip = req.ip || req.socket?.remoteAddress || '127.0.0.1';
+    const tenantId = req.clientUser?.id ? `salon_${req.clientUser.id}` : 'anon';
+    return `${ip}:${tenantId}:whatsapp_code`;
+  },
+});
+
+// Alias for backwards compatibility
+const whatsappPairingLimiter = whatsappPairingCodeLimiter;
 
 module.exports = {
   createRateLimiter,
@@ -291,5 +306,7 @@ module.exports = {
   adminActionLimiter,
   whatsappTestLimiter,
   whatsappPairingLimiter,
+  whatsappQrLimiter,
+  whatsappPairingCodeLimiter,
   cspReportLimiter,
 };
