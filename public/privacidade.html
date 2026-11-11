@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Política de Privacidade • RAIA</title>
+  <title>Política de Privacidade • RAIA AGENTES</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,6 +11,7 @@
   <style>
     body { background-color: #040711; color: #ffffff; font-family: 'Plus Jakarta Sans', sans-serif; }
     .glass-nav { background: rgba(4, 7, 17, 0.9); backdrop-filter: blur(20px); border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+    .glass-card { background: rgba(10, 16, 31, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
   </style>
 </head>
 <body class="min-h-screen bg-[#040711] text-white selection:bg-[#00F59B] selection:text-black">
@@ -18,30 +19,255 @@
     <div class="max-w-5xl mx-auto px-4 h-20 flex items-center justify-between">
       <a href="/" class="flex items-center gap-2">
         <img src="/raia-emblem-small.png" alt="RAIA" class="w-8 h-8 object-contain">
-        <span class="text-lg font-black text-white">RAIA</span>
+        <span class="text-lg font-black text-white tracking-wider">RAIA<span class="text-[#00F59B]">.</span></span>
       </a>
-      <a href="/" class="text-xs text-zinc-400 hover:text-white">Voltar ao Início</a>
+      <div class="flex items-center gap-4">
+        <span class="hidden sm:inline-block text-[11px] font-mono text-[#00F59B] bg-[#00F59B]/10 px-2.5 py-1 rounded-full border border-[#00F59B]/20">LGPD & Google API Compliant</span>
+        <a href="/" class="text-xs font-medium text-zinc-400 hover:text-white transition-colors">← Voltar ao Início</a>
+      </div>
     </div>
   </header>
 
-  <main class="pt-32 pb-20 max-w-3xl mx-auto px-4 sm:px-6 space-y-6 text-xs sm:text-sm text-zinc-300 leading-relaxed">
-    <h1 class="text-2xl sm:text-3xl font-black text-white">Política de Privacidade</h1>
-    <p class="text-zinc-500 text-xs">Conformidade com a LGPD (Lei nº 13.709/2018)</p>
+  <main class="pt-32 pb-24 max-w-4xl mx-auto px-4 sm:px-6 space-y-10 text-xs sm:text-sm text-zinc-300 leading-relaxed">
+    <div class="space-y-3 border-b border-white/10 pb-8">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-zinc-400">
+        <span class="w-2 h-2 rounded-full bg-[#00F59B]"></span>
+        <span>Versão 2.4 • Atualizada em Novembro de 2026</span>
+      </div>
+      <h1 class="text-3xl sm:text-4xl font-black text-white tracking-tight">Política de Privacidade e Governança de Dados</h1>
+      <p class="text-zinc-400 text-sm max-w-2xl">
+        Compromisso formal com a privacidade, conformidade com a Lei Geral de Proteção de Dados (LGPD, Lei nº 13.709/2018) e estrita observância à Política de Dados do Usuário dos Serviços de API do Google.
+      </p>
+    </div>
 
-    <h2 class="text-base font-bold text-white pt-4">1. Coleta de Dados Pessoais</h2>
-    <p>A RAIA coleta estritamente os dados necessários para o funcionamento do atendimento: nome do contato, número de telefone para contato via WhatsApp e informações fornecidas voluntariamente na troca de mensagens para agendamento ou orçamentos.</p>
+    <!-- 1. IDENTIFICAÇÃO DO CONTROLADOR -->
+    <section class="glass-card rounded-2xl p-6 sm:p-8 space-y-4">
+      <h2 class="text-lg font-bold text-white flex items-center gap-2">
+        <span class="text-[#00F59B] font-mono">01.</span> Identificação do Controlador e Encarregado (DPO)
+      </h2>
+      <p>
+        A plataforma <strong>RAIA AGENTES</strong> ("RAIA", "nós"), operada pela RAIA TECNOLOGIA LTDA, atua como Controladora dos dados pessoais de seus clientes assinantes (estabelecimentos como salões de beleza, clínicas e barbearias) e como Operadora dos dados pessoais dos consumidores finais agendados via canal conversacional do WhatsApp em nome do estabelecimento contratante.
+      </p>
+      <div class="p-4 rounded-xl bg-white/5 border border-white/10 text-xs text-zinc-400 space-y-1">
+        <p><strong class="text-white">Canal Oficial de Privacidade e DPO:</strong> dpo@raia.app / privacidade@raia.app</p>
+        <p><strong class="text-white">Sede Operacional:</strong> São Paulo - SP, Brasil</p>
+      </div>
+    </section>
 
-    <h2 class="text-base font-bold text-white pt-4">2. Finalidade do Tratamento</h2>
-    <p>Os dados processados são utilizados exclusivamente para: (a) viabilizar a resposta automática e organização de solicitações; (b) permitir o acompanhamento pelo contratante em seu painel de gestão; (c) aprimoramento da qualidade do vocabulário do assistente.</p>
+    <!-- 2. DADOS TRATADOS -->
+    <section class="glass-card rounded-2xl p-6 sm:p-8 space-y-4">
+      <h2 class="text-lg font-bold text-white flex items-center gap-2">
+        <span class="text-[#00F59B] font-mono">02.</span> Dados Pessoais Tratados e Origem
+      </h2>
+      <p>Coletamos estritamente os dados necessários para viabilizar as rotinas de agendamento e atendimento inteligente:</p>
+      <ul class="list-disc pl-5 space-y-2 text-zinc-300">
+        <li><strong>Dados Cadastrais do Contratante:</strong> Razão social, nome fantasia, nome do responsável, e-mail corporativo, número de telefone para gestão e dados de faturamento do plano contratado.</li>
+        <li><strong>Dados de Atendimento e Agendamento:</strong> Nome, número de telefone WhatsApp, serviço solicitado, profissional selecionado, data e horário do agendamento informados voluntariamente na conversa.</li>
+        <li><strong>Dados de Integração Google Calendar (quando conectado voluntariamente pelo salão):</strong> Endereço de e-mail da conta Google conectada, identificador e nome da agenda selecionada, horários de ocupação (Free/Busy) e metadados de eventos criados pela RAIA para prevenção de conflitos de agenda.</li>
+      </ul>
+    </section>
 
-    <h2 class="text-base font-bold text-white pt-4">3. Não Compartilhamento</h2>
-    <p>A RAIA não comercializa, não aluga e não repassa bancos de dados ou números de telefone de clientes para terceiros para fins de publicidade não solicitada.</p>
+    <!-- 3. FINALIDADE E BASES LEGAIS -->
+    <section class="glass-card rounded-2xl p-6 sm:p-8 space-y-4">
+      <h2 class="text-lg font-bold text-white flex items-center gap-2">
+        <span class="text-[#00F59B] font-mono">03.</span> Finalidade do Tratamento e Bases Legais (LGPD Art. 7º)
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+        <div class="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider text-[#00F59B]">Execução de Contrato (Art. 7º, V)</h3>
+          <p class="text-xs text-zinc-400">Atendimento automático via WhatsApp, registro e remarcação de horários, confirmação de presença e gestão operacional da agenda do salão.</p>
+        </div>
+        <div class="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider text-[#00F59B]">Consentimento Específico (Art. 7º, I)</h3>
+          <p class="text-xs text-zinc-400">Integração voluntária da conta Google Calendar com concessão explícita de escopos OAuth 2.0 pelo contratante em tela oficial do Google.</p>
+        </div>
+        <div class="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider text-[#00F59B]">Obrigação Legal (Art. 7º, II)</h3>
+          <p class="text-xs text-zinc-400">Guarda de registros de conexão a aplicações de internet por 6 meses nos termos do Art. 15 da Lei nº 12.965/2014 (Marco Civil da Internet).</p>
+        </div>
+        <div class="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
+          <h3 class="font-bold text-white text-xs uppercase tracking-wider text-[#00F59B]">Legítimo Interesse (Art. 7º, IX)</h3>
+          <p class="text-xs text-zinc-400">Prevenção a fraudes, monitoramento de integridade e proteção cibernética da infraestrutura do sistema.</p>
+        </div>
+      </div>
+    </section>
 
-    <h2 class="text-base font-bold text-white pt-4">4. Segurança da Informação</h2>
-    <p>Adotamos medidas técnicas de segurança para proteção contra acesso não autorizado aos bancos de dados e registros de conversas.</p>
+    <!-- 4. GOOGLE CALENDAR E LIMITED USE (OWASP & GOOGLE COMPLIANCE) -->
+    <section class="glass-card rounded-2xl p-6 sm:p-8 space-y-4 border-[#00F59B]/30 bg-[#00F59B]/[0.02]">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-mono font-bold text-black bg-[#00F59B] px-2 py-0.5 rounded">MANDATÓRIO</span>
+        <h2 class="text-lg font-bold text-white">04. Conformidade Estrita com Google API Services (Limited Use)</h2>
+      </div>
+      <p class="text-zinc-300">
+        O uso e a transferência de informações recebidas de APIs do Google pela RAIA para qualquer outro aplicativo obedecerão estritamente à 
+        <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" class="text-[#00F59B] underline hover:text-white">Política de Dados do Usuário dos Serviços de API do Google</a>, incluindo os requisitos de <strong>Uso Limitado (Limited Use Requirements)</strong>:
+      </p>
+      <div class="space-y-3 pt-2 text-xs">
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-3">
+          <span class="text-[#00F59B] font-bold">✓</span>
+          <p><strong class="text-white">Finalidade Estrita de Agendamento:</strong> Os dados do Google Calendar são lidos exclusivamente para verificar horários ocupados (Free/Busy) e gravar, atualizar ou cancelar eventos diretamente decorrentes de agendamentos solicitados pelo consumidor.</p>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-3">
+          <span class="text-[#00F59B] font-bold">✓</span>
+          <p><strong class="text-white">Proibição de Venda e Compartilhamento:</strong> A RAIA JAMAIS comercializa, cede, aluga ou compartilha dados obtidos via Google Calendar com terceiros, sob qualquer pretexto comercial ou publicitário.</p>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-3">
+          <span class="text-[#00F59B] font-bold">✓</span>
+          <p><strong class="text-white">Vedação a Publicidade e Anúncios:</strong> Dados obtidos pelo Google Calendar NÃO são utilizados para veiculação de anúncios, criação de perfis de marketing ou retargeting.</p>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-3">
+          <span class="text-[#00F59B] font-bold">✓</span>
+          <p><strong class="text-white">Vedação a Treinamento de Modelos de IA:</strong> Os dados acessados via Google Calendar API NÃO são utilizados para treinar, retreinar ou calibrar modelos generativos de Inteligência Artificial ou modelos de Aprendizado de Máquina (Machine Learning).</p>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-3">
+          <span class="text-[#00F59B] font-bold">✓</span>
+          <p><strong class="text-white">Acesso Humano Restrito:</strong> Nenhum colaborador da RAIA possui acesso visual ordinário aos eventos do Google Calendar do salão, ressalvadas hipóteses excepcionais com autorização explícita do titular para suporte técnico pontual, auditoria de segurança ou ordem judicial expressa.</p>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-3">
+          <span class="text-[#00F59B] font-bold">✓</span>
+          <p><strong class="text-white">Desconexão e Revogação Imediata:</strong> O contratante pode desconectar sua conta Google a qualquer momento no painel. O sistema executa a chamada de revogação OAuth oficial perante a API do Google e elimina imediatamente todos os tokens em repouso dos bancos de dados operacionais.</p>
+        </div>
+      </div>
+    </section>
 
-    <h2 class="text-base font-bold text-white pt-4">5. Direitos do Titular</h2>
-    <p>O titular dos dados pode solicitar a qualquer momento a confirmação, correção ou exclusão de seus dados pessoais entrando em contato pelos canais oficiais de suporte da RAIA.</p>
+    <!-- 5. PRESTADORES DE SERVIÇOS TERCEIRIZADOS -->
+    <section class="glass-card rounded-2xl p-6 sm:p-8 space-y-4">
+      <h2 class="text-lg font-bold text-white flex items-center gap-2">
+        <span class="text-[#00F59B] font-mono">05.</span> Categorias de Prestadores de Serviços Utilizados
+      </h2>
+      <p>Para prover a solução tecnológica com estabilidade e disponibilidade, a RAIA contrata parceiros de infraestrutura qualificados, divididos estritamente nas seguintes categorias:</p>
+      <div class="space-y-3 pt-2 text-xs">
+        <div class="p-4 rounded-xl bg-white/5 border border-white/10 space-y-1">
+          <div class="flex items-center justify-between">
+            <strong class="text-white text-sm">Hospedagem e Infraestrutura de Nuvem</strong>
+            <span class="text-[10px] font-mono text-zinc-400 bg-white/10 px-2 py-0.5 rounded">Infraestrutura</span>
+          </div>
+          <p class="text-zinc-400">Provedores de servidores em nuvem para hospedagem das rotinas de backend Express, persistência de banco de dados SQLite isolado por tenant e geração cíclica de cópias de segurança (backups).</p>
+        </div>
+        <div class="p-4 rounded-xl bg-white/5 border border-white/10 space-y-1">
+          <div class="flex items-center justify-between">
+            <strong class="text-white text-sm">Inteligência Artificial Conversacional (Google Gemini API)</strong>
+            <span class="text-[10px] font-mono text-zinc-400 bg-white/10 px-2 py-0.5 rounded">Processamento de IA</span>
+          </div>
+          <p class="text-zinc-400">Processamento em tempo real do texto das mensagens do WhatsApp para interpretação de intenções e formulação de respostas naturais. As requisições de API são processadas sem retenção para treinamento de modelos generativos gerais do provedor de IA.</p>
+        </div>
+        <div class="p-4 rounded-xl bg-white/5 border border-white/10 space-y-1">
+          <div class="flex items-center justify-between">
+            <strong class="text-white text-sm">Conectividade de Mensageria WhatsApp (Meta Business / Gateways)</strong>
+            <span class="text-[10px] font-mono text-zinc-400 bg-white/10 px-2 py-0.5 rounded">Comunicação</span>
+          </div>
+          <p class="text-zinc-400">Protocolos e gateways de conexão WhatsApp para envio e recebimento de mensagens e confirmações de presença entre o salão e os clientes.</p>
+        </div>
+        <div class="p-4 rounded-xl bg-white/5 border border-white/10 space-y-1">
+          <div class="flex items-center justify-between">
+            <strong class="text-white text-sm">Processamento de Faturamento e Assinaturas (Asaas e Hotmart)</strong>
+            <span class="text-[10px] font-mono text-zinc-400 bg-white/10 px-2 py-0.5 rounded">Financeiro</span>
+          </div>
+          <p class="text-zinc-400">Intermediação de cobrança de assinaturas da plataforma RAIA via cartão de crédito, PIX e boletos bancários, com controle de status financeiro.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. SEGURANÇA E CRIPTOGRAFIA -->
+    <section class="glass-card rounded-2xl p-6 sm:p-8 space-y-4">
+      <h2 class="text-lg font-bold text-white flex items-center gap-2">
+        <span class="text-[#00F59B] font-mono">06.</span> Segurança da Informação e Salvaguardas Técnicas
+      </h2>
+      <p>Em conformidade com a Matriz de Segurança RAIA-27 e padrões OWASP ASVS 5.0, adotamos controles proporcionais aos riscos:</p>
+      <ul class="list-disc pl-5 space-y-2 text-zinc-300 text-xs">
+        <li><strong>Criptografia em Repouso (AES-256-GCM):</strong> Tokens de integração OAuth (access tokens e refresh tokens) e segredos de autenticação TOTP são criptografados em repouso com algoritmo autenticado AES-256-GCM antes de sua persistência em disco.</li>
+        <li><strong>Criptografia em Trânsito (TLS 1.3 / HTTPS):</strong> Todas as comunicações entre o navegador do usuário, as APIs parceiras e os servidores trafegam com cifras modernas sobre TLS/HTTPS.</li>
+        <li><strong>Isolamento Multi-Tenant Lógico:</strong> O banco de dados SQLite e as consultas de negócio operam estritamente segregadas por identificador do cliente (`user_id`), impedindo acesso cruzado a informações entre diferentes salões.</li>
+        <li><strong>Autenticação Multifator (MFA/TOTP):</strong> Suporte a autenticação em duas etapas via TOTP (RFC 6238) para contas administrativas, além de proteção contra ataques CSRF e validação de Host Header.</li>
+      </ul>
+    </section>
+
+    <!-- 7. RETENÇÃO E EXCLUSÃO (REALIDADE TÉCNICA) -->
+    <section class="glass-card rounded-2xl p-6 sm:p-8 space-y-4">
+      <h2 class="text-lg font-bold text-white flex items-center gap-2">
+        <span class="text-[#00F59B] font-mono">07.</span> Retenção, Ciclo de Vida e Rotinas de Expurgo
+      </h2>
+      <p>
+        A RAIA descreve suas práticas de retenção de dados com base na realidade técnica e operacional de seus sistemas:
+      </p>
+      <div class="space-y-3 pt-2 text-xs">
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+          <strong class="text-white block mb-1">Desconexão de Integrações (Google Calendar):</strong>
+          <p class="text-zinc-400">Ao desconectar, os tokens criptografados armazenados são imediatamente eliminados dos bancos operacionais (`encrypted_tokens = NULL`) e a autorização remota é revogada perante a API do Google. Sincronizações pendentes na fila outbox são canceladas no mesmo momento.</p>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+          <strong class="text-white block mb-1">Encerramento de Contrato e Expurgo Cadastral:</strong>
+          <p class="text-zinc-400">O encerramento do contrato e o expurgo dos dados cadastrais e histórico de agendamentos são processados mediante solicitação de descadastro/exclusão pelo titular nos canais de atendimento, ressalvadas as hipóteses de guarda obrigatória por lei para defesa em processos e obrigações fiscais.</p>
+        </div>
+        <div class="p-3.5 rounded-xl bg-white/5 border border-white/10">
+          <strong class="text-white block mb-1">Backups e Registros Legais de Conexão:</strong>
+          <p class="text-zinc-400">Em observância ao Art. 15 da Lei nº 12.965/2014 (Marco Civil da Internet), registros de conexão são conservados sob sigilo pelo período legal obrigatório de 6 (seis) meses. Cópias de segurança periódicas (backups) são mantidas em ambiente protegido e são substituídas ciclicamente de acordo com as rotinas técnicas do provedor de infraestrutura.</p>
+        </div>
+      </div>
+      <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200/80">
+        <strong>Nota de Transparência Operacional:</strong> A eliminação de dados pessoais em bancos de dados operacionais não implica na destruição instantânea e retroativa de mídias de backup passivo imutáveis já geradas, as quais são sobrescritas progressivamente ao final do seu ciclo regular de rotação.
+      </div>
+    </section>
+
+    <!-- 8. DIREITOS DO TITULAR (LGPD) -->
+    <section class="glass-card rounded-2xl p-6 sm:p-8 space-y-4">
+      <h2 class="text-lg font-bold text-white flex items-center gap-2">
+        <span class="text-[#00F59B] font-mono">08.</span> Direitos dos Titulares de Dados (LGPD Art. 18)
+      </h2>
+      <p>Nos termos do artigo 18 da LGPD, os titulares podem exercer a qualquer momento seus direitos fundamentais:</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
+        <div class="p-3 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2">
+          <span class="text-[#00F59B]">•</span> Confirmação da existência de tratamento
+        </div>
+        <div class="p-3 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2">
+          <span class="text-[#00F59B]">•</span> Acesso facilitado aos dados tratados
+        </div>
+        <div class="p-3 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2">
+          <span class="text-[#00F59B]">•</span> Correção de dados incompletos ou inexatos
+        </div>
+        <div class="p-3 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2">
+          <span class="text-[#00F59B]">•</span> Anonimização, bloqueio ou eliminação
+        </div>
+        <div class="p-3 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2">
+          <span class="text-[#00F59B]">•</span> Portabilidade dos dados cadastrais
+        </div>
+        <div class="p-3 rounded-lg bg-white/5 border border-white/10 flex items-center gap-2">
+          <span class="text-[#00F59B]">•</span> Revogação do consentimento concedido
+        </div>
+      </div>
+      <p class="pt-2 text-xs text-zinc-400">
+        Para exercer qualquer um destes direitos ou tratar de assuntos de privacidade, envie mensagem para <a href="mailto:privacidade@raia.app" class="text-[#00F59B] underline hover:text-white">privacidade@raia.app</a>.
+      </p>
+    </section>
+
+    <!-- 9. DISPOSIÇÕES FINAIS -->
+    <section class="glass-card rounded-2xl p-6 sm:p-8 space-y-4">
+      <h2 class="text-lg font-bold text-white flex items-center gap-2">
+        <span class="text-[#00F59B] font-mono">09.</span> Disposições Gerais e Contato
+      </h2>
+      <p>
+        Esta Política de Privacidade poderá ser revisada periodicamente para refletir aprimoramentos técnicos e ajustes legislativos. Atualizações relevantes serão comunicadas aos estabelecimentos parceiros nos canais cadastrados.
+      </p>
+      <div class="pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between text-[11px] text-zinc-500 gap-2">
+        <span>RAIA TECNOLOGIA LTDA • São Paulo - SP</span>
+        <span>Branch: security/raia-27-protecoes • Edição 2026.2</span>
+      </div>
+    </section>
   </main>
+
+  <footer class="border-t border-white/10 py-8 bg-[#040711] text-center text-xs text-zinc-500">
+    <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2">
+        <img src="/raia-emblem-small.png" alt="RAIA" class="w-5 h-5 object-contain opacity-60">
+        <span class="font-bold text-zinc-400">RAIA AGENTES</span>
+      </div>
+      <div class="flex items-center gap-6">
+        <a href="/termos.html" class="hover:text-zinc-300 transition-colors">Termos de Uso</a>
+        <a href="/privacidade.html" class="text-[#00F59B]">Privacidade</a>
+        <a href="mailto:contato@raia.app" class="hover:text-zinc-300 transition-colors">Contato</a>
+      </div>
+      <div>© 2026 RAIA. Todos os direitos reservados.</div>
+    </div>
+  </footer>
 </body>
 </html>

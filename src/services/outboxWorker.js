@@ -80,6 +80,8 @@ async function processGoogleSyncOutbox(filterUserId = null) {
 
     if (lock.changes === 0) continue;
 
+    let initialConnectedAt = null;
+
     try {
       const apt = db.prepare('SELECT * FROM appointments WHERE id = ?').get(item.appointment_id);
       if (!apt) {
@@ -92,17 +94,34 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         continue;
       }
 
-      const status = googleCalendarService.getConnectionStatus(item.user_id);
-      if (!status.isConnected) {
-        // Se a conta não está conectada, registra que está aguardando conexão
+      // 1.5. Pre-Flight Revalidation: revalida se a conta permanece conectada antes de qualquer operação externa
+      const tokenRow = db.prepare(`
+        SELECT encrypted_tokens, is_connected, connected_at, initial_connection_at, sync_existing_authorized, account_email
+        FROM google_calendar_tokens
+        WHERE user_id = ?
+      `).get(item.user_id);
+
+      if (!tokenRow || tokenRow.is_connected !== 1 || !tokenRow.encrypted_tokens) {
         db.prepare(`
           UPDATE google_sync_outbox
-          SET status = 'PENDING', last_error = 'Google Calendar não conectado no momento',
-              next_retry_at = datetime('now', '+15 minutes'), locked_at = NULL
+          SET status = 'CANCELLED',
+              last_error = 'CANCELLED_DISCONNECTED: Conta Google Calendar desconectada pelo usuário',
+              processed_at = CURRENT_TIMESTAMP,
+              locked_at = NULL
           WHERE id = ?
         `).run(item.id);
+
+        db.prepare(`
+          UPDATE appointments
+          SET google_sync_status = 'NOT_SYNCED',
+              google_sync_error = 'Conta Google Calendar desconectada pelo usuário',
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND google_sync_status IN ('PENDING', 'PROCESSING')
+        `).run(item.appointment_id);
         continue;
       }
+
+      initialConnectedAt = tokenRow.connected_at;
 
       // 2. Proteção contra sincronização de dados fictícios em contas de demonstração (is_demo) - Requisito 8
       const userRow = db.prepare('SELECT is_demo FROM users WHERE id = ?').get(item.user_id);
@@ -162,12 +181,6 @@ async function processGoogleSyncOutbox(filterUserId = null) {
 
       // 4b. Prevenção de sincronização de agendamentos preexistentes à primeira conexão sem autorização explícita (Requisitos 2 e 5)
       // Cobre CREATE, UPDATE e DELETE para garantir que nenhum agendamento fictício anterior seja enviado
-      const tokenRow = db.prepare(`
-        SELECT initial_connection_at, sync_existing_authorized 
-        FROM google_calendar_tokens 
-        WHERE user_id = ?
-      `).get(item.user_id);
-
       if (tokenRow && tokenRow.initial_connection_at && !tokenRow.sync_existing_authorized && !hasRealGoogleEvent) {
         const aptCreatedMs = new Date(apt.created_at).getTime();
         const initialConnMs = new Date(tokenRow.initial_connection_at).getTime();
@@ -191,7 +204,7 @@ async function processGoogleSyncOutbox(filterUserId = null) {
       }
 
       // 4c. Proteção de Homologação/Staging: bloquear chamadas externas não autorizadas (Requisito 7)
-      const isLiveAllowed = googleCalendarService.isLiveGoogleSyncAllowed(status.accountEmail);
+      const isLiveAllowed = googleCalendarService.isLiveGoogleSyncAllowed(tokenRow.account_email);
       if (!isLiveAllowed) {
         const simId = 'sim_gcal_' + crypto.createHash('sha256').update(`sim_${item.user_id}_${apt.id}`).digest('hex').substring(0, 24);
         db.prepare(`
@@ -242,7 +255,48 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         }
       }
 
-      // 3. Sucesso na execução (distingue SIMULATED de SYNCED - Requisito 8)
+      // 6. Post-Flight State Revalidation: revalidar estado do banco após chamada remota assíncrona
+      const postTokenRow = db.prepare(`
+        SELECT is_connected, connected_at, encrypted_tokens
+        FROM google_calendar_tokens
+        WHERE user_id = ?
+      `).get(item.user_id);
+
+      // Se a conta foi desconectada durante a requisição: marcar CANCELLED e NÃO marcar como SYNCED
+      if (!postTokenRow || postTokenRow.is_connected !== 1 || !postTokenRow.encrypted_tokens) {
+        db.prepare(`
+          UPDATE google_sync_outbox
+          SET status = 'CANCELLED',
+              processed_at = CURRENT_TIMESTAMP,
+              last_error = 'CANCELLED_DISCONNECTED: Operação remota executada, mas conta desconectada antes da confirmação local',
+              locked_at = NULL
+          WHERE id = ?
+        `).run(item.id);
+
+        db.prepare(`
+          UPDATE appointments
+          SET google_sync_status = 'NOT_SYNCED',
+              google_sync_error = 'Conta Google Calendar desconectada pelo usuário',
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND google_sync_status != 'CANCELLED'
+        `).run(item.appointment_id);
+        continue;
+      }
+
+      // Se a conta foi substituída por reconexão concorrente: marcar CANCELLED_SUPERSEDED
+      if (postTokenRow.connected_at !== initialConnectedAt) {
+        db.prepare(`
+          UPDATE google_sync_outbox
+          SET status = 'CANCELLED',
+              processed_at = CURRENT_TIMESTAMP,
+              last_error = 'CANCELLED_SUPERSEDED: Operação remota executada sob conexão anterior substituída',
+              locked_at = NULL
+          WHERE id = ?
+        `).run(item.id);
+        continue;
+      }
+
+      // 7. Sucesso na execução (distingue SIMULATED de SYNCED - Requisito 8)
       const isSimulated = Boolean(result?.isSimulated);
       const outboxStatus = isSimulated ? 'SIMULATED' : 'SENT';
       const outboxError = isSimulated ? 'Ambiente de Homologação: Sincronização segura simulada' : null;
@@ -268,28 +322,54 @@ async function processGoogleSyncOutbox(filterUserId = null) {
       if (isRevoked) {
         db.prepare(`
           UPDATE google_calendar_tokens
-          SET is_connected = 0, last_error = 'Token revogado ou expirado no Google. Reconecte sua conta.', updated_at = CURRENT_TIMESTAMP
-          WHERE user_id = ?
-        `).run(item.user_id);
+          SET encrypted_tokens = NULL,
+              is_connected = 0,
+              last_error = 'Token revogado ou expirado no Google. Reconecte sua conta.',
+              updated_at = CURRENT_TIMESTAMP
+          WHERE user_id = ? AND (connected_at = ? OR connected_at IS NULL)
+        `).run(item.user_id, initialConnectedAt || null);
       }
 
-      const newAttempts = (item.attempts || 0) + 1;
-      const maxAttempts = item.max_attempts || 5;
-      const isFinal = newAttempts >= maxAttempts || isRevoked;
-      const backoffMin = Math.min(Math.pow(2, newAttempts), 60);
-      const nextRetry = isRevoked ? null : new Date(Date.now() + backoffMin * 60000).toISOString();
+      // Se a conta já estiver desconectada ou token revogado, cancela a tarefa em vez de agendar retentativa
+      const postCatchToken = db.prepare('SELECT is_connected FROM google_calendar_tokens WHERE user_id = ?').get(item.user_id);
+      const isDisconnectedNow = !postCatchToken || postCatchToken.is_connected !== 1;
 
-      db.prepare(`
-        UPDATE google_sync_outbox
-        SET status = ?, attempts = ?, last_error = ?, next_retry_at = ?, locked_at = NULL
-        WHERE id = ?
-      `).run(isFinal ? 'FAILED' : 'PENDING', newAttempts, errMsg, nextRetry, item.id);
+      if (isDisconnectedNow) {
+        db.prepare(`
+          UPDATE google_sync_outbox
+          SET status = 'CANCELLED',
+              last_error = ?,
+              processed_at = CURRENT_TIMESTAMP,
+              locked_at = NULL
+          WHERE id = ?
+        `).run(`CANCELLED_DISCONNECTED: ${errMsg}`, item.id);
 
-      db.prepare(`
-        UPDATE appointments
-        SET google_sync_status = 'FAILED', google_sync_error = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-      `).run(errMsg, item.appointment_id);
+        db.prepare(`
+          UPDATE appointments
+          SET google_sync_status = 'NOT_SYNCED',
+              google_sync_error = ?,
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(errMsg, item.appointment_id);
+      } else {
+        const newAttempts = (item.attempts || 0) + 1;
+        const maxAttempts = item.max_attempts || 5;
+        const isFinal = newAttempts >= maxAttempts || isRevoked;
+        const backoffMin = Math.min(Math.pow(2, newAttempts), 60);
+        const nextRetry = isRevoked ? null : new Date(Date.now() + backoffMin * 60000).toISOString();
+
+        db.prepare(`
+          UPDATE google_sync_outbox
+          SET status = ?, attempts = ?, last_error = ?, next_retry_at = ?, locked_at = NULL
+          WHERE id = ?
+        `).run(isFinal ? 'FAILED' : 'PENDING', newAttempts, errMsg, nextRetry, item.id);
+
+        db.prepare(`
+          UPDATE appointments
+          SET google_sync_status = 'FAILED', google_sync_error = ?, updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(errMsg, item.appointment_id);
+      }
     }
   }
 

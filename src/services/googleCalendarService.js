@@ -164,11 +164,13 @@ function getGoogleCredentials() {
  */
 function getOAuth2Client(userId = null) {
   const creds = getGoogleCredentials();
-  const oauth2 = new google.auth.OAuth2(
-    creds.client_id,
-    creds.client_secret,
-    creds.redirect_uri
-  );
+  const oauth2 = (mockHandler && typeof mockHandler.createOAuth2Client === 'function')
+    ? mockHandler.createOAuth2Client(creds)
+    : new google.auth.OAuth2(
+        creds.client_id,
+        creds.client_secret,
+        creds.redirect_uri
+      );
 
   if (userId) {
     const row = db.prepare('SELECT * FROM google_calendar_tokens WHERE user_id = ? AND is_connected = 1').get(userId);
@@ -176,17 +178,34 @@ function getOAuth2Client(userId = null) {
       const tokens = decryptTokens(row.encrypted_tokens);
       if (tokens) {
         oauth2.setCredentials(tokens);
+        const originalConnectedAt = row.connected_at;
 
-        // Auto-persist refreshed tokens
+        // Auto-persist refreshed tokens com proteção de sessão
         oauth2.on('tokens', (newTokens) => {
           try {
-            const merged = { ...tokens, ...newTokens };
+            // 1. Revalida se o registro ainda existe e se a conta permanece conectada
+            const currentRow = db.prepare('SELECT encrypted_tokens, is_connected, connected_at FROM google_calendar_tokens WHERE user_id = ?').get(userId);
+            if (!currentRow || currentRow.is_connected !== 1 || !currentRow.encrypted_tokens) {
+              console.warn(`[GoogleCalendarService] Descartando atualização de tokens para user_id=${userId}: conta desconectada.`);
+              return;
+            }
+
+            // 2. Protege contra atualizações atrasadas de uma sessão anterior/obsoleta
+            if (currentRow.connected_at !== originalConnectedAt) {
+              console.warn(`[GoogleCalendarService] Descartando atualização de tokens para user_id=${userId}: sessão de conexão substituída.`);
+              return;
+            }
+
+            const currentTokens = decryptTokens(currentRow.encrypted_tokens) || {};
+            const merged = { ...currentTokens, ...newTokens };
             const enc = encryptTokens(merged);
+
+            // 3. Atualização atômica defensiva
             db.prepare(`
               UPDATE google_calendar_tokens
               SET encrypted_tokens = ?, last_sync_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-              WHERE user_id = ?
-            `).run(enc, userId);
+              WHERE user_id = ? AND is_connected = 1 AND connected_at = ?
+            `).run(enc, userId, originalConnectedAt);
           } catch (e) {
             console.error('[GoogleCalendarService] Erro ao persistir tokens atualizados:', e.message);
           }
@@ -398,28 +417,84 @@ async function handleOAuthCallback(code, state, authenticatedUserId = null, opti
 }
 
 /**
- * Disconnects Google Calendar account for a user
+ * Disconnects Google Calendar account for a user, purging stored encrypted tokens
  */
 async function disconnectUserCalendar(userId) {
   if (mockHandler?.disconnectUserCalendar) {
     return mockHandler.disconnectUserCalendar(userId);
   }
 
-  const row = db.prepare('SELECT * FROM google_calendar_tokens WHERE user_id = ?').get(userId);
-  if (row && row.encrypted_tokens && isLiveGoogleSyncAllowed(row.account_email)) {
+  const uid = Number(userId);
+  const row = db.prepare('SELECT * FROM google_calendar_tokens WHERE user_id = ?').get(uid);
+
+  let remoteRevoked = false;
+  let remoteRevocationError = null;
+
+  // 1. Revogação remota junto à API oficial do Google
+  // NOTA DE SEGURANÇA: NÃO condicionar ao isLiveGoogleSyncAllowed!
+  // isLiveGoogleSyncAllowed se refere à sincronização de eventos, enquanto a revogação OAuth é mandatória.
+  if (row && row.encrypted_tokens) {
     try {
-      const oauth2 = getOAuth2Client(userId);
-      await oauth2.revokeCredentials();
-    } catch (_) {}
+      const tokens = decryptTokens(row.encrypted_tokens);
+      const tokenToRevoke = tokens?.refresh_token || tokens?.access_token;
+      if (tokenToRevoke) {
+        const oauth2 = getOAuth2Client(uid);
+        if (typeof oauth2.revokeToken === 'function') {
+          await oauth2.revokeToken(tokenToRevoke);
+          remoteRevoked = true;
+        } else if (typeof oauth2.revokeCredentials === 'function') {
+          await oauth2.revokeCredentials();
+          remoteRevoked = true;
+        }
+      }
+    } catch (err) {
+      remoteRevocationError = err.message || 'Falha na revogação remota junto ao Google';
+      console.warn(`[GoogleCalendarService] Erro ao revogar credenciais remotas no Google para usuário ${uid}:`, err.message);
+    }
   }
 
+  // 2. Eliminação imediata dos tokens locais em repouso (MESMO se a revogação remota falhar)
+  // Preserva apenas metadados administrativos estritamente necessários (initial_connection_at, connected_at)
   db.prepare(`
     UPDATE google_calendar_tokens
-    SET is_connected = 0, last_error = 'Conta desconectada pelo usuário.', updated_at = CURRENT_TIMESTAMP
+    SET encrypted_tokens = NULL,
+        is_connected = 0,
+        last_error = ?,
+        updated_at = CURRENT_TIMESTAMP
     WHERE user_id = ?
-  `).run(userId);
+  `).run(
+    remoteRevocationError ? `Conta desconectada pelo usuário (aviso: falha na revogação remota: ${remoteRevocationError})` : 'Conta desconectada pelo usuário.',
+    uid
+  );
 
-  return { success: true, message: 'Google Calendar desconectado com sucesso.' };
+  // 3. Cancela imediatamente quaisquer sincronizações pendentes OU em processamento na fila outbox
+  try {
+    db.prepare(`
+      UPDATE google_sync_outbox
+      SET status = 'CANCELLED',
+          last_error = 'CANCELLED_DISCONNECTED: Conta Google Calendar desconectada pelo usuário',
+          processed_at = CURRENT_TIMESTAMP,
+          locked_at = NULL
+      WHERE user_id = ? AND status IN ('PENDING', 'PROCESSING')
+    `).run(uid);
+
+    db.prepare(`
+      UPDATE appointments
+      SET google_sync_status = 'NOT_SYNCED',
+          google_sync_error = 'Conta Google Calendar desconectada pelo usuário',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = ? AND google_sync_status IN ('PENDING', 'PROCESSING')
+    `).run(uid);
+  } catch (outboxErr) {
+    console.error('[GoogleCalendarService] Erro ao cancelar tarefas de outbox na desconexão:', outboxErr.message);
+  }
+
+  return {
+    success: true,
+    message: 'Google Calendar desconectado com sucesso.',
+    remoteRevoked,
+    remoteRevocationError,
+  };
 }
 
 /**
@@ -1187,6 +1262,7 @@ module.exports = {
   getPreExistingSyncPreview,
   syncPreExistingAppointments,
   isLiveGoogleSyncAllowed,
+  getOAuth2Client,
   setMockHandler,
   resetMockHandler,
   isMockActive,
