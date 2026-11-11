@@ -2503,10 +2503,16 @@
                 <p id="waConnectionErrorMessage" class="text-[11px] text-orange-300/90">O tempo para leitura expirou. Clique em tentar novamente para gerar um novo código.</p>
               </div>
             </div>
-            <button type="button" onclick="cancelSalonConnectMode()" class="px-4 py-2 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-white font-bold text-xs transition-colors shrink-0 flex items-center gap-1.5 self-start sm:self-center cursor-pointer">
-              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-              <span>Tentar Novamente</span>
-            </button>
+            <div class="flex items-center gap-2 shrink-0 self-start sm:self-center">
+              <button type="button" id="btnGenerateNewQr" onclick="openSalonQrConnection()" class="px-4 py-2 rounded-lg bg-[#C89B6D] hover:bg-[#b58759] text-black font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer">
+                <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+                <span>Gerar novo QR Code</span>
+              </button>
+              <button type="button" id="btnConnectionErrorRetry" onclick="cancelSalonConnectMode()" class="px-4 py-2 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>Tentar Novamente</span>
+              </button>
+            </div>
           </div>
 
           <!-- MODO 1: DESCONECTADO (Escolha entre QR Code e Código de Pareamento) -->
@@ -9221,6 +9227,7 @@
     let salonWaPairingRateLimitTimer = null;
     let salonWaQrRateLimitTimer = null;
     let salonWaSessionSeq = 0; // Monotônico para invalidar respostas assíncronas obsoletas
+    let salonWaPollSeq = 0; // Monotônico para descarte de respostas defasadas no polling
     let isSalonWaSubmitting = false; // Mutex local de interface
 
     function scheduleSalonWaPoll() {
@@ -9232,9 +9239,11 @@
     }
 
     async function loadSalonWhatsAppStatus() {
+      const pollSeq = ++salonWaPollSeq;
       try {
         const res = await fetch('/api/cliente/whatsapp/status');
         const data = await res.json();
+        if (pollSeq !== salonWaPollSeq) return; // Descarte de resposta defasada / fora de ordem
         if (!data.success) return;
 
         renderSalonWhatsAppUI(data);
@@ -9253,8 +9262,19 @@
         }
       } catch (err) {
         console.error('Erro ao verificar status do WhatsApp:', err);
+        // Em caso de erro de rede no polling, não travar em silêncio se houver método ativo
+        if (salonWaActiveMethod && pollSeq === salonWaPollSeq) {
+          scheduleSalonWaPoll();
+        }
       }
     }
+
+    // Recuperação de status ao alternar entre abas do navegador
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && salonWaActiveMethod) {
+        loadSalonWhatsAppStatus();
+      }
+    });
 
     function renderSalonWhatsAppUI(statusData) {
       const serverStatus = statusData.status || 'DISCONNECTED';
@@ -9408,9 +9428,26 @@
           salonWaClientState = 'QR_WAITING';
           if (img) img.src = statusData.qrCode;
           spinner?.classList.add('hidden');
+          errorAlert?.classList.add('hidden');
+        } else if (serverStatus === 'DISCONNECTED' || serverStatus === 'CONNECTION_LOST' || serverStatus === 'QR_EXPIRED') {
+          // Tratar os estados DISCONNECTED / CONNECTION_LOST sem deixar spinner infinito
+          if (img) img.src = '';
+          spinner?.classList.add('hidden');
+          if (errorAlert) {
+            errorAlert.classList.remove('hidden');
+            if (errorTitle) {
+              errorTitle.innerText = serverStatus === 'QR_EXPIRED' ? 'QR Code Expirado' : (serverStatus === 'DISCONNECTED' ? 'Conexão Desconectada' : 'Conexão Temporariamente Interrompida');
+            }
+            if (errorMsg) {
+              errorMsg.innerText = serverStatus === 'QR_EXPIRED'
+                ? 'O tempo para leitura do QR Code expirou. Clique em "Gerar novo QR Code" para continuar.'
+                : (serverStatus === 'DISCONNECTED'
+                    ? 'A sessão foi encerrada. Clique em "Gerar novo QR Code" para reconectar.'
+                    : 'A conexão com o WhatsApp foi interrompida. Verifique o aparelho ou clique em "Gerar novo QR Code".');
+            }
+          }
         } else {
-          // Quando o código expirou no servidor ou está sendo rotacionado pelo Baileys,
-          // limpa a imagem e exibe o spinner para que o usuário jamais escaneie código expirado
+          // Quando o código está sendo gerado ou rotacionado pelo Baileys, exibe spinner
           if (img) img.src = '';
           const spinnerText = document.querySelector('#waQrCodeSpinner span');
           if (spinnerText) {
@@ -9459,6 +9496,7 @@
       if (isSalonWaSubmitting) return;
       isSalonWaSubmitting = true;
       const seq = ++salonWaSessionSeq;
+      ++salonWaPollSeq;
 
       salonWaActiveMethod = 'QR';
       salonWaClientState = 'QR_SELECTED';
@@ -9469,11 +9507,13 @@
       const spinner = document.getElementById('waQrCodeSpinner');
       const img = document.getElementById('salonQrCodeImg');
       const refreshBtn = document.getElementById('btnRefreshSalonQr');
+      const errorAlert = document.getElementById('waConnectionErrorAlert');
 
       if (refreshBtn) refreshBtn.disabled = true;
 
       choiceBox?.classList.add('hidden');
       pairingBox?.classList.add('hidden');
+      errorAlert?.classList.add('hidden');
       qrBox?.classList.remove('hidden');
       spinner?.classList.remove('hidden');
       if (img) img.src = '';
@@ -9731,6 +9771,7 @@
 
     function cancelSalonConnectMode() {
       ++salonWaSessionSeq; // Invalida qualquer resposta assíncrona pendente
+      ++salonWaPollSeq; // Invalida respostas de polling defasadas
       salonWaActiveMethod = null;
       salonWaClientState = 'DISCONNECTED';
       isSalonWaSubmitting = false;

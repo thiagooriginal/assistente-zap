@@ -221,11 +221,67 @@ function maskPhoneNumber(phone) {
   return `+55 (${ddd}) 9****-${last4}`;
 }
 
+/**
+ * Extrai e valida o número de telefone de um remetente a partir de uma mensagem Baileys.
+ * Verifica campos alternativos suportados (remoteJidAlt, senderPn, participantAlt)
+ * antes de recorrer ao mapeamento reverso de @lid.
+ * Em conformidade fail-closed: nunca converte dígitos puros de LID em telefone.
+ *
+ * @param {object} msg - Mensagem recebida do Baileys
+ * @param {string} [authDir] - Diretório de autenticação exclusivo do tenant
+ * @returns {string|null} Telefone limpo (10 a 13 dígitos com DDD válido) ou null
+ */
+function extractSenderPhone(msg, authDir) {
+  if (!msg || !msg.key) return null;
+  const remoteJid = String(msg.key.remoteJid || '').trim();
+
+  // 1. Verificar campos alternativos suportados pelo Baileys (remoteJidAlt, senderPn, participantAlt)
+  const candidateFields = [
+    msg.key.remoteJidAlt,
+    msg.key.senderPn,
+    msg.senderPn,
+    msg.key.participantAlt,
+  ].filter(Boolean);
+
+  for (const cand of candidateFields) {
+    const candStr = String(cand).trim();
+    if (!candStr.includes('@lid')) {
+      const clean = extractCleanPhone('', candStr, null);
+      if (clean && clean.length >= 10 && clean.length <= 13) {
+        return clean;
+      }
+    }
+  }
+
+  // 2. Se o remoteJid for @s.whatsapp.net direto
+  if (remoteJid.includes('@s.whatsapp.net')) {
+    const clean = extractCleanPhone('', remoteJid, null);
+    if (clean && clean.length >= 10 && clean.length <= 13) {
+      return clean;
+    }
+  }
+
+  // 3. Se for @lid, tentar mapeamento reverso exclusivamente no authDir fornecido do tenant
+  if (remoteJid.includes('@lid')) {
+    if (authDir && typeof authDir === 'string') {
+      const resolved = resolveLidToPhone(remoteJid, authDir);
+      if (resolved && resolved.length >= 10 && resolved.length <= 13) {
+        return resolved;
+      }
+    }
+    // Fail-closed: NUNCA usar os dígitos do LID como telefone
+    return null;
+  }
+
+  return null;
+}
+
 module.exports = {
   cleanDigits,
   isValidBrazilianDdd,
   resolveLidToPhone,
   extractCleanPhone,
+  extractSenderPhone,
   getExactPhoneCandidates,
   getPhoneCandidates,
   maskPhoneNumber,

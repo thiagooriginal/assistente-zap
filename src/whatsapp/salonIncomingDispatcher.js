@@ -243,32 +243,22 @@ async function dispatchMessage(salonUserId, sock, msg) {
     return false;
   }
 
-  // A5: Resolução defensiva de JID para telefone e validação de whitelist
+  // A5 / CORREÇÃO 4: Resolução defensiva do telefone do remetente via identificadores alternativos e mapeamento
   const sessionMgr = getSessionManager();
-  let cleanPhone = null;
-  if (senderJid.includes('@lid')) {
-    let authDir = null;
-    try {
-      authDir = sessionMgr.getSalonSessionDir(uid);
-    } catch (_) {}
+  let authDir = null;
+  try {
+    authDir = sessionMgr.getSalonSessionDir(uid);
+  } catch (_) {}
 
-    cleanPhone = phoneUtils.resolveLidToPhone(senderJid, authDir);
-
-    // Se o JID for @lid e não puder ser resolvido para um telefone E.164 válido:
-    // NUNCA converta dígitos de LID em telefone. Aborte imediatamente (sem resposta e sem agendamento).
-    if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 13) {
-      console.warn(`[salonIncomingDispatcher] Mensagem @lid ignorada: impossível mapear para telefone E.164 válido (#${uid}).`);
-      return false;
-    }
-  } else {
-    cleanPhone = phoneUtils.cleanDigits(senderJid.split('@')[0].split(':')[0]);
-  }
-
+  const cleanPhone = phoneUtils.extractSenderPhone(msg, authDir);
   if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 13) {
+    if (senderJid.includes('@lid')) {
+      console.warn(`[salonIncomingDispatcher] Mensagem @lid ignorada: impossível mapear para telefone E.164 válido (#${uid}).`);
+    }
     return false;
   }
 
-  // A5: Validação estrita da Whitelist de Homologação
+  // A5: Validação estrita da Whitelist de Homologação (Fail-Closed)
   if (!sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
     console.warn(`[salonIncomingDispatcher] STAGING: Remetente ${phoneUtils.maskPhoneNumber(cleanPhone)} não autorizado na whitelist para salão #${uid}. Mensagem descartada.`);
     return false;

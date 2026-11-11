@@ -110,7 +110,9 @@ function inspectSalonAuthCredentials(userId) {
       try {
         const raw = fs.readFileSync(path.join(sessionDir, 'creds.json'), 'utf8');
         const parsed = JSON.parse(raw);
-        credsValid = Boolean(parsed && typeof parsed === 'object');
+        const isRegistered = Boolean(parsed && typeof parsed === 'object' && parsed.registered === true);
+        const hasMeId = Boolean(parsed?.me?.id);
+        credsValid = Boolean(isRegistered && hasMeId);
         if (parsed?.me?.id) {
           credsMe = phoneUtils.maskPhoneNumber(parsed.me.id.split('@')[0].split(':')[0]);
         }
@@ -453,15 +455,32 @@ async function _createBaileysSocket(uid, sessionDir, session) {
   session.socketGen = (session.socketGen || 0) + 1;
   const currentGen = session.socketGen;
 
+  const isSessionAborted = () => {
+    return activeSessions.get(uid) !== session || session.socketGen !== currentGen || session.status === 'DISCONNECTED' || session.isCancelled;
+  };
+
   if (_socketFactoryForTesting) {
     const sock = await _socketFactoryForTesting(uid, sessionDir, session);
+    if (isSessionAborted()) {
+      if (sock && typeof sock.end === 'function') {
+        try { sock.end(undefined); } catch (_) {}
+      }
+      throw new Error('SESSION_CANCELLED_OR_SUPERSEDED: Sessão invalidada durante inicialização de testes.');
+    }
     session.sock = sock;
     _attachSocketListeners(uid, sock, session, () => {}, currentGen);
     return { sock, saveCreds: () => {}, currentGen };
   }
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+  if (isSessionAborted()) {
+    throw new Error('SESSION_CANCELLED_OR_SUPERSEDED: Sessão invalidada durante leitura de auth state.');
+  }
+
   const { version } = await fetchLatestBaileysVersion();
+  if (isSessionAborted()) {
+    throw new Error('SESSION_CANCELLED_OR_SUPERSEDED: Sessão invalidada durante obtenção de versão do Baileys.');
+  }
 
   recordDiagnosticEvent(uid, 'SOCKET_INIT', {
     method: session.pairingMethod || 'QR',
@@ -478,6 +497,13 @@ async function _createBaileysSocket(uid, sessionDir, session) {
     printQRInTerminal: false,
     syncFullHistory: false,
   });
+
+  if (isSessionAborted()) {
+    if (sock && typeof sock.end === 'function') {
+      try { sock.end(undefined); } catch (_) {}
+    }
+    throw new Error('SESSION_CANCELLED_OR_SUPERSEDED: Sessão invalidada durante criação do socket.');
+  }
 
   session.sock = sock;
   _attachSocketListeners(uid, sock, session, saveCreds, currentGen);
@@ -580,6 +606,9 @@ function _attachSocketListeners(uid, sock, session, saveCreds, currentGen) {
       const { connection, lastDisconnect, qr } = update;
 
       if (qr) {
+        if (session.pairingMethod === 'CODE') {
+          return; // Preserva WAITING_CODE e ignora QR quando o método for CODE
+        }
         try {
           const isFirstQr = (session.qrVersion || 0) === 0;
           const qrTtlMs = isFirstQr ? 65000 : 25000;
@@ -590,6 +619,10 @@ function _attachSocketListeners(uid, sock, session, saveCreds, currentGen) {
             errorCorrectionLevel: 'M',
             color: { dark: '#000000', light: '#FFFFFF' },
           });
+
+          // Defesa contra corrida: descarta se a sessão foi cancelada durante a geração do DataURL
+          if (isSocketStale()) return;
+
           session.qrCode = qrDataUrl;
           session.qrExpiresAt = Date.now() + qrTtlMs;
           session.qrVersion = (session.qrVersion || 0) + 1;
@@ -766,10 +799,10 @@ function _attachSocketListeners(uid, sock, session, saveCreds, currentGen) {
             reason: session.lastError,
           });
         } else {
-          // Estava em WAITING_QR ou sem credenciais salvas e fechou por timeout/interrupção
+          // Estava em WAITING_QR, WAITING_CODE ou sem credenciais registradas válidas e fechou por timeout/interrupção
           session.reconnecting = false;
           session.status = 'DISCONNECTED';
-          session.lastError = 'QR Code expirado ou conexão fechada antes da leitura.';
+          session.lastError = 'QR Code expirado ou conexão fechada antes da leitura (QR_EXPIRED)';
           SalonWhatsAppRepository.markSessionDisconnected(uid, {
             status: 'DISCONNECTED',
             error: session.lastError,
@@ -777,7 +810,7 @@ function _attachSocketListeners(uid, sock, session, saveCreds, currentGen) {
 
           SalonWhatsAppRepository.createLog(uid, {
             eventType: 'DISCONNECTED',
-            oldStatus: 'WAITING_QR',
+            oldStatus: session.pairingMethod === 'CODE' ? 'WAITING_CODE' : 'WAITING_QR',
             newStatus: 'DISCONNECTED',
             reason: session.lastError,
             metadata: { reasonCode: 'QR_EXPIRED' },
@@ -982,7 +1015,9 @@ async function startQrSession(userId) {
   try {
     return await connectPromise;
   } finally {
-    tenantLocks.delete(uid);
+    if (tenantLocks.get(uid) === connectPromise) {
+      tenantLocks.delete(uid);
+    }
   }
 }
 
@@ -1088,28 +1123,43 @@ async function requestPairingCode(userId, rawPhone) {
 
     const { sock } = await _createBaileysSocket(uid, sessionDir, session);
 
-    // CORREÇÃO 4: Aguarda prontidão do socket antes de solicitar código de pareamento
-    await waitForSocketReady(sock, 15000);
+    let formattedCode;
+    let expiresAt;
+    try {
+      // CORREÇÃO 4: Aguarda prontidão do socket antes de solicitar código de pareamento
+      await waitForSocketReady(sock, 15000);
 
-    const rawPairingCode = await sock.requestPairingCode(formattedPhone);
-    const formattedCode = rawPairingCode && rawPairingCode.length === 8
-      ? `${rawPairingCode.slice(0, 4)}-${rawPairingCode.slice(4)}`
-      : rawPairingCode;
+      const rawPairingCode = await sock.requestPairingCode(formattedPhone);
+      formattedCode = rawPairingCode && rawPairingCode.length === 8
+        ? `${rawPairingCode.slice(0, 4)}-${rawPairingCode.slice(4)}`
+        : rawPairingCode;
 
-    const expiresAt = Date.now() + 180000; // 3 minutos
+      expiresAt = Date.now() + 180000; // 3 minutos
 
-    session.pairingCode = formattedCode;
-    session.pairingExpiresAt = expiresAt;
+      session.pairingCode = formattedCode;
+      session.pairingExpiresAt = expiresAt;
 
-    // Atualiza SQLite sem gravar código bruto (CORREÇÃO 5)
-    SalonWhatsAppRepository.updatePairingCode(uid, null, 180);
+      // Atualiza SQLite sem gravar código bruto (CORREÇÃO 5)
+      SalonWhatsAppRepository.updatePairingCode(uid, null, 180);
 
-    SalonWhatsAppRepository.createLog(uid, {
-      eventType: 'PAIRING_CODE_REQUESTED',
-      newStatus: 'WAITING_CODE',
-      pairingMethod: 'CODE',
-      connectedPhone: formattedPhone,
-    });
+      SalonWhatsAppRepository.createLog(uid, {
+        eventType: 'PAIRING_CODE_REQUESTED',
+        newStatus: 'WAITING_CODE',
+        pairingMethod: 'CODE',
+        connectedPhone: formattedPhone,
+      });
+    } catch (pairErr) {
+      if (sock) {
+        try { sock.end(undefined); } catch (_) {}
+      }
+      session.sock = null;
+      session.status = 'DISCONNECTED';
+      session.pairingCode = null;
+      session.pairingExpiresAt = null;
+      session.lastError = pairErr.message;
+      recordDiagnosticEvent(uid, 'PAIRING_ERROR', { error: pairErr.message });
+      throw pairErr;
+    }
 
     return {
       success: true,
@@ -1118,15 +1168,15 @@ async function requestPairingCode(userId, rawPhone) {
       status: 'WAITING_CODE',
       simulated: false,
     };
-
-    return { success: true, pairingCode: formattedCode, expiresAt, status: 'WAITING_CODE' };
   })();
 
   tenantLocks.set(uid, pairingPromise);
   try {
     return await pairingPromise;
   } finally {
-    tenantLocks.delete(uid);
+    if (tenantLocks.get(uid) === pairingPromise) {
+      tenantLocks.delete(uid);
+    }
   }
 }
 
@@ -1206,11 +1256,13 @@ async function cancelPendingPairing(userId) {
   }
 
   if (session) {
+    session.isCancelled = true;
+    session.socketGen = (session.socketGen || 0) + 1;
+    session.reconnecting = false;
     if (session.reconnectTimer) {
       clearTimeout(session.reconnectTimer);
       session.reconnectTimer = null;
     }
-    session.socketGen = null;
     if (session.sock) {
       try {
         session.sock.end(undefined);
@@ -1387,10 +1439,18 @@ async function restoreActiveSalonSessions() {
         continue;
       }
 
-      // Valida se o creds.json contém JSON válido
+      // Valida se o creds.json contém credenciais autenticadas e registradas
       try {
         const rawCreds = fs.readFileSync(credsFile, 'utf8');
-        JSON.parse(rawCreds);
+        const parsedCreds = JSON.parse(rawCreds);
+        if (!parsedCreds || parsedCreds.registered !== true || !parsedCreds.me?.id) {
+          SalonWhatsAppRepository.markSessionDisconnected(uid, {
+            status: 'DISCONNECTED',
+            error: 'Credenciais incompletas ou não registradas.',
+            resetCredentials: false,
+          });
+          continue;
+        }
       } catch (_) {
         SalonWhatsAppRepository.markSessionDisconnected(uid, {
           status: 'CONNECTION_LOST',
