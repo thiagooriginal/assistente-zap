@@ -13,6 +13,13 @@ const db = require('../database/db');
 const phoneUtils = require('../utils/phoneUtils');
 const salonAppointmentService = require('../services/salonAppointmentService');
 
+/**
+ * Acesso preguiçoso (lazy) ao salonSessionManager para eliminar advertência de dependência circular
+ */
+function getSessionManager() {
+  return require('./salonSessionManager');
+}
+
 // Memória volátil de conversação: `${salonUserId}:${customerPhone}` => State
 const customerSessions = new Map();
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutos
@@ -236,6 +243,37 @@ async function dispatchMessage(salonUserId, sock, msg) {
     return false;
   }
 
+  // A5: Resolução defensiva de JID para telefone e validação de whitelist
+  const sessionMgr = getSessionManager();
+  let cleanPhone = null;
+  if (senderJid.includes('@lid')) {
+    let authDir = null;
+    try {
+      authDir = sessionMgr.getSalonSessionDir(uid);
+    } catch (_) {}
+
+    cleanPhone = phoneUtils.resolveLidToPhone(senderJid, authDir);
+
+    // Se o JID for @lid e não puder ser resolvido para um telefone E.164 válido:
+    // NUNCA converta dígitos de LID em telefone. Aborte imediatamente (sem resposta e sem agendamento).
+    if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 13) {
+      console.warn(`[salonIncomingDispatcher] Mensagem @lid ignorada: impossível mapear para telefone E.164 válido (#${uid}).`);
+      return false;
+    }
+  } else {
+    cleanPhone = phoneUtils.cleanDigits(senderJid.split('@')[0].split(':')[0]);
+  }
+
+  if (!cleanPhone || cleanPhone.length < 10 || cleanPhone.length > 13) {
+    return false;
+  }
+
+  // A5: Validação estrita da Whitelist de Homologação
+  if (!sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
+    console.warn(`[salonIncomingDispatcher] STAGING: Remetente ${phoneUtils.maskPhoneNumber(cleanPhone)} não autorizado na whitelist para salão #${uid}. Mensagem descartada.`);
+    return false;
+  }
+
   const text = extractMessageText(msg.message);
   if (!text) {
     return false;
@@ -253,7 +291,6 @@ async function dispatchMessage(salonUserId, sock, msg) {
     } catch (_) {}
   }
 
-  const cleanPhone = phoneUtils.cleanDigits(senderJid.split('@')[0].split(':')[0]);
   const sessionKey = `${uid}:${cleanPhone}`;
 
   // 3. Resolução de contexto no escopo estrito do tenant
@@ -323,6 +360,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
 
     replyText = `Tudo bem! O agendamento foi cancelado. Se você precisar de qualquer informação sobre nossos serviços ou quiser agendar em outro momento, estarei à sua disposição! ✨`;
     try {
+      if (!sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) return false;
       await sock.sendMessage(senderJid, { text: replyText });
       return true;
     } catch (err) {
@@ -616,6 +654,10 @@ async function dispatchMessage(salonUserId, sock, msg) {
 
   // 7. Envio da resposta exclusivamente pelo socket do próprio salão
   try {
+    if (!sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
+      console.warn(`[salonIncomingDispatcher] STAGING: Envio de resposta bloqueado para ${phoneUtils.maskPhoneNumber(cleanPhone)} (#${uid}).`);
+      return false;
+    }
     await sock.sendMessage(senderJid, { text: replyText });
     return true;
   } catch (sendErr) {

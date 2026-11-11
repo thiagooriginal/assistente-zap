@@ -13,6 +13,28 @@
 
 const db = require('./db');
 
+const ALLOWED_SESSION_STATUSES = Object.freeze([
+  'DISCONNECTED',
+  'WAITING_QR',
+  'WAITING_CODE',
+  'CONNECTING',
+  'CONNECTED',
+  'CONNECTION_LOST',
+  'ERROR',
+]);
+
+const ALLOWED_EVENT_TYPES = Object.freeze([
+  'STATUS_CHANGE',
+  'QR_GENERATED',
+  'PAIRING_CODE_REQUESTED',
+  'CONNECTED',
+  'DISCONNECTED',
+  'RECONNECTING',
+  'AUTH_FAILURE',
+  'ERROR',
+  'LOGOUT_USER',
+]);
+
 class SalonWhatsAppRepository {
   /**
    * Sanitiza recursivamente strings e objetos de log para impedir vazamento de credenciais efêmeras
@@ -69,28 +91,33 @@ class SalonWhatsAppRepository {
    * @returns {object|null}
    */
   static getSessionByUserId(userId) {
-    return db.prepare(`
-      SELECT 
-        id,
-        user_id,
-        session_status,
-        connected_phone,
-        connected_phone_jid,
-        connected_at,
-        last_seen_at,
-        last_error,
-        pairing_method,
-        NULL AS qr_code_cached,
-        qr_code_expires_at,
-        NULL AS pairing_code_cached,
-        pairing_code_expires_at,
-        auth_dir_path,
-        reconnect_attempts,
-        created_at,
-        updated_at
-      FROM client_salon_whatsapp_sessions
-      WHERE user_id = ?
-    `).get(Number(userId)) || null;
+    try {
+      return db.prepare(`
+        SELECT 
+          id,
+          user_id,
+          session_status,
+          connected_phone,
+          connected_phone_jid,
+          connected_at,
+          last_seen_at,
+          last_error,
+          pairing_method,
+          NULL AS qr_code_cached,
+          qr_code_expires_at,
+          NULL AS pairing_code_cached,
+          pairing_code_expires_at,
+          auth_dir_path,
+          reconnect_attempts,
+          created_at,
+          updated_at
+        FROM client_salon_whatsapp_sessions
+        WHERE user_id = ?
+      `).get(Number(userId)) || null;
+    } catch (err) {
+      console.error(`[salonWhatsAppRepository] getSessionByUserId falhou (#${userId}):`, err.message);
+      return null;
+    }
   }
 
   /**
@@ -99,16 +126,21 @@ class SalonWhatsAppRepository {
    * @param {string} authDirPath
    * @returns {object}
    */
-  static ensureSessionExists(userId, authDirPath) {
-    db.prepare(`
-      INSERT INTO client_salon_whatsapp_sessions (user_id, auth_dir_path, session_status)
-      VALUES (?, ?, 'DISCONNECTED')
-      ON CONFLICT(user_id) DO UPDATE SET
-        auth_dir_path = COALESCE(client_salon_whatsapp_sessions.auth_dir_path, excluded.auth_dir_path),
-        updated_at = CURRENT_TIMESTAMP
-    `).run(Number(userId), authDirPath);
+  static ensureSessionExists(userId, authDirPath = null) {
+    try {
+      db.prepare(`
+        INSERT INTO client_salon_whatsapp_sessions (user_id, auth_dir_path, session_status)
+        VALUES (?, ?, 'DISCONNECTED')
+        ON CONFLICT(user_id) DO UPDATE SET
+          auth_dir_path = COALESCE(client_salon_whatsapp_sessions.auth_dir_path, excluded.auth_dir_path),
+          updated_at = CURRENT_TIMESTAMP
+      `).run(Number(userId), authDirPath || null);
 
-    return this.getSessionByUserId(userId);
+      return this.getSessionByUserId(userId);
+    } catch (err) {
+      console.error(`[salonWhatsAppRepository] ensureSessionExists falhou (#${userId}):`, err.message);
+      return null;
+    }
   }
 
   /**
@@ -124,8 +156,8 @@ class SalonWhatsAppRepository {
     const uid = Number(userId);
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
 
-    db.exec('BEGIN IMMEDIATE');
     try {
+      db.exec('BEGIN IMMEDIATE');
       db.prepare(`
         UPDATE client_salon_whatsapp_sessions
         SET session_status = 'WAITING_QR',
@@ -149,8 +181,8 @@ class SalonWhatsAppRepository {
 
       db.exec('COMMIT');
     } catch (err) {
-      db.exec('ROLLBACK');
-      throw err;
+      try { db.exec('ROLLBACK'); } catch (_) {}
+      console.error(`[salonWhatsAppRepository] updateQrCode falhou (#${uid}):`, err.message);
     }
   }
 
@@ -167,8 +199,8 @@ class SalonWhatsAppRepository {
     const uid = Number(userId);
     const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString();
 
-    db.exec('BEGIN IMMEDIATE');
     try {
+      db.exec('BEGIN IMMEDIATE');
       db.prepare(`
         UPDATE client_salon_whatsapp_sessions
         SET session_status = 'WAITING_CODE',
@@ -192,8 +224,8 @@ class SalonWhatsAppRepository {
 
       db.exec('COMMIT');
     } catch (err) {
-      db.exec('ROLLBACK');
-      throw err;
+      try { db.exec('ROLLBACK'); } catch (_) {}
+      console.error(`[salonWhatsAppRepository] updatePairingCode falhou (#${uid}):`, err.message);
     }
   }
 
@@ -209,8 +241,8 @@ class SalonWhatsAppRepository {
     const uid = Number(userId);
     const now = new Date().toISOString();
 
-    db.exec('BEGIN IMMEDIATE');
     try {
+      db.exec('BEGIN IMMEDIATE');
       db.prepare(`
         UPDATE client_salon_whatsapp_sessions
         SET session_status = 'CONNECTED',
@@ -242,8 +274,8 @@ class SalonWhatsAppRepository {
 
       db.exec('COMMIT');
     } catch (err) {
-      db.exec('ROLLBACK');
-      throw err;
+      try { db.exec('ROLLBACK'); } catch (_) {}
+      console.error(`[salonWhatsAppRepository] markSessionConnected falhou (#${uid}):`, err.message);
     }
   }
 
@@ -258,9 +290,10 @@ class SalonWhatsAppRepository {
   static markSessionDisconnected(userId, { status = 'DISCONNECTED', error = null, resetCredentials = false } = {}) {
     const uid = Number(userId);
     const resetFlag = resetCredentials ? 1 : 0;
+    const safeStatus = ALLOWED_SESSION_STATUSES.includes(status) ? status : 'DISCONNECTED';
 
-    db.exec('BEGIN IMMEDIATE');
     try {
+      db.exec('BEGIN IMMEDIATE');
       db.prepare(`
         UPDATE client_salon_whatsapp_sessions
         SET session_status = ?,
@@ -274,7 +307,7 @@ class SalonWhatsAppRepository {
             connected_at = CASE WHEN ? = 1 THEN NULL ELSE connected_at END,
             updated_at = CURRENT_TIMESTAMP
         WHERE user_id = ?
-      `).run(status, error, resetFlag, resetFlag, resetFlag, uid);
+      `).run(safeStatus, error, resetFlag, resetFlag, resetFlag, uid);
 
       db.prepare(`
         UPDATE client_salons
@@ -283,12 +316,12 @@ class SalonWhatsAppRepository {
             whatsapp_last_error = ?,
             updated_at = CURRENT_TIMESTAMP
         WHERE user_id = ?
-      `).run(status, resetFlag, error, uid);
+      `).run(safeStatus, resetFlag, error, uid);
 
       db.exec('COMMIT');
     } catch (err) {
-      db.exec('ROLLBACK');
-      throw err;
+      try { db.exec('ROLLBACK'); } catch (_) {}
+      console.error(`[salonWhatsAppRepository] markSessionDisconnected falhou (#${uid}):`, err.message);
     }
   }
 
@@ -304,25 +337,30 @@ class SalonWhatsAppRepository {
   static getActiveSessionsForRestore({ limit = 100 } = {}) {
     const safeLimit = Math.max(1, Math.min(Number(limit) || 100, 500));
 
-    return db.prepare(`
-      SELECT 
-        id,
-        user_id,
-        session_status,
-        connected_phone,
-        connected_phone_jid,
-        pairing_method,
-        auth_dir_path,
-        reconnect_attempts,
-        last_seen_at,
-        created_at,
-        updated_at
-      FROM client_salon_whatsapp_sessions
-      WHERE session_status IN ('CONNECTED', 'CONNECTION_LOST', 'CONNECTING')
-        AND session_status != 'DISCONNECTED'
-      ORDER BY updated_at DESC
-      LIMIT ?
-    `).all(safeLimit);
+    try {
+      return db.prepare(`
+        SELECT 
+          id,
+          user_id,
+          session_status,
+          connected_phone,
+          connected_phone_jid,
+          pairing_method,
+          auth_dir_path,
+          reconnect_attempts,
+          last_seen_at,
+          created_at,
+          updated_at
+        FROM client_salon_whatsapp_sessions
+        WHERE session_status IN ('CONNECTED', 'CONNECTION_LOST', 'CONNECTING')
+          AND session_status != 'DISCONNECTED'
+        ORDER BY updated_at DESC
+        LIMIT ?
+      `).all(safeLimit);
+    } catch (err) {
+      console.error('[salonWhatsAppRepository] getActiveSessionsForRestore falhou:', err.message);
+      return [];
+    }
   }
 
   /**
@@ -330,12 +368,16 @@ class SalonWhatsAppRepository {
    * @param {number} userId
    */
   static touchHeartbeat(userId) {
-    db.prepare(`
-      UPDATE client_salon_whatsapp_sessions
-      SET last_seen_at = CURRENT_TIMESTAMP,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE user_id = ?
-    `).run(Number(userId));
+    try {
+      db.prepare(`
+        UPDATE client_salon_whatsapp_sessions
+        SET last_seen_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = ?
+      `).run(Number(userId));
+    } catch (err) {
+      console.error(`[salonWhatsAppRepository] touchHeartbeat falhou (#${userId}):`, err.message);
+    }
   }
 
   /**
@@ -357,18 +399,26 @@ class SalonWhatsAppRepository {
     userAgent = null,
     metadata = null,
   }) {
-    const sanitizedReason = reason ? SalonWhatsAppRepository._sanitizeLogPayload(reason) : null;
-    const metadataStr = metadata ? SalonWhatsAppRepository._sanitizeLogPayload(metadata) : null;
+    try {
+      const safeEventType = ALLOWED_EVENT_TYPES.includes(eventType) ? eventType : 'DISCONNECTED';
+      const safeOldStatus = oldStatus && ALLOWED_SESSION_STATUSES.includes(oldStatus) ? oldStatus : null;
+      const safeNewStatus = newStatus && ALLOWED_SESSION_STATUSES.includes(newStatus) ? newStatus : null;
+      const safePairingMethod = ['QR', 'CODE'].includes(pairingMethod) ? pairingMethod : null;
+      const sanitizedReason = reason ? SalonWhatsAppRepository._sanitizeLogPayload(reason) : null;
+      const metadataStr = metadata ? SalonWhatsAppRepository._sanitizeLogPayload(metadata) : null;
 
-    db.prepare(`
-      INSERT INTO client_salon_whatsapp_logs (
-        session_id, user_id, event_type, old_status, new_status,
-        pairing_method, connected_phone, reason, ip_address, user_agent, metadata_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      sessionId, Number(userId), eventType, oldStatus, newStatus,
-      pairingMethod, connectedPhone, sanitizedReason, ipAddress, userAgent, metadataStr
-    );
+      db.prepare(`
+        INSERT INTO client_salon_whatsapp_logs (
+          session_id, user_id, event_type, old_status, new_status,
+          pairing_method, connected_phone, reason, ip_address, user_agent, metadata_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        sessionId, Number(userId), safeEventType, safeOldStatus, safeNewStatus,
+        safePairingMethod, connectedPhone, sanitizedReason, ipAddress, userAgent, metadataStr
+      );
+    } catch (err) {
+      console.error(`[salonWhatsAppRepository] createLog falhou (#${userId}):`, err.message);
+    }
   }
 
   /**
@@ -380,16 +430,21 @@ class SalonWhatsAppRepository {
   static getRecentLogs(userId, limit = 20) {
     const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 100));
 
-    return db.prepare(`
-      SELECT 
-        id, session_id, user_id, event_type, old_status, new_status,
-        pairing_method, connected_phone, reason, ip_address, user_agent,
-        metadata_json, created_at
-      FROM client_salon_whatsapp_logs
-      WHERE user_id = ?
-      ORDER BY id DESC
-      LIMIT ?
-    `).all(Number(userId), safeLimit);
+    try {
+      return db.prepare(`
+        SELECT 
+          id, session_id, user_id, event_type, old_status, new_status,
+          pairing_method, connected_phone, reason, ip_address, user_agent,
+          metadata_json, created_at
+        FROM client_salon_whatsapp_logs
+        WHERE user_id = ?
+        ORDER BY id DESC
+        LIMIT ?
+      `).all(Number(userId), safeLimit);
+    } catch (err) {
+      console.error(`[salonWhatsAppRepository] getRecentLogs falhou (#${userId}):`, err.message);
+      return [];
+    }
   }
 }
 

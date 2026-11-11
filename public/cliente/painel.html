@@ -9412,6 +9412,10 @@
           // Quando o código expirou no servidor ou está sendo rotacionado pelo Baileys,
           // limpa a imagem e exibe o spinner para que o usuário jamais escaneie código expirado
           if (img) img.src = '';
+          const spinnerText = document.querySelector('#waQrCodeSpinner span');
+          if (spinnerText) {
+            spinnerText.innerText = (statusData.status === 'CONNECTING') ? 'Gerando QR Code...' : 'Atualizando código...';
+          }
           spinner?.classList.remove('hidden');
         }
 
@@ -9483,22 +9487,31 @@
           return;
         }
 
-        spinner?.classList.add('hidden');
-
         if (data.success && data.qrCode) {
           salonWaClientState = 'QR_WAITING';
           if (img) img.src = data.qrCode;
+          spinner?.classList.add('hidden');
           scheduleSalonWaPoll();
         } else if (data.status === 'CONNECTED') {
+          spinner?.classList.add('hidden');
           salonWaClientState = 'CONNECTED';
           showToast('WhatsApp já conectado!');
           loadSalonWhatsAppStatus();
         } else if (data.code === 'RATE_LIMIT_EXCEEDED') {
+          spinner?.classList.add('hidden');
           salonWaClientState = 'RATE_LIMITED';
           showToast(data.error || 'Limite de renovação de QR Code excedido.', 'error');
           startQrRateLimitCountdown(data.retryAfter || 300);
           return;
+        } else if (data.success && (data.status === 'CONNECTING' || (data.status === 'WAITING_QR' && !data.qrCode))) {
+          // B1: Estado transitório: mantenha spinner ativo com "Gerando QR Code...", NÃO defina erro, NÃO cancele o socket e inicie o polling
+          salonWaClientState = 'QR_SELECTED';
+          const spinnerText = document.querySelector('#waQrCodeSpinner span');
+          if (spinnerText) spinnerText.innerText = 'Gerando QR Code...';
+          spinner?.classList.remove('hidden');
+          scheduleSalonWaPoll();
         } else {
+          spinner?.classList.add('hidden');
           salonWaClientState = 'ERROR';
           showToast(data.error || 'Erro ao gerar QR Code.', 'error');
           cancelSalonConnectMode();
