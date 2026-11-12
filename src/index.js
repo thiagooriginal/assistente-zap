@@ -10,6 +10,11 @@ const config = require('./config');
 const calendarService = require('./services/calendarService');
 const { startServer } = require('./server/app');
 const clientAuth = require('./services/clientAuthService');
+const { acquireAppLock } = require('./utils/appLock');
+
+if (process.env.NODE_ENV !== 'test') {
+  acquireAppLock();
+}
 
 const isStagingMode =
   process.env.APP_MODE === 'homologacao' ||

@@ -718,7 +718,7 @@ runVersionedMigration('20261110_01_salon_whatsapp_sessions', 'Create client_salo
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
       session_status TEXT NOT NULL DEFAULT 'DISCONNECTED' 
-        CHECK(session_status IN ('DISCONNECTED', 'WAITING_QR', 'WAITING_CODE', 'CONNECTING', 'CONNECTED', 'CONNECTION_LOST', 'ERROR')),
+        CHECK(session_status IN ('DISCONNECTED', 'WAITING_QR', 'WAITING_CODE', 'CONNECTING', 'CONNECTED', 'CONNECTION_LOST', 'ERROR', 'KMS_UNAVAILABLE', 'NOT_MIGRATED')),
       connected_phone TEXT,
       connected_phone_jid TEXT,
       connected_at TEXT,
@@ -780,6 +780,43 @@ runVersionedMigration('20261110_02_purge_whatsapp_credentials_from_db', 'Purge l
         pairing_code_cached = NULL,
         pairing_code_expires_at = NULL;
   `);
+});
+
+// Versioned migration: T9 - Allow KMS_UNAVAILABLE and NOT_MIGRATED session statuses
+runVersionedMigration('20261112_01_t9_kms_session_status', 'Allow KMS_UNAVAILABLE and NOT_MIGRATED in client_salon_whatsapp_sessions', () => {
+  const tableInfo = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='client_salon_whatsapp_sessions'").get();
+  if (tableInfo && tableInfo.sql && !tableInfo.sql.includes('KMS_UNAVAILABLE')) {
+    db.exec(`
+      PRAGMA foreign_keys=OFF;
+      CREATE TABLE client_salon_whatsapp_sessions_new (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        session_status TEXT NOT NULL DEFAULT 'DISCONNECTED' 
+          CHECK(session_status IN ('DISCONNECTED', 'WAITING_QR', 'WAITING_CODE', 'CONNECTING', 'CONNECTED', 'CONNECTION_LOST', 'ERROR', 'KMS_UNAVAILABLE', 'NOT_MIGRATED')),
+        connected_phone TEXT,
+        connected_phone_jid TEXT,
+        connected_at TEXT,
+        last_seen_at TEXT,
+        last_error TEXT,
+        pairing_method TEXT CHECK(pairing_method IN ('QR', 'CODE') OR pairing_method IS NULL),
+        qr_code_cached TEXT,
+        qr_code_expires_at TEXT,
+        pairing_code_cached TEXT,
+        pairing_code_expires_at TEXT,
+        auth_dir_path TEXT,
+        reconnect_attempts INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );
+      INSERT INTO client_salon_whatsapp_sessions_new SELECT * FROM client_salon_whatsapp_sessions;
+      DROP TABLE client_salon_whatsapp_sessions;
+      ALTER TABLE client_salon_whatsapp_sessions_new RENAME TO client_salon_whatsapp_sessions;
+      CREATE INDEX IF NOT EXISTS idx_salon_wa_sessions_user ON client_salon_whatsapp_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_salon_wa_sessions_status ON client_salon_whatsapp_sessions(session_status);
+      CREATE INDEX IF NOT EXISTS idx_salon_wa_sessions_phone ON client_salon_whatsapp_sessions(connected_phone);
+      PRAGMA foreign_keys=ON;
+    `);
+  }
 });
 
 // User columns for Client Authentication & Hotmart Subscriptions

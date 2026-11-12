@@ -15,6 +15,11 @@ const { handleIncomingMessage } = require('./messageHandler');
 const { startReminderJob } = require('../services/reminderService');
 const agentChatService = require('../services/agentChatService');
 const phoneUtils = require('../utils/phoneUtils');
+const {
+  useEncryptedMultiFileAuthState,
+  clearTenantDek,
+} = require('./encryptedAuthState');
+const { getKeyProvider } = require('../security/keyProvider');
 
 let currentSock = null;
 let lastKnownUserJid = null;
@@ -157,7 +162,17 @@ async function startWhatsAppBot() {
     return null;
   }
 
-  const { state, saveCreds } = await useMultiFileAuthState(config.authDir);
+  const isEncryptionOn = process.env.WA_CREDS_ENCRYPTION === 'on';
+  let authStateResult;
+  if (isEncryptionOn) {
+    authStateResult = await useEncryptedMultiFileAuthState(config.authDir, {
+      tenantId: 'personal',
+      keyProvider: getKeyProvider(),
+    });
+  } else {
+    authStateResult = await useMultiFileAuthState(config.authDir);
+  }
+  const { state, saveCreds } = authStateResult;
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log(`Usando versão Baileys v${version.join('.')}, isLatest: ${isLatest}`);
 
@@ -206,12 +221,21 @@ async function startWhatsAppBot() {
         setTimeout(startWhatsAppBot, 3000);
       } else {
         console.log('Você foi desconectado (logout). Limpando sessão...');
+        const qrImagePath = path.resolve(__dirname, '../../qrcode.png');
+        if (fs.existsSync(qrImagePath)) {
+          try { fs.unlinkSync(qrImagePath); } catch (_) {}
+        }
+        clearTenantDek('personal');
         if (fs.existsSync(config.authDir)) {
           fs.rmSync(config.authDir, { recursive: true, force: true });
         }
         setTimeout(startWhatsAppBot, 2000);
       }
     } else if (connection === 'open') {
+      const qrImagePath = path.resolve(__dirname, '../../qrcode.png');
+      if (fs.existsSync(qrImagePath)) {
+        try { fs.unlinkSync(qrImagePath); } catch (_) {}
+      }
       console.log('\n=========================================');
       console.log('🚀 WHATSAPP CONECTADO COM SUCESSO!');
       console.log(`Conectado como: ${sock.user?.id || 'Desconhecido'}`);

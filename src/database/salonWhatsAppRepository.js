@@ -21,6 +21,8 @@ const ALLOWED_SESSION_STATUSES = Object.freeze([
   'CONNECTED',
   'CONNECTION_LOST',
   'ERROR',
+  'KMS_UNAVAILABLE',
+  'NOT_MIGRATED',
 ]);
 
 const ALLOWED_EVENT_TYPES = Object.freeze([
@@ -237,9 +239,10 @@ class SalonWhatsAppRepository {
    * @param {string} params.phoneJid
    * @param {string} [params.pairingMethod='QR']
    */
-  static markSessionConnected(userId, { phone, phoneJid, pairingMethod = 'QR' }) {
+  static markSessionConnected(userId, { phone, phoneJid = null, pairingMethod = 'QR' }) {
     const uid = Number(userId);
     const now = new Date().toISOString();
+    const safePhoneJid = phoneJid || (phone ? `${phone.replace(/\D/g, '')}@s.whatsapp.net` : null);
 
     try {
       db.exec('BEGIN IMMEDIATE');
@@ -259,7 +262,7 @@ class SalonWhatsAppRepository {
             pairing_code_expires_at = NULL,
             updated_at = CURRENT_TIMESTAMP
         WHERE user_id = ?
-      `).run(phone, phoneJid, pairingMethod, now, now, uid);
+      `).run(phone, safePhoneJid, pairingMethod, now, now, uid);
 
       db.prepare(`
         UPDATE client_salons

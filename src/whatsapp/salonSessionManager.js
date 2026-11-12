@@ -33,6 +33,18 @@ const SalonWhatsAppRepository = require('../database/salonWhatsAppRepository');
 const phoneUtils = require('../utils/phoneUtils');
 const clientModule = require('./client');
 const salonIncomingDispatcher = require('./salonIncomingDispatcher');
+const {
+  useEncryptedMultiFileAuthState,
+  clearTenantDek,
+  readEncryptedJson,
+  readEncryptedJsonSync,
+} = require('./encryptedAuthState');
+const {
+  getKeyProvider,
+  getKmsStatus,
+  _setKeyProviderForTesting,
+  _resetKeyProviderForTesting,
+} = require('../security/keyProvider');
 
 // Raiz padrão das credenciais persistentes
 let SESSIONS_ROOT = path.resolve(__dirname, '../../data/sessions');
@@ -80,6 +92,7 @@ function recordDiagnosticEvent(userId, event, details = {}) {
  */
 function inspectSalonAuthCredentials(userId) {
   const uid = Number(userId);
+  const isEncryptionOn = process.env.WA_CREDS_ENCRYPTION === 'on';
   if (!uid || isNaN(uid) || uid <= 0) {
     return {
       exists: false,
@@ -88,6 +101,9 @@ function inspectSalonAuthCredentials(userId) {
       credsMe: null,
       filesCount: 0,
       keyFilesCount: 0,
+      encryptionMode: isEncryptionOn ? 'on' : 'off',
+      sessionEncrypted: false,
+      notMigrated: false,
     };
   }
   const sessionDir = path.resolve(SESSIONS_ROOT, `salon_${uid}`);
@@ -99,30 +115,67 @@ function inspectSalonAuthCredentials(userId) {
       credsMe: null,
       filesCount: 0,
       keyFilesCount: 0,
+      encryptionMode: isEncryptionOn ? 'on' : 'off',
+      sessionEncrypted: false,
+      notMigrated: false,
     };
   }
   try {
     const files = fs.readdirSync(sessionDir);
-    const hasCreds = files.includes('creds.json');
+    const hasPlainCreds = files.includes('creds.json');
+    const hasEncCreds = files.includes('creds.json.enc');
+
     let credsValid = false;
     let credsMe = null;
-    if (hasCreds) {
-      try {
-        const raw = fs.readFileSync(path.join(sessionDir, 'creds.json'), 'utf8');
-        const parsed = JSON.parse(raw);
-        credsValid = Boolean(parsed && typeof parsed === 'object' && parsed.me?.id && parsed.account);
-        if (parsed?.me?.id) {
-          credsMe = phoneUtils.maskPhoneNumber(parsed.me.id.split('@')[0].split(':')[0]);
-        }
-      } catch (_) {}
+    let sessionEncrypted = false;
+    let notMigrated = false;
+
+    if (isEncryptionOn) {
+      if (hasEncCreds) {
+        sessionEncrypted = true;
+        try {
+          const parsed = readEncryptedJsonSync(sessionDir, 'creds.json', { tenantId: uid });
+          credsValid = Boolean(parsed && typeof parsed === 'object' && parsed.me?.id && parsed.account);
+          if (parsed?.me?.id) {
+            credsMe = phoneUtils.maskPhoneNumber(parsed.me.id.split('@')[0].split(':')[0]);
+          }
+        } catch (_) {}
+      } else if (hasPlainCreds) {
+        notMigrated = true;
+        try {
+          const raw = fs.readFileSync(path.join(sessionDir, 'creds.json'), 'utf8');
+          const parsed = JSON.parse(raw);
+          credsValid = Boolean(parsed && typeof parsed === 'object' && parsed.me?.id && parsed.account);
+          if (parsed?.me?.id) {
+            credsMe = phoneUtils.maskPhoneNumber(parsed.me.id.split('@')[0].split(':')[0]);
+          }
+        } catch (_) {}
+      }
+    } else {
+      if (hasPlainCreds) {
+        try {
+          const raw = fs.readFileSync(path.join(sessionDir, 'creds.json'), 'utf8');
+          const parsed = JSON.parse(raw);
+          credsValid = Boolean(parsed && typeof parsed === 'object' && parsed.me?.id && parsed.account);
+          if (parsed?.me?.id) {
+            credsMe = phoneUtils.maskPhoneNumber(parsed.me.id.split('@')[0].split(':')[0]);
+          }
+        } catch (_) {}
+      }
     }
+
+    const hasCreds = isEncryptionOn ? (hasEncCreds || hasPlainCreds) : hasPlainCreds;
+
     return {
       exists: true,
       hasCreds,
       credsValid,
       credsMe,
       filesCount: files.length,
-      keyFilesCount: files.filter((f) => f.endsWith('.json')).length,
+      keyFilesCount: files.filter((f) => f.endsWith('.json') || f.endsWith('.json.enc')).length,
+      encryptionMode: isEncryptionOn ? 'on' : 'off',
+      sessionEncrypted,
+      notMigrated,
     };
   } catch (err) {
     return {
@@ -132,6 +185,9 @@ function inspectSalonAuthCredentials(userId) {
       credsMe: null,
       filesCount: 0,
       keyFilesCount: 0,
+      encryptionMode: isEncryptionOn ? 'on' : 'off',
+      sessionEncrypted: false,
+      notMigrated: false,
       error: 'FS_READ_ERROR',
     };
   }
@@ -148,6 +204,8 @@ function getSalonDiagnostics(userId) {
   const repo = SalonWhatsAppRepository.getSessionByUserId(uid);
   const events = salonDiagnostics.get(uid) || [];
   const credentialsAudit = inspectSalonAuthCredentials(uid);
+  const isEncryptionOn = process.env.WA_CREDS_ENCRYPTION === 'on';
+  const kmsStatus = getKmsStatus();
 
   return {
     userId: uid,
@@ -159,6 +217,10 @@ function getSalonDiagnostics(userId) {
     qrExpiresInMs: session?.qrExpiresAt ? Math.max(0, session.qrExpiresAt - Date.now()) : 0,
     pairingActive: Boolean(session && session.pairingCode && session.pairingExpiresAt > Date.now()),
     connectedPhone: session?.connectedPhone ? phoneUtils.maskPhoneNumber(session.connectedPhone) : (repo?.connected_phone ? phoneUtils.maskPhoneNumber(repo.connected_phone) : null),
+    encryptionMode: isEncryptionOn ? 'on' : 'off',
+    sessionEncrypted: credentialsAudit.sessionEncrypted,
+    notMigrated: credentialsAudit.notMigrated,
+    kmsStatus,
     environment: {
       isHomologacao: process.env.HOMOLOGACAO === 'true',
       allowSalonWhatsAppTesting: process.env.ALLOW_SALON_WHATSAPP_TESTING === 'true',
@@ -470,7 +532,17 @@ async function _createBaileysSocket(uid, sessionDir, session) {
     return { sock, saveCreds: () => {}, currentGen };
   }
 
-  const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+  const isEncryptionOn = process.env.WA_CREDS_ENCRYPTION === 'on';
+  let authStateResult;
+  if (isEncryptionOn) {
+    authStateResult = await useEncryptedMultiFileAuthState(sessionDir, {
+      tenantId: uid,
+      keyProvider: getKeyProvider(),
+    });
+  } else {
+    authStateResult = await useMultiFileAuthState(sessionDir);
+  }
+  const { state, saveCreds } = authStateResult;
   if (isSessionAborted()) {
     throw new Error('SESSION_CANCELLED_OR_SUPERSEDED: Sessão invalidada durante leitura de auth state.');
   }
@@ -1202,6 +1274,7 @@ async function disconnect(userId) {
   }
 
   activeSessions.delete(uid);
+  clearTenantDek(uid);
   recordDiagnosticEvent(uid, 'DISCONNECTED', { reason: 'Desconexão formal solicitada pelo usuário.' });
 
   // Expurgo seguro das credenciais em disco
@@ -1425,37 +1498,84 @@ async function restoreActiveSalonSessions() {
 
     try {
       const sessionDir = getSalonSessionDir(uid);
-      const credsFile = path.join(sessionDir, 'creds.json');
+      const isEncryptionOn = process.env.WA_CREDS_ENCRYPTION === 'on';
+      const encCredsFile = path.join(sessionDir, 'creds.json.enc');
+      const plainCredsFile = path.join(sessionDir, 'creds.json');
 
-      if (!fs.existsSync(credsFile)) {
-        // Credenciais ausentes em disco: marca desconectado
-        SalonWhatsAppRepository.markSessionDisconnected(uid, {
-          status: 'DISCONNECTED',
-          error: 'Credenciais ausentes em disco após inicialização.',
-          resetCredentials: false,
-        });
-        continue;
-      }
-
-      // Valida se o creds.json contém credenciais autenticadas (me.id + account)
-      try {
-        const rawCreds = fs.readFileSync(credsFile, 'utf8');
-        const parsedCreds = JSON.parse(rawCreds);
-        if (!parsedCreds || !parsedCreds.me?.id || !parsedCreds.account) {
+      if (isEncryptionOn) {
+        if (!fs.existsSync(encCredsFile)) {
+          if (fs.existsSync(plainCredsFile)) {
+            console.warn(`[salonSessionManager] Sessão #${uid} possui credenciais em texto claro pendentes de migração (T9).`);
+            SalonWhatsAppRepository.markSessionDisconnected(uid, {
+              status: 'NOT_MIGRATED',
+              error: 'Sessão em texto claro pendente de migração para armazenamento cifrado.',
+              resetCredentials: false,
+            });
+            continue;
+          }
           SalonWhatsAppRepository.markSessionDisconnected(uid, {
             status: 'DISCONNECTED',
-            error: 'Credenciais incompletas ou não autenticadas.',
+            error: 'Credenciais cifradas ausentes em disco após inicialização.',
             resetCredentials: false,
           });
           continue;
         }
-      } catch (_) {
-        SalonWhatsAppRepository.markSessionDisconnected(uid, {
-          status: 'CONNECTION_LOST',
-          error: 'Arquivo de credenciais corrompido no disco.',
-          resetCredentials: false,
-        });
-        continue;
+
+        let parsedCreds;
+        try {
+          parsedCreds = await readEncryptedJson(sessionDir, 'creds.json', {
+            tenantId: uid,
+            keyProvider: getKeyProvider(),
+          });
+        } catch (kmsErr) {
+          console.error(`[salonSessionManager] Erro KMS ao decifrar credenciais da sessão #${uid}:`, kmsErr.message);
+          SalonWhatsAppRepository.markSessionDisconnected(uid, {
+            status: 'KMS_UNAVAILABLE',
+            error: `KMS indisponível ao decifrar credenciais: ${kmsErr.message}`,
+            resetCredentials: false,
+          });
+          continue;
+        }
+
+        if (!parsedCreds || !parsedCreds.me?.id || !parsedCreds.account) {
+          SalonWhatsAppRepository.markSessionDisconnected(uid, {
+            status: 'DISCONNECTED',
+            error: 'Credenciais cifradas incompletas ou não autenticadas.',
+            resetCredentials: false,
+          });
+          continue;
+        }
+      } else {
+        if (!fs.existsSync(plainCredsFile)) {
+          // Credenciais ausentes em disco: marca desconectado
+          SalonWhatsAppRepository.markSessionDisconnected(uid, {
+            status: 'DISCONNECTED',
+            error: 'Credenciais ausentes em disco após inicialização.',
+            resetCredentials: false,
+          });
+          continue;
+        }
+
+        // Valida se o creds.json contém credenciais autenticadas (me.id + account)
+        try {
+          const rawCreds = fs.readFileSync(plainCredsFile, 'utf8');
+          const parsedCreds = JSON.parse(rawCreds);
+          if (!parsedCreds || !parsedCreds.me?.id || !parsedCreds.account) {
+            SalonWhatsAppRepository.markSessionDisconnected(uid, {
+              status: 'DISCONNECTED',
+              error: 'Credenciais incompletas ou não autenticadas.',
+              resetCredentials: false,
+            });
+            continue;
+          }
+        } catch (_) {
+          SalonWhatsAppRepository.markSessionDisconnected(uid, {
+            status: 'CONNECTION_LOST',
+            error: 'Arquivo de credenciais corrompido no disco.',
+            resetCredentials: false,
+          });
+          continue;
+        }
       }
 
       const session = {
@@ -1575,4 +1695,6 @@ module.exports = {
   _setBaseDirForTesting,
   _setBaileysSocketFactoryForTesting,
   _setQrInitTimeoutForTesting,
+  _setKeyProviderForTesting,
+  _resetKeyProviderForTesting,
 };
