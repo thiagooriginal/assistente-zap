@@ -30,16 +30,22 @@ const {
 const { getKeyProvider } = require('../src/security/keyProvider');
 const { inspectAppLock, tryForceUnlock, DEFAULT_LOCK_FILE } = require('../src/utils/appLock');
 
-const DEFAULT_SESSIONS_ROOT = path.resolve(__dirname, '../data/sessions');
-const DEFAULT_QUARANTINE_ROOT = path.resolve(__dirname, '../data/sessions_quarantine');
-const DEFAULT_PERSONAL_DIR = path.resolve(__dirname, '../auth_info_baileys');
+const DEFAULT_SESSIONS_ROOT = process.env.WA_SESSIONS_DIR
+  ? path.resolve(process.env.WA_SESSIONS_DIR)
+  : path.resolve(__dirname, '../data/sessions');
+const DEFAULT_QUARANTINE_ROOT = process.env.WA_QUARANTINE_DIR
+  ? path.resolve(process.env.WA_QUARANTINE_DIR)
+  : path.resolve(__dirname, '../data/sessions_quarantine');
+const DEFAULT_PERSONAL_DIR = process.env.WA_PERSONAL_AUTH_DIR
+  ? path.resolve(process.env.WA_PERSONAL_AUTH_DIR)
+  : path.resolve(__dirname, '../auth_info_baileys');
 
 /**
  * Retorna os diretórios alvo para processamento
  * @param {object} options
  * @returns {Array<{ tenantId: string|number, dir: string, isPersonal: boolean }>}
  */
-function resolveTargets({ tenant, personal, all, baseSessionsDir = DEFAULT_SESSIONS_ROOT, personalDir = DEFAULT_PERSONAL_DIR }) {
+function resolveTargets({ tenant, personal, all, dir, baseSessionsDir = DEFAULT_SESSIONS_ROOT, personalDir = DEFAULT_PERSONAL_DIR }) {
   const targets = [];
 
   if (tenant) {
@@ -49,7 +55,7 @@ function resolveTargets({ tenant, personal, all, baseSessionsDir = DEFAULT_SESSI
     }
     targets.push({
       tenantId: uid,
-      dir: path.join(baseSessionsDir, `salon_${uid}`),
+      dir: dir ? path.resolve(dir) : path.join(baseSessionsDir, `salon_${uid}`),
       isPersonal: false,
     });
   }
@@ -488,6 +494,10 @@ async function main(argv = process.argv.slice(2), { exitOnError = true, lockFile
     const arg = argv[i];
     if (arg === '--tenant' && argv[i + 1]) {
       args.tenant = argv[++i];
+    } else if ((arg === '--sessions-dir' || arg === '--base-sessions-dir') && argv[i + 1]) {
+      args.baseSessionsDir = path.resolve(argv[++i]);
+    } else if (arg === '--dir' && argv[i + 1]) {
+      args.dir = path.resolve(argv[++i]);
     } else if (arg === '--personal') {
       args.personal = true;
     } else if (arg === '--all') {

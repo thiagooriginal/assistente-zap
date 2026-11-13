@@ -29,9 +29,13 @@ const { EventEmitter } = require('node:events');
 const uniqueRunId = `035_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 const tempDbPath = path.join(os.tmpdir(), `raia_test_db_${uniqueRunId}.db`);
 const tempSessionsDir = path.join(os.tmpdir(), `raia_test_sessions_${uniqueRunId}`);
+const tempLockPath = path.join(os.tmpdir(), `raia_test_lock_${uniqueRunId}.lock`);
 fs.mkdirSync(tempSessionsDir, { recursive: true });
 
 process.env.DB_PATH = tempDbPath;
+process.env.WA_LOCK_PATH = tempLockPath;
+process.env.WA_SESSIONS_DIR = tempSessionsDir;
+process.env.NODE_ENV = 'test';
 process.env.APP_MODE = 'staging';
 process.env.HOMOLOGACAO = 'true';
 process.env.ALLOW_SALON_WHATSAPP_TESTING = 'true';
@@ -381,5 +385,13 @@ test.describe('COMANDO 035 — SUÍTE HERMÉTICA DE AUDITORIA CRUZADA DO CLAUDE 
 
     const diag = salonSessionManager.getSalonDiagnostics(unlistedUid);
     assert.strictEqual(diag.environment.allowedPhonesCount, undefined, 'Não deve vazar contagens de telefones');
+  });
+
+  test.after(() => {
+    try {
+      if (fs.existsSync(tempLockPath)) fs.unlinkSync(tempLockPath);
+      if (fs.existsSync(tempDbPath)) fs.unlinkSync(tempDbPath);
+      if (fs.existsSync(tempSessionsDir)) fs.rmSync(tempSessionsDir, { recursive: true, force: true });
+    } catch (_) {}
   });
 });

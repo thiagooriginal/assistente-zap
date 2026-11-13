@@ -29,9 +29,13 @@ const { EventEmitter } = require('node:events');
 const uniqueRunId = `036_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 const tempDbPath = path.join(os.tmpdir(), `raia_test_db_${uniqueRunId}.db`);
 const tempSessionsDir = path.join(os.tmpdir(), `raia_test_sessions_${uniqueRunId}`);
+const tempLockPath = path.join(os.tmpdir(), `raia_test_lock_${uniqueRunId}.lock`);
 fs.mkdirSync(tempSessionsDir, { recursive: true });
 
 process.env.DB_PATH = tempDbPath;
+process.env.WA_LOCK_PATH = tempLockPath;
+process.env.WA_SESSIONS_DIR = tempSessionsDir;
+process.env.NODE_ENV = 'test';
 process.env.APP_MODE = 'staging';
 process.env.HOMOLOGACAO = 'true';
 process.env.ALLOW_SALON_WHATSAPP_TESTING = 'true';
@@ -437,5 +441,13 @@ test.describe('COMANDO 036 — SUÍTE HERMÉTICA DE CORREÇÕES BLOQUEANTES (B1,
       htmlContent.includes('statusData.qrCode'),
       'painel.html deve renderizar a imagem do QR Code quando disponibilizada no polling'
     );
+  });
+
+  test.after(() => {
+    try {
+      if (fs.existsSync(tempLockPath)) fs.unlinkSync(tempLockPath);
+      if (fs.existsSync(tempDbPath)) fs.unlinkSync(tempDbPath);
+      if (fs.existsSync(tempSessionsDir)) fs.rmSync(tempSessionsDir, { recursive: true, force: true });
+    } catch (_) {}
   });
 });

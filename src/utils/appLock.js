@@ -9,7 +9,19 @@
 const fs = require('fs');
 const path = require('path');
 
-const DEFAULT_LOCK_FILE = path.resolve(__dirname, '../../data/wa-sessions.lock');
+const OPERATIONAL_LOCK_FILE = path.resolve(__dirname, '../../data/wa-sessions.lock');
+const DEFAULT_LOCK_FILE = OPERATIONAL_LOCK_FILE;
+
+/**
+ * Resolve o caminho do lock file com suporte a WA_LOCK_PATH
+ * @param {string} [customPath]
+ * @returns {string}
+ */
+function resolveLockFilePath(customPath) {
+  if (customPath) return path.resolve(customPath);
+  if (process.env.WA_LOCK_PATH) return path.resolve(process.env.WA_LOCK_PATH);
+  return OPERATIONAL_LOCK_FILE;
+}
 
 // Estado de aquisição em memória por processo
 let _engineLockAcquired = false;
@@ -112,7 +124,8 @@ function getLinuxProcessStat(pid) {
  *   lockFile: string
  * }}
  */
-function inspectAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
+function inspectAppLock(customPath) {
+  const lockFilePath = resolveLockFilePath(customPath);
   if (!fs.existsSync(lockFilePath)) {
     return {
       exists: false,
@@ -339,7 +352,8 @@ function inspectAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
  * @param {{ logger?: object }} [options]
  * @returns {{ unlocked: boolean, reason: string, status: object }}
  */
-function tryForceUnlock(lockFilePath = DEFAULT_LOCK_FILE, { logger = console } = {}) {
+function tryForceUnlock(customPath, { logger = console } = {}) {
+  const lockFilePath = resolveLockFilePath(customPath);
   const status = inspectAppLock(lockFilePath);
   if (!status.exists) {
     return { unlocked: true, reason: 'LOCK_NOT_FOUND', status };
@@ -354,6 +368,10 @@ function tryForceUnlock(lockFilePath = DEFAULT_LOCK_FILE, { logger = console } =
   }
 
   try {
+    // Salvaguarda: em ambiente de teste, nunca apaga a trava operacional data/wa-sessions.lock
+    if (process.env.NODE_ENV === 'test' && lockFilePath === OPERATIONAL_LOCK_FILE) {
+      return { unlocked: false, reason: 'TEST_ENVIRONMENT_PREVENTED_OPERATIONAL_LOCK_REMOVAL', status };
+    }
     fs.unlinkSync(lockFilePath);
     if (logger && typeof logger.warn === 'function') {
       logger.warn(`[appLock] Trava órfã removida com sucesso. Motivo: ${status.reason} (PID: ${status.pid}).`);
@@ -367,11 +385,17 @@ function tryForceUnlock(lockFilePath = DEFAULT_LOCK_FILE, { logger = console } =
 /**
  * Adquire a trava de sessões do WhatsApp gravando PID, startTicks, bootId e engineId.
  * Se WA_SESSIONS_DISABLED=true, não adquire e retorna false.
- * @param {string} [lockFilePath=DEFAULT_LOCK_FILE]
+ * @param {string} [customPath]
  * @returns {boolean} True se o lock foi adquirido
  */
-function acquireAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
+function acquireAppLock(customPath) {
+  const lockFilePath = resolveLockFilePath(customPath);
   if (process.env.WA_SESSIONS_DISABLED === 'true') {
+    return false;
+  }
+
+  // Salvaguarda mandatória: em ambiente de teste, nunca grava no arquivo operacional data/wa-sessions.lock
+  if (process.env.NODE_ENV === 'test' && lockFilePath === OPERATIONAL_LOCK_FILE) {
     return false;
   }
 
@@ -403,6 +427,9 @@ function acquireAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
 
   const removeLock = () => {
     try {
+      if (process.env.NODE_ENV === 'test' && lockFilePath === OPERATIONAL_LOCK_FILE) {
+        return;
+      }
       if (fs.existsSync(lockFilePath)) {
         const raw = fs.readFileSync(lockFilePath, 'utf8').trim();
         try {
@@ -435,15 +462,16 @@ function acquireAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
 /**
  * Garante a criação da trava do motor WhatsApp sempre que um motor puder iniciar.
  * Idempotente por processo.
- * @param {string} [lockFilePath=DEFAULT_LOCK_FILE]
+ * @param {string} [customPath]
  * @returns {boolean}
  */
-function ensureWaEngineLock(lockFilePath = DEFAULT_LOCK_FILE) {
+function ensureWaEngineLock(customPath) {
+  const lockFilePath = resolveLockFilePath(customPath);
   if (process.env.WA_SESSIONS_DISABLED === 'true') {
     return false;
   }
 
-  if (process.env.NODE_ENV === 'test' && lockFilePath === DEFAULT_LOCK_FILE) {
+  if (process.env.NODE_ENV === 'test' && lockFilePath === OPERATIONAL_LOCK_FILE) {
     return false;
   }
 
@@ -465,10 +493,14 @@ function ensureWaEngineLock(lockFilePath = DEFAULT_LOCK_FILE) {
 
 /**
  * Libera explicitamente o lock file
- * @param {string} [lockFilePath=DEFAULT_LOCK_FILE]
+ * @param {string} [customPath]
  */
-function releaseAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
+function releaseAppLock(customPath) {
+  const lockFilePath = resolveLockFilePath(customPath);
   try {
+    if (process.env.NODE_ENV === 'test' && lockFilePath === OPERATIONAL_LOCK_FILE) {
+      return;
+    }
     if (fs.existsSync(lockFilePath)) {
       fs.unlinkSync(lockFilePath);
     }
@@ -482,7 +514,8 @@ function releaseAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
 /**
  * Função de retrocompatibilidade para chamadas legadas
  */
-function checkAppRunning(lockFilePath = DEFAULT_LOCK_FILE) {
+function checkAppRunning(customPath) {
+  const lockFilePath = resolveLockFilePath(customPath);
   const status = inspectAppLock(lockFilePath);
   return {
     running: status.running || status.indeterminate,

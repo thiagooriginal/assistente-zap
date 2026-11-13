@@ -34,6 +34,10 @@ fs.mkdirSync(suiteAuthDir, { recursive: true });
 
 // Redireciona DB_PATH para o SQLite temporário isolado
 process.env.DB_PATH = suiteDbPath;
+process.env.WA_LOCK_PATH = suiteLockFile;
+process.env.WA_SESSIONS_DIR = suiteSessionsDir;
+process.env.WA_QUARANTINE_DIR = path.join(suiteTempDir, 'quarantine');
+process.env.WA_PERSONAL_AUTH_DIR = suiteAuthDir;
 process.env.APP_MODE = 'staging';
 process.env.HOMOLOGACAO = 'true';
 process.env.NODE_ENV = 'test';
@@ -635,14 +639,14 @@ test('T12: Trava do motor de sessões com waCredsMigrate CLI e integridade de ar
 
     // Executa CLI sem force-unlock: bloqueia e mantém arquivo intacto
     await assert.rejects(
-      async () => waCredsMigrate.main(['--tenant', '13', '--migrate'], { exitOnError: false, lockFile, keyProvider: kp }),
+      async () => waCredsMigrate.main(['--tenant', '13', '--dir', sessionDir, '--migrate'], { exitOnError: false, lockFile, keyProvider: kp }),
       /Trava existente detectada/
     );
     assert.equal(crypto.createHash('sha256').update(fs.readFileSync(testJsonPath)).digest('hex'), hashOriginal);
 
     // Executa CLI com force-unlock: bloqueia pois o PID está vivo
     await assert.rejects(
-      async () => waCredsMigrate.main(['--tenant', '13', '--migrate', '--force-unlock'], { exitOnError: false, lockFile, keyProvider: kp }),
+      async () => waCredsMigrate.main(['--tenant', '13', '--dir', sessionDir, '--migrate', '--force-unlock'], { exitOnError: false, lockFile, keyProvider: kp }),
       /Não foi possível liberar a trava/
     );
     assert.equal(crypto.createHash('sha256').update(fs.readFileSync(testJsonPath)).digest('hex'), hashOriginal);
@@ -653,7 +657,7 @@ test('T12: Trava do motor de sessões com waCredsMigrate CLI e integridade de ar
     // (b) Trava com PID da própria ferramenta (process.pid)
     fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, startTicks: null, bootId: null, engineId: 'wa-sessions-engine' }));
     await assert.rejects(
-      async () => waCredsMigrate.main(['--tenant', '13', '--migrate', '--force-unlock'], { exitOnError: false, lockFile, keyProvider: kp }),
+      async () => waCredsMigrate.main(['--tenant', '13', '--dir', sessionDir, '--migrate', '--force-unlock'], { exitOnError: false, lockFile, keyProvider: kp }),
       /CANNOT_UNLOCK_SELF_PROCESS/
     );
     assert.equal(crypto.createHash('sha256').update(fs.readFileSync(testJsonPath)).digest('hex'), hashOriginal);
@@ -661,7 +665,7 @@ test('T12: Trava do motor de sessões com waCredsMigrate CLI e integridade de ar
     // (c) Trava ilegível / corrompida
     fs.writeFileSync(lockFile, 'CORRUPTED_RAW_NON_JSON');
     await assert.rejects(
-      async () => waCredsMigrate.main(['--tenant', '13', '--migrate', '--force-unlock'], { exitOnError: false, lockFile, keyProvider: kp }),
+      async () => waCredsMigrate.main(['--tenant', '13', '--dir', sessionDir, '--migrate', '--force-unlock'], { exitOnError: false, lockFile, keyProvider: kp }),
       /LOCK_CORRUPTED_OR_UNREADABLE/
     );
     assert.equal(crypto.createHash('sha256').update(fs.readFileSync(testJsonPath)).digest('hex'), hashOriginal);
@@ -670,7 +674,7 @@ test('T12: Trava do motor de sessões com waCredsMigrate CLI e integridade de ar
     fs.writeFileSync(lockFile, JSON.stringify({ pid: 9999999, startTicks: 100, bootId: 'mock', engineId: 'wa-sessions-engine' }));
     // Sem force-unlock: recusa
     await assert.rejects(
-      async () => waCredsMigrate.main(['--tenant', '13', '--migrate'], { exitOnError: false, lockFile, keyProvider: kp }),
+      async () => waCredsMigrate.main(['--tenant', '13', '--dir', sessionDir, '--migrate'], { exitOnError: false, lockFile, keyProvider: kp }),
       /Trava existente detectada/
     );
     // Com force-unlock: libera e remove a trava
@@ -729,9 +733,10 @@ test('T12-X: Trava entre processos reais sem função falsa (Windows e Linux)', 
   assert.equal(res.status, 0, `Filho deve detectar running=true e unlocked=false. Stderr: ${res.stderr}`);
 
   // Teste via CLI do waCredsMigrate no processo filho com --force-unlock
+  const tempSessionsDirX = createTestDir('t12_x_sess_');
   const cliRes = child_process.spawnSync(
     process.execPath,
-    ['scripts/waCredsMigrate.js', '--tenant', '13', '--migrate', '--force-unlock', '--lock-file', lockFile],
+    ['scripts/waCredsMigrate.js', '--tenant', '13', '--dir', tempSessionsDirX, '--migrate', '--force-unlock', '--lock-file', lockFile],
     {
       cwd: path.resolve(__dirname, '..'),
       encoding: 'utf8',
@@ -743,6 +748,7 @@ test('T12-X: Trava entre processos reais sem função falsa (Windows e Linux)', 
 
   _resetEngineLockForTesting();
   fs.rmSync(lockDir, { recursive: true, force: true });
+  fs.rmSync(tempSessionsDirX, { recursive: true, force: true });
 });
 
 test('T12-L: Parser de /proc/<pid>/stat com comm complexo (espaços/parênteses) e bootId', () => {
