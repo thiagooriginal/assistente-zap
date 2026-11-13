@@ -260,6 +260,20 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_client_staff_user ON client_staff(user_id);
 
+  -- CLIENT PORTAL: Association between Services and Staff Members (N:N)
+  CREATE TABLE IF NOT EXISTS client_service_staff (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    service_id INTEGER NOT NULL REFERENCES client_services(id) ON DELETE CASCADE,
+    staff_id INTEGER NOT NULL REFERENCES client_staff(id) ON DELETE CASCADE,
+    confirmed INTEGER NOT NULL DEFAULT 1 CHECK(confirmed IN (0, 1)),
+    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, service_id, staff_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_css_tenant_service ON client_service_staff(user_id, service_id);
+  CREATE INDEX IF NOT EXISTS idx_css_tenant_staff ON client_service_staff(user_id, staff_id);
+  CREATE INDEX IF NOT EXISTS idx_css_tenant_confirmed ON client_service_staff(user_id, confirmed);
+
   -- CLIENT PORTAL: Promotional Campaigns (Pro Plan)
   CREATE TABLE IF NOT EXISTS client_campaigns (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -844,6 +858,115 @@ runVersionedMigration('20261112_01_t9_kms_session_status', 'Allow KMS_UNAVAILABL
     }
   }
 });
+
+// Versioned migration: Comando 040 - Vinculação Inteligente entre Serviços e Profissionais (client_service_staff)
+runVersionedMigration('20261113_01_client_service_staff', 'Create client_service_staff table and execute safe data transition', () => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS client_service_staff (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      service_id INTEGER NOT NULL REFERENCES client_services(id) ON DELETE CASCADE,
+      staff_id INTEGER NOT NULL REFERENCES client_staff(id) ON DELETE CASCADE,
+      confirmed INTEGER NOT NULL DEFAULT 1 CHECK(confirmed IN (0, 1)),
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, service_id, staff_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_css_tenant_service ON client_service_staff(user_id, service_id);
+    CREATE INDEX IF NOT EXISTS idx_css_tenant_staff ON client_service_staff(user_id, staff_id);
+    CREATE INDEX IF NOT EXISTS idx_css_tenant_confirmed ON client_service_staff(user_id, confirmed);
+  `);
+
+  ensureColumnExists('client_service_staff', 'confirmed', 'INTEGER NOT NULL DEFAULT 1 CHECK(confirmed IN (0, 1))');
+
+  // 1. Salões com exatamente 1 staff ativo: vincular a todos os serviços ativos do salão com confirmed = 1
+  db.exec(`
+    INSERT OR IGNORE INTO client_service_staff (user_id, service_id, staff_id, confirmed)
+    SELECT cs.user_id, cs.id AS service_id, staff_single.id AS staff_id, 1
+    FROM client_services cs
+    JOIN (
+      SELECT user_id, MIN(id) AS id
+      FROM client_staff
+      WHERE active = 1
+      GROUP BY user_id
+      HAVING COUNT(id) = 1
+    ) staff_single ON staff_single.user_id = cs.user_id
+    WHERE cs.active = 1;
+  `);
+
+  // 2. Vincula pares (service_id, staff_id) que já tenham agendamentos históricos válidos em appointments
+  try {
+    const aptCols = db.prepare("PRAGMA table_info(appointments)").all().map(c => c.name);
+    if (aptCols.includes('service_id') && aptCols.includes('staff_id')) {
+      db.exec(`
+        INSERT OR IGNORE INTO client_service_staff (user_id, service_id, staff_id, confirmed)
+        SELECT DISTINCT a.user_id, a.service_id, a.staff_id, 1
+        FROM appointments a
+        JOIN client_services cs ON cs.id = a.service_id AND cs.user_id = a.user_id
+        JOIN client_staff st ON st.id = a.staff_id AND st.user_id = a.user_id
+        WHERE a.service_id IS NOT NULL 
+          AND a.staff_id IS NOT NULL
+          AND cs.active = 1
+          AND st.active = 1;
+      `);
+    }
+  } catch (_) {}
+
+  // 3. Match heurístico por categoria / especialidade para salões com múltiplos profissionais (confirmed = 0: sugestão para conferência)
+  const multiStaffSalons = db.prepare(`
+    SELECT DISTINCT user_id FROM client_staff WHERE active = 1 GROUP BY user_id HAVING COUNT(id) > 1
+  `).all();
+
+  for (const salon of multiStaffSalons) {
+    const uId = salon.user_id;
+    const services = db.prepare('SELECT id, name, category FROM client_services WHERE user_id = ? AND active = 1').all(uId);
+    const staff = db.prepare('SELECT id, name, specialty FROM client_staff WHERE user_id = ? AND active = 1').all(uId);
+
+    for (const svc of services) {
+      const existing = db.prepare('SELECT COUNT(*) AS count FROM client_service_staff WHERE user_id = ? AND service_id = ?').get(uId, svc.id);
+      if (existing && existing.count > 0) continue;
+
+      const svcText = `${svc.name} ${svc.category || ''}`.toLowerCase();
+      let matchedStaffList = [];
+
+      for (const st of staff) {
+        const spec = (st.specialty || '').toLowerCase();
+        if (!spec || spec.includes('geral') || spec.includes('atendimento')) {
+          matchedStaffList.push(st.id);
+          continue;
+        }
+
+        const isHairMatch = (spec.includes('cabel') || spec.includes('barb') || spec.includes('color')) &&
+          (svcText.includes('cabel') || svcText.includes('corte') || svcText.includes('escova') || svcText.includes('barb') || svcText.includes('mecha') || svcText.includes('tint'));
+        const isNailMatch = (spec.includes('manicur') || spec.includes('pedicur') || spec.includes('unha')) &&
+          (svcText.includes('unha') || svcText.includes('manicur') || svcText.includes('pedicur') || svcText.includes('gel') || svcText.includes('esmalte'));
+        const isEstheticMatch = (spec.includes('estet') || spec.includes('sobrancelh') || spec.includes('depil') || spec.includes('maquiag')) &&
+          (svcText.includes('estet') || svcText.includes('sobrancelh') || svcText.includes('depil') || svcText.includes('make') || svcText.includes('cera') || svcText.includes('limpeza'));
+
+        if (isHairMatch || isNailMatch || isEstheticMatch || svcText.includes(spec) || spec.includes(svc.category?.toLowerCase() || '')) {
+          matchedStaffList.push(st.id);
+        }
+      }
+
+      if (matchedStaffList.length === 0) {
+        matchedStaffList = staff.map(s => s.id);
+      }
+
+      const insertStmt = db.prepare('INSERT OR IGNORE INTO client_service_staff (user_id, service_id, staff_id, confirmed) VALUES (?, ?, ?, 0)');
+      for (const staffId of matchedStaffList) {
+        insertStmt.run(uId, svc.id, staffId);
+      }
+    }
+  }
+});
+
+// Versioned migration: Comando 040.1 - Coluna confirmed e índice para bases existentes
+runVersionedMigration('20261113_02_client_service_staff_confirmed', 'Add confirmed column and index to client_service_staff', () => {
+  ensureColumnExists('client_service_staff', 'confirmed', 'INTEGER NOT NULL DEFAULT 1 CHECK(confirmed IN (0, 1))');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_css_tenant_confirmed ON client_service_staff(user_id, confirmed);');
+});
+
+ensureColumnExists('client_service_staff', 'confirmed', 'INTEGER NOT NULL DEFAULT 1 CHECK(confirmed IN (0, 1))');
+db.exec('CREATE INDEX IF NOT EXISTS idx_css_tenant_confirmed ON client_service_staff(user_id, confirmed);');
 
 // User columns for Client Authentication & Hotmart Subscriptions
 ensureColumnExists('users', 'session_token', 'TEXT');

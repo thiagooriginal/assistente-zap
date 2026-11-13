@@ -596,6 +596,29 @@ router.get('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), (
 
   const rows = db.prepare(sql).all(...params);
 
+  // Buscar mapeamento de profissionais habilitados e pendentes para cada serviço
+  const staffRelations = db.prepare(`
+    SELECT css.service_id, css.staff_id, css.confirmed
+    FROM client_service_staff css
+    JOIN client_staff cs ON cs.id = css.staff_id AND cs.user_id = css.user_id
+    WHERE css.user_id = ? AND cs.active = 1
+  `).all(req.clientUser.id);
+  const staffByService = new Map();
+  const pendingStaffByService = new Map();
+  for (const rel of staffRelations) {
+    if (rel.confirmed === 1) {
+      if (!staffByService.has(rel.service_id)) {
+        staffByService.set(rel.service_id, []);
+      }
+      staffByService.get(rel.service_id).push(rel.staff_id);
+    } else {
+      if (!pendingStaffByService.has(rel.service_id)) {
+        pendingStaffByService.set(rel.service_id, []);
+      }
+      pendingStaffByService.get(rel.service_id).push(rel.staff_id);
+    }
+  }
+
   // Return both duration_min and duration_minutes for total compatibility and predictability
   const services = rows.map((svc) => ({
     id: svc.id,
@@ -608,13 +631,15 @@ router.get('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), (
     active: svc.active,
     appointment_count: svc.appointment_count || 0,
     has_appointments: (svc.appointment_count || 0) > 0,
+    staff_ids: staffByService.get(svc.id) || [],
+    pending_staff_ids: pendingStaffByService.get(svc.id) || [],
   }));
 
   res.json({ success: true, services });
 });
 
 router.post('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
-  const { name, price, category, confirmSimilar } = req.body || {};
+  const { name, price, category, confirmSimilar, staff_ids, staffIds } = req.body || {};
 
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ success: false, error: 'Nome e valor do serviço são obrigatórios.' });
@@ -694,19 +719,65 @@ router.post('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), 
 
   const cleanCategory = category && typeof category === 'string' && category.trim() ? category.trim() : 'Cabelos';
 
-  const info = db.prepare(`
-    INSERT INTO client_services (user_id, name, price, duration_min, category, active)
-    VALUES (?, ?, ?, ?, ?, 1)
-  `).run(
-    req.clientUser.id,
-    cleanName,
-    numPrice,
-    parsedDuration,
-    cleanCategory
-  );
+  // Validação estrita de staff_ids (fail-closed contra multi-tenant)
+  const rawStaffIds = staff_ids !== undefined ? staff_ids : staffIds;
+  let parsedStaffIds = null;
+  if (rawStaffIds !== undefined && rawStaffIds !== null) {
+    if (!Array.isArray(rawStaffIds)) {
+      return res.status(400).json({ success: false, error: 'O campo staff_ids deve ser uma lista de identificadores numéricos.' });
+    }
+    parsedStaffIds = [];
+    for (const sid of rawStaffIds) {
+      const num = Number(sid);
+      if (!Number.isInteger(num) || num <= 0) {
+        return res.status(400).json({ success: false, error: 'Identificador de profissional inválido na lista.' });
+      }
+      parsedStaffIds.push(num);
+    }
+    if (parsedStaffIds.length > 0) {
+      const uniqueIds = Array.from(new Set(parsedStaffIds));
+      const placeholders = uniqueIds.map(() => '?').join(',');
+      const countRow = db.prepare(`
+        SELECT COUNT(*) AS total
+        FROM client_staff
+        WHERE user_id = ? AND id IN (${placeholders}) AND active = 1
+      `).get(req.clientUser.id, ...uniqueIds);
+      if ((countRow?.total || 0) !== uniqueIds.length) {
+        return res.status(400).json({ success: false, error: 'Um ou mais profissionais selecionados não existem ou não pertencem ao seu salão.', code: 'INVALID_STAFF_IDS' });
+      }
+      parsedStaffIds = uniqueIds;
+    }
+  } else {
+    // Se não fornecido e o salão tem exatamente 1 staff ativo, auto-vincula
+    const activeStaff = db.prepare('SELECT id FROM client_staff WHERE user_id = ? AND active = 1').all(req.clientUser.id);
+    if (activeStaff.length === 1) {
+      parsedStaffIds = [activeStaff[0].id];
+    }
+  }
+
+  db.exec('BEGIN IMMEDIATE');
+  let serviceId;
+  try {
+    const info = db.prepare(`
+      INSERT INTO client_services (user_id, name, price, duration_min, category, active)
+      VALUES (?, ?, ?, ?, ?, 1)
+    `).run(req.clientUser.id, cleanName, numPrice, parsedDuration, cleanCategory);
+    serviceId = info.lastInsertRowid;
+
+    if (parsedStaffIds && parsedStaffIds.length > 0) {
+      const insertCss = db.prepare('INSERT INTO client_service_staff (user_id, service_id, staff_id, confirmed) VALUES (?, ?, ?, 1)');
+      for (const sId of parsedStaffIds) {
+        insertCss.run(req.clientUser.id, serviceId, sId);
+      }
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    return res.status(500).json({ success: false, error: 'Falha ao gravar serviço no banco de dados.' });
+  }
 
   const createdService = {
-    id: info.lastInsertRowid,
+    id: serviceId,
     user_id: req.clientUser.id,
     name: cleanName,
     price: numPrice,
@@ -716,6 +787,7 @@ router.post('/services', clientAuthMiddleware, requireProductAccess('JESSICA'), 
     active: 1,
     appointment_count: 0,
     has_appointments: false,
+    staff_ids: parsedStaffIds || [],
   };
 
   res.json({
@@ -869,7 +941,7 @@ router.post('/services/batch', clientAuthMiddleware, requireProductAccess('JESSI
 
 router.put('/services/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { id } = req.params;
-  const { name, price, category, active, confirmSimilar } = req.body || {};
+  const { name, price, category, active, confirmSimilar, staff_ids, staffIds } = req.body || {};
 
   const existing = db.prepare('SELECT id, name, duration_min FROM client_services WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
   if (!existing) {
@@ -949,23 +1021,67 @@ router.put('/services/:id', clientAuthMiddleware, requireProductAccess('JESSICA'
     }
   }
 
-  db.prepare(`
-    UPDATE client_services
-    SET name = COALESCE(?, name),
-        price = COALESCE(?, price),
-        duration_min = COALESCE(?, duration_min),
-        category = COALESCE(?, category),
-        active = COALESCE(?, active)
-    WHERE id = ? AND user_id = ?
-  `).run(
-    cleanName || null,
-    numPrice !== null ? numPrice : null,
-    parsedDuration !== null ? parsedDuration : null,
-    category && typeof category === 'string' && category.trim() ? category.trim() : null,
-    active !== undefined ? (Number(active) ? 1 : 0) : null,
-    id,
-    req.clientUser.id
-  );
+  const rawStaffIds = staff_ids !== undefined ? staff_ids : staffIds;
+  let parsedStaffIds = null;
+  if (rawStaffIds !== undefined && rawStaffIds !== null) {
+    if (!Array.isArray(rawStaffIds)) {
+      return res.status(400).json({ success: false, error: 'O campo staff_ids deve ser uma lista de identificadores numéricos.' });
+    }
+    parsedStaffIds = [];
+    for (const sid of rawStaffIds) {
+      const num = Number(sid);
+      if (!Number.isInteger(num) || num <= 0) {
+        return res.status(400).json({ success: false, error: 'Identificador de profissional inválido na lista.' });
+      }
+      parsedStaffIds.push(num);
+    }
+    if (parsedStaffIds.length > 0) {
+      const uniqueIds = Array.from(new Set(parsedStaffIds));
+      const placeholders = uniqueIds.map(() => '?').join(',');
+      const countRow = db.prepare(`
+        SELECT COUNT(*) AS total
+        FROM client_staff
+        WHERE user_id = ? AND id IN (${placeholders}) AND active = 1
+      `).get(req.clientUser.id, ...uniqueIds);
+      if ((countRow?.total || 0) !== uniqueIds.length) {
+        return res.status(400).json({ success: false, error: 'Um ou mais profissionais selecionados não existem ou não pertencem ao seu salão.', code: 'INVALID_STAFF_IDS' });
+      }
+      parsedStaffIds = uniqueIds;
+    }
+  }
+
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.prepare(`
+      UPDATE client_services
+      SET name = COALESCE(?, name),
+          price = COALESCE(?, price),
+          duration_min = COALESCE(?, duration_min),
+          category = COALESCE(?, category),
+          active = COALESCE(?, active)
+      WHERE id = ? AND user_id = ?
+    `).run(
+      cleanName || null,
+      numPrice !== null ? numPrice : null,
+      parsedDuration !== null ? parsedDuration : null,
+      category && typeof category === 'string' && category.trim() ? category.trim() : null,
+      active !== undefined ? (Number(active) ? 1 : 0) : null,
+      id,
+      req.clientUser.id
+    );
+
+    if (parsedStaffIds !== null) {
+      db.prepare('DELETE FROM client_service_staff WHERE user_id = ? AND service_id = ?').run(req.clientUser.id, id);
+      const insertCss = db.prepare('INSERT INTO client_service_staff (user_id, service_id, staff_id, confirmed) VALUES (?, ?, ?, 1)');
+      for (const sId of parsedStaffIds) {
+        insertCss.run(req.clientUser.id, id, sId);
+      }
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    return res.status(500).json({ success: false, error: 'Falha ao atualizar serviço no banco.' });
+  }
 
   const updated = db.prepare(`
     SELECT s.id, s.user_id, s.name, s.price, s.duration_min, s.category, s.active,
@@ -981,8 +1097,29 @@ router.put('/services/:id', clientAuthMiddleware, requireProductAccess('JESSICA'
       ...updated,
       duration_minutes: updated.duration_min,
       has_appointments: (updated.appointment_count || 0) > 0,
+      staff_ids: db.prepare(`
+        SELECT staff_id FROM client_service_staff WHERE user_id = ? AND service_id = ? AND confirmed = 1
+      `).all(req.clientUser.id, id).map(r => r.staff_id),
     } : null,
   });
+});
+
+// Retorna profissionais habilitados para um serviço específico
+router.get('/services/:id/staff', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const { id } = req.params;
+  const service = db.prepare('SELECT id, name FROM client_services WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
+  if (!service) {
+    return res.status(404).json({ success: false, error: 'Serviço não encontrado.' });
+  }
+  const staff = db.prepare(`
+    SELECT cs.id, cs.name, cs.specialty, cs.active, cs.google_calendar_id
+    FROM client_staff cs
+    JOIN client_service_staff css ON css.staff_id = cs.id AND css.user_id = cs.user_id
+    WHERE css.service_id = ? AND css.user_id = ? AND css.confirmed = 1 AND cs.active = 1
+    ORDER BY cs.name ASC
+  `).all(id, req.clientUser.id);
+
+  res.json({ success: true, service_id: Number(id), staff });
 });
 
 // Toggle Ativar / Desativar Serviço
@@ -1047,11 +1184,37 @@ router.get('/staff', clientAuthMiddleware, requireProductAccess('JESSICA'), (req
     ORDER BY id ASC
   `).all(req.clientUser.id);
 
-  res.json({ success: true, staff: rows });
+  const serviceRelations = db.prepare(`
+    SELECT css.staff_id, css.service_id, css.confirmed
+    FROM client_service_staff css
+    JOIN client_services cs ON cs.id = css.service_id AND cs.user_id = css.user_id
+    WHERE css.user_id = ? AND cs.active = 1
+  `).all(req.clientUser.id);
+  const servicesByStaff = new Map();
+  const pendingServicesByStaff = new Map();
+  for (const rel of serviceRelations) {
+    if (rel.confirmed === 1) {
+      if (!servicesByStaff.has(rel.staff_id)) {
+        servicesByStaff.set(rel.staff_id, []);
+      }
+      servicesByStaff.get(rel.staff_id).push(rel.service_id);
+    } else {
+      if (!pendingServicesByStaff.has(rel.staff_id)) {
+        pendingServicesByStaff.set(rel.staff_id, []);
+      }
+      pendingServicesByStaff.get(rel.staff_id).push(rel.service_id);
+    }
+  }
+
+  res.json({ success: true, staff: rows.map(s => ({
+    ...s,
+    service_ids: servicesByStaff.get(s.id) || [],
+    pending_service_ids: pendingServicesByStaff.get(s.id) || [],
+  })) });
 });
 
 router.post('/staff', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
-  const { name, specialty, googleCalendarId, daysOff, customHours } = req.body || {};
+  const { name, specialty, googleCalendarId, daysOff, customHours, service_ids, serviceIds } = req.body || {};
   if (!name || !name.trim()) {
     return res.status(400).json({ success: false, error: 'Nome do profissional é obrigatório.' });
   }
@@ -1074,27 +1237,72 @@ router.post('/staff', clientAuthMiddleware, requireProductAccess('JESSICA'), (re
   const daysOffStr = typeof daysOff === 'object' ? JSON.stringify(daysOff) : daysOff;
   const customHoursStr = typeof customHours === 'object' ? JSON.stringify(customHours) : customHours;
 
-  const info = db.prepare(`
-    INSERT INTO client_staff (user_id, name, specialty, google_calendar_id, days_off, custom_hours)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `).run(
-    req.clientUser.id,
-    name.trim(),
-    specialty ? specialty.trim() : 'Atendimento Geral',
-    googleCalendarId || null,
-    daysOffStr || null,
-    customHoursStr || null
-  );
+  const rawServiceIds = service_ids !== undefined ? service_ids : serviceIds;
+  let parsedServiceIds = null;
+  if (rawServiceIds !== undefined && rawServiceIds !== null) {
+    if (!Array.isArray(rawServiceIds)) {
+      return res.status(400).json({ success: false, error: 'O campo service_ids deve ser uma lista de identificadores.' });
+    }
+    parsedServiceIds = [];
+    for (const sid of rawServiceIds) {
+      const num = Number(sid);
+      if (!Number.isInteger(num) || num <= 0) {
+        return res.status(400).json({ success: false, error: 'Identificador de serviço inválido.' });
+      }
+      parsedServiceIds.push(num);
+    }
+    if (parsedServiceIds.length > 0) {
+      const uniqueIds = Array.from(new Set(parsedServiceIds));
+      const placeholders = uniqueIds.map(() => '?').join(',');
+      const countRow = db.prepare(`
+        SELECT COUNT(*) AS total
+        FROM client_services
+        WHERE user_id = ? AND id IN (${placeholders}) AND active = 1
+      `).get(req.clientUser.id, ...uniqueIds);
+      if ((countRow?.total || 0) !== uniqueIds.length) {
+        return res.status(400).json({ success: false, error: 'Um ou mais serviços selecionados não existem ou não pertencem ao seu salão.', code: 'INVALID_SERVICE_IDS' });
+      }
+      parsedServiceIds = uniqueIds;
+    }
+  }
+
+  db.exec('BEGIN IMMEDIATE');
+  let staffId;
+  try {
+    const info = db.prepare(`
+      INSERT INTO client_staff (user_id, name, specialty, google_calendar_id, days_off, custom_hours)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      req.clientUser.id,
+      name.trim(),
+      specialty ? specialty.trim() : 'Atendimento Geral',
+      googleCalendarId || null,
+      daysOffStr || null,
+      customHoursStr || null
+    );
+    staffId = info.lastInsertRowid;
+    if (parsedServiceIds && parsedServiceIds.length > 0) {
+      const insertCss = db.prepare('INSERT INTO client_service_staff (user_id, service_id, staff_id, confirmed) VALUES (?, ?, ?, 1)');
+      for (const sId of parsedServiceIds) {
+        insertCss.run(req.clientUser.id, sId, staffId);
+      }
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    return res.status(500).json({ success: false, error: 'Falha ao cadastrar profissional.' });
+  }
 
   res.json({
     success: true,
     staff: {
-      id: info.lastInsertRowid,
+      id: staffId,
       name: name.trim(),
       specialty: specialty || 'Atendimento Geral',
       google_calendar_id: googleCalendarId || null,
       days_off: daysOffStr || null,
       active: 1,
+      service_ids: parsedServiceIds || [],
     },
     message: 'Profissional adicionado à equipe com sucesso!',
   });
@@ -1102,7 +1310,7 @@ router.post('/staff', clientAuthMiddleware, requireProductAccess('JESSICA'), (re
 
 router.put('/staff/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { id } = req.params;
-  const { name, specialty, active, googleCalendarId, daysOff, customHours } = req.body || {};
+  const { name, specialty, active, googleCalendarId, daysOff, customHours, service_ids, serviceIds } = req.body || {};
 
   const existing = db.prepare('SELECT id FROM client_staff WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
   if (!existing) {
@@ -1112,27 +1320,173 @@ router.put('/staff/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), 
   const daysOffStr = typeof daysOff === 'object' ? JSON.stringify(daysOff) : daysOff;
   const customHoursStr = typeof customHours === 'object' ? JSON.stringify(customHours) : customHours;
 
-  db.prepare(`
-    UPDATE client_staff
-    SET name = COALESCE(?, name),
-        specialty = COALESCE(?, specialty),
-        active = COALESCE(?, active),
-        google_calendar_id = COALESCE(?, google_calendar_id),
-        days_off = COALESCE(?, days_off),
-        custom_hours = COALESCE(?, custom_hours)
-    WHERE id = ? AND user_id = ?
-  `).run(
-    name ? name.trim() : null,
-    specialty ? specialty.trim() : null,
-    active !== undefined ? (active ? 1 : 0) : null,
-    googleCalendarId !== undefined ? googleCalendarId : null,
-    daysOffStr !== undefined ? daysOffStr : null,
-    customHoursStr !== undefined ? customHoursStr : null,
-    id,
-    req.clientUser.id
-  );
+  const rawServiceIds = service_ids !== undefined ? service_ids : serviceIds;
+  let parsedServiceIds = null;
+  if (rawServiceIds !== undefined && rawServiceIds !== null) {
+    if (!Array.isArray(rawServiceIds)) {
+      return res.status(400).json({ success: false, error: 'O campo service_ids deve ser uma lista de identificadores.' });
+    }
+    parsedServiceIds = [];
+    for (const sid of rawServiceIds) {
+      const num = Number(sid);
+      if (!Number.isInteger(num) || num <= 0) {
+        return res.status(400).json({ success: false, error: 'Identificador de serviço inválido.' });
+      }
+      parsedServiceIds.push(num);
+    }
+    if (parsedServiceIds.length > 0) {
+      const uniqueIds = Array.from(new Set(parsedServiceIds));
+      const placeholders = uniqueIds.map(() => '?').join(',');
+      const countRow = db.prepare(`
+        SELECT COUNT(*) AS total
+        FROM client_services
+        WHERE user_id = ? AND id IN (${placeholders}) AND active = 1
+      `).get(req.clientUser.id, ...uniqueIds);
+      if ((countRow?.total || 0) !== uniqueIds.length) {
+        return res.status(400).json({ success: false, error: 'Um ou mais serviços selecionados não existem ou não pertencem ao seu salão.', code: 'INVALID_SERVICE_IDS' });
+      }
+      parsedServiceIds = uniqueIds;
+    }
+  }
+
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    db.prepare(`
+      UPDATE client_staff
+      SET name = COALESCE(?, name),
+          specialty = COALESCE(?, specialty),
+          active = COALESCE(?, active),
+          google_calendar_id = COALESCE(?, google_calendar_id),
+          days_off = COALESCE(?, days_off),
+          custom_hours = COALESCE(?, custom_hours)
+      WHERE id = ? AND user_id = ?
+    `).run(
+      name ? name.trim() : null,
+      specialty ? specialty.trim() : null,
+      active !== undefined ? (active ? 1 : 0) : null,
+      googleCalendarId !== undefined ? googleCalendarId : null,
+      daysOffStr !== undefined ? daysOffStr : null,
+      customHoursStr !== undefined ? customHoursStr : null,
+      id,
+      req.clientUser.id
+    );
+
+    if (parsedServiceIds !== null) {
+      db.prepare('DELETE FROM client_service_staff WHERE user_id = ? AND staff_id = ?').run(req.clientUser.id, id);
+      const insertCss = db.prepare('INSERT INTO client_service_staff (user_id, service_id, staff_id, confirmed) VALUES (?, ?, ?, 1)');
+      for (const sId of parsedServiceIds) {
+        insertCss.run(req.clientUser.id, sId, id);
+      }
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    return res.status(500).json({ success: false, error: 'Falha ao atualizar profissional.' });
+  }
 
   res.json({ success: true, message: 'Dados do profissional atualizados com sucesso.' });
+});
+
+// Retorna serviços habilitados para um profissional específico
+router.get('/staff/:id/services', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const { id } = req.params;
+  const staff = db.prepare('SELECT id, name FROM client_staff WHERE id = ? AND user_id = ?').get(id, req.clientUser.id);
+  if (!staff) {
+    return res.status(404).json({ success: false, error: 'Profissional não encontrado.' });
+  }
+  const services = db.prepare(`
+    SELECT s.id, s.name, s.price, s.duration_min, s.category, s.active
+    FROM client_services s
+    JOIN client_service_staff css ON css.service_id = s.id AND css.user_id = s.user_id
+    WHERE css.staff_id = ? AND s.user_id = ? AND css.confirmed = 1 AND s.active = 1
+    ORDER BY s.category ASC, s.name ASC
+  `).all(id, req.clientUser.id);
+
+  res.json({ success: true, staff_id: Number(id), services });
+});
+
+// ==========================================
+// GESTÃO DE QUALIFICAÇÕES PENDENTES (COMANDO 040.1)
+// ==========================================
+
+router.get('/staff/qualifications/pending', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const rows = db.prepare(`
+    SELECT css.id, css.service_id, cs.name AS service_name, cs.category AS service_category,
+           css.staff_id, st.name AS staff_name, st.specialty AS staff_specialty, css.created_at
+    FROM client_service_staff css
+    JOIN client_services cs ON cs.id = css.service_id AND cs.user_id = css.user_id
+    JOIN client_staff st ON st.id = css.staff_id AND st.user_id = css.user_id
+    WHERE css.user_id = ? AND css.confirmed = 0 AND cs.active = 1 AND st.active = 1
+    ORDER BY cs.name ASC, st.name ASC
+  `).all(req.clientUser.id);
+
+  res.json({ success: true, count: rows.length, pendingQualifications: rows });
+});
+
+router.post('/staff/qualifications/batch-confirm', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items : (Array.isArray(req.body) ? req.body : null);
+  if (!items || items.length === 0) {
+    return res.status(400).json({ success: false, error: 'A lista de qualificações para confirmação é obrigatória.' });
+  }
+
+  // Validação preliminar anti-IDOR e de integridade dos dados
+  const validActions = ['confirm', 'reject'];
+  const sanitizedItems = [];
+  for (const item of items) {
+    const serviceId = Number(item.service_id || item.serviceId);
+    const staffId = Number(item.staff_id || item.staffId);
+    const action = String(item.action || 'confirm').toLowerCase();
+
+    if (!Number.isInteger(serviceId) || serviceId <= 0 || !Number.isInteger(staffId) || staffId <= 0) {
+      return res.status(400).json({ success: false, error: 'Identificadores de serviço ou profissional inválidos.' });
+    }
+    if (!validActions.includes(action)) {
+      return res.status(400).json({ success: false, error: `Ação inválida: "${action}". Utilize "confirm" ou "reject".` });
+    }
+    sanitizedItems.push({ serviceId, staffId, action });
+  }
+
+  // Transação Atômica BEGIN IMMEDIATE
+  db.exec('BEGIN IMMEDIATE');
+  let confirmedCount = 0;
+  let rejectedCount = 0;
+  try {
+    const checkService = db.prepare('SELECT id FROM client_services WHERE id = ? AND user_id = ?');
+    const checkStaff = db.prepare('SELECT id FROM client_staff WHERE id = ? AND user_id = ?');
+    const updateConfirm = db.prepare('UPDATE client_service_staff SET confirmed = 1 WHERE user_id = ? AND service_id = ? AND staff_id = ?');
+    const deleteReject = db.prepare('DELETE FROM client_service_staff WHERE user_id = ? AND service_id = ? AND staff_id = ?');
+
+    for (const it of sanitizedItems) {
+      const svcExists = checkService.get(it.serviceId, req.clientUser.id);
+      const staffExists = checkStaff.get(it.staffId, req.clientUser.id);
+      if (!svcExists || !staffExists) {
+        throw new Error('SECURITY_VIOLATION_IDOR: Tentativa de manipulação de entidades de outro usuário.');
+      }
+
+      if (it.action === 'confirm') {
+        const resUpdate = updateConfirm.run(req.clientUser.id, it.serviceId, it.staffId);
+        if (resUpdate.changes > 0) confirmedCount++;
+      } else {
+        const resDel = deleteReject.run(req.clientUser.id, it.serviceId, it.staffId);
+        if (resDel.changes > 0) rejectedCount++;
+      }
+    }
+    db.exec('COMMIT');
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    console.error('[Qualifications Batch Confirm] Falha na operação atômica:', err.message);
+    return res.status(err.message.includes('IDOR') ? 403 : 500).json({
+      success: false,
+      error: err.message.includes('IDOR') ? 'Violação de acesso a dados.' : 'Falha ao processar confirmação das qualificações.',
+    });
+  }
+
+  res.json({
+    success: true,
+    confirmedCount,
+    rejectedCount,
+    message: `${confirmedCount} qualificação(ões) confirmada(s) e ${rejectedCount} rejeitada(s) com sucesso.`,
+  });
 });
 
 router.delete('/staff/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
@@ -1350,6 +1704,14 @@ router.post('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA
       });
     }
 
+    if (err.code === 'STAFF_NOT_QUALIFIED' || err.code === 'NO_QUALIFIED_STAFF_FOR_SERVICE') {
+      return res.status(422).json({
+        success: false,
+        code: err.code,
+        error: err.message,
+      });
+    }
+
     const isBadRequest = [
       'SALON_CLOSED_DAY',
       'BEFORE_OPENING',
@@ -1400,6 +1762,14 @@ router.put('/appointments/:id/reschedule', clientAuthMiddleware, requireProductA
         code: 'SLOT_CONFLICT',
         error: err.message,
         suggestedSlots: err.suggestedSlots || [],
+      });
+    }
+
+    if (err.code === 'STAFF_NOT_QUALIFIED' || err.code === 'NO_QUALIFIED_STAFF_FOR_SERVICE') {
+      return res.status(422).json({
+        success: false,
+        code: err.code,
+        error: err.message,
       });
     }
 

@@ -42,6 +42,19 @@ function cleanupExpiredSessions() {
 setInterval(cleanupExpiredSessions, 10 * 60 * 1000).unref();
 
 /**
+ * Retorna profissionais ativos habilitados para um serviço específico (Comando 040 e 040.1)
+ */
+function getQualifiedStaffForService(uid, serviceId) {
+  return db.prepare(`
+    SELECT cs.id, cs.name, cs.active, cs.days_off
+    FROM client_staff cs
+    JOIN client_service_staff css ON css.staff_id = cs.id AND css.user_id = cs.user_id
+    WHERE css.service_id = ? AND cs.user_id = ? AND css.confirmed = 1 AND cs.active = 1
+    ORDER BY cs.name ASC
+  `).all(serviceId, uid);
+}
+
+/**
  * Extrai o texto limpo da mensagem recebida
  * @private
  * @param {object} messageContent
@@ -176,6 +189,7 @@ async function findCandidateSlots(userId, service, staff = null) {
         date: day.dateStr,
         serviceDurationMin: duration,
         staffId,
+        serviceId: service?.id || null,
         limit: 3, // Limita a 3 sugestões por dia para não poluir o WhatsApp
       });
 
@@ -370,36 +384,30 @@ async function dispatchMessage(salonUserId, sock, msg) {
 
       session.selectedService = matchedService;
 
-      // Resolução de Profissionais
-      if (staffList.length === 1) {
-        session.selectedStaff = staffList[0];
+      // Resolução de Profissionais Habilitados para o Serviço (Comando 040)
+      const qualifiedStaff = getQualifiedStaffForService(uid, matchedService.id);
+
+      if (qualifiedStaff.length === 0) {
+        session.state = 'IDLE';
+        session.selectedService = null;
+        replyText = `No momento não temos profissionais disponíveis para o serviço *${matchedService.name}*. Gostaria de escolher outro serviço do nosso catálogo? Digite *Serviços* para ver as opções! ✨`;
+      } else if (qualifiedStaff.length === 1) {
+        session.selectedStaff = qualifiedStaff[0];
         const slots = await findCandidateSlots(uid, session.selectedService, session.selectedStaff);
         if (slots.length > 0) {
           session.candidateSlots = slots;
           session.state = 'AWAITING_SLOT';
           const slotList = slots.map((s) => `${s.number}. ${s.dayLabel} às *${s.time}*`).join('\n');
-          replyText = `Excelente escolha: *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}) com *${staffList[0].name}*! ✨\n\nEstes são os horários livres mais próximos disponíveis:\n\n${slotList}\n\nPor favor, digite o *número* do horário de sua preferência (ou digite *Cancelar*):`;
+          replyText = `Excelente escolha: *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}) com *${qualifiedStaff[0].name}*! ✨\n\nEstes são os horários livres mais próximos disponíveis:\n\n${slotList}\n\nPor favor, digite o *número* do horário de sua preferência (ou digite *Cancelar*):`;
         } else {
           session.state = 'IDLE';
-          replyText = `No momento não encontramos horários disponíveis nos próximos dias para *${matchedService.name}*. Nossa equipe entrará em contato em breve para verificar um encaixe especial para você! ✨`;
+          replyText = `No momento não encontramos horários disponíveis nos próximos dias para *${matchedService.name}* com ${qualifiedStaff[0].name}. Nossa equipe entrará em contato em breve para verificar um encaixe especial para você! ✨`;
         }
-      } else if (staffList.length > 1) {
-        session.availableStaffList = staffList;
-        session.state = 'AWAITING_STAFF';
-        const staffMenu = staffList.map((st, i) => `${i + 1}. *${st.name}*`).join('\n');
-        replyText = `Perfeito! Você escolheu *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}).\n\nCom qual de nossas profissionais você gostaria de ser atendida?\n\n${staffMenu}\n${staffList.length + 1}. *Qualquer profissional disponível*\n\nPor favor, digite o número da sua preferência:`;
       } else {
-        session.selectedStaff = null;
-        const slots = await findCandidateSlots(uid, session.selectedService, null);
-        if (slots.length > 0) {
-          session.candidateSlots = slots;
-          session.state = 'AWAITING_SLOT';
-          const slotList = slots.map((s) => `${s.number}. ${s.dayLabel} às *${s.time}*`).join('\n');
-          replyText = `Ótima escolha: *${matchedService.name}* (R$ ${formatPrice(matchedService.price)})! ✨\n\nEstes são os horários livres disponíveis:\n\n${slotList}\n\nPor favor, digite o *número* da opção desejada:`;
-        } else {
-          session.state = 'IDLE';
-          replyText = `No momento não encontramos horários livres disponíveis para este procedimento. Nossa equipe entrará em contato em breve para agendar seu atendimento! ✨`;
-        }
+        session.availableStaffList = qualifiedStaff;
+        session.state = 'AWAITING_STAFF';
+        const staffMenu = qualifiedStaff.map((st, i) => `${i + 1}. *${st.name}*`).join('\n');
+        replyText = `Perfeito! Você escolheu *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}).\n\nCom qual de nossas profissionais você gostaria de ser atendida?\n\n${staffMenu}\n${qualifiedStaff.length + 1}. *Qualquer profissional disponível*\n\nPor favor, digite o número da sua preferência:`;
       }
       break;
     }
@@ -464,8 +472,22 @@ async function dispatchMessage(salonUserId, sock, msg) {
       session.selectedSlot = { date: pickedSlot.date, time: pickedSlot.time };
       session.state = 'AWAITING_CONFIRMATION';
 
+      // Se o cliente escolheu "Qualquer profissional disponível", resolver atomicamente agora
+      if (!session.selectedStaff) {
+        try {
+          const eff = salonAppointmentService.resolveEffectiveStaff(uid, {
+            serviceId: session.selectedService.id,
+            staffId: null,
+            date: pickedSlot.date,
+            time: pickedSlot.time,
+            durationMin: session.selectedService.duration_min,
+          });
+          session.selectedStaff = { id: eff.staffId, name: eff.staffName };
+        } catch (_) {}
+      }
+
       const displayDate = formatDisplayDate(pickedSlot.date);
-      const staffName = session.selectedStaff ? session.selectedStaff.name : 'Profissional disponível da equipe';
+      const staffName = session.selectedStaff ? session.selectedStaff.name : 'Equipe do Salão';
       const priceFormatted = formatPrice(session.selectedService.price);
 
       replyText = `Perfeito! Por favor, confira os dados do seu agendamento:\n\n` +
@@ -513,12 +535,26 @@ async function dispatchMessage(salonUserId, sock, msg) {
           throw new Error('SECURITY_VIOLATION_IDOR: Tentativa de agendamento em serviço inválido ou não pertencente ao salão.');
         }
 
-        if (session.selectedStaff && session.selectedStaff.id) {
+        // Garantir resolução nominal estrita de staffId antes de invocar bookAppointment
+        let finalStaffId = session.selectedStaff ? session.selectedStaff.id : null;
+        if (!finalStaffId) {
+          const eff = salonAppointmentService.resolveEffectiveStaff(uid, {
+            serviceId: validService.id,
+            staffId: null,
+            date: session.selectedSlot.date,
+            time: session.selectedSlot.time,
+            durationMin: validService.duration_min,
+          });
+          finalStaffId = eff.staffId;
+          session.selectedStaff = { id: eff.staffId, name: eff.staffName };
+        }
+
+        if (finalStaffId) {
           const validStaff = db.prepare(`
             SELECT id, name
             FROM client_staff
             WHERE id = ? AND user_id = ? AND active = 1
-          `).get(session.selectedStaff.id, uid);
+          `).get(finalStaffId, uid);
 
           if (!validStaff) {
             throw new Error('SECURITY_VIOLATION_IDOR: Tentativa de agendamento com profissional inválido ou não pertencente ao salão.');
@@ -529,7 +565,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
           clientName: session.customerName || 'Cliente WhatsApp',
           clientPhone: cleanPhone,
           serviceId: validService.id,
-          staffId: session.selectedStaff ? session.selectedStaff.id : null,
+          staffId: finalStaffId,
           date: session.selectedSlot.date,
           time: session.selectedSlot.time,
           durationMin: validService.duration_min,
@@ -585,35 +621,30 @@ async function dispatchMessage(salonUserId, sock, msg) {
         if (matchedService) {
           session.selectedService = matchedService;
 
-          if (staffList.length === 1) {
-            session.selectedStaff = staffList[0];
+          // Resolução de Profissionais Habilitados para o Serviço (Comando 040)
+          const qualifiedStaff = getQualifiedStaffForService(uid, matchedService.id);
+
+          if (qualifiedStaff.length === 0) {
+            session.state = 'IDLE';
+            session.selectedService = null;
+            replyText = `Olá! Adoraríamos te atender para *${matchedService.name}*, mas no momento não temos profissionais disponíveis habilitadas para este serviço. Nossa equipe entrará em contato com você em instantes! ✨`;
+          } else if (qualifiedStaff.length === 1) {
+            session.selectedStaff = qualifiedStaff[0];
             const slots = await findCandidateSlots(uid, session.selectedService, session.selectedStaff);
             if (slots.length > 0) {
               session.candidateSlots = slots;
               session.state = 'AWAITING_SLOT';
               const slotList = slots.map((s) => `${s.number}. ${s.dayLabel} às *${s.time}*`).join('\n');
-              replyText = `Olá! Com certeza! Para *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}) com *${staffList[0].name}*, temos os seguintes horários disponíveis:\n\n${slotList}\n\nPor favor, digite o *número* da opção que você prefere (ou envie outro horário desejado):`;
+              replyText = `Olá! Com certeza! Para *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}) com *${qualifiedStaff[0].name}*, temos os seguintes horários disponíveis:\n\n${slotList}\n\nPor favor, digite o *número* da opção que você prefere (ou envie outro horário desejado):`;
             } else {
               session.state = 'IDLE';
-              replyText = `Olá! Adoraríamos te atender para *${matchedService.name}*, mas no momento não encontramos horários disponíveis nos próximos dias. Nossa equipe entrará em contato com você em instantes! ✨`;
+              replyText = `Olá! Adoraríamos te atender para *${matchedService.name}*, mas no momento não encontramos horários disponíveis nos próximos dias com ${qualifiedStaff[0].name}. Nossa equipe entrará em contato com você em instantes! ✨`;
             }
-          } else if (staffList.length > 1) {
-            session.availableStaffList = staffList;
-            session.state = 'AWAITING_STAFF';
-            const staffMenu = staffList.map((st, i) => `${i + 1}. *${st.name}*`).join('\n');
-            replyText = `Olá! Seja muito bem-vinda ao *${salonName}*! ✨\n\nIdentifiquei seu interesse em *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}).\n\nCom qual de nossas profissionais você gostaria de realizar o atendimento?\n\n${staffMenu}\n${staffList.length + 1}. *Qualquer profissional disponível*\n\nPor favor, digite o número da sua preferência:`;
           } else {
-            session.selectedStaff = null;
-            const slots = await findCandidateSlots(uid, session.selectedService, null);
-            if (slots.length > 0) {
-              session.candidateSlots = slots;
-              session.state = 'AWAITING_SLOT';
-              const slotList = slots.map((s) => `${s.number}. ${s.dayLabel} às *${s.time}*`).join('\n');
-              replyText = `Olá! Seja bem-vinda ao *${salonName}*! ✨\n\nPara *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}), temos os seguintes horários disponíveis:\n\n${slotList}\n\nPor favor, digite o *número* do horário desejado:`;
-            } else {
-              session.state = 'IDLE';
-              replyText = `Olá! No momento estamos sem vagas imediatas para *${matchedService.name}*, mas nossa equipe entrará em contato para te acomodar no melhor horário! ✨`;
-            }
+            session.availableStaffList = qualifiedStaff;
+            session.state = 'AWAITING_STAFF';
+            const staffMenu = qualifiedStaff.map((st, i) => `${i + 1}. *${st.name}*`).join('\n');
+            replyText = `Olá! Seja muito bem-vinda ao *${salonName}*! ✨\n\nIdentifiquei seu interesse em *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}).\n\nCom qual de nossas profissionais você gostaria de realizar o atendimento?\n\n${staffMenu}\n${qualifiedStaff.length + 1}. *Qualquer profissional disponível*\n\nPor favor, digite o número da sua preferência:`;
           }
         } else {
           // Não especificou o serviço ainda: apresenta catálogo numerado
