@@ -45,6 +45,7 @@ const {
   _setKeyProviderForTesting,
   _resetKeyProviderForTesting,
 } = require('../security/keyProvider');
+const { ensureWaEngineLock } = require('../utils/appLock');
 
 // Raiz padrão das credenciais persistentes
 let SESSIONS_ROOT = path.resolve(__dirname, '../../data/sessions');
@@ -89,6 +90,11 @@ function _scheduleKmsRetry() {
  * Executa tentativa de restauração exclusivamente para salões que continuam em KMS_UNAVAILABLE
  */
 async function _executeKmsRetry() {
+  if (process.env.WA_SESSIONS_DISABLED === 'true') {
+    return;
+  }
+  ensureWaEngineLock();
+
   let candidates;
   try {
     candidates = db.prepare(`
@@ -110,6 +116,11 @@ async function _executeKmsRetry() {
 
   for (const cand of candidates) {
     const uid = cand.user_id;
+
+    // Item 4 do Comando 038.2: em homologação/staging só tenta salão aprovado na lista
+    if (!clientModule.isRealWhatsAppTransportAllowed() && !isSalonRealWhatsAppAllowed(uid, cand.connected_phone)) {
+      continue;
+    }
 
     // Item 2.4: Verificar o status no banco antes de cada tentativa: se o usuário desconectou formalmente (DISCONNECTED), NÃO restaurar!
     const current = SalonWhatsAppRepository.getSessionByUserId(uid);
@@ -1039,8 +1050,11 @@ function _attachSocketListeners(uid, sock, session, saveCreds, currentGen) {
  */
 async function startQrSession(userId) {
   if (process.env.WA_SESSIONS_DISABLED === 'true') {
-    throw new Error('WA_SESSIONS_DISABLED: Operações de WhatsApp desativadas pelo modo manutenção.');
+    const err = new Error('WA_SESSIONS_DISABLED: Operações de WhatsApp desativadas pelo modo manutenção.');
+    err.code = 'WA_SESSIONS_DISABLED';
+    throw err;
   }
+  ensureWaEngineLock();
   const uid = Number(userId);
 
   // Mutex unificado por tenant (CORREÇÃO 4)
@@ -1052,8 +1066,12 @@ async function startQrSession(userId) {
     const sessionDir = getSalonSessionDir(uid);
     if (fs.existsSync(sessionDir)) {
       const existingFiles = fs.readdirSync(sessionDir);
-      if (existingFiles.includes('creds.json.enc') || existingFiles.includes('dek.wrapped')) {
-        const err = new Error('CANNOT_PAIR_EXISTING_ENCRYPTED_SESSION: Sessão cifrada já existente. Desconecte formalmente antes de parear.');
+      const hasEncCreds = existingFiles.includes('creds.json.enc');
+      const hasOtherEnc = existingFiles.some((f) => f.endsWith('.enc'));
+      const hasPlainCreds = existingFiles.includes('creds.json');
+      // Item 3 do Comando 038.2: pasta só com dek.wrapped (sem *.enc e sem creds.json) é permitida para pareamento
+      if (hasEncCreds || hasOtherEnc || hasPlainCreds) {
+        const err = new Error('CANNOT_PAIR_EXISTING_ENCRYPTED_SESSION: Sessão já existente. Desconecte formalmente antes de parear.');
         err.code = 'CANNOT_PAIR_EXISTING_ENCRYPTED_SESSION';
         throw err;
       }
@@ -1278,12 +1296,23 @@ async function requestPairingCode(userId, rawPhone) {
     return tenantLocks.get(uid);
   }
 
+  if (process.env.WA_SESSIONS_DISABLED === 'true') {
+    const err = new Error('WA_SESSIONS_DISABLED: Operações de WhatsApp desativadas pelo modo manutenção.');
+    err.code = 'WA_SESSIONS_DISABLED';
+    throw err;
+  }
+  ensureWaEngineLock();
+
   const pairingPromise = (async () => {
     const sessionDir = getSalonSessionDir(uid);
     if (fs.existsSync(sessionDir)) {
       const existingFiles = fs.readdirSync(sessionDir);
-      if (existingFiles.includes('creds.json.enc') || existingFiles.includes('dek.wrapped')) {
-        const err = new Error('CANNOT_PAIR_EXISTING_ENCRYPTED_SESSION: Sessão cifrada já existente. Desconecte formalmente antes de parear.');
+      const hasEncCreds = existingFiles.includes('creds.json.enc');
+      const hasOtherEnc = existingFiles.some((f) => f.endsWith('.enc'));
+      const hasPlainCreds = existingFiles.includes('creds.json');
+      // Item 3 do Comando 038.2: pasta só com dek.wrapped (sem *.enc e sem creds.json) é permitida para pareamento
+      if (hasEncCreds || hasOtherEnc || hasPlainCreds) {
+        const err = new Error('CANNOT_PAIR_EXISTING_ENCRYPTED_SESSION: Sessão já existente. Desconecte formalmente antes de parear.');
         err.code = 'CANNOT_PAIR_EXISTING_ENCRYPTED_SESSION';
         throw err;
       }
@@ -1637,6 +1666,8 @@ async function restoreActiveSalonSessions() {
     console.log('[salonSessionManager] WA_SESSIONS_DISABLED=true: restauração de sessões desativada.');
     return { restored: 0, total: 0, disabled: true };
   }
+
+  ensureWaEngineLock();
 
   const isGlobalReal = clientModule.isRealWhatsAppTransportAllowed();
   const isStagingTesting = (process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging') && process.env.ALLOW_SALON_WHATSAPP_TESTING === 'true';

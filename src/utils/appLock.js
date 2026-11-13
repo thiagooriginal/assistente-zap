@@ -1,9 +1,9 @@
 /**
- * RAIA AGENTES — PROCESS LOCK HELPER (T9 / COMANDO 038.1)
+ * RAIA AGENTES — PROCESS LOCK HELPER (T9 / COMANDO 038.2)
  *
  * Gerencia a trava do motor de sessões do WhatsApp (`data/wa-sessions.lock`)
  * para prevenir execuções concorrentes de scripts de migração/rollback enquanto
- * a aplicação ou o motor de sessões estiver ativo.
+ * o motor de sessões estiver ativo em qualquer ambiente.
  */
 
 const fs = require('fs');
@@ -11,41 +11,87 @@ const path = require('path');
 
 const DEFAULT_LOCK_FILE = path.resolve(__dirname, '../../data/wa-sessions.lock');
 
-let _processStartTimeChecker = null;
+// Estado de aquisição em memória por processo
+let _engineLockAcquired = false;
+let _engineLockPath = null;
 
-/**
- * Hook exclusivo para testes herméticos injetarem verificador de tempo de início de processo
- * @param {((pid: number) => number|null)|null} fn
- */
-function _setProcessStartTimeCheckerForTesting(fn) {
-  _processStartTimeChecker = fn;
+// Hooks de teste hermético para simular leituras de /proc no Linux
+let _procStatReaderForTesting = null;
+let _bootIdReaderForTesting = null;
+
+function _setProcStatReaderForTesting(fn) {
+  _procStatReaderForTesting = fn;
+}
+
+function _setBootIdReaderForTesting(fn) {
+  _bootIdReaderForTesting = fn;
+}
+
+function _resetEngineLockForTesting() {
+  _engineLockAcquired = false;
+  _engineLockPath = null;
+  _procStatReaderForTesting = null;
+  _bootIdReaderForTesting = null;
 }
 
 /**
- * Retorna o tempo de início do processo (timestamp em ms) ou null se indeterminado
- * @param {number} pid
- * @returns {number|null}
+ * Lê o boot_id atual do sistema Linux (/proc/sys/kernel/random/boot_id)
+ * @returns {string|null}
  */
-function getProcessStartTime(pid) {
-  if (typeof _processStartTimeChecker === 'function') {
-    return _processStartTimeChecker(pid);
+function readBootId() {
+  if (typeof _bootIdReaderForTesting === 'function') {
+    return _bootIdReaderForTesting();
   }
-
-  if (pid === process.pid) {
-    return Math.floor(Date.now() - (process.uptime() * 1000));
-  }
-
   try {
-    if (process.platform === 'linux' && fs.existsSync(`/proc/${pid}/stat`)) {
-      const statContent = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
-      const afterComm = statContent.substring(statContent.lastIndexOf(')') + 1).trim().split(/\s+/);
-      const starttimeJiffies = parseInt(afterComm[19], 10);
-      if (!isNaN(starttimeJiffies)) {
-        return starttimeJiffies;
+    if (process.platform === 'linux' && fs.existsSync('/proc/sys/kernel/random/boot_id')) {
+      return fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+    }
+  } catch (_) {}
+  return null;
+}
+
+/**
+ * Parser robusto de /proc/<pid>/stat do Linux
+ * Suporta nomes de processos contendo parênteses e espaços (ex: '(Web Content (worker))')
+ * O campo 2 (comm) é delimitado pelo primeiro '(' e o último ')'.
+ * O campo 22 (starttime) é o 19º elemento após o comm.
+ *
+ * @param {string} statContent
+ * @returns {{ startTicks: number }|null}
+ */
+function parseProcStat(statContent) {
+  if (!statContent || typeof statContent !== 'string') return null;
+  const lastParenIndex = statContent.lastIndexOf(')');
+  if (lastParenIndex === -1) return null;
+
+  const afterComm = statContent.substring(lastParenIndex + 1).trim();
+  const fields = afterComm.split(/\s+/);
+  if (fields.length <= 19) return null;
+
+  const startTicks = parseInt(fields[19], 10);
+  if (isNaN(startTicks) || startTicks < 0) return null;
+
+  return { startTicks };
+}
+
+/**
+ * Obtém informações do processo a partir de /proc/<pid>/stat
+ * @param {number|string} pid
+ * @returns {{ startTicks: number }|null}
+ */
+function getLinuxProcessStat(pid) {
+  if (typeof _procStatReaderForTesting === 'function') {
+    return _procStatReaderForTesting(pid);
+  }
+  try {
+    if (process.platform === 'linux') {
+      const statPath = pid === process.pid || pid === 'self' ? '/proc/self/stat' : `/proc/${pid}/stat`;
+      if (fs.existsSync(statPath)) {
+        const content = fs.readFileSync(statPath, 'utf8');
+        return parseProcStat(content);
       }
     }
   } catch (_) {}
-
   return null;
 }
 
@@ -59,7 +105,8 @@ function getProcessStartTime(pid) {
  *   indeterminate: boolean,
  *   self: boolean,
  *   pid: number|null,
- *   startedAt: number|null,
+ *   startTicks: number|null,
+ *   bootId: string|null,
  *   engineId: string|null,
  *   reason: string,
  *   lockFile: string
@@ -74,7 +121,8 @@ function inspectAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
       indeterminate: false,
       self: false,
       pid: null,
-      startedAt: null,
+      startTicks: null,
+      bootId: null,
       engineId: null,
       reason: 'LOCK_NOT_FOUND',
       lockFile: lockFilePath,
@@ -92,7 +140,8 @@ function inspectAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
       indeterminate: true,
       self: false,
       pid: null,
-      startedAt: null,
+      startTicks: null,
+      bootId: null,
       engineId: null,
       reason: `READ_ERROR: ${err.code || err.message}`,
       lockFile: lockFilePath,
@@ -103,7 +152,7 @@ function inspectAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
   try {
     payload = JSON.parse(raw);
   } catch (_) {
-    // Compatibilidade com lock antigo (apenas número) ou corrompido
+    // Compatibilidade com lock legado (apenas número) ou corrompido
     const numericOnly = parseInt(raw, 10);
     if (!numericOnly || isNaN(numericOnly)) {
       return {
@@ -113,17 +162,19 @@ function inspectAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
         indeterminate: true,
         self: false,
         pid: null,
-        startedAt: null,
+        startTicks: null,
+        bootId: null,
         engineId: null,
         reason: 'LOCK_CORRUPTED_OR_UNREADABLE',
         lockFile: lockFilePath,
       };
     }
-    payload = { pid: numericOnly, startedAt: null, engineId: 'legacy' };
+    payload = { pid: numericOnly, startTicks: null, bootId: null, engineId: 'legacy' };
   }
 
   const pid = Number(payload.pid);
-  const startedAt = payload.startedAt != null ? Number(payload.startedAt) : null;
+  const startTicks = payload.startTicks != null ? Number(payload.startTicks) : null;
+  const bootId = payload.bootId != null ? String(payload.bootId) : null;
   const engineId = payload.engineId || null;
 
   if (!pid || isNaN(pid) || pid <= 0) {
@@ -134,7 +185,8 @@ function inspectAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
       indeterminate: true,
       self: false,
       pid: null,
-      startedAt,
+      startTicks,
+      bootId,
       engineId,
       reason: 'INVALID_PID_IN_LOCK',
       lockFile: lockFilePath,
@@ -149,13 +201,15 @@ function inspectAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
       indeterminate: false,
       self: true,
       pid,
-      startedAt,
+      startTicks,
+      bootId,
       engineId,
       reason: 'LOCK_HELD_BY_SELF_PROCESS',
       lockFile: lockFilePath,
     };
   }
 
+  // Verifica se o processo com esse PID existe no sistema operacional
   try {
     process.kill(pid, 0);
   } catch (err) {
@@ -168,7 +222,8 @@ function inspectAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
         indeterminate: false,
         self: false,
         pid,
-        startedAt,
+        startTicks,
+        bootId,
         engineId,
         reason: 'PID_NOT_FOUND_DEAD',
         lockFile: lockFilePath,
@@ -182,7 +237,8 @@ function inspectAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
       indeterminate: true,
       self: false,
       pid,
-      startedAt,
+      startTicks,
+      bootId,
       engineId,
       reason: `SIGNAL_CHECK_FAILED: ${err.code || err.message}`,
       lockFile: lockFilePath,
@@ -190,9 +246,11 @@ function inspectAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
   }
 
   // O processo está vivo (process.kill retornou sem erro)
-  // Agora verifica se o PID foi reciclado se houver startedAt no lock
-  const currentStartTime = getProcessStartTime(pid);
-  if (currentStartTime !== null && startedAt !== null && currentStartTime !== startedAt) {
+  // Agora compara o horário de início na mesma unidade (Linux startTicks e bootId)
+  const currentBootId = readBootId();
+
+  // Se a trava possui bootId gravado e o bootId atual difere: o sistema reiniciou (PID reciclado)
+  if (bootId !== null && currentBootId !== null && bootId !== currentBootId) {
     return {
       exists: true,
       running: false,
@@ -200,13 +258,66 @@ function inspectAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
       indeterminate: false,
       self: false,
       pid,
-      startedAt,
+      startTicks,
+      bootId,
       engineId,
-      reason: 'PID_RECYCLED_DIFFERENT_START_TIME',
+      reason: 'BOOT_ID_MISMATCH_REAPROVEITADO',
       lockFile: lockFilePath,
     };
   }
 
+  // Se a trava possui startTicks gravados
+  if (startTicks !== null) {
+    const currentStat = getLinuxProcessStat(pid);
+    if (currentStat && currentStat.startTicks !== null) {
+      if (currentStat.startTicks !== startTicks) {
+        return {
+          exists: true,
+          running: false,
+          orphan: true,
+          indeterminate: false,
+          self: false,
+          pid,
+          startTicks,
+          bootId,
+          engineId,
+          reason: 'PID_RECYCLED_DIFFERENT_START_TICKS',
+          lockFile: lockFilePath,
+        };
+      }
+      return {
+        exists: true,
+        running: true,
+        orphan: false,
+        indeterminate: false,
+        self: false,
+        pid,
+        startTicks,
+        bootId,
+        engineId,
+        reason: 'PROCESS_ALIVE_ACTIVE',
+        lockFile: lockFilePath,
+      };
+    }
+    // Não foi possível ler /proc/<pid>/stat (ex: erro de permissão ou sistema não-Linux):
+    // Resultado é indeterminado. Com processo vivo, tratado como ativo (fail-closed).
+    return {
+      exists: true,
+      running: true,
+      orphan: false,
+      indeterminate: true,
+      self: false,
+      pid,
+      startTicks,
+      bootId,
+      engineId,
+      reason: 'PROC_READ_FAILED_INDETERMINATE',
+      lockFile: lockFilePath,
+    };
+  }
+
+  // Trava antiga (apenas PID ou sem startTicks legíveis):
+  // Com o PID vivo, tratada obrigatoriamente como ativa
   return {
     exists: true,
     running: true,
@@ -214,9 +325,10 @@ function inspectAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
     indeterminate: false,
     self: false,
     pid,
-    startedAt,
+    startTicks: null,
+    bootId,
     engineId,
-    reason: 'PROCESS_ALIVE_ACTIVE',
+    reason: 'LEGACY_LOCK_PID_ALIVE_ACTIVE',
     lockFile: lockFilePath,
   };
 }
@@ -253,7 +365,7 @@ function tryForceUnlock(lockFilePath = DEFAULT_LOCK_FILE, { logger = console } =
 }
 
 /**
- * Adquire a trava de sessões do WhatsApp gravando PID, startedAt e engineId.
+ * Adquire a trava de sessões do WhatsApp gravando PID, startTicks, bootId e engineId.
  * Se WA_SESSIONS_DISABLED=true, não adquire e retorna false.
  * @param {string} [lockFilePath=DEFAULT_LOCK_FILE]
  * @returns {boolean} True se o lock foi adquirido
@@ -271,11 +383,15 @@ function acquireAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
   }
 
   const pid = process.pid;
-  const startedAt = getProcessStartTime(pid) || Date.now();
+  const linuxStat = getLinuxProcessStat(pid);
+  const bootId = readBootId();
+
   const payload = {
     pid,
-    startedAt,
     engineId: 'wa-sessions-engine',
+    createdAt: Date.now(),
+    startTicks: linuxStat ? linuxStat.startTicks : null,
+    bootId: bootId || null,
   };
 
   try {
@@ -317,6 +433,37 @@ function acquireAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
 }
 
 /**
+ * Garante a criação da trava do motor WhatsApp sempre que um motor puder iniciar.
+ * Idempotente por processo.
+ * @param {string} [lockFilePath=DEFAULT_LOCK_FILE]
+ * @returns {boolean}
+ */
+function ensureWaEngineLock(lockFilePath = DEFAULT_LOCK_FILE) {
+  if (process.env.WA_SESSIONS_DISABLED === 'true') {
+    return false;
+  }
+
+  if (process.env.NODE_ENV === 'test' && lockFilePath === DEFAULT_LOCK_FILE) {
+    return false;
+  }
+
+  if (_engineLockAcquired && _engineLockPath === lockFilePath) {
+    return true;
+  }
+
+  const acquired = acquireAppLock(lockFilePath);
+  if (acquired) {
+    _engineLockAcquired = true;
+    _engineLockPath = lockFilePath;
+    return true;
+  }
+
+  const err = new Error('WA_ENGINE_LOCK_ACQUISITION_FAILED: Falha ao adquirir trava do motor WhatsApp.');
+  err.code = 'WA_ENGINE_LOCK_FAILED';
+  throw err;
+}
+
+/**
  * Libera explicitamente o lock file
  * @param {string} [lockFilePath=DEFAULT_LOCK_FILE]
  */
@@ -324,6 +471,10 @@ function releaseAppLock(lockFilePath = DEFAULT_LOCK_FILE) {
   try {
     if (fs.existsSync(lockFilePath)) {
       fs.unlinkSync(lockFilePath);
+    }
+    if (_engineLockPath === lockFilePath) {
+      _engineLockAcquired = false;
+      _engineLockPath = null;
     }
   } catch (_) {}
 }
@@ -344,10 +495,15 @@ function checkAppRunning(lockFilePath = DEFAULT_LOCK_FILE) {
 
 module.exports = {
   DEFAULT_LOCK_FILE,
+  parseProcStat,
+  readBootId,
   inspectAppLock,
   tryForceUnlock,
   acquireAppLock,
+  ensureWaEngineLock,
   releaseAppLock,
   checkAppRunning,
-  _setProcessStartTimeCheckerForTesting,
+  _setProcStatReaderForTesting,
+  _setBootIdReaderForTesting,
+  _resetEngineLockForTesting,
 };

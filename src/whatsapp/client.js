@@ -20,6 +20,7 @@ const {
   clearTenantDek,
 } = require('./encryptedAuthState');
 const { getKeyProvider } = require('../security/keyProvider');
+const { ensureWaEngineLock } = require('../utils/appLock');
 
 let currentSock = null;
 let lastKnownUserJid = null;
@@ -162,6 +163,8 @@ async function startWhatsAppBot() {
     console.log('[WhatsApp Bot] WA_SESSIONS_DISABLED=true: inicialização do bot WhatsApp desativada pelo modo manutenção.');
     return null;
   }
+
+  ensureWaEngineLock();
 
   if (!isRealWhatsAppTransportAllowed()) {
     console.log('[WhatsApp Bot] Hard Staging Lock ativo: inicialização do socket Baileys bloqueada (fail-closed).');

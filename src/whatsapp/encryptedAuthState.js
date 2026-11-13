@@ -423,7 +423,7 @@ async function useEncryptedMultiFileAuthState(sessionDir, { tenantId, keyProvide
     throw err;
   }
 
-  if (!hasEncCreds && (hasOtherEnc || hasWrappedKey)) {
+  if (!hasEncCreds && hasOtherEnc) {
     const err = new Error('ENCRYPTED_STATE_INCONSISTENT: Estado cifrado inconsistente (creds.json.enc ausente com outros arquivos cifrados).');
     err.code = 'ENCRYPTED_STATE_INCONSISTENT';
     throw err;

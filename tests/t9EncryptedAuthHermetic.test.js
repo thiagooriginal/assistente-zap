@@ -1,10 +1,12 @@
 /**
- * RAIA AGENTES — SUÍTE HERMÉTICA DE TESTES AUTOMATIZADOS (COMANDO 038.1 / T9)
- * Validação rigorosa dos 27 Requisitos Mandatórios (T1 a T27).
+ * RAIA AGENTES — SUÍTE HERMÉTICA DE TESTES AUTOMATIZADOS (COMANDO 038.2 / T9)
+ * Validação rigorosa dos Requisitos Mandatórios (T0 a T29).
  *
- * Utiliza exclusivamente módulos nativos Node 22 (node:test, node:assert/strict).
- * Provedor de chaves falso (FakeKeyProvider), sem dependência de rede ou AWS real.
- * Bancos SQLite temporários descartáveis e diretórios isolados em os.tmpdir().
+ * ISOLAMENTO E HERMETICIDADE ESTRITA (BL2):
+ * - Banco temporário isolado em os.tmpdir() inicializado antes de qualquer require de src/.
+ * - Sessões, autenticação pessoal e travas alocadas exclusivamente em os.tmpdir().
+ * - Guarda de isolamento T0 aborta a execução se houver risco de contaminação do banco operacional.
+ * - Provedor de chaves falso (FakeKeyProvider), sem rede, sem AWS real e sem Baileys real.
  */
 
 const test = require('node:test');
@@ -16,13 +18,52 @@ const crypto = require('node:crypto');
 const child_process = require('node:child_process');
 const { DatabaseSync } = require('node:sqlite');
 
-// Helpers e módulos de produção
+// ============================================================================
+// 1. CONFIGURAÇÃO DE ISOLAMENTO HERMÉTICO ANTES DE QUALQUER REQUIRE DE SRC/
+// ============================================================================
+const suiteTempDir = path.join(os.tmpdir(), `t9_suite_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
+fs.mkdirSync(suiteTempDir, { recursive: true });
+
+const suiteDbPath = path.join(suiteTempDir, 'suite_hermetic.sqlite');
+const suiteSessionsDir = path.join(suiteTempDir, 'sessions');
+const suiteAuthDir = path.join(suiteTempDir, 'personal_auth');
+const suiteLockFile = path.join(suiteTempDir, 'wa-sessions.lock');
+
+fs.mkdirSync(suiteSessionsDir, { recursive: true });
+fs.mkdirSync(suiteAuthDir, { recursive: true });
+
+// Redireciona DB_PATH para o SQLite temporário isolado
+process.env.DB_PATH = suiteDbPath;
+process.env.APP_MODE = 'staging';
+process.env.HOMOLOGACAO = 'true';
+process.env.NODE_ENV = 'test';
+process.env.ALLOW_SALON_WHATSAPP_TESTING = 'true';
+process.env.SALON_TEST_ALLOWED_TENANTS = '13,14,15,16,99';
+process.env.SALON_TEST_ALLOWED_PHONES = '5511999990011,5511999990002';
+process.env.ALLOW_WHATSAPP_SENDING = 'false';
+
+// Segredo fictício para auditoria de logs (T23)
+const SUITE_FICTITIOUS_AWS_SECRET = 'AWS_HERMETIC_SECRET_KEY_MOCK_XYZ123456789';
+process.env.AWS_SECRET_ACCESS_KEY = SUITE_FICTITIOUS_AWS_SECRET;
+
+// Carregamento de módulos após configuração do ambiente
+const db = require('../src/database/db');
+const config = require('../src/config');
+config.authDir = suiteAuthDir;
+
+// Criação de registros fictícios para integridade referencial com FOREIGN KEY (BL2)
+db.prepare(`
+  INSERT OR IGNORE INTO users (id, name, phone_number, email, plan_tier, subscription_status)
+  VALUES (13, 'Jéssica Beauty Teste', '5511999990011', 'jessica@teste.com', 'PRO', 'active'),
+         (14, 'Salão Secundário Teste', '5511999990002', 'salao14@teste.com', 'PRO', 'active'),
+         (99, 'Salão Single Flight Teste', '5511999990099', 'salao99@teste.com', 'PRO', 'active');
+`).run();
+
 const { FakeKeyProvider } = require('./helpers/fakeKeyProvider');
 const {
   _setKeyProviderForTesting,
   _resetKeyProviderForTesting,
   KmsKeyProvider,
-  buildEncryptionContext,
 } = require('../src/security/keyProvider');
 
 const {
@@ -39,19 +80,27 @@ const {
 
 const {
   DEFAULT_LOCK_FILE,
+  parseProcStat,
+  readBootId,
   inspectAppLock,
   tryForceUnlock,
   acquireAppLock,
-  _setProcessStartTimeCheckerForTesting,
+  ensureWaEngineLock,
+  _setProcStatReaderForTesting,
+  _setBootIdReaderForTesting,
+  _resetEngineLockForTesting,
 } = require('../src/utils/appLock');
 
 const waCredsMigrate = require('../scripts/waCredsMigrate');
 const SalonWhatsAppRepository = require('../src/database/salonWhatsAppRepository');
 const salonSessionManager = require('../src/whatsapp/salonSessionManager');
 
-// Helper para criar diretório temporário isolado por teste
+// Define a pasta base de sessões inicial para a temporária da suíte
+salonSessionManager._setBaseDirForTesting(suiteSessionsDir);
+
+// Helper para criar diretórios temporários isolados por teste
 function createTestDir(prefix = 'raia_test_') {
-  const dir = path.join(os.tmpdir(), `${prefix}${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
+  const dir = path.join(suiteTempDir, `${prefix}${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -94,14 +143,6 @@ function createMockCreds() {
   };
 }
 
-// Setup global para testes
-process.env.APP_MODE = 'staging';
-process.env.HOMOLOGACAO = 'true';
-process.env.ALLOW_SALON_WHATSAPP_TESTING = 'true';
-process.env.SALON_TEST_ALLOWED_TENANTS = '13,14,15,16';
-process.env.SALON_TEST_ALLOWED_PHONES = '5511999990011,5511999990002';
-process.env.ALLOW_WHATSAPP_SENDING = 'false';
-
 // Coletor global de saída para T23 (Auditoria de Segredos nos Logs)
 const logCapture = [];
 const originalConsoleLog = console.log;
@@ -143,9 +184,33 @@ function stopLogCapture() {
 
 startLogCapture();
 
+// Registro das chaves capturadas para auditoria em T23
+let capturedTenantDek = null;
+let capturedWrappedKey = null;
+
+test.after(() => {
+  stopLogCapture();
+  salonSessionManager._setBaseDirForTesting(suiteSessionsDir);
+  try {
+    fs.rmSync(suiteTempDir, { recursive: true, force: true });
+  } catch (_) {}
+});
+
 // ============================================================================
-// SUÍTE DE TESTES HERMÉTICOS T1 A T27
+// SUÍTE DE TESTES HERMÉTICOS T0 A T29
 // ============================================================================
+
+test('T0: Guarda de isolamento hermético (todos os caminhos alocados em os.tmpdir)', () => {
+  const tmpRoot = os.tmpdir().toLowerCase();
+  assert.ok(config.dbPath.toLowerCase().startsWith(tmpRoot), `config.dbPath (${config.dbPath}) deve estar em os.tmpdir()`);
+  assert.ok(process.env.DB_PATH.toLowerCase().startsWith(tmpRoot), `process.env.DB_PATH deve estar em os.tmpdir()`);
+  assert.ok(suiteSessionsDir.toLowerCase().startsWith(tmpRoot), `suiteSessionsDir deve estar em os.tmpdir()`);
+  assert.ok(config.authDir.toLowerCase().startsWith(tmpRoot), `config.authDir deve estar em os.tmpdir()`);
+  assert.ok(suiteLockFile.toLowerCase().startsWith(tmpRoot), `suiteLockFile deve estar em os.tmpdir()`);
+
+  const forbiddenRealDb = path.resolve(__dirname, '../data/assistant.db').toLowerCase();
+  assert.notEqual(config.dbPath.toLowerCase(), forbiddenRealDb, 'DB_PATH jamais pode apontar para data/assistant.db');
+});
 
 test('T1: Ida e volta completa (creds, pre-key, session, sender-key, app-state-sync-key)', async () => {
   const dir = createTestDir('t1_');
@@ -170,7 +235,6 @@ test('T1: Ida e volta completa (creds, pre-key, session, sender-key, app-state-s
       'app-state-sync-key': { 'ask_1': appStateData },
     });
 
-    // Recarrega em nova instância do estado
     const { state: stateReloaded } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
     assert.equal(stateReloaded.creds.me.id, mockCreds.me.id);
     assert.equal(stateReloaded.creds.registrationId, mockCreds.registrationId);
@@ -297,7 +361,7 @@ test('T4: Adulteração (ciphertext e tag adulterados lançam ENCRYPTED_FILE_COR
   }
 });
 
-test('T5: Falha entre .tmp e rename (arquivo anterior continua legível e .tmp órfão é limpo)', async () => {
+test('T5: Falha real entre .tmp e rename (arquivo anterior continua íntegro e .tmp órfão é limpo)', async () => {
   const dir = createTestDir('t5_');
   const kp = new FakeKeyProvider();
   _setKeyProviderForTesting(kp);
@@ -307,18 +371,41 @@ test('T5: Falha entre .tmp e rename (arquivo anterior continua legível e .tmp �
     state.creds = createMockCreds();
     await saveCreds();
 
-    await state.keys.set({ 'pre-key': { '1': { keyPair: { public: Buffer.from('v1'), private: Buffer.from('p1') }, keyId: 1 } } });
+    // Grava versão inicial de pre-key-1
+    await state.keys.set({ 'pre-key': { '1': { keyPair: { public: Buffer.from('v1_pub'), private: Buffer.from('v1_priv') }, keyId: 1 } } });
+    const pk1Path = path.join(dir, 'pre-key-1.json.enc');
+    const hashBefore = crypto.createHash('sha256').update(fs.readFileSync(pk1Path)).digest('hex');
 
-    // Cria um .tmp órfão proposital
-    const orphanTmp = path.join(dir, 'pre-key-1.json.enc.tmp');
-    fs.writeFileSync(orphanTmp, Buffer.from('garbage'));
+    // Injeta falha real em fs.promises.rename na gravação da versão v2
+    const originalRename = fs.promises.rename;
+    fs.promises.rename = async (oldPath, newPath) => {
+      if (String(newPath).endsWith('pre-key-1.json.enc')) {
+        throw new Error('SIMULATED_FS_RENAME_FAILURE');
+      }
+      return originalRename(oldPath, newPath);
+    };
 
-    // Recarrega o estado: o .tmp órfão deve ser limpo e o original preservado
-    const { state: state2 } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
-    assert.equal(fs.existsSync(orphanTmp), false, 'Arquivo .tmp órfão deve ser removido');
+    await assert.rejects(
+      async () => state.keys.set({ 'pre-key': { '1': { keyPair: { public: Buffer.from('v2_pub'), private: Buffer.from('v2_priv') }, keyId: 1 } } }),
+      /SIMULATED_FS_RENAME_FAILURE/
+    );
 
-    const key = await state2.keys.get('pre-key', ['1']);
-    assert.deepEqual(key['1'].keyPair.public, Buffer.from('v1'));
+    fs.promises.rename = originalRename;
+
+    // Arquivo original continua com o mesmo hash e legível
+    const hashAfter = crypto.createHash('sha256').update(fs.readFileSync(pk1Path)).digest('hex');
+    assert.equal(hashAfter, hashBefore, 'Arquivo .enc original não deve ser modificado em caso de falha no rename');
+
+    const orphanTmpList = fs.readdirSync(dir).filter((f) => f.includes('pre-key-1.json.enc.tmp'));
+    assert.ok(orphanTmpList.length > 0, 'O arquivo .tmp órfão deve permanecer na pasta antes da limpeza');
+
+    // Na próxima carga de useEncryptedMultiFileAuthState, o .tmp órfão é removido
+    const { state: stateReloaded } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    const orphanTmpListAfter = fs.readdirSync(dir).filter((f) => f.includes('pre-key-1.json.enc.tmp'));
+    assert.equal(orphanTmpListAfter.length, 0, 'Arquivo .tmp órfão deve ser expurgado');
+
+    const keyLoaded = await stateReloaded.keys.get('pre-key', ['1']);
+    assert.deepEqual(keyLoaded['1'].keyPair.public, Buffer.from('v1_pub'));
   } finally {
     clearTenantDek(13);
     _resetKeyProviderForTesting();
@@ -430,7 +517,6 @@ test('T9: Falha no 3º arquivo (pasta fica idêntica à original e quarentena fi
     const initialFiles = fs.readdirSync(dir).sort();
     const hashBefore = initialFiles.map(f => crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, f))).digest('hex'));
 
-    // Injeta falha forçada simulando erro de escrita no 3º arquivo
     const originalOpenSync = fs.openSync;
     fs.openSync = function (p, flags, mode) {
       if (String(p).includes('file3.json.enc.tmp')) {
@@ -515,12 +601,10 @@ test('T11: Rollback do estado atual (contém alterações novas, não o estado d
 
     await waCredsMigrate.runMigration({ tenantId: 13, dir, isPersonal: false }, { keyProvider: kp, quarantineRoot });
 
-    // Grava alteração nova no estado cifrado
     const { state, saveCreds } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
     state.creds.me = { id: 'brand_new_id@s.whatsapp.net' };
     await saveCreds();
 
-    // Executa rollback
     const rollbackRes = await waCredsMigrate.runRollback({ tenantId: 13, dir, isPersonal: false }, { keyProvider: kp, confirmRollback: true });
     assert.equal(rollbackRes.status, 'SUCCESS');
 
@@ -534,77 +618,184 @@ test('T11: Rollback do estado atual (contém alterações novas, não o estado d
   }
 });
 
-test('T12: Trava do motor de sessões (casos a, b, c, d, e e WA_SESSIONS_DISABLED)', async () => {
+test('T12: Trava do motor de sessões com waCredsMigrate CLI e integridade de arquivos (a a e)', async () => {
   const lockDir = createTestDir('t12_locks_');
   const lockFile = path.join(lockDir, 'wa-sessions.lock');
   const sessionDir = createTestDir('t12_sess_');
-  fs.writeFileSync(path.join(sessionDir, 'dummy.json'), JSON.stringify({ dummy: 1 }));
+  const testJsonPath = path.join(sessionDir, 'creds.json');
+  fs.writeFileSync(testJsonPath, JSON.stringify({ me: { id: '5511999990011@s.whatsapp.net' } }));
+  const hashOriginal = crypto.createHash('sha256').update(fs.readFileSync(testJsonPath)).digest('hex');
+
+  const kp = new FakeKeyProvider();
 
   try {
-    // (a) Trava com PID de processo vivo (processo filho ativo mantido vivo)
+    // (a) Trava com PID de processo vivo (child mantido vivo)
     const child = child_process.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000);'], { stdio: 'ignore' });
-    fs.writeFileSync(lockFile, JSON.stringify({ pid: child.pid, startedAt: Date.now(), engineId: 'wa-sessions-engine' }));
+    fs.writeFileSync(lockFile, JSON.stringify({ pid: child.pid, startTicks: null, bootId: null, engineId: 'wa-sessions-engine' }));
 
-    // Rejeita sem force-unlock
-    let inspected = inspectAppLock(lockFile);
-    assert.equal(inspected.running, true);
-    assert.equal(inspected.orphan, false);
-    let unlockRes = tryForceUnlock(lockFile);
-    assert.equal(unlockRes.unlocked, false);
+    // Executa CLI sem force-unlock: bloqueia e mantém arquivo intacto
+    await assert.rejects(
+      async () => waCredsMigrate.main(['--tenant', '13', '--migrate'], { exitOnError: false, lockFile, keyProvider: kp }),
+      /Trava existente detectada/
+    );
+    assert.equal(crypto.createHash('sha256').update(fs.readFileSync(testJsonPath)).digest('hex'), hashOriginal);
+
+    // Executa CLI com force-unlock: bloqueia pois o PID está vivo
+    await assert.rejects(
+      async () => waCredsMigrate.main(['--tenant', '13', '--migrate', '--force-unlock'], { exitOnError: false, lockFile, keyProvider: kp }),
+      /Não foi possível liberar a trava/
+    );
+    assert.equal(crypto.createHash('sha256').update(fs.readFileSync(testJsonPath)).digest('hex'), hashOriginal);
     assert.ok(fs.existsSync(lockFile));
 
     child.kill('SIGKILL');
 
     // (b) Trava com PID da própria ferramenta (process.pid)
-    fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, startedAt: Date.now(), engineId: 'wa-sessions-engine' }));
-    inspected = inspectAppLock(lockFile);
-    assert.equal(inspected.self, true);
-    unlockRes = tryForceUnlock(lockFile);
-    assert.equal(unlockRes.unlocked, false);
-    assert.equal(unlockRes.reason, 'CANNOT_UNLOCK_SELF_PROCESS');
+    fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, startTicks: null, bootId: null, engineId: 'wa-sessions-engine' }));
+    await assert.rejects(
+      async () => waCredsMigrate.main(['--tenant', '13', '--migrate', '--force-unlock'], { exitOnError: false, lockFile, keyProvider: kp }),
+      /CANNOT_UNLOCK_SELF_PROCESS/
+    );
+    assert.equal(crypto.createHash('sha256').update(fs.readFileSync(testJsonPath)).digest('hex'), hashOriginal);
 
-    // (c) Trava ilegível ou corrompida
-    fs.writeFileSync(lockFile, 'CORRUPTED_NON_JSON_CONTENT_WITHOUT_PID');
-    inspected = inspectAppLock(lockFile);
-    assert.equal(inspected.indeterminate, true);
-    unlockRes = tryForceUnlock(lockFile);
-    assert.equal(unlockRes.unlocked, false);
+    // (c) Trava ilegível / corrompida
+    fs.writeFileSync(lockFile, 'CORRUPTED_RAW_NON_JSON');
+    await assert.rejects(
+      async () => waCredsMigrate.main(['--tenant', '13', '--migrate', '--force-unlock'], { exitOnError: false, lockFile, keyProvider: kp }),
+      /LOCK_CORRUPTED_OR_UNREADABLE/
+    );
+    assert.equal(crypto.createHash('sha256').update(fs.readFileSync(testJsonPath)).digest('hex'), hashOriginal);
 
     // (d) PID inexistente (morto)
-    fs.writeFileSync(lockFile, JSON.stringify({ pid: 9999999, startedAt: Date.now(), engineId: 'wa-sessions-engine' }));
-    inspected = inspectAppLock(lockFile);
-    assert.equal(inspected.orphan, true);
-    assert.equal(inspected.running, false);
-    unlockRes = tryForceUnlock(lockFile);
+    fs.writeFileSync(lockFile, JSON.stringify({ pid: 9999999, startTicks: 100, bootId: 'mock', engineId: 'wa-sessions-engine' }));
+    // Sem force-unlock: recusa
+    await assert.rejects(
+      async () => waCredsMigrate.main(['--tenant', '13', '--migrate'], { exitOnError: false, lockFile, keyProvider: kp }),
+      /Trava existente detectada/
+    );
+    // Com force-unlock: libera e remove a trava
+    const unlockRes = tryForceUnlock(lockFile);
     assert.equal(unlockRes.unlocked, true);
     assert.equal(fs.existsSync(lockFile), false);
 
-    // (e) PID vivo com tempo de início diferente do gravado (PID reaproveitado)
-    const aliveChild = child_process.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000);'], { stdio: 'ignore' });
-    fs.writeFileSync(lockFile, JSON.stringify({ pid: aliveChild.pid, startedAt: 1000000, engineId: 'wa-sessions-engine' }));
-    _setProcessStartTimeCheckerForTesting((pid) => pid === aliveChild.pid ? 2000000 : null);
+    // (e) PID vivo com ticks diferentes simulados
+    const aliveProc = child_process.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000);'], { stdio: 'ignore' });
+    fs.writeFileSync(lockFile, JSON.stringify({ pid: aliveProc.pid, startTicks: 1000, bootId: 'boot1', engineId: 'wa-sessions-engine' }));
+    _setBootIdReaderForTesting(() => 'boot1');
+    _setProcStatReaderForTesting((pid) => pid === aliveProc.pid ? { startTicks: 2000 } : null);
 
-    inspected = inspectAppLock(lockFile);
-    assert.equal(inspected.orphan, true);
-    assert.equal(inspected.reason, 'PID_RECYCLED_DIFFERENT_START_TIME');
+    const inspectRecycled = inspectAppLock(lockFile);
+    assert.equal(inspectRecycled.orphan, true);
+    assert.equal(inspectRecycled.reason, 'PID_RECYCLED_DIFFERENT_START_TICKS');
 
-    unlockRes = tryForceUnlock(lockFile);
-    assert.equal(unlockRes.unlocked, true);
+    const unlockRecycled = tryForceUnlock(lockFile);
+    assert.equal(unlockRecycled.unlocked, true);
     assert.equal(fs.existsSync(lockFile), false);
 
-    aliveChild.kill('SIGKILL');
-    _setProcessStartTimeCheckerForTesting(null);
-
-    // (f) WA_SESSIONS_DISABLED=true: trava não é criada
-    process.env.WA_SESSIONS_DISABLED = 'true';
-    const acquired = acquireAppLock(lockFile);
-    assert.equal(acquired, false);
-    assert.equal(fs.existsSync(lockFile), false);
-    delete process.env.WA_SESSIONS_DISABLED;
+    aliveProc.kill('SIGKILL');
+    _setProcStatReaderForTesting(null);
+    _setBootIdReaderForTesting(null);
   } finally {
     fs.rmSync(lockDir, { recursive: true, force: true });
     fs.rmSync(sessionDir, { recursive: true, force: true });
   }
+});
+
+test('T12-X: Trava entre processos reais sem função falsa (Windows e Linux)', () => {
+  const lockDir = createTestDir('t12_x_');
+  const lockFile = path.join(lockDir, 'wa-engine-real.lock');
+
+  _resetEngineLockForTesting();
+  ensureWaEngineLock(lockFile);
+
+  assert.ok(fs.existsSync(lockFile));
+
+  // Processo filho Node executa inspeção real sobre a trava mantida pelo pai
+  const childScript = `
+    const { inspectAppLock, tryForceUnlock } = require('./src/utils/appLock');
+    const status = inspectAppLock(process.argv[1]);
+    const unlock = tryForceUnlock(process.argv[1]);
+    if (status.running !== true || unlock.unlocked !== false) {
+      process.exit(2);
+    }
+    process.exit(0);
+  `;
+
+  const res = child_process.spawnSync(process.execPath, ['-e', childScript, lockFile], {
+    cwd: path.resolve(__dirname, '..'),
+    encoding: 'utf8',
+  });
+
+  assert.equal(res.status, 0, `Filho deve detectar running=true e unlocked=false. Stderr: ${res.stderr}`);
+
+  // Teste via CLI do waCredsMigrate no processo filho com --force-unlock
+  const cliRes = child_process.spawnSync(
+    process.execPath,
+    ['scripts/waCredsMigrate.js', '--tenant', '13', '--migrate', '--force-unlock', '--lock-file', lockFile],
+    {
+      cwd: path.resolve(__dirname, '..'),
+      encoding: 'utf8',
+    }
+  );
+
+  assert.notEqual(cliRes.status, 0, 'CLI deve falhar e recusar remover trava de processo ativo');
+  assert.ok(fs.existsSync(lockFile), 'A trava deve permanecer no lugar');
+
+  _resetEngineLockForTesting();
+  fs.rmSync(lockDir, { recursive: true, force: true });
+});
+
+test('T12-L: Parser de /proc/<pid>/stat com comm complexo (espaços/parênteses) e bootId', () => {
+  // 1. Parser com nome de processo complexo
+  const statWithParens = '1234 (Web Content (worker)) S 1 14 14 0 -1 4194304 316 0 0 0 10 2 0 0 20 0 1 0 789101 1234567 123 18446744073709551615 1 1 0 0 0 0 0 0 0 0 0 0 0 17 0 0 0 0 0 0';
+  const parsed = parseProcStat(statWithParens);
+  assert.ok(parsed != null);
+  assert.equal(parsed.startTicks, 789101);
+
+  // 2. Trava com bootId diferente é órfã
+  const lockDir = createTestDir('t12_l_');
+  const lockFile = path.join(lockDir, 'boot-test.lock');
+
+  const child = child_process.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000);'], { stdio: 'ignore' });
+  fs.writeFileSync(lockFile, JSON.stringify({ pid: child.pid, startTicks: 12345, bootId: 'old-boot-uuid', engineId: 'wa-sessions-engine' }));
+
+  _setBootIdReaderForTesting(() => 'new-boot-uuid-rebooted');
+  const inspectBoot = inspectAppLock(lockFile);
+  assert.equal(inspectBoot.orphan, true);
+  assert.equal(inspectBoot.reason, 'BOOT_ID_MISMATCH_REAPROVEITADO');
+
+  // 3. Trava antiga só com PID vivo é ativa
+  fs.writeFileSync(lockFile, JSON.stringify({ pid: child.pid, engineId: 'wa-sessions-engine' }));
+  const inspectLegacy = inspectAppLock(lockFile);
+  assert.equal(inspectLegacy.running, true);
+  assert.equal(inspectLegacy.orphan, false);
+
+  child.kill('SIGKILL');
+  _setBootIdReaderForTesting(null);
+  fs.rmSync(lockDir, { recursive: true, force: true });
+});
+
+test('T12-H: Trava criada em homologação no startup e suprimida com WA_SESSIONS_DISABLED=true', async () => {
+  const lockDir = createTestDir('t12_h_');
+  const testLockFile = path.join(lockDir, 'wa-sessions.lock');
+
+  _resetEngineLockForTesting();
+
+  // Com WA_SESSIONS_DISABLED=true, não adquire trava
+  process.env.WA_SESSIONS_DISABLED = 'true';
+  const resDisabled = ensureWaEngineLock(testLockFile);
+  assert.equal(resDisabled, false);
+  assert.equal(fs.existsSync(testLockFile), false);
+
+  delete process.env.WA_SESSIONS_DISABLED;
+
+  // Sem WA_SESSIONS_DISABLED, adquire com sucesso
+  const resEnabled = ensureWaEngineLock(testLockFile);
+  assert.equal(resEnabled, true);
+  assert.ok(fs.existsSync(testLockFile));
+
+  _resetEngineLockForTesting();
+  fs.rmSync(lockDir, { recursive: true, force: true });
 });
 
 test('T13: B1 - Chave ausente (dek.wrapped ausente com arquivos .enc presentes lança DEK_MISSING_WITH_ENCRYPTED_FILES)', async () => {
@@ -620,7 +811,6 @@ test('T13: B1 - Chave ausente (dek.wrapped ausente com arquivos .enc presentes l
     const encFile = path.join(dir, 'creds.json.enc');
     const hashBefore = crypto.createHash('sha256').update(fs.readFileSync(encFile)).digest('hex');
 
-    // Remove apenas a chave embrulhada
     fs.unlinkSync(path.join(dir, 'dek.wrapped'));
     clearTenantDek(13);
 
@@ -713,7 +903,6 @@ test('T16: B1 - Novo pareamento recusado sobre pasta com credenciais cifradas ex
     const salonDir = path.join(sessionsBase, 'salon_13');
     fs.mkdirSync(salonDir, { recursive: true });
 
-    // Cria sessão cifrada válida
     const { state, saveCreds } = await useEncryptedMultiFileAuthState(salonDir, { tenantId: 13, keyProvider: kp });
     state.creds = createMockCreds();
     await saveCreds();
@@ -740,7 +929,7 @@ test('T16: B1 - Novo pareamento recusado sobre pasta com credenciais cifradas ex
     assert.equal(hashEncAfter, hashEncBefore, 'Arquivos não devem ser alterados');
     assert.equal(kp.calls.generateDataKey, generateCallsBefore, 'Não deve gerar novas chaves');
   } finally {
-    salonSessionManager._setBaseDirForTesting(null);
+    salonSessionManager._setBaseDirForTesting(suiteSessionsDir);
     clearTenantDek(13);
     _resetKeyProviderForTesting();
     fs.rmSync(sessionsBase, { recursive: true, force: true });
@@ -764,13 +953,11 @@ test('T17: B1 - Chave secundária corrompida (pre-key renomeada para .corrupt- e
       },
     });
 
-    // Corrompe pre-key-1
     const pk1Path = path.join(dir, 'pre-key-1.json.enc');
     const pk1Buf = fs.readFileSync(pk1Path);
     pk1Buf[pk1Buf.length - 1] ^= 0x55;
     fs.writeFileSync(pk1Path, pk1Buf);
 
-    // Recarrega estado e lê chaves
     const { state: stateReloaded } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
     const keys = await stateReloaded.keys.get('pre-key', ['1', '2']);
 
@@ -786,7 +973,7 @@ test('T17: B1 - Chave secundária corrompida (pre-key renomeada para .corrupt- e
   }
 });
 
-test('T18: Restauração de salão migrado (não é marcado DISCONNECTED e cria socket)', async () => {
+test('T18: Restauração de salão migrado no banco temporário (não é marcado DISCONNECTED e cria socket)', async () => {
   const sessionsBase = createTestDir('t18_sessions_');
   salonSessionManager._setBaseDirForTesting(sessionsBase);
 
@@ -821,7 +1008,7 @@ test('T18: Restauração de salão migrado (não é marcado DISCONNECTED e cria 
     assert.notEqual(session.session_status, 'DISCONNECTED');
   } finally {
     salonSessionManager._resetForTesting();
-    salonSessionManager._setBaseDirForTesting(null);
+    salonSessionManager._setBaseDirForTesting(suiteSessionsDir);
     clearTenantDek(13);
     _resetKeyProviderForTesting();
     fs.rmSync(sessionsBase, { recursive: true, force: true });
@@ -848,7 +1035,6 @@ test('T19: B2 - Novas tentativas do KMS (KMS_UNAVAILABLE -> retentativa -> resta
 
     clearTenantDek(13);
 
-    // Simula KMS indisponível
     kp.setUnavailable(true);
     process.env.WA_CREDS_ENCRYPTION = 'on';
 
@@ -857,11 +1043,9 @@ test('T19: B2 - Novas tentativas do KMS (KMS_UNAVAILABLE -> retentativa -> resta
     let session = SalonWhatsAppRepository.getSessionByUserId(13);
     assert.equal(session.session_status, 'KMS_UNAVAILABLE');
 
-    // Confirma que getActiveSessionsForRestore continua retornando o salão
     const active = SalonWhatsAppRepository.getActiveSessionsForRestore();
     assert.ok(active.some(s => s.user_id === 13));
 
-    // O KMS volta a ficar saudável
     kp.setUnavailable(false);
     let socketRestored = false;
     salonSessionManager._setBaileysSocketFactoryForTesting(async () => {
@@ -869,13 +1053,12 @@ test('T19: B2 - Novas tentativas do KMS (KMS_UNAVAILABLE -> retentativa -> resta
       return { ev: { on: () => {} }, ws: { close: () => {} }, end: () => {} };
     });
 
-    // Executa retentativa programada
     await salonSessionManager._executeKmsRetry();
 
     assert.equal(socketRestored, true, 'Salão deve ser restaurado quando o KMS volta');
   } finally {
     salonSessionManager._resetForTesting();
-    salonSessionManager._setBaseDirForTesting(null);
+    salonSessionManager._setBaseDirForTesting(suiteSessionsDir);
     clearTenantDek(13);
     _resetKeyProviderForTesting();
     fs.rmSync(sessionsBase, { recursive: true, force: true });
@@ -891,7 +1074,6 @@ test('T20: B2 - Desconexão durante as tentativas (salão desconectado formalmen
     SalonWhatsAppRepository.ensureSessionExists(13);
     SalonWhatsAppRepository.markSessionDisconnected(13, { status: 'KMS_UNAVAILABLE' });
 
-    // Usuário desconecta formalmente
     SalonWhatsAppRepository.markSessionDisconnected(13, { status: 'DISCONNECTED' });
 
     let socketCreated = false;
@@ -904,6 +1086,7 @@ test('T20: B2 - Desconexão durante as tentativas (salão desconectado formalmen
     assert.equal(socketCreated, false, 'Salão formalmente desconectado NÃO pode ser restaurado pelo retry do KMS');
   } finally {
     salonSessionManager._resetForTesting();
+    salonSessionManager._setBaseDirForTesting(suiteSessionsDir);
     _resetKeyProviderForTesting();
   }
 });
@@ -927,15 +1110,12 @@ test('T21: B2 - NOT_MIGRATED volta (após migração o salão é restaurado norm
 
     process.env.WA_CREDS_ENCRYPTION = 'on';
 
-    // 1ª restauração detecta não migrado
     await salonSessionManager.restoreActiveSalonSessions();
     let session = SalonWhatsAppRepository.getSessionByUserId(13);
     assert.equal(session.session_status, 'NOT_MIGRATED');
 
-    // 2. Operador executa a migração
     await waCredsMigrate.runMigration({ tenantId: 13, dir: salonDir, isPersonal: false }, { keyProvider: kp, quarantineRoot });
 
-    // 3. Próxima inicialização restaura com sucesso
     let socketCreated = false;
     salonSessionManager._setBaileysSocketFactoryForTesting(async () => {
       socketCreated = true;
@@ -946,7 +1126,7 @@ test('T21: B2 - NOT_MIGRATED volta (após migração o salão é restaurado norm
     assert.equal(socketCreated, true);
   } finally {
     salonSessionManager._resetForTesting();
-    salonSessionManager._setBaseDirForTesting(null);
+    salonSessionManager._setBaseDirForTesting(suiteSessionsDir);
     clearTenantDek(13);
     _resetKeyProviderForTesting();
     fs.rmSync(sessionsBase, { recursive: true, force: true });
@@ -954,40 +1134,80 @@ test('T21: B2 - NOT_MIGRATED volta (após migração o salão é restaurado norm
   }
 });
 
-test('T22: disconnect() real (pasta é removida e DEK é zeroizada buffer.every(b => b === 0))', async () => {
-  const dir = createTestDir('t22_');
+test('T22: disconnect() real (sessão ativa removida e DEK zeroizada buffer.every(b => b === 0))', async () => {
+  salonSessionManager._resetForTesting();
+  const sessionsBase = createTestDir('t22_sessions_');
+  salonSessionManager._setBaseDirForTesting(sessionsBase);
+
   const kp = new FakeKeyProvider();
   _setKeyProviderForTesting(kp);
 
   try {
-    const dek = await getOrLoadTenantDek(dir, { tenantId: 13, keyProvider: kp });
-    assert.ok(dek.length === 32);
+    const salonDir = path.join(sessionsBase, 'salon_13');
+    fs.mkdirSync(salonDir, { recursive: true });
 
-    // Guarda referência direta do Buffer
+    const dek = await getOrLoadTenantDek(salonDir, { tenantId: 13, keyProvider: kp });
+    capturedTenantDek = dek;
+    const wrappedBuf = fs.readFileSync(path.join(salonDir, 'dek.wrapped'));
+    capturedWrappedKey = wrappedBuf;
+
     const dekRef = dek;
+    assert.equal(dekRef.length, 32);
 
-    clearTenantDek(13);
+    let socketClosed = false;
+    const mockSocket = {
+      ev: { on: () => {}, removeAllListeners: () => {} },
+      ws: { close: () => { socketClosed = true; } },
+      end: () => { socketClosed = true; },
+    };
 
-    // O buffer deve ter todos os bytes zerados
+    salonSessionManager._setSocketForTesting(13, mockSocket, { status: 'CONNECTED', connectedPhone: '5511999990011' });
+
+    await salonSessionManager.disconnect(13);
+
+    // DEK na RAM deve estar completamente preenchida com zeros
     const allZeroes = dekRef.every((b) => b === 0);
-    assert.equal(allZeroes, true, 'DEK em memória deve ser preenchida com zeros na desconexão');
+    assert.equal(allZeroes, true, 'Buffer da DEK em memória deve ser preenchido com zeros');
+
+    assert.equal(salonSessionManager._getActiveSessionForTesting(13), undefined);
+    assert.equal(fs.existsSync(salonDir), false, 'Pasta do salão deve ser removida');
   } finally {
+    salonSessionManager._resetForTesting();
+    salonSessionManager._setBaseDirForTesting(suiteSessionsDir);
     _resetKeyProviderForTesting();
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(sessionsBase, { recursive: true, force: true });
   }
 });
 
-test('T23: Auditoria rigorosa de segredos nos logs e no /diagnostics', async () => {
-  const secretKey = 'AWS_SECRET_MOCK_123456789';
-  process.env.AWS_SECRET_ACCESS_KEY = secretKey;
-
+test('T23: Auditoria rigorosa de segredos nos logs de toda a suíte e telemetria', async () => {
   const logsText = logCapture.join('\n');
-  assert.equal(logsText.includes(secretKey), false, 'AWS_SECRET_ACCESS_KEY não deve vazar nos logs');
 
+  // Procura pelo segredo AWS fictício
+  assert.equal(logsText.includes(SUITE_FICTITIOUS_AWS_SECRET), false, 'AWS_SECRET_ACCESS_KEY não deve vazar nos logs');
+
+  // Procura pela chave aberta (hex e base64) capturada em T22
+  if (capturedTenantDek) {
+    const dekHex = capturedTenantDek.toString('hex');
+    const dekB64 = capturedTenantDek.toString('base64');
+    assert.equal(logsText.includes(dekHex), false, 'DEK aberta em hex não deve constar nos logs');
+    assert.equal(logsText.includes(dekB64), false, 'DEK aberta em base64 não deve constar nos logs');
+  }
+
+  // Procura pelo wrappedKey (hex e base64)
+  if (capturedWrappedKey) {
+    const wrapHex = capturedWrappedKey.toString('hex');
+    const wrapB64 = capturedWrappedKey.toString('base64');
+    assert.equal(logsText.includes(wrapHex), false, 'Wrapped key em hex não deve constar nos logs');
+    assert.equal(logsText.includes(wrapB64), false, 'Wrapped key em base64 não deve constar nos logs');
+  }
+
+  // Verifica telemetria do salão
   const diag = salonSessionManager.getSalonDiagnostics(13);
   const diagString = JSON.stringify(diag);
+  assert.equal(diagString.includes(SUITE_FICTITIOUS_AWS_SECRET), false);
   assert.equal(diagString.includes('encrypted_tokens'), false);
-  assert.equal(diagString.includes(secretKey), false);
+  assert.equal(diagString.includes('noiseKey'), false);
+  assert.equal(diagString.includes('advSecretKey'), false);
 });
 
 test('T24: Contrato com o AWS KMS (KeySpec AES_256, EncryptionContext rígido e sanitização)', async () => {
@@ -1023,7 +1243,6 @@ test('T24: Contrato com o AWS KMS (KeySpec AES_256, EncryptionContext rígido e 
   await provider.unwrapDataKey({ wrappedKey: resGen.wrappedKey, tenantId: 13, purpose: 'wa-session' });
   assert.deepEqual(recordedCommand.input.EncryptionContext, { tenant_id: '13', purpose: 'wa-session' });
 
-  // Testa sanitização de erro
   mockClient.send = async () => {
     const err = new Error('Sensitive internal AWS trace with token ABCDEF');
     err.name = 'AccessDeniedException';
@@ -1050,7 +1269,6 @@ test('T25: Inspeção depois de reinício (chave fora da memória retorna credsV
     state.creds = createMockCreds();
     await saveCreds();
 
-    // Limpa chave da RAM simulando reinício do processo
     clearTenantDek(13);
     const unwrapCallsBefore = kp.calls.unwrapDataKey;
 
@@ -1063,7 +1281,7 @@ test('T25: Inspeção depois de reinício (chave fora da memória retorna credsV
     assert.equal(inspection.credsValid, null);
     assert.equal(kp.calls.unwrapDataKey, unwrapCallsBefore, 'Inspeção não deve chamar KMS se chave não está em RAM');
   } finally {
-    salonSessionManager._setBaseDirForTesting(null);
+    salonSessionManager._setBaseDirForTesting(suiteSessionsDir);
     clearTenantDek(13);
     _resetKeyProviderForTesting();
     fs.rmSync(sessionsBase, { recursive: true, force: true });
@@ -1071,10 +1289,9 @@ test('T25: Inspeção depois de reinício (chave fora da memória retorna credsV
 });
 
 test('T26: Migração do banco SQLite (linhas preservadas, novos status aceitos e foreign_keys preservado)', async () => {
-  const dbPath = path.join(os.tmpdir(), `test_db_migration_${Date.now()}.sqlite`);
+  const dbPath = path.join(suiteTempDir, `test_db_migration_${Date.now()}.sqlite`);
   const rawDb = new DatabaseSync(dbPath);
 
-  // Cria schema legado
   rawDb.exec('PRAGMA foreign_keys = OFF;');
   rawDb.exec(`
     CREATE TABLE salon_whatsapp_sessions (
@@ -1092,7 +1309,6 @@ test('T26: Migração do banco SQLite (linhas preservadas, novos status aceitos 
     INSERT INTO salon_whatsapp_sessions (tenant_id, phone_jid, session_status) VALUES (13, '5511999990011@s.whatsapp.net', 'CONNECTED');
   `);
 
-  // Executa migração 20261112_01
   const fkBefore = rawDb.prepare('PRAGMA foreign_keys').get()['foreign_keys'];
   assert.equal(fkBefore, 0);
 
@@ -1128,7 +1344,6 @@ test('T26: Migração do banco SQLite (linhas preservadas, novos status aceitos 
   const fkAfter = rawDb.prepare('PRAGMA foreign_keys').get()['foreign_keys'];
   assert.equal(fkAfter, fkBefore, 'foreign_keys deve retornar ao valor original');
 
-  // Valida inserção dos novos status
   rawDb.prepare("INSERT INTO salon_whatsapp_sessions (tenant_id, session_status) VALUES (14, 'KMS_UNAVAILABLE')").run();
   rawDb.prepare("INSERT INTO salon_whatsapp_sessions (tenant_id, session_status) VALUES (15, 'NOT_MIGRATED')").run();
 
@@ -1150,8 +1365,99 @@ test('T27: Modo off (testes com WA_CREDS_ENCRYPTION=off operam sem alteração)'
     assert.equal(inspection.notMigrated, false);
     assert.equal(inspection.credsValid, true);
   } finally {
-    salonSessionManager._setBaseDirForTesting(null);
+    salonSessionManager._setBaseDirForTesting(suiteSessionsDir);
     fs.rmSync(sessionsBase, { recursive: true, force: true });
-    stopLogCapture();
+  }
+});
+
+test('T28: Pareamento depois de QR expirado ou cancelado (pasta só com dek.wrapped permite pareamento)', async () => {
+  const sessionsBase = createTestDir('t28_sessions_');
+  salonSessionManager._setBaseDirForTesting(sessionsBase);
+  const salonDir = path.join(sessionsBase, 'salon_13');
+  fs.mkdirSync(salonDir, { recursive: true });
+
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    // 1. Gera dek.wrapped simulando tentativa anterior de pareamento que expirou
+    await getOrLoadTenantDek(salonDir, { tenantId: 13, keyProvider: kp });
+    assert.ok(fs.existsSync(path.join(salonDir, 'dek.wrapped')));
+    clearTenantDek(13);
+
+    const generateCallsBefore = kp.calls.generateDataKey;
+    process.env.WA_CREDS_ENCRYPTION = 'on';
+
+    // 2. Pasta só com dek.wrapped: useEncryptedMultiFileAuthState deve ter sucesso (reaproveita chave via unwrap)
+    const { state, saveCreds } = await useEncryptedMultiFileAuthState(salonDir, { tenantId: 13, keyProvider: kp });
+    assert.ok(state.creds != null);
+    assert.equal(kp.calls.generateDataKey, generateCallsBefore, 'Não deve gerar chave nova (reaproveita dek.wrapped existente)');
+    assert.ok(fs.existsSync(path.join(salonDir, 'dek.wrapped')), 'Não pode apagar o dek.wrapped');
+
+    // 3. startQrSession e requestPairingCode devem PERMITIR pareamento sobre pasta apenas com dek.wrapped
+    let socketCreated = false;
+    salonSessionManager._setBaileysSocketFactoryForTesting(async () => {
+      socketCreated = true;
+      return { ev: { on: () => {} }, ws: { close: () => {} }, end: () => {} };
+    });
+
+    const qrResult = await salonSessionManager.startQrSession(13);
+    assert.ok(qrResult != null);
+    assert.ok(fs.existsSync(path.join(salonDir, 'dek.wrapped')));
+
+    // 4. Se creds.json.enc for gravado, aí sim novas chamadas devem recusar
+    state.creds = createMockCreds();
+    await saveCreds();
+
+    await assert.rejects(
+      async () => salonSessionManager.startQrSession(13),
+      (err) => err.code === 'CANNOT_PAIR_EXISTING_ENCRYPTED_SESSION'
+    );
+  } finally {
+    salonSessionManager._resetForTesting();
+    salonSessionManager._setBaseDirForTesting(suiteSessionsDir);
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(sessionsBase, { recursive: true, force: true });
+  }
+});
+
+test('T29: _executeKmsRetry respeita whitelist de homologação e WA_SESSIONS_DISABLED=true', async () => {
+  salonSessionManager._resetForTesting();
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    // Registra tenant 14 (autorizado) e tenant 88 (não autorizado) em KMS_UNAVAILABLE
+    SalonWhatsAppRepository.ensureSessionExists(14);
+    SalonWhatsAppRepository.markSessionDisconnected(14, { status: 'KMS_UNAVAILABLE' });
+
+    // Com WA_SESSIONS_DISABLED=true, não executa retry
+    process.env.WA_SESSIONS_DISABLED = 'true';
+    let socketAttempt = false;
+    salonSessionManager._setBaileysSocketFactoryForTesting(async () => {
+      socketAttempt = true;
+      return { ev: { on: () => {} } };
+    });
+
+    await salonSessionManager._executeKmsRetry();
+    assert.equal(socketAttempt, false, 'Com WA_SESSIONS_DISABLED=true não deve tentar restaurar');
+
+    delete process.env.WA_SESSIONS_DISABLED;
+
+    // Em homologação com tenant não autorizado (ex: 88), não restaura
+    db.prepare(`
+      INSERT OR IGNORE INTO users (id, name, phone_number) VALUES (88, 'Não Autorizado', '5511888880088');
+    `).run();
+    SalonWhatsAppRepository.ensureSessionExists(88);
+    SalonWhatsAppRepository.markSessionDisconnected(88, { status: 'KMS_UNAVAILABLE' });
+
+    await salonSessionManager._executeKmsRetry();
+    const s88 = SalonWhatsAppRepository.getSessionByUserId(88);
+    assert.equal(s88.session_status, 'KMS_UNAVAILABLE', 'Salão fora da whitelist não pode ser restaurado');
+  } finally {
+    salonSessionManager._resetForTesting();
+    salonSessionManager._setBaseDirForTesting(suiteSessionsDir);
+    _resetKeyProviderForTesting();
   }
 });

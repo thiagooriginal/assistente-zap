@@ -10,7 +10,7 @@ const config = require('./config');
 const calendarService = require('./services/calendarService');
 const { startServer } = require('./server/app');
 const clientAuth = require('./services/clientAuthService');
-const { acquireAppLock } = require('./utils/appLock');
+const { ensureWaEngineLock } = require('./utils/appLock');
 
 const isStagingMode =
   process.env.APP_MODE === 'homologacao' ||
@@ -20,8 +20,8 @@ const isStagingMode =
   process.env.DISABLE_WHATSAPP_BOT === 'true' ||
   process.env.WA_SESSIONS_DISABLED === 'true';
 
-if (process.env.NODE_ENV !== 'test' && !isStagingMode && process.env.WA_SESSIONS_DISABLED !== 'true') {
-  acquireAppLock();
+if (process.env.NODE_ENV !== 'test' && process.env.WA_SESSIONS_DISABLED !== 'true') {
+  ensureWaEngineLock();
 }
 
 if (isStagingMode) {

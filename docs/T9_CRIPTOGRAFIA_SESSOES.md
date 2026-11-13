@@ -113,6 +113,9 @@ Para evitar conflito de processos sem derrubar o container do Easypanel, a migra
 ### 4.1 Roteiro de Homologação (Restrito Exclusivamente ao `--tenant 13`)
 Em homologação/staging, a migração **NÃO** deve usar `--all`. Aplique apenas para o tenant de testes:
 
+> [!NOTE]
+> A ferramenta de migração `waCredsMigrate.js` deve ser executada obrigatoriamente **no mesmo container** da aplicação (acessado pelo console do Easypanel ou `docker exec`), para que a inspeção da trava `data/wa-sessions.lock` e a verificação do PID compartilhem o mesmo espaço de processos (PID namespace).
+
 1. **Ativar Modo de Manutenção:**
    No Easypanel, defina `WA_SESSIONS_DISABLED=true` e reinicie a aplicação.
    O servidor web subirá sem acionar o motor de sessões do WhatsApp e sem criar a trava `data/wa-sessions.lock`.
