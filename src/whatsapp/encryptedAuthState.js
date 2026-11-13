@@ -3,12 +3,12 @@
  * 
  * Implementa useEncryptedMultiFileAuthState compatível com o Baileys v7.
  * - Todos os arquivos de sessão possuem sufixo .enc (ex: creds.json.enc, pre-key-*.json.enc).
- * - Criptografia autenticada AES-256-GCM.
+ * - Criptografia autenticada AES-256-GCM com AAD rígido: `wa:${tenantId}:${originalFileName}`.
  * - Cabeçalho binário: RAIAENC1 (8 bytes) + versão (1 byte: 0x01) + IV (12 bytes) + Tag (16 bytes) + Ciphertext.
- * - AAD vincula rigidamente o tenantId e o nome do arquivo original: `wa:${tenantId}:${originalFileName}`.
- * - Gravação atômica: escrita em .tmp, fsync e rename atômico.
- * - Concorrência serializada por arquivo.
- * - Chave DEK mantida em memória por salão e zerada com .fill(0) na desconexão.
+ * - Gravação atômica: escrita em .tmp, fsync e rename atômico, com fsync de diretório.
+ * - Concorrência serializada por arquivo e single-flight por tenant para obtenção de DEK.
+ * - Proteção B1 contra recriação de credenciais sobre sessões existentes.
+ * - Isolamento estrito de memória: DEK zerada via fill(0) ao desconectar.
  */
 
 const fs = require('fs');
@@ -23,6 +23,9 @@ const HEADER_LENGTH = 8 + 1 + 12 + 16; // 37 bytes: Magic(8) + Version(1) + IV(1
 
 // Cache em memória de chaves abertas (DEK) por tenant: tenantId -> Buffer(32)
 const tenantDekCache = new Map();
+
+// Single-flight de promessas de obtenção de DEK por tenant: tenantId -> Promise<Buffer>
+const dekFlightMap = new Map();
 
 // Mutex simples por caminho de arquivo para serializar gravações concorrentes
 const fileLocks = new Map();
@@ -109,19 +112,25 @@ function decryptBuffer(encBuffer, dek, { tenantId, fileName }) {
     throw new Error('INVALID_DEK: A chave DEK deve possuir exatamente 32 bytes.');
   }
   if (!Buffer.isBuffer(encBuffer) || encBuffer.length < HEADER_LENGTH) {
-    throw new Error('CORRUPT_ENCRYPTED_FILE: Tamanho insuficiente para arquivo cifrado.');
+    const err = new Error('ENCRYPTED_FILE_CORRUPT: Falha na integridade do arquivo cifrado.');
+    err.code = 'ENCRYPTED_FILE_CORRUPT';
+    throw err;
   }
 
   // Validação do Magic Header
   const magic = encBuffer.subarray(0, 8);
   if (!magic.equals(MAGIC_HEADER)) {
-    throw new Error('INVALID_FILE_HEADER: Cabeçalho mágico inválido (esperado RAIAENC1).');
+    const err = new Error('ENCRYPTED_FILE_CORRUPT: Falha na integridade do arquivo cifrado.');
+    err.code = 'ENCRYPTED_FILE_CORRUPT';
+    throw err;
   }
 
   // Validação de versão
   const version = encBuffer[8];
   if (version !== CURRENT_VERSION) {
-    throw new Error(`UNSUPPORTED_VERSION: Versão de cifra não suportada (${version}).`);
+    const err = new Error('ENCRYPTED_FILE_CORRUPT: Falha na integridade do arquivo cifrado.');
+    err.code = 'ENCRYPTED_FILE_CORRUPT';
+    throw err;
   }
 
   const iv = encBuffer.subarray(9, 21);
@@ -136,14 +145,33 @@ function decryptBuffer(encBuffer, dek, { tenantId, fileName }) {
     return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
   } catch (err) {
     // Falha de autenticação (adulteração, AAD incorreto ou chave errada)
-    const safeErr = new Error('AUTH_TAG_VERIFICATION_FAILED: Falha de autenticação ao decifrar arquivo de sessão.');
-    safeErr.code = 'AUTH_TAG_VERIFICATION_FAILED';
+    const safeErr = new Error('ENCRYPTED_FILE_CORRUPT: Falha na integridade do arquivo cifrado.');
+    safeErr.code = 'ENCRYPTED_FILE_CORRUPT';
     throw safeErr;
   }
 }
 
 /**
- * Obtém ou carrega a DEK do tenant em memória (desembrulhando via KMS quando necessário)
+ * Remove apenas arquivos temporários órfãos de gravações anteriores
+ * NUNCA remove arquivos .enc legítimos
+ * @param {string} sessionDir
+ */
+function cleanOrphanTmpFiles(sessionDir) {
+  try {
+    if (!fs.existsSync(sessionDir)) return;
+    const entries = fs.readdirSync(sessionDir);
+    for (const file of entries) {
+      if ((file.endsWith('.tmp') || file.includes('.enc.tmp') || file.includes('dek.wrapped.tmp')) && !file.endsWith('.enc')) {
+        try {
+          fs.unlinkSync(path.join(sessionDir, file));
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+}
+
+/**
+ * Obtém ou carrega a DEK do tenant em memória com single-flight por inquilino
  * @param {string} sessionDir
  * @param {{ tenantId: string|number, keyProvider: object }} options
  * @returns {Promise<Buffer>}
@@ -154,42 +182,84 @@ async function getOrLoadTenantDek(sessionDir, { tenantId, keyProvider }) {
     return tenantDekCache.get(tenantKey);
   }
 
-  if (!fs.existsSync(sessionDir)) {
-    fs.mkdirSync(sessionDir, { recursive: true });
+  if (dekFlightMap.has(tenantKey)) {
+    return await dekFlightMap.get(tenantKey);
   }
 
-  const wrappedKeyPath = path.join(sessionDir, 'dek.wrapped');
+  const flightPromise = (async () => {
+    if (!fs.existsSync(sessionDir)) {
+      fs.mkdirSync(sessionDir, { recursive: true });
+    }
 
-  if (fs.existsSync(wrappedKeyPath)) {
-    // Sessão preexistente: desembrulha a DEK utilizando o keyProvider
-    const wrappedKey = fs.readFileSync(wrappedKeyPath);
-    const plaintextKey = await keyProvider.unwrapDataKey({
-      wrappedKey,
+    const wrappedKeyPath = path.join(sessionDir, 'dek.wrapped');
+
+    if (fs.existsSync(wrappedKeyPath)) {
+      // Sessão preexistente: desembrulha a DEK utilizando o keyProvider
+      const wrappedKey = fs.readFileSync(wrappedKeyPath);
+      const plaintextKey = await keyProvider.unwrapDataKey({
+        wrappedKey,
+        tenantId,
+        purpose: 'wa-session',
+      });
+      tenantDekCache.set(tenantKey, plaintextKey);
+      return plaintextKey;
+    }
+
+    // Se dek.wrapped não existe mas há qualquer arquivo .enc na pasta: BLOQUEIO B1
+    const files = fs.readdirSync(sessionDir);
+    const hasEncFiles = files.some((f) => f.endsWith('.enc'));
+    if (hasEncFiles) {
+      const err = new Error('DEK_MISSING_WITH_ENCRYPTED_FILES: dek.wrapped ausente em pasta com arquivos cifrados.');
+      err.code = 'DEK_MISSING_WITH_ENCRYPTED_FILES';
+      throw err;
+    }
+
+    // Geração de nova chave permitida exclusivamente quando NÃO há arquivos .enc
+    const { plaintextKey, wrappedKey } = await keyProvider.generateDataKey({
       tenantId,
       purpose: 'wa-session',
     });
+
+    const tmpPath = `${wrappedKeyPath}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 7)}`;
+    const fd = fs.openSync(tmpPath, 'wx');
+    try {
+      fs.writeFileSync(fd, wrappedKey);
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+
+    // Verificação de concorrência antes do rename
+    if (fs.existsSync(wrappedKeyPath)) {
+      try { fs.unlinkSync(tmpPath); } catch (_) {}
+      const existingWrapped = fs.readFileSync(wrappedKeyPath);
+      const existingPlaintext = await keyProvider.unwrapDataKey({
+        wrappedKey: existingWrapped,
+        tenantId,
+        purpose: 'wa-session',
+      });
+      tenantDekCache.set(tenantKey, existingPlaintext);
+      return existingPlaintext;
+    }
+
+    fs.renameSync(tmpPath, wrappedKeyPath);
+
+    // Fsync do diretório (com try/catch para compatibilidade Windows)
+    try {
+      const dirFd = fs.openSync(sessionDir, 'r');
+      try { fs.fsyncSync(dirFd); } finally { fs.closeSync(dirFd); }
+    } catch (_) {}
+
     tenantDekCache.set(tenantKey, plaintextKey);
     return plaintextKey;
-  }
+  })();
 
-  // Primeira sessão: gera nova DEK no KMS e persiste dek.wrapped atomicamente
-  const { plaintextKey, wrappedKey } = await keyProvider.generateDataKey({
-    tenantId,
-    purpose: 'wa-session',
-  });
-
-  const tmpPath = `${wrappedKeyPath}.tmp`;
-  const fd = fs.openSync(tmpPath, 'w');
+  dekFlightMap.set(tenantKey, flightPromise);
   try {
-    fs.writeFileSync(fd, wrappedKey);
-    fs.fsyncSync(fd);
+    return await flightPromise;
   } finally {
-    fs.closeSync(fd);
+    dekFlightMap.delete(tenantKey);
   }
-  fs.renameSync(tmpPath, wrappedKeyPath);
-
-  tenantDekCache.set(tenantKey, plaintextKey);
-  return plaintextKey;
 }
 
 /**
@@ -203,52 +273,44 @@ function clearTenantDek(tenantId) {
     key.fill(0); // Limpeza de segurança em memória
   }
   tenantDekCache.delete(tenantKey);
+  dekFlightMap.delete(tenantKey);
 }
 
 /**
- * Lê e decifra sincronicamente um arquivo JSON de sessão (usado por inspeções/diagnósticos)
+ * Lê sincronicamente um arquivo JSON de sessão quando a chave DEK já está em memória
+ * Quando a chave não está em memória, reporta keyLoaded: false sem acionar unwrap síncrono
  * @param {string} sessionDir
  * @param {string} rawFileName Ex: 'creds.json'
- * @param {{ tenantId: string|number, keyProvider?: object }} options
- * @returns {any|null}
+ * @param {{ tenantId: string|number }} options
+ * @returns {{ keyLoaded: boolean, data: any|null, error?: string }}
  */
-function readEncryptedJsonSync(sessionDir, rawFileName, { tenantId, keyProvider = getKeyProvider() } = {}) {
+function readEncryptedJsonSync(sessionDir, rawFileName, { tenantId } = {}) {
   const fileName = fixFileName(rawFileName);
   const encFilePath = path.join(sessionDir, `${fileName}.enc`);
 
   if (!fs.existsSync(encFilePath)) {
-    return null;
+    return { keyLoaded: true, data: null };
+  }
+
+  const tenantKey = String(tenantId);
+  const dek = tenantDekCache.get(tenantKey);
+  if (!dek) {
+    return { keyLoaded: false, data: null };
   }
 
   try {
-    const tenantKey = String(tenantId);
-    let dek = tenantDekCache.get(tenantKey);
-    if (!dek) {
-      const wrappedKeyPath = path.join(sessionDir, 'dek.wrapped');
-      if (fs.existsSync(wrappedKeyPath) && keyProvider && typeof keyProvider.unwrapDataKeySync === 'function') {
-        const wrappedKey = fs.readFileSync(wrappedKeyPath);
-        dek = keyProvider.unwrapDataKeySync({
-          wrappedKey,
-          tenantId,
-          purpose: 'wa-session',
-        });
-        tenantDekCache.set(tenantKey, dek);
-      }
-    }
-    if (!dek) {
-      return null;
-    }
-
     const encBuffer = fs.readFileSync(encFilePath);
     const decryptedBuf = decryptBuffer(encBuffer, dek, { tenantId, fileName });
-    return JSON.parse(decryptedBuf.toString('utf8'), BufferJSON.reviver);
-  } catch (_) {
-    return null;
+    const parsed = JSON.parse(decryptedBuf.toString('utf8'), BufferJSON.reviver);
+    return { keyLoaded: true, data: parsed };
+  } catch (err) {
+    return { keyLoaded: true, data: null, error: err.code || 'ENCRYPTED_FILE_CORRUPT' };
   }
 }
 
 /**
  * Lê e decifra um arquivo JSON de sessão específico
+ * Distingue arquivo ausente (null) de corrupção/adulteração (lança ENCRYPTED_FILE_CORRUPT)
  * @param {string} sessionDir
  * @param {string} rawFileName Ex: 'creds.json'
  * @param {{ tenantId: string|number, keyProvider?: object }} options
@@ -264,13 +326,14 @@ async function readEncryptedJson(sessionDir, rawFileName, { tenantId, keyProvide
 
   return withFileLock(encFilePath, async () => {
     const dek = await getOrLoadTenantDek(sessionDir, { tenantId, keyProvider });
+    const encBuffer = await fs.promises.readFile(encFilePath);
+    const decryptedBuf = decryptBuffer(encBuffer, dek, { tenantId, fileName });
     try {
-      const encBuffer = await fs.promises.readFile(encFilePath);
-      const decryptedBuf = decryptBuffer(encBuffer, dek, { tenantId, fileName });
       return JSON.parse(decryptedBuf.toString('utf8'), BufferJSON.reviver);
-    } catch (err) {
-      // Se falhar a decifração do arquivo ou JSON inválido, trata como corrompido
-      return null;
+    } catch (_) {
+      const err = new Error('ENCRYPTED_FILE_CORRUPT: Falha na integridade do arquivo cifrado.');
+      err.code = 'ENCRYPTED_FILE_CORRUPT';
+      throw err;
     }
   });
 }
@@ -285,7 +348,7 @@ async function readEncryptedJson(sessionDir, rawFileName, { tenantId, keyProvide
 async function writeEncryptedJson(sessionDir, rawFileName, data, { tenantId, keyProvider }) {
   const fileName = fixFileName(rawFileName);
   const encFilePath = path.join(sessionDir, `${fileName}.enc`);
-  const tmpFilePath = `${encFilePath}.tmp`;
+  const tmpFilePath = `${encFilePath}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 6)}`;
 
   await withFileLock(encFilePath, async () => {
     const dek = await getOrLoadTenantDek(sessionDir, { tenantId, keyProvider });
@@ -301,6 +364,12 @@ async function writeEncryptedJson(sessionDir, rawFileName, data, { tenantId, key
       await fd.close();
     }
     await fs.promises.rename(tmpFilePath, encFilePath);
+
+    // Fsync do diretório pai (tolerante a falha em Windows)
+    try {
+      const dirFd = fs.openSync(sessionDir, 'r');
+      try { fs.fsyncSync(dirFd); } finally { fs.closeSync(dirFd); }
+    } catch (_) {}
   });
 }
 
@@ -321,8 +390,8 @@ async function removeEncryptedJson(sessionDir, rawFileName) {
 }
 
 /**
- * Implementação de useMultiFileAuthState cifrada (drop-in replacement para o Baileys)
- * @param {string} sessionDir Diretório da sessão (ex: data/sessions/salon_13)
+ * Implementação de useMultiFileAuthState cifrada com Proteções Bloqueantes B1 (Comando 038.1)
+ * @param {string} sessionDir Diretório da sessão
  * @param {{ tenantId: string|number, keyProvider?: object }} options
  * @returns {Promise<{ state: { creds: any, keys: object }, saveCreds: () => Promise<void> }>}
  */
@@ -338,10 +407,43 @@ async function useEncryptedMultiFileAuthState(sessionDir, { tenantId, keyProvide
     fs.mkdirSync(sessionDir, { recursive: true });
   }
 
-  // Inicializa ou carrega a DEK na inicialização
+  // 1. Limpeza preventiva de arquivos temporários órfãos
+  cleanOrphanTmpFiles(sessionDir);
+
+  // 2. Validações de integridade e não-sobrescrita (Proteção B1)
+  const dirFiles = fs.readdirSync(sessionDir);
+  const hasPlainCreds = dirFiles.includes('creds.json');
+  const hasEncCreds = dirFiles.includes('creds.json.enc');
+  const hasOtherEnc = dirFiles.some((f) => f.endsWith('.enc') && f !== 'creds.json.enc');
+  const hasWrappedKey = dirFiles.includes('dek.wrapped');
+
+  if (hasPlainCreds && !hasEncCreds) {
+    const err = new Error('NOT_MIGRATED: Sessão em texto claro pendente de migração para armazenamento cifrado.');
+    err.code = 'NOT_MIGRATED';
+    throw err;
+  }
+
+  if (!hasEncCreds && (hasOtherEnc || hasWrappedKey)) {
+    const err = new Error('ENCRYPTED_STATE_INCONSISTENT: Estado cifrado inconsistente (creds.json.enc ausente com outros arquivos cifrados).');
+    err.code = 'ENCRYPTED_STATE_INCONSISTENT';
+    throw err;
+  }
+
+  // Inicializa ou carrega a DEK
   await getOrLoadTenantDek(sessionDir, { tenantId, keyProvider });
 
-  const creds = (await readEncryptedJson(sessionDir, 'creds.json', { tenantId, keyProvider })) || initAuthCreds();
+  let creds;
+  if (hasEncCreds) {
+    creds = await readEncryptedJson(sessionDir, 'creds.json', { tenantId, keyProvider });
+    if (!creds) {
+      const err = new Error('ENCRYPTED_FILE_CORRUPT: Falha na integridade do arquivo cifrado.');
+      err.code = 'ENCRYPTED_FILE_CORRUPT';
+      throw err;
+    }
+  } else {
+    // Apenas permitido initAuthCreds quando diretório virgem
+    creds = initAuthCreds();
+  }
 
   const state = {
     creds,
@@ -350,7 +452,28 @@ async function useEncryptedMultiFileAuthState(sessionDir, { tenantId, keyProvide
         const data = {};
         await Promise.all(
           ids.map(async (id) => {
-            let value = await readEncryptedJson(sessionDir, `${type}-${id}.json`, { tenantId, keyProvider });
+            const rawFileName = `${type}-${id}.json`;
+            let value = null;
+            try {
+              value = await readEncryptedJson(sessionDir, rawFileName, { tenantId, keyProvider });
+            } catch (err) {
+              if (err.code === 'ENCRYPTED_FILE_CORRUPT') {
+                // Mover arquivo de chave corrompido para <nome>.enc.corrupt-<timestampUTC> sem derrubar socket
+                const encFileName = `${fixFileName(rawFileName)}.enc`;
+                const encFilePath = path.join(sessionDir, encFileName);
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const corruptFilePath = path.join(sessionDir, `${encFileName}.corrupt-${timestamp}`);
+                try {
+                  if (fs.existsSync(encFilePath)) {
+                    fs.renameSync(encFilePath, corruptFilePath);
+                  }
+                } catch (_) {}
+                value = null;
+              } else {
+                throw err;
+              }
+            }
+
             if (type === 'app-state-sync-key' && value) {
               value = proto.Message.AppStateSyncKeyData.fromObject(value);
             }
@@ -393,6 +516,7 @@ module.exports = {
   decryptBuffer,
   getOrLoadTenantDek,
   clearTenantDek,
+  cleanOrphanTmpFiles,
   readEncryptedJson,
   readEncryptedJsonSync,
   writeEncryptedJson,

@@ -12,16 +12,17 @@ const { startServer } = require('./server/app');
 const clientAuth = require('./services/clientAuthService');
 const { acquireAppLock } = require('./utils/appLock');
 
-if (process.env.NODE_ENV !== 'test') {
-  acquireAppLock();
-}
-
 const isStagingMode =
   process.env.APP_MODE === 'homologacao' ||
   process.env.APP_MODE === 'staging' ||
   process.env.HOMOLOGACAO === 'true' ||
   process.env.DISABLE_WHATSAPP === 'true' ||
-  process.env.DISABLE_WHATSAPP_BOT === 'true';
+  process.env.DISABLE_WHATSAPP_BOT === 'true' ||
+  process.env.WA_SESSIONS_DISABLED === 'true';
+
+if (process.env.NODE_ENV !== 'test' && !isStagingMode && process.env.WA_SESSIONS_DISABLED !== 'true') {
+  acquireAppLock();
+}
 
 if (isStagingMode) {
   console.log('====================================================');

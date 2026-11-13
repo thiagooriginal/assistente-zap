@@ -239,10 +239,9 @@ class SalonWhatsAppRepository {
    * @param {string} params.phoneJid
    * @param {string} [params.pairingMethod='QR']
    */
-  static markSessionConnected(userId, { phone, phoneJid = null, pairingMethod = 'QR' }) {
+  static markSessionConnected(userId, { phone, phoneJid, pairingMethod = 'QR' }) {
     const uid = Number(userId);
     const now = new Date().toISOString();
-    const safePhoneJid = phoneJid || (phone ? `${phone.replace(/\D/g, '')}@s.whatsapp.net` : null);
 
     try {
       db.exec('BEGIN IMMEDIATE');
@@ -262,7 +261,7 @@ class SalonWhatsAppRepository {
             pairing_code_expires_at = NULL,
             updated_at = CURRENT_TIMESTAMP
         WHERE user_id = ?
-      `).run(phone, safePhoneJid, pairingMethod, now, now, uid);
+      `).run(phone, phoneJid, pairingMethod, now, now, uid);
 
       db.prepare(`
         UPDATE client_salons
@@ -355,8 +354,8 @@ class SalonWhatsAppRepository {
           created_at,
           updated_at
         FROM client_salon_whatsapp_sessions
-        WHERE session_status IN ('CONNECTED', 'CONNECTION_LOST', 'CONNECTING')
-          AND session_status != 'DISCONNECTED'
+        WHERE session_status IN ('CONNECTED', 'CONNECTION_LOST', 'CONNECTING', 'KMS_UNAVAILABLE', 'NOT_MIGRATED')
+          AND session_status NOT IN ('DISCONNECTED', 'ERROR', 'WAITING_QR', 'WAITING_CODE')
         ORDER BY updated_at DESC
         LIMIT ?
       `).all(safeLimit);

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * RAIA AGENTES — SCRIPT DE MIGRAÇÃO E ROLLBACK DE SESSÕES WHATSAPP (T9)
+ * RAIA AGENTES — SCRIPT DE MIGRAÇÃO E ROLLBACK DE SESSÕES WHATSAPP (T9 / COMANDO 038.1)
  *
  * Converte credenciais legadas em texto claro (.json) para armazenamento cifrado
  * com envelope AWS KMS (AES-256-GCM com AAD rígido e extensão .enc).
@@ -14,23 +14,21 @@
  *   node scripts/waCredsMigrate.js --all --verify
  *
  * SEGURANÇA:
- * - Valida se a aplicação está parada (process lock).
+ * - Valida rigorosamente a trava do motor de sessões (data/wa-sessions.lock).
  * - Sanidade obrigatória byte-a-byte antes de quarentenar texto claro.
  * - NUNCA deleta arquivos em texto claro; move para data/sessions_quarantine/.
- * - Reversão atômica por tenant em caso de falha.
+ * - Reversão atômica por tenant em caso de falha (restaura arquivos da quarentena se falhar).
  */
 
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
 const {
   encryptBuffer,
   decryptBuffer,
   getOrLoadTenantDek,
-  readEncryptedJson,
 } = require('../src/whatsapp/encryptedAuthState');
 const { getKeyProvider } = require('../src/security/keyProvider');
-const { checkAppRunning, DEFAULT_LOCK_FILE } = require('../src/utils/appLock');
+const { inspectAppLock, tryForceUnlock, DEFAULT_LOCK_FILE } = require('../src/utils/appLock');
 
 const DEFAULT_SESSIONS_ROOT = path.resolve(__dirname, '../data/sessions');
 const DEFAULT_QUARANTINE_ROOT = path.resolve(__dirname, '../data/sessions_quarantine');
@@ -96,6 +94,7 @@ function resolveTargets({ tenant, personal, all, baseSessionsDir = DEFAULT_SESSI
 
 /**
  * Executa simulação sem escrita (--dry-run)
+ * Mostra apenas nomes e tamanhos em bytes, sem hashes ou dados sensíveis.
  */
 async function runDryRun(target, { keyProvider = getKeyProvider() } = {}) {
   const { tenantId, dir, isPersonal } = target;
@@ -123,15 +122,12 @@ async function runDryRun(target, { keyProvider = getKeyProvider() } = {}) {
   for (const file of jsonFiles) {
     const filePath = path.join(dir, file);
     const stat = fs.statSync(filePath);
-    const rawContent = fs.readFileSync(filePath);
-    const shaBefore = crypto.createHash('sha256').update(rawContent).digest('hex').substring(0, 8);
     const estimatedEncSize = stat.size + 37; // 37 bytes de cabeçalho binário (Magic + Versão + IV + Tag)
 
     details.push({
       file,
       sizePlain: stat.size,
       estimatedEncSize,
-      shaBefore,
       aad: `wa:${tenantId}:${file}`,
     });
   }
@@ -139,7 +135,7 @@ async function runDryRun(target, { keyProvider = getKeyProvider() } = {}) {
   if (details.length > 0) {
     console.log('\nArquivos que seriam migrados:');
     for (const d of details) {
-      console.log(`  • ${d.file.padEnd(35)} ${String(d.sizePlain).padStart(6)}B -> ~${String(d.estimatedEncSize).padStart(6)}B (sha256: ${d.shaBefore}) [AAD: ${d.aad}]`);
+      console.log(`  • ${d.file.padEnd(35)} ${String(d.sizePlain).padStart(6)}B -> ~${String(d.estimatedEncSize).padStart(6)}B [AAD: ${d.aad}]`);
     }
   } else {
     console.log(`ℹ️ Nenhum arquivo .json pendente de migração.`);
@@ -154,7 +150,9 @@ async function runDryRun(target, { keyProvider = getKeyProvider() } = {}) {
 }
 
 /**
- * Executa a migração cifrada com quarentena e validação byte-a-byte
+ * Executa a migração cifrada com quarentena e validação byte-a-byte.
+ * Se houver qualquer falha, restaura os arquivos já movidos para quarentena de volta
+ * e remove arquivos .enc gerados nesta tentativa, deixando o diretório 100% idêntico ao original.
  */
 async function runMigration(target, { keyProvider = getKeyProvider(), quarantineRoot = DEFAULT_QUARANTINE_ROOT } = {}) {
   const { tenantId, dir, isPersonal } = target;
@@ -186,6 +184,8 @@ async function runMigration(target, { keyProvider = getKeyProvider(), quarantine
 
   const stagedEncFiles = [];
   const processedPlainFiles = [];
+  const movedToQuarantine = [];
+  let quarantineFolder = null;
 
   try {
     // 2. Cifra cada arquivo para .enc e valida byte-a-byte
@@ -201,7 +201,9 @@ async function runMigration(target, { keyProvider = getKeyProvider(), quarantine
       const fd = fs.openSync(tmpEncPath, 'w');
       try {
         fs.writeFileSync(fd, encBuffer);
-        fs.fsyncSync(fd);
+        try {
+          fs.fsyncSync(fd);
+        } catch (_) {}
       } finally {
         fs.closeSync(fd);
       }
@@ -222,7 +224,7 @@ async function runMigration(target, { keyProvider = getKeyProvider(), quarantine
 
     // 4. Mover arquivos em texto claro para a quarentena (NUNCA deletar)
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const quarantineFolder = path.join(
+    quarantineFolder = path.join(
       quarantineRoot,
       isPersonal ? `personal_${timestamp}` : `salon_${tenantId}_${timestamp}`
     );
@@ -234,6 +236,7 @@ async function runMigration(target, { keyProvider = getKeyProvider(), quarantine
     for (const item of processedPlainFiles) {
       const destPath = path.join(quarantineFolder, item.file);
       fs.renameSync(item.plainPath, destPath);
+      movedToQuarantine.push({ item, destPath });
     }
 
     console.log(`\n📦 ${processedPlainFiles.length} arquivos em texto claro movidos para quarentena segura:`);
@@ -250,7 +253,26 @@ async function runMigration(target, { keyProvider = getKeyProvider(), quarantine
     console.error(`\n❌ ERRO CRÍTICO durante a migração do tenant ${tenantId}: ${err.message}`);
     console.log(`🔄 Executando reversão imediata das alterações pendentes...`);
 
-    // Remove apenas os arquivos .enc gerados nesta tentativa falha
+    // 1. Devolver à pasta da sessão os arquivos já movidos para a quarentena
+    for (const entry of movedToQuarantine) {
+      try {
+        if (fs.existsSync(entry.destPath)) {
+          fs.renameSync(entry.destPath, entry.item.plainPath);
+        }
+      } catch (_) {}
+    }
+
+    // Se a pasta de quarentena ficou vazia, limpa-a
+    try {
+      if (quarantineFolder && fs.existsSync(quarantineFolder)) {
+        const remaining = fs.readdirSync(quarantineFolder);
+        if (remaining.length === 0) {
+          fs.rmdirSync(quarantineFolder);
+        }
+      }
+    } catch (_) {}
+
+    // 2. Remove apenas os arquivos .enc gerados nesta tentativa falha
     for (const encFile of stagedEncFiles) {
       try {
         if (fs.existsSync(encFile)) {
@@ -264,7 +286,8 @@ async function runMigration(target, { keyProvider = getKeyProvider(), quarantine
 }
 
 /**
- * Executa o rollback: decifra .enc para .json em staging temporário antes do swap
+ * Executa o rollback: decifra .enc para .json em staging temporário antes do swap.
+ * Se falhar no meio, a pasta volta ao estado anterior, sem estado misto.
  */
 async function runRollback(target, { keyProvider = getKeyProvider(), confirmRollback = false } = {}) {
   const { tenantId, dir, isPersonal } = target;
@@ -292,11 +315,12 @@ async function runRollback(target, { keyProvider = getKeyProvider(), confirmRoll
 
   const dek = await getOrLoadTenantDek(dir, { tenantId, keyProvider });
 
-  // Staging temporário no mesmo filesystem para garantir atomicidade
-  const stagingDir = path.join(dir, `.rollback_staging_${Date.now()}`);
+  // Staging temporário no mesmo diretório para garantir atomicidade no mesmo filesystem
+  const stagingDir = path.join(dir, `.rollback_staging_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`);
   fs.mkdirSync(stagingDir, { recursive: true });
 
   const restoredFiles = [];
+  const movedToDest = [];
 
   try {
     // 1. Decifra todos os arquivos no staging e valida integridade JSON
@@ -314,7 +338,9 @@ async function runRollback(target, { keyProvider = getKeyProvider(), confirmRoll
       const fd = fs.openSync(stagingFilePath, 'w');
       try {
         fs.writeFileSync(fd, decrypted);
-        fs.fsyncSync(fd);
+        try {
+          fs.fsyncSync(fd);
+        } catch (_) {}
       } finally {
         fs.closeSync(fd);
       }
@@ -327,8 +353,16 @@ async function runRollback(target, { keyProvider = getKeyProvider(), confirmRoll
     for (const item of restoredFiles) {
       const finalDest = path.join(dir, item.originalFileName);
       fs.renameSync(item.stagingFilePath, finalDest);
-      // Remove o arquivo .enc após sucesso
-      fs.unlinkSync(item.encPath);
+      movedToDest.push({ finalDest, item });
+    }
+
+    // 3. Remove os arquivos .enc somente APÓS todos os decifrados estarem no diretório oficial
+    for (const item of restoredFiles) {
+      try {
+        if (fs.existsSync(item.encPath)) {
+          fs.unlinkSync(item.encPath);
+        }
+      } catch (_) {}
     }
 
     // Limpa staging dir
@@ -346,10 +380,21 @@ async function runRollback(target, { keyProvider = getKeyProvider(), confirmRoll
     };
   } catch (err) {
     console.error(`❌ Erro durante o rollback do tenant ${tenantId}: ${err.message}`);
+
+    // Reverte arquivos que já foram movidos para o destino, voltando ao estado puramente cifrado
+    for (const { finalDest } of movedToDest) {
+      try {
+        if (fs.existsSync(finalDest)) {
+          fs.unlinkSync(finalDest);
+        }
+      } catch (_) {}
+    }
+
     // Limpa staging dir em caso de falha
     try {
       fs.rmSync(stagingDir, { recursive: true, force: true });
     } catch (_) {}
+
     throw err;
   }
 }
@@ -379,42 +424,44 @@ async function runVerify(target, { keyProvider = getKeyProvider() } = {}) {
   }
 
   if (!hasWrappedKey) {
-    const err = 'dek.wrapped ausente no diretório de sessão!';
-    console.error(`❌ ${err}`);
-    return { target: tenantId, status: 'MISSING_WRAPPED_KEY', verifiedCount: 0, errors: [err] };
+    const msg = 'CHAVE_AUSENTE: dek.wrapped não encontrado no diretório!';
+    console.error(`❌ ${msg}`);
+    return { target: tenantId, status: 'CORRUPTED', verifiedCount: 0, errors: [msg] };
+  }
+
+  let dek;
+  try {
+    dek = await getOrLoadTenantDek(dir, { tenantId, keyProvider });
+  } catch (err) {
+    console.error(`❌ Falha ao carregar chave do tenant: ${err.message}`);
+    return { target: tenantId, status: 'KMS_ERROR', verifiedCount: 0, errors: [err.message] };
   }
 
   const errors = [];
   let verifiedCount = 0;
 
-  try {
-    const dek = await getOrLoadTenantDek(dir, { tenantId, keyProvider });
-    for (const encFile of encFiles) {
-      const originalFileName = encFile.replace(/\.enc$/, '');
-      const encPath = path.join(dir, encFile);
-      try {
-        const encBuffer = fs.readFileSync(encPath);
-        const decrypted = decryptBuffer(encBuffer, dek, { tenantId, fileName: originalFileName });
-        JSON.parse(decrypted.toString('utf8'));
-        verifiedCount++;
-        console.log(`  ✓ ${encFile.padEnd(35)} [OK]`);
-      } catch (fErr) {
-        const msg = `${encFile}: ${fErr.message}`;
-        errors.push(msg);
-        console.error(`  ✗ ${encFile.padEnd(35)} [FALHA: ${fErr.message}]`);
-      }
+  for (const encFile of encFiles) {
+    const originalFileName = encFile.replace(/\.enc$/, '');
+    const encPath = path.join(dir, encFile);
+    try {
+      const buffer = fs.readFileSync(encPath);
+      const decrypted = decryptBuffer(buffer, dek, { tenantId, fileName: originalFileName });
+      JSON.parse(decrypted.toString('utf8'));
+      verifiedCount++;
+      console.log(`  ✓ ${encFile} [Íntegro e Válido]`);
+    } catch (err) {
+      console.error(`  ✗ ${encFile} [FALHA]: ${err.message}`);
+      errors.push({ file: encFile, error: err.message });
     }
-  } catch (kErr) {
-    errors.push(`KMS/DEK Error: ${kErr.message}`);
-    console.error(`❌ Falha ao carregar chave DEK: ${kErr.message}`);
   }
 
-  const status = errors.length === 0 ? 'VALID' : 'CORRUPTED';
-  console.log(`Resultado da verificação do tenant ${tenantId}: ${status} (${verifiedCount}/${encFiles.length} arquivos válidos).`);
+  console.log(`\nResultado da verificação do tenant ${tenantId}:`);
+  console.log(`- Arquivos verificados com sucesso: ${verifiedCount}/${encFiles.length}`);
+  console.log(`- Erros detectados:                ${errors.length}`);
 
   return {
     target: tenantId,
-    status,
+    status: errors.length === 0 ? 'HEALTHY' : 'CORRUPTED',
     verifiedCount,
     errors,
   };
@@ -423,7 +470,7 @@ async function runVerify(target, { keyProvider = getKeyProvider() } = {}) {
 /**
  * Ponto de entrada CLI
  */
-async function main(argv = process.argv.slice(2)) {
+async function main(argv = process.argv.slice(2), { exitOnError = true, lockFile = DEFAULT_LOCK_FILE, keyProvider = null } = {}) {
   const args = {
     tenant: null,
     personal: false,
@@ -434,6 +481,7 @@ async function main(argv = process.argv.slice(2)) {
     confirmRollback: false,
     verify: false,
     forceUnlock: false,
+    lockFile,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -456,6 +504,8 @@ async function main(argv = process.argv.slice(2)) {
       args.verify = true;
     } else if (arg === '--force-unlock') {
       args.forceUnlock = true;
+    } else if (arg === '--lock-file' && argv[i + 1]) {
+      args.lockFile = argv[++i];
     } else if (arg === '--help' || arg === '-h') {
       console.log(`
 Uso: node scripts/waCredsMigrate.js [alvos] [ação] [opções]
@@ -473,41 +523,47 @@ Ações (exatamente uma obrigatória):
 
 Opções:
   --confirm-rollback   Confirmação explícita obrigatória para ação de rollback
-  --force-unlock       Ignora lock órfão de processo se detectado
+  --force-unlock       Ignora lock órfão comprovado se detectado
+  --lock-file <path>   Caminho customizado do lock file (para testes)
       `);
       return;
     }
   }
 
+  const fail = (msg) => {
+    console.error(msg);
+    if (exitOnError) {
+      process.exit(1);
+    } else {
+      const err = new Error(msg);
+      err.code = 'CLI_ERROR';
+      throw err;
+    }
+  };
+
   if (!args.tenant && !args.personal && !args.all) {
-    console.error('ERRO: Especifique pelo menos um alvo: --tenant <id>, --personal ou --all.');
-    process.exit(1);
+    return fail('ERRO: Especifique pelo menos um alvo: --tenant <id>, --personal ou --all.');
   }
 
   const actionsCount = [args.dryRun, args.migrate, args.rollback, args.verify].filter(Boolean).length;
   if (actionsCount === 0) {
-    console.error('ERRO: Especifique uma ação: --dry-run, --migrate, --rollback ou --verify.');
-    process.exit(1);
+    return fail('ERRO: Especifique uma ação: --dry-run, --migrate, --rollback ou --verify.');
   }
   if (actionsCount > 1) {
-    console.error('ERRO: Especifique apenas UMA ação por execução.');
-    process.exit(1);
+    return fail('ERRO: Especifique apenas UMA ação por execução.');
   }
 
-  // 1. Verificação de Process Lock (Se for ação de escrita: --migrate ou --rollback)
+  // 1. Verificação rigorosa de Process Lock (Se for ação de escrita: --migrate ou --rollback)
   if (args.migrate || args.rollback) {
-    const lockStatus = checkAppRunning(DEFAULT_LOCK_FILE);
-    if (lockStatus.running) {
-      console.error('\n======================================================');
-      console.error('❌ ERRO: A aplicação está em execução (PID: ' + lockStatus.pid + ').');
-      console.error('Pare o serviço antes de migrar as credenciais para evitar corrupção por escrita concorrente.');
-      console.error('======================================================\n');
-      process.exit(1);
-    } else if (lockStatus.stale) {
+    const lockStatus = inspectAppLock(args.lockFile);
+    if (lockStatus.exists) {
       if (args.forceUnlock) {
-        console.warn(`⚠️ AVISO: Lock file órfão detectado (PID: ${lockStatus.pid} morto). Continuando devido a --force-unlock.`);
+        const unlockResult = tryForceUnlock(args.lockFile, { logger: console });
+        if (!unlockResult.unlocked) {
+          return fail(`\n❌ ERRO: Não foi possível liberar a trava (${unlockResult.reason}). Execução cancelada.`);
+        }
       } else {
-        console.warn(`⚠️ AVISO: Lock file órfão encontrado em ${lockStatus.lockFile} (PID: ${lockStatus.pid} inativo).`);
+        return fail(`\n❌ ERRO: Trava existente detectada em ${lockStatus.lockFile} (Status: ${lockStatus.reason}, PID: ${lockStatus.pid || 'N/A'}). Ação de escrita bloqueada.`);
       }
     }
   }
@@ -521,17 +577,17 @@ Opções:
   console.log(`\nRAIA AGENTES — Utilitário de Criptografia de Credenciais WhatsApp (T9)`);
   console.log(`Alvos identificados: ${targets.length}`);
 
-  const keyProvider = getKeyProvider();
+  const kp = keyProvider || getKeyProvider();
 
   for (const target of targets) {
     if (args.dryRun) {
-      await runDryRun(target, { keyProvider });
+      await runDryRun(target, { keyProvider: kp });
     } else if (args.migrate) {
-      await runMigration(target, { keyProvider });
+      await runMigration(target, { keyProvider: kp });
     } else if (args.rollback) {
-      await runRollback(target, { keyProvider, confirmRollback: args.confirmRollback });
+      await runRollback(target, { keyProvider: kp, confirmRollback: args.confirmRollback });
     } else if (args.verify) {
-      await runVerify(target, { keyProvider });
+      await runVerify(target, { keyProvider: kp });
     }
   }
 

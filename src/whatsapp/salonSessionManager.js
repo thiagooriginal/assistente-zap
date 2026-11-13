@@ -63,6 +63,130 @@ let _qrInitTimeoutMs = 25000;
 const salonDiagnostics = new Map();
 const MAX_DIAGNOSTIC_EVENTS = 30;
 
+// Estado e agendador de novas tentativas do KMS (Item 2.3 do Comando 038.1)
+let _kmsRetryTimer = null;
+let _kmsAttempts = 0;
+let _kmsNextRetryAt = null;
+const KMS_BACKOFF_SCHEDULE = [5000, 15000, 60000, 300000]; // 5s, 15s, 60s, depois a cada 5m
+
+/**
+ * Agenda nova tentativa de restauração para salões com falha temporária do KMS
+ */
+function _scheduleKmsRetry() {
+  if (_kmsRetryTimer) return;
+
+  const delayMs = KMS_BACKOFF_SCHEDULE[Math.min(_kmsAttempts, KMS_BACKOFF_SCHEDULE.length - 1)];
+  _kmsNextRetryAt = new Date(Date.now() + delayMs).toISOString();
+
+  _kmsRetryTimer = setTimeout(async () => {
+    _kmsRetryTimer = null;
+    _kmsAttempts++;
+    await _executeKmsRetry();
+  }, delayMs);
+}
+
+/**
+ * Executa tentativa de restauração exclusivamente para salões que continuam em KMS_UNAVAILABLE
+ */
+async function _executeKmsRetry() {
+  let candidates;
+  try {
+    candidates = db.prepare(`
+      SELECT user_id, connected_phone, pairing_method
+      FROM client_salon_whatsapp_sessions
+      WHERE session_status = 'KMS_UNAVAILABLE'
+    `).all();
+  } catch (_) {
+    return;
+  }
+
+  if (!candidates || candidates.length === 0) {
+    _kmsAttempts = 0;
+    _kmsNextRetryAt = null;
+    return;
+  }
+
+  let anyKmsFailed = false;
+
+  for (const cand of candidates) {
+    const uid = cand.user_id;
+
+    // Item 2.4: Verificar o status no banco antes de cada tentativa: se o usuário desconectou formalmente (DISCONNECTED), NÃO restaurar!
+    const current = SalonWhatsAppRepository.getSessionByUserId(uid);
+    if (!current || current.session_status !== 'KMS_UNAVAILABLE') {
+      continue;
+    }
+
+    if (activeSessions.has(uid) && activeSessions.get(uid).status === 'CONNECTED') {
+      continue;
+    }
+
+    try {
+      const sessionDir = getSalonSessionDir(uid);
+      const parsedCreds = await readEncryptedJson(sessionDir, 'creds.json', {
+        tenantId: uid,
+        keyProvider: getKeyProvider(),
+      });
+
+      if (!parsedCreds || !parsedCreds.me?.id || !parsedCreds.account) {
+        SalonWhatsAppRepository.markSessionDisconnected(uid, {
+          status: 'DISCONNECTED',
+          error: 'Credenciais cifradas incompletas após retorno do KMS.',
+          resetCredentials: false,
+        });
+        continue;
+      }
+
+      // Sucesso ao contactar KMS! Restaura a sessão
+      const session = {
+        userId: uid,
+        sock: null,
+        status: 'CONNECTING',
+        qrCode: null,
+        qrExpiresAt: null,
+        pairingCode: null,
+        pairingExpiresAt: null,
+        connectedPhone: cand.connected_phone || null,
+        lastConnectedAt: null,
+        lastError: null,
+        pairingMethod: cand.pairing_method || 'QR',
+        simulated: false,
+      };
+      activeSessions.set(uid, session);
+      await _createBaileysSocket(uid, sessionDir, session);
+    } catch (err) {
+      if (err.code === 'KMS_UNAVAILABLE' || err.message?.includes('KMS')) {
+        anyKmsFailed = true;
+      } else if (['ENCRYPTED_FILE_CORRUPT', 'DEK_MISSING_WITH_ENCRYPTED_FILES', 'ENCRYPTED_STATE_INCONSISTENT'].includes(err.code)) {
+        SalonWhatsAppRepository.markSessionDisconnected(uid, {
+          status: 'ERROR',
+          error: err.code,
+          resetCredentials: false,
+        });
+      }
+    }
+  }
+
+  if (anyKmsFailed) {
+    _scheduleKmsRetry();
+  } else {
+    _kmsAttempts = 0;
+    _kmsNextRetryAt = null;
+  }
+}
+
+/**
+ * Interrompe o agendador de retry do KMS (usado na limpeza de testes)
+ */
+function _stopKmsRetrySchedulerForTesting() {
+  if (_kmsRetryTimer) {
+    clearTimeout(_kmsRetryTimer);
+    _kmsRetryTimer = null;
+  }
+  _kmsAttempts = 0;
+  _kmsNextRetryAt = null;
+}
+
 /**
  * Registra evento de diagnóstico sanitizado em memória (sem segredos, tokens ou dados desmascarados).
  * @param {number} userId
@@ -104,6 +228,7 @@ function inspectSalonAuthCredentials(userId) {
       encryptionMode: isEncryptionOn ? 'on' : 'off',
       sessionEncrypted: false,
       notMigrated: false,
+      keyLoaded: true,
     };
   }
   const sessionDir = path.resolve(SESSIONS_ROOT, `salon_${uid}`);
@@ -118,6 +243,7 @@ function inspectSalonAuthCredentials(userId) {
       encryptionMode: isEncryptionOn ? 'on' : 'off',
       sessionEncrypted: false,
       notMigrated: false,
+      keyLoaded: true,
     };
   }
   try {
@@ -129,17 +255,24 @@ function inspectSalonAuthCredentials(userId) {
     let credsMe = null;
     let sessionEncrypted = false;
     let notMigrated = false;
+    let keyLoaded = true;
 
     if (isEncryptionOn) {
       if (hasEncCreds) {
         sessionEncrypted = true;
-        try {
-          const parsed = readEncryptedJsonSync(sessionDir, 'creds.json', { tenantId: uid });
-          credsValid = Boolean(parsed && typeof parsed === 'object' && parsed.me?.id && parsed.account);
-          if (parsed?.me?.id) {
-            credsMe = phoneUtils.maskPhoneNumber(parsed.me.id.split('@')[0].split(':')[0]);
+        const syncRes = readEncryptedJsonSync(sessionDir, 'creds.json', { tenantId: uid });
+        if (!syncRes.keyLoaded) {
+          keyLoaded = false;
+          credsValid = null;
+          credsMe = null;
+        } else if (syncRes.data && typeof syncRes.data === 'object') {
+          credsValid = Boolean(syncRes.data.me?.id && syncRes.data.account);
+          if (syncRes.data.me?.id) {
+            credsMe = phoneUtils.maskPhoneNumber(syncRes.data.me.id.split('@')[0].split(':')[0]);
           }
-        } catch (_) {}
+        } else {
+          credsValid = false;
+        }
       } else if (hasPlainCreds) {
         notMigrated = true;
         try {
@@ -176,6 +309,7 @@ function inspectSalonAuthCredentials(userId) {
       encryptionMode: isEncryptionOn ? 'on' : 'off',
       sessionEncrypted,
       notMigrated,
+      keyLoaded,
     };
   } catch (err) {
     return {
@@ -188,6 +322,7 @@ function inspectSalonAuthCredentials(userId) {
       encryptionMode: isEncryptionOn ? 'on' : 'off',
       sessionEncrypted: false,
       notMigrated: false,
+      keyLoaded: true,
       error: 'FS_READ_ERROR',
     };
   }
@@ -221,6 +356,8 @@ function getSalonDiagnostics(userId) {
     sessionEncrypted: credentialsAudit.sessionEncrypted,
     notMigrated: credentialsAudit.notMigrated,
     kmsStatus,
+    kmsNextRetryAt: _kmsNextRetryAt,
+    kmsAttempts: _kmsAttempts,
     environment: {
       isHomologacao: process.env.HOMOLOGACAO === 'true',
       allowSalonWhatsAppTesting: process.env.ALLOW_SALON_WHATSAPP_TESTING === 'true',
@@ -901,6 +1038,9 @@ function _attachSocketListeners(uid, sock, session, saveCreds, currentGen) {
  * @returns {Promise<{ success: boolean, qrCode: string|null, status: string, connectedPhone?: string }>}
  */
 async function startQrSession(userId) {
+  if (process.env.WA_SESSIONS_DISABLED === 'true') {
+    throw new Error('WA_SESSIONS_DISABLED: Operações de WhatsApp desativadas pelo modo manutenção.');
+  }
   const uid = Number(userId);
 
   // Mutex unificado por tenant (CORREÇÃO 4)
@@ -909,6 +1049,16 @@ async function startQrSession(userId) {
   }
 
   const connectPromise = (async () => {
+    const sessionDir = getSalonSessionDir(uid);
+    if (fs.existsSync(sessionDir)) {
+      const existingFiles = fs.readdirSync(sessionDir);
+      if (existingFiles.includes('creds.json.enc') || existingFiles.includes('dek.wrapped')) {
+        const err = new Error('CANNOT_PAIR_EXISTING_ENCRYPTED_SESSION: Sessão cifrada já existente. Desconecte formalmente antes de parear.');
+        err.code = 'CANNOT_PAIR_EXISTING_ENCRYPTED_SESSION';
+        throw err;
+      }
+    }
+
     let session = activeSessions.get(uid);
     if (session && session.status === 'CONNECTED') {
       return {
@@ -934,7 +1084,6 @@ async function startQrSession(userId) {
       };
     }
 
-    const sessionDir = getSalonSessionDir(uid);
     SalonWhatsAppRepository.ensureSessionExists(uid, `data/sessions/salon_${uid}`);
 
     // Hard Staging Lock com Whitelist Granular Cirúrgica
@@ -1101,6 +1250,9 @@ async function startQrSession(userId) {
  * @returns {Promise<{ success: boolean, pairingCode: string, expiresAt: number, status: string }>}
  */
 async function requestPairingCode(userId, rawPhone) {
+  if (process.env.WA_SESSIONS_DISABLED === 'true') {
+    throw new Error('WA_SESSIONS_DISABLED: Operações de WhatsApp desativadas pelo modo manutenção.');
+  }
   const uid = Number(userId);
   const formattedPhone = validateBrazilianPhoneForPairing(rawPhone);
 
@@ -1128,6 +1280,14 @@ async function requestPairingCode(userId, rawPhone) {
 
   const pairingPromise = (async () => {
     const sessionDir = getSalonSessionDir(uid);
+    if (fs.existsSync(sessionDir)) {
+      const existingFiles = fs.readdirSync(sessionDir);
+      if (existingFiles.includes('creds.json.enc') || existingFiles.includes('dek.wrapped')) {
+        const err = new Error('CANNOT_PAIR_EXISTING_ENCRYPTED_SESSION: Sessão cifrada já existente. Desconecte formalmente antes de parear.');
+        err.code = 'CANNOT_PAIR_EXISTING_ENCRYPTED_SESSION';
+        throw err;
+      }
+    }
     SalonWhatsAppRepository.ensureSessionExists(uid, `data/sessions/salon_${uid}`);
 
     // Hard Staging Lock com Whitelist Granular Cirúrgica
@@ -1473,6 +1633,11 @@ async function sendSalonMessage(userId, recipientJid, text, options = {}) {
  * @returns {Promise<{ restored: number, total: number, skippedStaging?: boolean }>}
  */
 async function restoreActiveSalonSessions() {
+  if (process.env.WA_SESSIONS_DISABLED === 'true') {
+    console.log('[salonSessionManager] WA_SESSIONS_DISABLED=true: restauração de sessões desativada.');
+    return { restored: 0, total: 0, disabled: true };
+  }
+
   const isGlobalReal = clientModule.isRealWhatsAppTransportAllowed();
   const isStagingTesting = (process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging') && process.env.ALLOW_SALON_WHATSAPP_TESTING === 'true';
 
@@ -1528,12 +1693,27 @@ async function restoreActiveSalonSessions() {
             keyProvider: getKeyProvider(),
           });
         } catch (kmsErr) {
-          console.error(`[salonSessionManager] Erro KMS ao decifrar credenciais da sessão #${uid}:`, kmsErr.message);
-          SalonWhatsAppRepository.markSessionDisconnected(uid, {
-            status: 'KMS_UNAVAILABLE',
-            error: `KMS indisponível ao decifrar credenciais: ${kmsErr.message}`,
-            resetCredentials: false,
-          });
+          console.error(`[salonSessionManager] Erro ao decifrar credenciais da sessão #${uid}:`, kmsErr.message);
+          if (kmsErr.code === 'KMS_UNAVAILABLE' || kmsErr.message?.includes('KMS')) {
+            SalonWhatsAppRepository.markSessionDisconnected(uid, {
+              status: 'KMS_UNAVAILABLE',
+              error: `KMS indisponível ao decifrar credenciais: ${kmsErr.message}`,
+              resetCredentials: false,
+            });
+            _scheduleKmsRetry();
+          } else if (['ENCRYPTED_FILE_CORRUPT', 'DEK_MISSING_WITH_ENCRYPTED_FILES', 'ENCRYPTED_STATE_INCONSISTENT'].includes(kmsErr.code)) {
+            SalonWhatsAppRepository.markSessionDisconnected(uid, {
+              status: 'ERROR',
+              error: kmsErr.code,
+              resetCredentials: false,
+            });
+          } else {
+            SalonWhatsAppRepository.markSessionDisconnected(uid, {
+              status: 'CONNECTION_LOST',
+              error: kmsErr.message,
+              resetCredentials: false,
+            });
+          }
           continue;
         }
 
@@ -1598,11 +1778,32 @@ async function restoreActiveSalonSessions() {
       restored++;
     } catch (err) {
       console.error(`[salonSessionManager] Erro ao restaurar sessão #${uid}:`, err.message);
-      SalonWhatsAppRepository.markSessionDisconnected(uid, {
-        status: 'CONNECTION_LOST',
-        error: `Falha na restauração: ${err.message}`,
-        resetCredentials: false,
-      });
+      if (err.code === 'KMS_UNAVAILABLE' || err.message?.includes('KMS')) {
+        SalonWhatsAppRepository.markSessionDisconnected(uid, {
+          status: 'KMS_UNAVAILABLE',
+          error: `KMS indisponível ao inicializar socket: ${err.message}`,
+          resetCredentials: false,
+        });
+        _scheduleKmsRetry();
+      } else if (['ENCRYPTED_FILE_CORRUPT', 'DEK_MISSING_WITH_ENCRYPTED_FILES', 'ENCRYPTED_STATE_INCONSISTENT'].includes(err.code)) {
+        SalonWhatsAppRepository.markSessionDisconnected(uid, {
+          status: 'ERROR',
+          error: err.code,
+          resetCredentials: false,
+        });
+      } else if (err.code === 'NOT_MIGRATED') {
+        SalonWhatsAppRepository.markSessionDisconnected(uid, {
+          status: 'NOT_MIGRATED',
+          error: 'Sessão em texto claro pendente de migração para armazenamento cifrado.',
+          resetCredentials: false,
+        });
+      } else {
+        SalonWhatsAppRepository.markSessionDisconnected(uid, {
+          status: 'CONNECTION_LOST',
+          error: `Falha na restauração: ${err.message}`,
+          resetCredentials: false,
+        });
+      }
     }
   }
 
@@ -1656,6 +1857,7 @@ function _resetForTesting() {
   tenantLocks.clear();
   _socketFactoryForTesting = null;
   _qrInitTimeoutMs = 25000;
+  _stopKmsRetrySchedulerForTesting();
 }
 
 /**
@@ -1663,7 +1865,7 @@ function _resetForTesting() {
  * @param {string} dir
  */
 function _setBaseDirForTesting(dir) {
-  SESSIONS_ROOT = dir;
+  SESSIONS_ROOT = dir || path.resolve(__dirname, '../../data/sessions');
 }
 
 function _setBaileysSocketFactoryForTesting(factory) {
@@ -1697,4 +1899,6 @@ module.exports = {
   _setQrInitTimeoutForTesting,
   _setKeyProviderForTesting,
   _resetKeyProviderForTesting,
+  _stopKmsRetrySchedulerForTesting,
+  _executeKmsRetry,
 };

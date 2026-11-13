@@ -23,6 +23,7 @@ const { getKeyProvider } = require('../security/keyProvider');
 
 let currentSock = null;
 let lastKnownUserJid = null;
+let qrExpiryTimer = null;
 
 /**
  * Verifica se o transporte real de mensagens via WhatsApp (rede Baileys) é autorizado.
@@ -157,6 +158,11 @@ async function sendWhatsAppMessage(jid, text) {
 }
 
 async function startWhatsAppBot() {
+  if (process.env.WA_SESSIONS_DISABLED === 'true') {
+    console.log('[WhatsApp Bot] WA_SESSIONS_DISABLED=true: inicialização do bot WhatsApp desativada pelo modo manutenção.');
+    return null;
+  }
+
   if (!isRealWhatsAppTransportAllowed()) {
     console.log('[WhatsApp Bot] Hard Staging Lock ativo: inicialização do socket Baileys bloqueada (fail-closed).');
     return null;
@@ -164,14 +170,25 @@ async function startWhatsAppBot() {
 
   const isEncryptionOn = process.env.WA_CREDS_ENCRYPTION === 'on';
   let authStateResult;
-  if (isEncryptionOn) {
-    authStateResult = await useEncryptedMultiFileAuthState(config.authDir, {
-      tenantId: 'personal',
-      keyProvider: getKeyProvider(),
-    });
-  } else {
-    authStateResult = await useMultiFileAuthState(config.authDir);
+  try {
+    if (isEncryptionOn) {
+      authStateResult = await useEncryptedMultiFileAuthState(config.authDir, {
+        tenantId: 'personal',
+        keyProvider: getKeyProvider(),
+      });
+    } else {
+      authStateResult = await useMultiFileAuthState(config.authDir);
+    }
+  } catch (err) {
+    console.error(`[WhatsApp Bot] Erro ao carregar credenciais: ${err.code || err.message}`);
+    if (err.code === 'KMS_UNAVAILABLE' || err.message?.includes('KMS')) {
+      console.log('[WhatsApp Bot] KMS indisponível: agendando nova tentativa em 15s...');
+      setTimeout(startWhatsAppBot, 15000);
+    }
+    // Para outros erros (NOT_MIGRATED, ENCRYPTED_FILE_CORRUPT, etc.): NÃO iniciar socket e NÃO parear de novo
+    return null;
   }
+
   const { state, saveCreds } = authStateResult;
   const { version, isLatest } = await fetchLatestBaileysVersion();
   console.log(`Usando versão Baileys v${version.join('.')}, isLatest: ${isLatest}`);
@@ -190,15 +207,28 @@ async function startWhatsAppBot() {
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
+    const qrImagePath = path.resolve(__dirname, '../../qrcode.png');
 
     if (qr) {
+      // Remove imagem anterior se existir
+      if (fs.existsSync(qrImagePath)) {
+        try { fs.unlinkSync(qrImagePath); } catch (_) {}
+      }
+
+      // Agenda remoção do qrcode.png quando o QR expirar (60s)
+      if (qrExpiryTimer) clearTimeout(qrExpiryTimer);
+      qrExpiryTimer = setTimeout(() => {
+        if (fs.existsSync(qrImagePath)) {
+          try { fs.unlinkSync(qrImagePath); } catch (_) {}
+        }
+      }, 60000);
+
       console.log('\n=========================================');
       console.log('📱 ESCANEIE O QR CODE ABAIXO NO SEU WHATSAPP:');
       console.log('=========================================\n');
       qrcodeTerminal.generate(qr, { small: true });
 
       // Save as PNG image in project root for easy viewing
-      const qrImagePath = path.resolve(__dirname, '../../qrcode.png');
       try {
         await QRCode.toFile(qrImagePath, qr, { width: 350 });
         console.log(`\n🖼️ QR Code salvo também como imagem em: ${qrImagePath}`);
@@ -208,6 +238,14 @@ async function startWhatsAppBot() {
     }
 
     if (connection === 'close') {
+      if (qrExpiryTimer) {
+        clearTimeout(qrExpiryTimer);
+        qrExpiryTimer = null;
+      }
+      if (fs.existsSync(qrImagePath)) {
+        try { fs.unlinkSync(qrImagePath); } catch (_) {}
+      }
+
       const shouldReconnect =
         lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
       console.log(
@@ -221,10 +259,6 @@ async function startWhatsAppBot() {
         setTimeout(startWhatsAppBot, 3000);
       } else {
         console.log('Você foi desconectado (logout). Limpando sessão...');
-        const qrImagePath = path.resolve(__dirname, '../../qrcode.png');
-        if (fs.existsSync(qrImagePath)) {
-          try { fs.unlinkSync(qrImagePath); } catch (_) {}
-        }
         clearTenantDek('personal');
         if (fs.existsSync(config.authDir)) {
           fs.rmSync(config.authDir, { recursive: true, force: true });
@@ -232,7 +266,10 @@ async function startWhatsAppBot() {
         setTimeout(startWhatsAppBot, 2000);
       }
     } else if (connection === 'open') {
-      const qrImagePath = path.resolve(__dirname, '../../qrcode.png');
+      if (qrExpiryTimer) {
+        clearTimeout(qrExpiryTimer);
+        qrExpiryTimer = null;
+      }
       if (fs.existsSync(qrImagePath)) {
         try { fs.unlinkSync(qrImagePath); } catch (_) {}
       }

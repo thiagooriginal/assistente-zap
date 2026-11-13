@@ -4,17 +4,18 @@
 **Documento:** Runbook Operacional e Guia de Configuração T9  
 **Classificação:** Segurança Crítica (P0)  
 **Conformidade:** OWASP ASVS 5.0 (Nível 3) · Matriz RAIA-27 (Proteção 09 / Risco R9)  
-**Branch:** `security/raia-27-protecoes`
+**Branch:** `security/raia-27-protecoes`  
+**Região AWS Obrigatória:** `sa-east-1` (São Paulo)  
 
 ---
 
 ## 1. Visão Geral da Arquitetura
 
-O módulo T9 elimina o risco de exposição de credenciais e chaves criptográficas do Baileys (`creds.json`, `pre-key-*.json`, `session-*.json`, etc.) através do padrão de **Criptografia por Envelope (Envelope Encryption)** gerenciada por chave mestra na **AWS KMS (Key Management Service)**.
+O módulo T9 elimina o risco de exposição de credenciais e chaves criptográficas do Baileys (`creds.json`, `pre-key-*.json`, `session-*.json`, etc.) através do padrão de **Criptografia por Envelope (Envelope Encryption)** gerenciada por chave mestra na **AWS KMS (Key Management Service)** na região `sa-east-1`.
 
 ```
                     ┌──────────────────────────┐
-                    │   AWS KMS (us-east-1)    │
+                    │   AWS KMS (sa-east-1)    │
                     │  Chave Mestra CMK (KMS)  │
                     └─────────────┬────────────┘
                                   │ GenerateDataKey / Decrypt
@@ -37,41 +38,47 @@ O módulo T9 elimina o risco de exposição de credenciais e chaves criptográfi
 1. **Envelope Encryption:** A chave mestra CMK nunca sai da AWS. O KMS gera uma Chave de Criptografia de Dados (DEK) de 256 bits, entregando-a cifrada (`dek.wrapped`) para gravação em disco e em texto claro apenas na memória RAM da aplicação.
 2. **Cifragem Autenticada AES-256-GCM:** Cada arquivo gravado pelo Baileys é cifrado com IV randômico de 12 bytes e tag de autenticação GCM de 16 bytes.
 3. **Additional Authenticated Data (AAD) Vinculado:** O cabeçalho GCM autentica rigidamente o inquilino e o nome do arquivo (`wa:${tenantId}:${fileName}`). Uma chave transferida de um tenant para outro ou arquivo renomeado é sumariamente rejeitado (`AUTH_TAG_VERIFICATION_FAILED`).
-4. **Isolamento de Memória:** O hash da DEK é zerado em memória (`dek.fill(0)`) na desconexão da sessão ou logout do assistente.
+4. **Isolamento de Memória:** O buffer da DEK é zerado em memória (`dek.fill(0)`) na desconexão da sessão (`disconnect()`) ou logout.
 
 ---
 
-## 2. Configuração na AWS (Instruções para o Thiago)
+## 2. Configuração na AWS (Instruções Obrigatórias)
 
 ### 2.1 Criar a Chave Mestra (KMS CMK)
-1. Acesse o **AWS Management Console** na região escolhida (ex: `us-east-1`).
+1. Acesse o **AWS Management Console** obrigatoriamente na região `sa-east-1` (São Paulo).
 2. Navegue até **Key Management Service (KMS)** > **Customer managed keys** > **Create key**.
 3. Selecione:
    - **Key type:** `Symmetric`
    - **Key usage:** `Encrypt and decrypt`
    - **Key material origin:** `KMS`
-4. Nome/Alias: `raia-agentes-whatsapp-sessions`.
-5. Descrição: `Chave CMK para envelope encryption de credenciais Baileys - RAIA AGENTES`.
-6. Defina a política de exclusão com retenção mínima e habilite **Automatic Key Rotation** (rotação anual de chaves sem afetar decifração).
+4. Nome/Alias: `alias/raia-agentes-whatsapp-sessions`.
+5. Descrição: `Chave CMK para envelope encryption de credenciais Baileys - RAIA AGENTES (sa-east-1)`.
+6. Habilite **Automatic Key Rotation** (rotação anual da chave pela AWS sem afetar decifração).
 
-### 2.2 Política de IAM com Menor Privilégio
-Crie um usuário IAM específico para o Easypanel (ex: `raia-kms-app-user`) ou configure uma IAM Role com a política estrita abaixo:
+### 2.2 Política de IAM Obrigatória (Menor Privilégio com Restrição de IP e Contexto)
+Crie um usuário IAM específico para o Easypanel (ex: `raia-kms-app-user`) ou configure uma IAM Policy anexada com a política JSON estrita abaixo.
+
+> [!IMPORTANT]
+> A restrição por IP via `aws:SourceIp` com o IP estático da VPS onde roda o Easypanel e a validação do Encryption Context (`purpose = wa-session`) são **obrigatórias**, impedindo o uso indevido da chave fora do servidor autorizado.
 
 ```json
 {
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "AllowRaiaSessionEnvelopeOperations",
+      "Sid": "AllowRaiaSessionEnvelopeOperationsStrict",
       "Effect": "Allow",
       "Action": [
         "kms:GenerateDataKey",
         "kms:Decrypt"
       ],
-      "Resource": "arn:aws:kms:us-east-1:SUA_CONTA_AWS:key/SEU_KMS_KEY_ID",
+      "Resource": "arn:aws:kms:sa-east-1:SUA_CONTA_AWS:key/SEU_KMS_KEY_ID",
       "Condition": {
         "StringEquals": {
           "kms:EncryptionContext:purpose": "wa-session"
+        },
+        "IpAddress": {
+          "aws:SourceIp": "IP_ESTATICO_DA_VPS_EASYPANEL/32"
         }
       }
     }
@@ -79,104 +86,97 @@ Crie um usuário IAM específico para o Easypanel (ex: `raia-kms-app-user`) ou c
 }
 ```
 
-> [!TIP]
-> Caso o servidor de produção possua IP público fixo no Easypanel, adicione a restrição `aws:SourceIp` na condição da política para proteção de borda adicional contra vazamento acidental de credenciais de API.
-
 ---
 
 ## 3. Variáveis de Ambiente no Easypanel
 
-Adicione as variáveis de ambiente abaixo no painel do **Easypanel** no serviço `raia-agentes`:
+Configure as seguintes variáveis no painel do **Easypanel** no serviço `raia-agentes`:
 
 | Variável | Valor Recomendado | Descrição |
 |---|---|---|
-| `WA_CREDS_ENCRYPTION` | `on` | Ativa o armazenamento e a leitura cifrada de sessões. |
-| `AWS_REGION` | `us-east-1` | Região AWS da chave KMS. |
-| `AWS_KMS_KEY_ID` | `arn:aws:kms:...` ou Alias | ARN ou ID da chave CMK criada no KMS. |
-| `AWS_ACCESS_KEY_ID` | `AKIA...` | Access Key ID do usuário IAM da aplicação. |
+| `WA_CREDS_ENCRYPTION` | `off` (inicial) / `on` (pós-migração) | Ativa o armazenamento e leitura cifrada de credenciais WhatsApp. |
+| `AWS_REGION` | `sa-east-1` | Região AWS da chave KMS (estritamente São Paulo). |
+| `WA_KMS_KEY_ID` | `arn:aws:kms:sa-east-1:...` ou Alias | ARN ou Alias da chave CMK criada no KMS. |
+| `AWS_ACCESS_KEY_ID` | `AKIA...` | Access Key ID do usuário IAM autorizado. |
 | `AWS_SECRET_ACCESS_KEY` | `wJalr...` | Secret Access Key da aplicação. |
+| `WA_SESSIONS_DISABLED` | `true` (apenas em manutenção) | Desativa o motor de WhatsApp para manutenção e migração segura. |
 
 ---
 
-## 4. Procedimento de Migração Operacional (Passo a Passo)
+## 4. Procedimento de Migração e Homologação Operacional
 
-A migração de credenciais existentes para o formato cifrado deve ocorrer durante uma janela rápida de manutenção (1 a 3 minutos).
+Para evitar conflito de processos sem derrubar o container do Easypanel, a migração utiliza o modo de manutenção `WA_SESSIONS_DISABLED=true`. Nesse modo, o servidor web sobe sem ativar os sockets WhatsApp e sem criar a trava `data/wa-sessions.lock`.
 
-### Passo 1: Backup Preventivo
-Faça o backup de segurança do SQLite e das sessões:
-```bash
-# Backup do banco operacional
-cp data/assistant.db data/assistant_backup_t9.db
+> [!WARNING]
+> É estritamente proibido criar cópias manuais em texto claro (`cp -r data/sessions ...`). A ferramenta `waCredsMigrate.js` move os arquivos para quarentena isolada (`data/sessions_quarantine/`) com integridade verificada byte-a-byte.
 
-# Backup das sessões atuais
-cp -r data/sessions data/sessions_backup_t9
-```
+### 4.1 Roteiro de Homologação (Restrito Exclusivamente ao `--tenant 13`)
+Em homologação/staging, a migração **NÃO** deve usar `--all`. Aplique apenas para o tenant de testes:
 
-### Passo 2: Parar a Aplicação
-No Easypanel, pause ou pare temporariamente a aplicação. Isso evita leituras ou gravações concorrentes no Baileys. O utilitário `waCredsMigrate.js` verificará `data/app.lock` e recusará a migração se a aplicação ainda estiver rodando.
+1. **Ativar Modo de Manutenção:**
+   No Easypanel, defina `WA_SESSIONS_DISABLED=true` e reinicie a aplicação.
+   O servidor web subirá sem acionar o motor de sessões do WhatsApp e sem criar a trava `data/wa-sessions.lock`.
 
-### Passo 3: Executar a Migração Cifrada
-No terminal do servidor ou container:
-```bash
-# 1. Simulação prévia para auditoria (não altera arquivos)
-node scripts/waCredsMigrate.js --all --dry-run
-
-# 2. Executar a migração oficial
-node scripts/waCredsMigrate.js --all --migrate
-
-# 3. Validar a integridade de todas as credenciais migradas
-node scripts/waCredsMigrate.js --all --verify
-```
-
-O script realizará:
-- Validação do lock de processo.
-- Geração da DEK via KMS e gravação de `dek.wrapped`.
-- Cifragem AES-256-GCM de cada arquivo `.json` gerando `.enc` com `fsync`.
-- Teste de sanidade obrigatório com comparação byte-a-byte.
-- Quarentena segura dos arquivos em texto claro em `data/sessions_quarantine/` (nenhum arquivo é excluído).
-
-### Passo 4: Ativar `WA_CREDS_ENCRYPTION=on` e Iniciar
-1. No Easypanel, defina `WA_CREDS_ENCRYPTION=on`.
-2. Inicie a aplicação.
-3. Consulte o endpoint operacional de diagnóstico:
-   `GET /api/salon/whatsapp/diagnostics` (requer autenticação de salão ou admin).
-   Verifique se retorna:
-   ```json
-   {
-     "encryptionMode": "on",
-     "sessionEncrypted": true,
-     "notMigrated": false,
-     "kmsStatus": "healthy"
-   }
+2. **Acessar o Terminal do Container:**
+   Pelo console do Easypanel ou SSH, execute a simulação:
+   ```bash
+   node scripts/waCredsMigrate.js --tenant 13 --dry-run
    ```
+   *(Verifique se os arquivos e tamanhos estão corretos sem hashes expostos).*
+
+3. **Executar a Migração com Quarentena:**
+   ```bash
+   node scripts/waCredsMigrate.js --tenant 13 --migrate
+   ```
+   O script gerará a DEK com KMS (`sa-east-1`), cifrará os arquivos com `fsync`, validará byte-a-byte e moverá o texto claro para `data/sessions_quarantine/`.
+
+4. **Validar a Integridade:**
+   ```bash
+   node scripts/waCredsMigrate.js --tenant 13 --verify
+   ```
+
+5. **Reativar o Motor WhatsApp com Criptografia Ativa:**
+   No Easypanel, configure:
+   - `WA_SESSIONS_DISABLED=false`
+   - `WA_CREDS_ENCRYPTION=on`
+   Reinicie a aplicação.
+
+6. **Confirmar Conexão:**
+   Acesse `/api/salon/whatsapp/diagnostics` para o tenant 13 e confira se a sessão foi restaurada com sucesso.
 
 ---
 
 ## 5. Procedimento de Rollback de Contingência
 
-Caso ocorra qualquer comportamento inesperado ou indisponibilidade imprevista, o rollback é 100% suportado:
+Caso seja necessária a reversão imediata das credenciais cifradas para o formato legado em texto claro:
 
-1. **Parar a aplicação** no Easypanel.
-2. **Executar o utilitário de reversão:**
+1. Defina `WA_SESSIONS_DISABLED=true` e reinicie.
+2. Execute o rollback no container:
    ```bash
-   node scripts/waCredsMigrate.js --all --rollback --confirm-rollback
+   node scripts/waCredsMigrate.js --tenant 13 --rollback --confirm-rollback
    ```
-   *O utilitário decifra todos os arquivos `.enc` para o formato `.json` original em diretório temporário de staging, valida a integridade JSON e substitui os arquivos no disco.*
-3. No Easypanel, defina `WA_CREDS_ENCRYPTION=off`.
-4. Inicie a aplicação.
+3. Defina `WA_CREDS_ENCRYPTION=off` e `WA_SESSIONS_DISABLED=false`.
+4. Reinicie a aplicação.
 
 ---
 
-## 6. Planos de Contingência e Resiliência
+## 6. Runbook de Diagnóstico e Recuperação de Falhas
 
-### Indisponibilidade Temporária do AWS KMS
-Se a conexão com o KMS falhar durante a reinicialização da aplicação:
-- A rotina de restauração marca a sessão como `KMS_UNAVAILABLE`.
-- As credenciais no banco SQLite **NÃO SÃO APAGADAS NEM RESETADAS**.
-- Nenhuma desconexão destrutiva é realizada.
-- Assim que o KMS ou a rede for restabelecida, o próximo ciclo de conexão restaura a sessão automaticamente.
+### 6.1 `KMS_UNAVAILABLE` (KMS Temporariamente Indisponível ou Falha de Rede)
+- **Sintoma:** O endpoint `/diagnostics` reporta `kmsStatus: 'unavailable'`, `kmsAttempts` e `kmsNextRetryAt`. O salão permanece com status `KMS_UNAVAILABLE` no banco de dados.
+- **Comportamento do Sistema:** O sistema **NÃO** apaga credenciais, **NÃO** remove sessões e **NÃO** tenta parear novamente. Um agendador automático em background tenta restabelecer contato com o KMS em 5s, 15s, 60s e depois a cada 5 minutos.
+- **Ação:** Verificar conectividade de rede da VPS com a AWS na região `sa-east-1` e permissões IAM. Assim que o KMS voltar, os salões serão restaurados automaticamente sem intervenção humana.
+- **O QUE NUNCA FAZER:** **NÃO** reiniciar pareamento por QR/código. Não apagar arquivos de sessão.
 
-### Política de Exclusão e Retenção no KMS
-- **Nunca force a exclusão imediata da chave KMS.**
-- Se a chave for excluída no KMS, as credenciais em disco tornam-se matematicamente indecifráveis.
-- Utilize sempre um período de agendamento de exclusão (*Key Deletion Window*) de 30 dias na AWS.
+### 6.2 `NOT_MIGRATED` (Credenciais em Texto Claro com Modo Cifrado Ativo)
+- **Sintoma:** O salão tem arquivos `.json` legados mas não possui `.enc`.
+- **Ação:** Ativar o modo de manutenção `WA_SESSIONS_DISABLED=true` e executar `node scripts/waCredsMigrate.js --tenant <id> --migrate`. Ao reiniciar a aplicação, a restauração detectará os arquivos `.enc` e subirá normalmente.
+- **O QUE NUNCA FAZER:** **NÃO** gerar novo pareamento sobre a pasta existente.
+
+### 6.3 `ENCRYPTED_FILE_CORRUPT` (Arquivo Cifrado Adulterado ou Corrompido)
+- **Sintoma:** Erro de integridade de autenticação AES-256-GCM.
+- **Comportamento do Sistema:**
+  - Se for arquivo secundário (pre-key, session): o sistema renomeia o arquivo para `<arquivo>.enc.corrupt-<timestamp>` e ignora de forma segura sem derrubar a aplicação.
+  - Se for `creds.json.enc` ou `dek.wrapped`: o sistema bloqueia o salão marcando status `ERROR` com `last_error = 'ENCRYPTED_FILE_CORRUPT'`.
+- **Ação:** Notificar imediatamente o coordenador/Thiago. Se existir quarentena válida em `data/sessions_quarantine/`, analisar com o Revisor Técnico antes de qualquer restabelecimento.
+- **O QUE NUNCA FAZER:** **NÃO** gerar novas credenciais por cima nem tentar forçar pareamento sem autorização formal.

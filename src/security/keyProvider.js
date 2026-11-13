@@ -3,12 +3,9 @@
  * 
  * Implementa envelope encryption para credenciais do WhatsApp.
  * - KmsKeyProvider: Integração com AWS KMS (GenerateDataKey e Decrypt) com EncryptionContext rígido.
- * - FakeKeyProvider: Simulação hermética em memória para testes (sem AWS e sem rede).
  * 
  * Sanitização estrita: Segredos, chaves e objetos brutos de erro do SDK nunca são registrados em log.
  */
-
-const crypto = require('crypto');
 
 let activeKeyProvider = null;
 let lastKmsStatus = 'ok'; // 'ok' | 'unavailable' | 'unconfigured'
@@ -61,10 +58,6 @@ class KmsKeyProvider {
    * @param {{ tenantId: string|number, purpose?: string }} params
    * @returns {Promise<{ plaintextKey: Buffer, wrappedKey: Buffer }>}
    */
-  getDeterministicDek(tenantId) {
-    return crypto.createHash('sha256').update(`deterministic_dek_${tenantId}`).digest();
-  }
-
   async generateDataKey({ tenantId, purpose = 'wa-session' }) {
     if (!this.keyId) {
       lastKmsStatus = 'unconfigured';
@@ -104,7 +97,7 @@ class KmsKeyProvider {
   }
 
   /**
-   * Decifra uma DEK previamente cifrada utilizando o AWS KMS
+   * Desembrulha (decifra) uma chave de dados utilizando a CMK no AWS KMS
    * @param {{ wrappedKey: Buffer, tenantId: string|number, purpose?: string }} params
    * @returns {Promise<Buffer>}
    */
@@ -145,102 +138,8 @@ class KmsKeyProvider {
 }
 
 /**
- * Provedor simulado em memória para testes herméticos (zero chamadas de rede)
- */
-class FakeKeyProvider {
-  constructor() {
-    this.masterKey = crypto.randomBytes(32);
-    this.unavailable = false;
-    this.calls = {
-      generateDataKey: 0,
-      unwrapDataKey: 0,
-    };
-    this.lastContext = null;
-  }
-
-  setUnavailable(flag = true) {
-    this.unavailable = Boolean(flag);
-    if (this.unavailable) {
-      lastKmsStatus = 'unavailable';
-    } else {
-      lastKmsStatus = 'ok';
-    }
-  }
-
-  getDeterministicDek(tenantId) {
-    return crypto.createHash('sha256').update(`deterministic_dek_${tenantId}`).digest();
-  }
-
-  async generateDataKey({ tenantId, purpose = 'wa-session' }) {
-    this.calls.generateDataKey++;
-    const context = buildEncryptionContext(tenantId, purpose);
-    this.lastContext = context;
-
-    if (this.unavailable) {
-      lastKmsStatus = 'unavailable';
-      const err = new Error('KMS_UNAVAILABLE: Simulação de indisponibilidade do serviço KMS.');
-      err.code = 'KMS_UNAVAILABLE';
-      throw err;
-    }
-
-    const plaintextKey = crypto.randomBytes(32);
-    const iv = crypto.randomBytes(12);
-    const aad = Buffer.from(JSON.stringify(context), 'utf8');
-
-    const cipher = crypto.createCipheriv('aes-256-gcm', this.masterKey, iv);
-    cipher.setAAD(aad);
-    const encrypted = Buffer.concat([cipher.update(plaintextKey), cipher.final()]);
-    const tag = cipher.getAuthTag();
-
-    // Formato wrapped simulado: IV (12) + Tag (16) + Ciphertext (32)
-    const wrappedKey = Buffer.concat([iv, tag, encrypted]);
-    lastKmsStatus = 'ok';
-
-    return {
-      plaintextKey,
-      wrappedKey,
-    };
-  }
-
-  async unwrapDataKey({ wrappedKey, tenantId, purpose = 'wa-session' }) {
-    this.calls.unwrapDataKey++;
-    const context = buildEncryptionContext(tenantId, purpose);
-    this.lastContext = context;
-
-    if (this.unavailable) {
-      lastKmsStatus = 'unavailable';
-      const err = new Error('KMS_UNAVAILABLE: Simulação de indisponibilidade do serviço KMS.');
-      err.code = 'KMS_UNAVAILABLE';
-      throw err;
-    }
-
-    if (!Buffer.isBuffer(wrappedKey) || wrappedKey.length < 28) {
-      throw new Error('INVALID_WRAPPED_KEY: Chave cifrada inválida.');
-    }
-
-    const iv = wrappedKey.subarray(0, 12);
-    const tag = wrappedKey.subarray(12, 28);
-    const encrypted = wrappedKey.subarray(28);
-    const aad = Buffer.from(JSON.stringify(context), 'utf8');
-
-    try {
-      const decipher = crypto.createDecipheriv('aes-256-gcm', this.masterKey, iv);
-      decipher.setAAD(aad);
-      decipher.setAuthTag(tag);
-      const plaintext = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-      lastKmsStatus = 'ok';
-      return plaintext;
-    } catch (err) {
-      const safeErr = new Error('KMS_CONTEXT_MISMATCH_OR_CORRUPT: Falha de autenticação ao decifrar chave.');
-      safeErr.code = 'KMS_CONTEXT_MISMATCH_OR_CORRUPT';
-      throw safeErr;
-    }
-  }
-}
-
-/**
  * Obtém a instância ativa do provedor de chaves
- * @returns {KmsKeyProvider|FakeKeyProvider}
+ * @returns {KmsKeyProvider}
  */
 function getKeyProvider() {
   if (activeKeyProvider) {
@@ -283,7 +182,6 @@ function getKmsStatus() {
 module.exports = {
   buildEncryptionContext,
   KmsKeyProvider,
-  FakeKeyProvider,
   getKeyProvider,
   _setKeyProviderForTesting,
   _resetKeyProviderForTesting,

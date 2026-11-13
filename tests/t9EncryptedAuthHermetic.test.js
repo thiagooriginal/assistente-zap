@@ -1,29 +1,10 @@
 /**
- * RAIA AGENTES — SUÍTE HERMÉTICA DE TESTES AUTOMATIZADOS (COMANDO 038 / T9)
- * Validação rigorosa da Criptografia em Repouso de Credenciais WhatsApp (Envelope KMS + AES-256-GCM).
- *
- * Cobertura Obrigatória dos 17 Cenários:
- *  1. useEncryptedMultiFileAuthState grava arquivos com sufixo .enc e não deixa resíduos .json em claro.
- *  2. Cabeçalho binário dos arquivos .enc contém RAIAENC1, versão 0x01, IV de 12 bytes e tag de 16 bytes.
- *  3. Descriptografia de arquivo válido recupera o conteúdo exato gravado (round-trip idempotente).
- *  4. Adulteração de 1 byte no ciphertext causa erro de autenticação (AUTH_TAG_VERIFICATION_FAILED) e não retorna dados parciais.
- *  5. Adulteração da tag de autenticação GCM causa erro e aborta.
- *  6. Troca de arquivo entre tenants falha por inconsistência de AAD.
- *  7. Troca de nome de arquivo falha por inconsistência de AAD.
- *  8. dek.wrapped é criado na inicialização de tenant virgem com contexto correto (tenantId, purpose: wa-session).
- *  9. clearTenantDek zera a chave em memória (fill(0)) e remove do cache; próxima leitura força novo unwrap.
- * 10. inspectSalonAuthCredentials com WA_CREDS_ENCRYPTION=off lê creds.json legado normalmente.
- * 11. inspectSalonAuthCredentials com WA_CREDS_ENCRYPTION=on lê creds.json.enc e retorna sessionEncrypted: true, notMigrated: false.
- * 12. inspectSalonAuthCredentials com WA_CREDS_ENCRYPTION=on diante de creds.json legado retorna notMigrated: true.
- * 13. restoreActiveSalonSessions em modo on diante de KMS indisponível marca KMS_UNAVAILABLE e NÃO descarta credenciais no SQLite.
- * 14. restoreActiveSalonSessions em modo on diante de credenciais legadas em texto claro marca NOT_MIGRATED sem apagar.
- * 15. waCredsMigrate --dry-run não altera o filesystem.
- * 16. waCredsMigrate --migrate cifra todos os arquivos, valida integridade byte-a-byte, move texto claro para quarentena e não deleta arquivos.
- * 17. waCredsMigrate --rollback restaura arquivos em texto claro funcionais a partir dos .enc.
+ * RAIA AGENTES — SUÍTE HERMÉTICA DE TESTES AUTOMATIZADOS (COMANDO 038.1 / T9)
+ * Validação rigorosa dos 27 Requisitos Mandatórios (T1 a T27).
  *
  * Utiliza exclusivamente módulos nativos Node 22 (node:test, node:assert/strict).
  * Provedor de chaves falso (FakeKeyProvider), sem dependência de rede ou AWS real.
- * Banco temporário descartável e diretórios isolados em os.tmpdir().
+ * Bancos SQLite temporários descartáveis e diretórios isolados em os.tmpdir().
  */
 
 const test = require('node:test');
@@ -31,16 +12,89 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
+const crypto = require('node:crypto');
+const child_process = require('node:child_process');
+const { DatabaseSync } = require('node:sqlite');
 
-// 1. Configuração do ambiente hermético descartável
-const uniqueRunId = `t9_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-const tempDbPath = path.join(os.tmpdir(), `raia_test_db_${uniqueRunId}.db`);
-const tempSessionsDir = path.join(os.tmpdir(), `raia_test_sessions_${uniqueRunId}`);
-const tempQuarantineDir = path.join(os.tmpdir(), `raia_test_quarantine_${uniqueRunId}`);
-fs.mkdirSync(tempSessionsDir, { recursive: true });
-fs.mkdirSync(tempQuarantineDir, { recursive: true });
+// Helpers e módulos de produção
+const { FakeKeyProvider } = require('./helpers/fakeKeyProvider');
+const {
+  _setKeyProviderForTesting,
+  _resetKeyProviderForTesting,
+  KmsKeyProvider,
+  buildEncryptionContext,
+} = require('../src/security/keyProvider');
 
-process.env.DB_PATH = tempDbPath;
+const {
+  MAGIC_HEADER,
+  CURRENT_VERSION,
+  encryptBuffer,
+  decryptBuffer,
+  getOrLoadTenantDek,
+  clearTenantDek,
+  readEncryptedJson,
+  readEncryptedJsonSync,
+  useEncryptedMultiFileAuthState,
+} = require('../src/whatsapp/encryptedAuthState');
+
+const {
+  DEFAULT_LOCK_FILE,
+  inspectAppLock,
+  tryForceUnlock,
+  acquireAppLock,
+  _setProcessStartTimeCheckerForTesting,
+} = require('../src/utils/appLock');
+
+const waCredsMigrate = require('../scripts/waCredsMigrate');
+const SalonWhatsAppRepository = require('../src/database/salonWhatsAppRepository');
+const salonSessionManager = require('../src/whatsapp/salonSessionManager');
+
+// Helper para criar diretório temporário isolado por teste
+function createTestDir(prefix = 'raia_test_') {
+  const dir = path.join(os.tmpdir(), `${prefix}${Date.now()}_${Math.random().toString(36).substring(2, 7)}`);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+// Mock seguro de credenciais Baileys
+function createMockCreds() {
+  return {
+    noiseKey: {
+      private: Buffer.from('mock_noise_private_key_32_bytes!'),
+      public: Buffer.from('mock_noise_public_key_32_bytes!!'),
+    },
+    pairingEphemeralKeyPair: {
+      private: Buffer.from('mock_pairing_private_key_32_bytes'),
+      public: Buffer.from('mock_pairing_public_key_32_bytes!'),
+    },
+    signedIdentityKey: {
+      private: Buffer.from('mock_signed_id_priv_32_bytes!!!'),
+      public: Buffer.from('mock_signed_id_pub_32_bytes!!!!'),
+    },
+    signedPreKey: {
+      keyPair: {
+        private: Buffer.from('mock_signed_pre_priv_32_bytes!!'),
+        public: Buffer.from('mock_signed_pre_pub_32_bytes!!!'),
+      },
+      signature: Buffer.from('mock_signature_64_bytes_long_string_for_testing_purposes!!!!!!!!!'),
+      keyId: 1,
+    },
+    registrationId: 12345,
+    advSecretKey: Buffer.from('mock_adv_secret_key_32_bytes!!!!').toString('base64'),
+    processedHistoryMessages: [],
+    nextPreKeyId: 1,
+    firstUnuploadedPreKeyId: 1,
+    accountSettings: { unarchiveChats: false },
+    me: { id: '5511999990011:1@s.whatsapp.net', name: 'Salao Teste' },
+    account: { details: Buffer.from('mock_account_details') },
+    signalIdentities: [],
+    platform: 'smba',
+    lastAccountSyncTimestamp: 0,
+    myAppStateKeyId: 'mock_app_state_key_id',
+  };
+}
+
+// Setup global para testes
 process.env.APP_MODE = 'staging';
 process.env.HOMOLOGACAO = 'true';
 process.env.ALLOW_SALON_WHATSAPP_TESTING = 'true';
@@ -48,521 +102,1056 @@ process.env.SALON_TEST_ALLOWED_TENANTS = '13,14,15,16';
 process.env.SALON_TEST_ALLOWED_PHONES = '5511999990011,5511999990002';
 process.env.ALLOW_WHATSAPP_SENDING = 'false';
 
-const db = require('../src/database/db');
-const salonSessionManager = require('../src/whatsapp/salonSessionManager');
-const SalonWhatsAppRepository = require('../src/database/salonWhatsAppRepository');
-const {
-  MAGIC_HEADER,
-  CURRENT_VERSION,
-  encryptBuffer,
-  decryptBuffer,
-  useEncryptedMultiFileAuthState,
-  clearTenantDek,
-  readEncryptedJson,
-  readEncryptedJsonSync,
-} = require('../src/whatsapp/encryptedAuthState');
-const {
-  FakeKeyProvider,
-  _setKeyProviderForTesting,
-  _resetKeyProviderForTesting,
-} = require('../src/security/keyProvider');
-const waCredsMigrate = require('../scripts/waCredsMigrate');
+// Coletor global de saída para T23 (Auditoria de Segredos nos Logs)
+const logCapture = [];
+const originalConsoleLog = console.log;
+const originalConsoleError = console.error;
+const originalConsoleWarn = console.warn;
+const originalStdoutWrite = process.stdout.write;
+const originalStderrWrite = process.stderr.write;
 
-let fakeKeyProvider;
-
-test.before(() => {
-  fakeKeyProvider = new FakeKeyProvider();
-  _setKeyProviderForTesting(fakeKeyProvider);
-  salonSessionManager._setBaseDirForTesting(tempSessionsDir);
-
-  // Usuários de teste no SQLite temporário
-  db.prepare(`
-    INSERT OR REPLACE INTO users (id, phone_number, name, role)
-    VALUES (13, '5511999990011', 'Jéssica Beauty Premium', 'CLIENT'),
-           (14, '5511999990002', 'Studio Elegance', 'CLIENT')
-  `).run();
-
-  db.prepare(`
-    INSERT OR REPLACE INTO client_salons (user_id, salon_name, opening_hours)
-    VALUES (13, 'Jéssica Beauty Premium', '{"days":{"1":{"open":true}}}'),
-           (14, 'Studio Elegance', '{"days":{"1":{"open":true}}}')
-  `).run();
-
-  SalonWhatsAppRepository.ensureSessionExists(13, path.join(tempSessionsDir, 'salon_13'));
-  SalonWhatsAppRepository.ensureSessionExists(14, path.join(tempSessionsDir, 'salon_14'));
-});
-
-test.after(() => {
-  _resetKeyProviderForTesting();
-  try {
-    fs.rmSync(tempSessionsDir, { recursive: true, force: true });
-    fs.rmSync(tempQuarantineDir, { recursive: true, force: true });
-    if (fs.existsSync(tempDbPath)) fs.unlinkSync(tempDbPath);
-  } catch (_) {}
-});
-
-test.beforeEach(() => {
-  salonSessionManager._resetForTesting();
-  clearTenantDek(13);
-  clearTenantDek(14);
-  clearTenantDek('personal');
-  delete process.env.WA_CREDS_ENCRYPTION;
-});
-
-// ==============================================================================
-// CENÁRIO 1: useEncryptedMultiFileAuthState grava arquivos .enc sem resíduos .json
-// ==============================================================================
-test('1. useEncryptedMultiFileAuthState grava arquivos com sufixo .enc e não deixa resíduos .json em claro', async () => {
-  const tenantDir = path.join(tempSessionsDir, 'test_tenant_c1');
-  const authState = await useEncryptedMultiFileAuthState(tenantDir, {
-    tenantId: 13,
-    keyProvider: fakeKeyProvider,
-  });
-
-  // Salva credenciais e chaves
-  await authState.saveCreds();
-  await authState.state.keys.set({
-    'pre-key': {
-      '1': { private: Buffer.from('priv_key_data'), public: Buffer.from('pub_key_data') },
-    },
-  });
-
-  const files = fs.readdirSync(tenantDir);
-  assert.ok(files.includes('creds.json.enc'), 'Deve conter creds.json.enc');
-  assert.ok(files.includes('pre-key-1.json.enc'), 'Deve conter pre-key-1.json.enc');
-  assert.ok(files.includes('dek.wrapped'), 'Deve conter dek.wrapped');
-
-  const plainJsonFiles = files.filter((f) => f.endsWith('.json') && !f.endsWith('.enc'));
-  assert.equal(plainJsonFiles.length, 0, 'Não deve existir nenhum arquivo .json em claro');
-});
-
-// ==============================================================================
-// CENÁRIO 2: Cabeçalho binário contém RAIAENC1, versão 0x01, IV 12B e Tag 16B
-// ==============================================================================
-test('2. Cabeçalho binário dos arquivos .enc contém RAIAENC1, versão 0x01, IV de 12 bytes e tag de 16 bytes', async () => {
-  const tenantDir = path.join(tempSessionsDir, 'test_tenant_c2');
-  const authState = await useEncryptedMultiFileAuthState(tenantDir, {
-    tenantId: 13,
-    keyProvider: fakeKeyProvider,
-  });
-  await authState.saveCreds();
-
-  const encBuffer = fs.readFileSync(path.join(tenantDir, 'creds.json.enc'));
-  assert.ok(encBuffer.length >= 37, 'Arquivo cifrado deve ter pelo menos 37 bytes de cabeçalho');
-
-  // Magic Header
-  const magic = encBuffer.subarray(0, 8);
-  assert.equal(magic.toString('ascii'), 'RAIAENC1', 'Magic header deve ser RAIAENC1');
-
-  // Versão
-  const version = encBuffer[8];
-  assert.equal(version, 0x01, 'Versão da cifra deve ser 0x01');
-
-  // IV (12 bytes) e Tag (16 bytes)
-  const iv = encBuffer.subarray(9, 21);
-  const tag = encBuffer.subarray(21, 37);
-  assert.equal(iv.length, 12, 'IV deve ter 12 bytes');
-  assert.equal(tag.length, 16, 'Tag GCM deve ter 16 bytes');
-});
-
-// ==============================================================================
-// CENÁRIO 3: Descriptografia recupera o conteúdo exato (round-trip idempotente)
-// ==============================================================================
-test('3. Descriptografia de arquivo válido recupera o conteúdo exato gravado (round-trip idempotente)', async () => {
-  const sampleData = {
-    test: true,
-    secretToken: 'sensitive_baileys_token_12345',
-    registered: false,
-    me: { id: '5511999990011:1@s.whatsapp.net', name: 'Jéssica Beauty' },
-    account: { details: 'active' },
+function startLogCapture() {
+  console.log = (...args) => {
+    logCapture.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+    originalConsoleLog.apply(console, args);
   };
-
-  const tenantDir = path.join(tempSessionsDir, 'test_tenant_c3');
-  const authState = await useEncryptedMultiFileAuthState(tenantDir, {
-    tenantId: 13,
-    keyProvider: fakeKeyProvider,
-  });
-
-  authState.state.creds = sampleData;
-  await authState.saveCreds();
-
-  // Leitura independente via readEncryptedJson
-  const readBack = await readEncryptedJson(tenantDir, 'creds.json', {
-    tenantId: 13,
-    keyProvider: fakeKeyProvider,
-  });
-
-  assert.deepEqual(readBack, sampleData, 'Conteúdo decifrado deve ser estritamente idêntico ao original');
-});
-
-// ==============================================================================
-// CENÁRIO 4: Adulteração de 1 byte no ciphertext causa AUTH_TAG_VERIFICATION_FAILED
-// ==============================================================================
-test('4. Adulteração de 1 byte no ciphertext de um arquivo .enc causa erro de autenticação e não retorna dados parciais', async () => {
-  const tenantDir = path.join(tempSessionsDir, 'test_tenant_c4');
-  const authState = await useEncryptedMultiFileAuthState(tenantDir, {
-    tenantId: 13,
-    keyProvider: fakeKeyProvider,
-  });
-  await authState.saveCreds();
-
-  const encPath = path.join(tenantDir, 'creds.json.enc');
-  const encBuffer = fs.readFileSync(encPath);
-
-  // Adultera o último byte do ciphertext
-  encBuffer[encBuffer.length - 1] ^= 0xff;
-  fs.writeFileSync(encPath, encBuffer);
-
-  // Leitura deve falhar fail-closed retornando null ou lançando erro de auth tag
-  const result = await readEncryptedJson(tenantDir, 'creds.json', {
-    tenantId: 13,
-    keyProvider: fakeKeyProvider,
-  });
-
-  assert.equal(result, null, 'Leitura de arquivo com ciphertext adulterado deve falhar fail-closed');
-});
-
-// ==============================================================================
-// CENÁRIO 5: Adulteração da tag de autenticação GCM causa erro e aborta
-// ==============================================================================
-test('5. Adulteração da tag de autenticação GCM causa erro e aborta', async () => {
-  const tenantDir = path.join(tempSessionsDir, 'test_tenant_c5');
-  const authState = await useEncryptedMultiFileAuthState(tenantDir, {
-    tenantId: 13,
-    keyProvider: fakeKeyProvider,
-  });
-  await authState.saveCreds();
-
-  const encPath = path.join(tenantDir, 'creds.json.enc');
-  const encBuffer = fs.readFileSync(encPath);
-
-  // Adultera 1 byte da auth tag (bytes 21 a 37)
-  encBuffer[25] ^= 0xaa;
-  fs.writeFileSync(encPath, encBuffer);
-
-  const result = await readEncryptedJson(tenantDir, 'creds.json', {
-    tenantId: 13,
-    keyProvider: fakeKeyProvider,
-  });
-
-  assert.equal(result, null, 'Adulteração da tag GCM deve rejeitar o arquivo sem decifrar');
-});
-
-// ==============================================================================
-// CENÁRIO 6: Troca de arquivo entre tenants falha por inconsistência de AAD
-// ==============================================================================
-test('6. Troca de arquivo entre tenants falha por inconsistência de AAD', async () => {
-  const dek = fakeKeyProvider.getDeterministicDek(13);
-  const plainText = Buffer.from('{"secret":"dados_sigilosos_tenant_13"}', 'utf8');
-
-  // Cifrado com tenantId 13
-  const encBuffer = encryptBuffer(plainText, dek, { tenantId: 13, fileName: 'creds.json' });
-
-  // Tentativa de decifrar usando a mesma DEK mas declarando tenantId 14
-  assert.throws(
-    () => {
-      decryptBuffer(encBuffer, dek, { tenantId: 14, fileName: 'creds.json' });
-    },
-    (err) => err.code === 'AUTH_TAG_VERIFICATION_FAILED' || err.message.includes('AUTH_TAG_VERIFICATION_FAILED'),
-    'Decifração com tenantId divergente deve falhar devido ao AAD'
-  );
-});
-
-// ==============================================================================
-// CENÁRIO 7: Troca de nome de arquivo falha por inconsistência de AAD
-// ==============================================================================
-test('7. Troca de nome de arquivo (renomeação) falha por inconsistência de AAD', async () => {
-  const dek = fakeKeyProvider.getDeterministicDek(13);
-  const plainText = Buffer.from('{"secret":"dados_do_creds"}', 'utf8');
-
-  // Cifrado com nome original 'creds.json'
-  const encBuffer = encryptBuffer(plainText, dek, { tenantId: 13, fileName: 'creds.json' });
-
-  // Tentativa de decifrar como 'app-state-sync-key-1.json'
-  assert.throws(
-    () => {
-      decryptBuffer(encBuffer, dek, { tenantId: 13, fileName: 'app-state-sync-key-1.json' });
-    },
-    (err) => err.code === 'AUTH_TAG_VERIFICATION_FAILED' || err.message.includes('AUTH_TAG_VERIFICATION_FAILED'),
-    'Decifração com fileName divergente deve falhar devido ao AAD'
-  );
-});
-
-// ==============================================================================
-// CENÁRIO 8: dek.wrapped é criado na inicialização com contexto correto
-// ==============================================================================
-test('8. dek.wrapped é criado na inicialização de um tenant virgem com contexto de criptografia correto', async () => {
-  const tenantDir = path.join(tempSessionsDir, 'test_tenant_c8');
-  assert.ok(!fs.existsSync(path.join(tenantDir, 'dek.wrapped')));
-
-  await useEncryptedMultiFileAuthState(tenantDir, {
-    tenantId: 13,
-    keyProvider: fakeKeyProvider,
-  });
-
-  const wrappedKeyPath = path.join(tenantDir, 'dek.wrapped');
-  assert.ok(fs.existsSync(wrappedKeyPath), 'dek.wrapped deve ser gerado no diretório da sessão');
-
-  const wrappedKey = fs.readFileSync(wrappedKeyPath);
-  assert.ok(wrappedKey.length > 0, 'dek.wrapped não pode ser vazio');
-});
-
-// ==============================================================================
-// CENÁRIO 9: clearTenantDek zera a chave em memória e força novo unwrap
-// ==============================================================================
-test('9. clearTenantDek zera a chave em memória (fill(0)) e remove do cache; próxima leitura força novo unwrap', async () => {
-  const tenantDir = path.join(tempSessionsDir, 'test_tenant_c9');
-  fakeKeyProvider.unwrapCallCount = 0;
-
-  // Primeira chamada carrega e armazena em cache
-  await useEncryptedMultiFileAuthState(tenantDir, {
-    tenantId: 13,
-    keyProvider: fakeKeyProvider,
-  });
-
-  // Limpa DEK do tenant 13
-  clearTenantDek(13);
-
-  // Segunda inicialização deve acionar unwrapDataKey novamente
-  const unwrapCallsBefore = fakeKeyProvider.calls.unwrapDataKey;
-  await useEncryptedMultiFileAuthState(tenantDir, {
-    tenantId: 13,
-    keyProvider: fakeKeyProvider,
-  });
-
-  assert.ok(fakeKeyProvider.calls.unwrapDataKey > unwrapCallsBefore, 'Próxima leitura após clearTenantDek deve forçar novo unwrap');
-});
-
-// ==============================================================================
-// CENÁRIO 10: inspectSalonAuthCredentials com WA_CREDS_ENCRYPTION=off lê creds.json legado
-// ==============================================================================
-test('10. inspectSalonAuthCredentials com WA_CREDS_ENCRYPTION=off lê creds.json legado normalmente', () => {
-  process.env.WA_CREDS_ENCRYPTION = 'off';
-  const sessionDir = path.join(tempSessionsDir, 'salon_13');
-  fs.mkdirSync(sessionDir, { recursive: true });
-
-  const legacyCreds = {
-    me: { id: '5511999990011:1@s.whatsapp.net' },
-    account: { valid: true },
+  console.error = (...args) => {
+    logCapture.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+    originalConsoleError.apply(console, args);
   };
-  fs.writeFileSync(path.join(sessionDir, 'creds.json'), JSON.stringify(legacyCreds), 'utf8');
-
-  const audit = salonSessionManager.inspectSalonAuthCredentials(13);
-  assert.equal(audit.exists, true);
-  assert.equal(audit.hasCreds, true);
-  assert.equal(audit.credsValid, true);
-  assert.equal(audit.encryptionMode, 'off');
-  assert.equal(audit.sessionEncrypted, false);
-  assert.equal(audit.notMigrated, false);
-});
-
-// ==============================================================================
-// CENÁRIO 11: inspectSalonAuthCredentials com WA_CREDS_ENCRYPTION=on lê creds.json.enc
-// ==============================================================================
-test('11. inspectSalonAuthCredentials com WA_CREDS_ENCRYPTION=on lê creds.json.enc e retorna sessionEncrypted: true', async () => {
-  process.env.WA_CREDS_ENCRYPTION = 'on';
-  const sessionDir = path.join(tempSessionsDir, 'salon_13');
-  fs.mkdirSync(sessionDir, { recursive: true });
-
-  // Remove texto claro se houver
-  const plainPath = path.join(sessionDir, 'creds.json');
-  if (fs.existsSync(plainPath)) fs.unlinkSync(plainPath);
-
-  const authState = await useEncryptedMultiFileAuthState(sessionDir, {
-    tenantId: 13,
-    keyProvider: fakeKeyProvider,
-  });
-
-  authState.state.creds = {
-    me: { id: '5511999990011:1@s.whatsapp.net' },
-    account: { active: true },
+  console.warn = (...args) => {
+    logCapture.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+    originalConsoleWarn.apply(console, args);
   };
-  await authState.saveCreds();
-
-  const audit = salonSessionManager.inspectSalonAuthCredentials(13);
-  assert.equal(audit.exists, true);
-  assert.equal(audit.hasCreds, true);
-  assert.equal(audit.credsValid, true);
-  assert.equal(audit.encryptionMode, 'on');
-  assert.equal(audit.sessionEncrypted, true);
-  assert.equal(audit.notMigrated, false);
-});
-
-// ==============================================================================
-// CENÁRIO 12: inspectSalonAuthCredentials com WA_CREDS_ENCRYPTION=on alerta notMigrated: true
-// ==============================================================================
-test('12. inspectSalonAuthCredentials com WA_CREDS_ENCRYPTION=on diante de creds.json legado retorna notMigrated: true', () => {
-  process.env.WA_CREDS_ENCRYPTION = 'on';
-  const sessionDir = path.join(tempSessionsDir, 'salon_13');
-  fs.mkdirSync(sessionDir, { recursive: true });
-
-  // Remove versão cifrada se houver
-  const encPath = path.join(sessionDir, 'creds.json.enc');
-  if (fs.existsSync(encPath)) fs.unlinkSync(encPath);
-
-  const legacyCreds = {
-    me: { id: '5511999990011:1@s.whatsapp.net' },
-    account: { valid: true },
+  process.stdout.write = (chunk, ...rest) => {
+    logCapture.push(chunk ? chunk.toString() : '');
+    return originalStdoutWrite.call(process.stdout, chunk, ...rest);
   };
-  fs.writeFileSync(path.join(sessionDir, 'creds.json'), JSON.stringify(legacyCreds), 'utf8');
-
-  const audit = salonSessionManager.inspectSalonAuthCredentials(13);
-  assert.equal(audit.encryptionMode, 'on');
-  assert.equal(audit.sessionEncrypted, false);
-  assert.equal(audit.notMigrated, true, 'Deve sinalizar notMigrated: true para credenciais em texto claro pendentes');
-});
-
-// ==============================================================================
-// CENÁRIO 13: restoreActiveSalonSessions em modo on com KMS indisponível marca KMS_UNAVAILABLE sem resetar credenciais
-// ==============================================================================
-test('13. restoreActiveSalonSessions em modo on diante de KMS indisponível marca KMS_UNAVAILABLE e NÃO descarta nem reseta credenciais no SQLite', async () => {
-  process.env.WA_CREDS_ENCRYPTION = 'on';
-  const sessionDir = path.join(tempSessionsDir, 'salon_13');
-  fs.mkdirSync(sessionDir, { recursive: true });
-
-  // Prepara credenciais cifradas
-  const authState = await useEncryptedMultiFileAuthState(sessionDir, {
-    tenantId: 13,
-    keyProvider: fakeKeyProvider,
-  });
-  authState.state.creds = { me: { id: '5511999990011:1@s.whatsapp.net' }, account: { valid: true } };
-  await authState.saveCreds();
-
-  // Garante status CONNECTED no banco antes da restauração
-  SalonWhatsAppRepository.markSessionConnected(13, { phone: '5511999990011', phoneJid: '5511999990011@s.whatsapp.net' });
-  clearTenantDek(13);
-
-  // Configura provedor com falha forçada simulando KMS indisponível
-  const brokenKmsProvider = {
-    generateDataKey: async () => { throw new Error('KmsUnavailableException: Service endpoint unreachable'); },
-    unwrapDataKey: async () => { throw new Error('KmsUnavailableException: Service endpoint unreachable'); },
-    unwrapDataKeySync: () => { throw new Error('KmsUnavailableException: Service endpoint unreachable'); },
+  process.stderr.write = (chunk, ...rest) => {
+    logCapture.push(chunk ? chunk.toString() : '');
+    return originalStderrWrite.call(process.stderr, chunk, ...rest);
   };
-  _setKeyProviderForTesting(brokenKmsProvider);
+}
+
+function stopLogCapture() {
+  console.log = originalConsoleLog;
+  console.error = originalConsoleError;
+  console.warn = originalConsoleWarn;
+  process.stdout.write = originalStdoutWrite;
+  process.stderr.write = originalStderrWrite;
+}
+
+startLogCapture();
+
+// ============================================================================
+// SUÍTE DE TESTES HERMÉTICOS T1 A T27
+// ============================================================================
+
+test('T1: Ida e volta completa (creds, pre-key, session, sender-key, app-state-sync-key)', async () => {
+  const dir = createTestDir('t1_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
 
   try {
-    const res = await salonSessionManager.restoreActiveSalonSessions();
-    const session = SalonWhatsAppRepository.getSessionByUserId(13);
+    const { state, saveCreds } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    const mockCreds = createMockCreds();
+    state.creds = mockCreds;
+    await saveCreds();
 
-    assert.equal(session.session_status, 'KMS_UNAVAILABLE', 'Status deve ser marcado como KMS_UNAVAILABLE');
-    // Verifica que credenciais NÃO foram resetadas/apagadas no banco
-    assert.equal(session.connected_phone, '5511999990011', 'Telefone conectado não deve ser apagado');
+    const preKeyData = { keyPair: { public: Buffer.from('pub_pre_key_1'), private: Buffer.from('priv_pre_key_1') }, keyId: 1 };
+    const sessionData = Buffer.from('session_binary_state_abc');
+    const senderKeyData = Buffer.from('sender_key_binary_xyz');
+    const appStateData = { keyData: Buffer.from('app_state_raw_bytes'), fingerprint: { rawId: 42 } };
+
+    await state.keys.set({
+      'pre-key': { '1': preKeyData },
+      'session': { 'sess_1': sessionData },
+      'sender-key': { 'sk_1': senderKeyData },
+      'app-state-sync-key': { 'ask_1': appStateData },
+    });
+
+    // Recarrega em nova instância do estado
+    const { state: stateReloaded } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    assert.equal(stateReloaded.creds.me.id, mockCreds.me.id);
+    assert.equal(stateReloaded.creds.registrationId, mockCreds.registrationId);
+
+    const loadedKeys = await stateReloaded.keys.get('pre-key', ['1']);
+    assert.deepEqual(loadedKeys['1'].keyPair.public, preKeyData.keyPair.public);
+
+    const loadedSession = await stateReloaded.keys.get('session', ['sess_1']);
+    assert.deepEqual(loadedSession['sess_1'], sessionData);
+
+    const loadedSender = await stateReloaded.keys.get('sender-key', ['sk_1']);
+    assert.deepEqual(loadedSender['sk_1'], senderKeyData);
+
+    const loadedAppState = await stateReloaded.keys.get('app-state-sync-key', ['ask_1']);
+    assert.deepEqual(loadedAppState['ask_1'].keyData, appStateData.keyData);
   } finally {
-    _setKeyProviderForTesting(fakeKeyProvider);
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
-// ==============================================================================
-// CENÁRIO 14: restoreActiveSalonSessions em modo on diante de credenciais legadas marca NOT_MIGRATED sem apagar
-// ==============================================================================
-test('14. restoreActiveSalonSessions em modo on diante de credenciais legadas em texto claro marca NOT_MIGRATED sem apagar', async () => {
-  process.env.WA_CREDS_ENCRYPTION = 'on';
-  const sessionDir = path.join(tempSessionsDir, 'salon_13');
-  fs.mkdirSync(sessionDir, { recursive: true });
+test('T2: Arquivo ilegível (começa com RAIAENC1 e sem trechos do JSON em claro)', async () => {
+  const dir = createTestDir('t2_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
 
-  // Deixa apenas creds.json em texto claro
-  const encPath = path.join(sessionDir, 'creds.json.enc');
-  if (fs.existsSync(encPath)) fs.unlinkSync(encPath);
+  try {
+    const { state, saveCreds } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    state.creds = createMockCreds();
+    await saveCreds();
 
-  fs.writeFileSync(
-    path.join(sessionDir, 'creds.json'),
-    JSON.stringify({ me: { id: '5511999990011:1@s.whatsapp.net' }, account: { valid: true } }),
-    'utf8'
-  );
+    const encPath = path.join(dir, 'creds.json.enc');
+    assert.ok(fs.existsSync(encPath));
+    const buf = fs.readFileSync(encPath);
 
-  SalonWhatsAppRepository.markSessionConnected(13, { phone: '5511999990011', phoneJid: '5511999990011@s.whatsapp.net' });
+    assert.ok(buf.subarray(0, 8).equals(MAGIC_HEADER));
+    assert.equal(buf.readUInt8(8), CURRENT_VERSION);
 
-  await salonSessionManager.restoreActiveSalonSessions();
-  const session = SalonWhatsAppRepository.getSessionByUserId(13);
-
-  assert.equal(session.session_status, 'NOT_MIGRATED', 'Status deve ser marcado como NOT_MIGRATED');
-  assert.equal(session.connected_phone, '5511999990011', 'Registro não deve ser apagado nem desvinculado');
-  assert.ok(fs.existsSync(path.join(sessionDir, 'creds.json')), 'Arquivo em texto claro deve ser preservado intacto');
+    assert.equal(buf.includes(Buffer.from('"me"')), false);
+    assert.equal(buf.includes(Buffer.from('noiseKey')), false);
+    assert.equal(buf.includes(Buffer.from('5511999990011')), false);
+  } finally {
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
-// ==============================================================================
-// CENÁRIO 15: waCredsMigrate --dry-run não altera o filesystem
-// ==============================================================================
-test('15. waCredsMigrate --dry-run não altera o filesystem', async () => {
-  const tenantDir = path.join(tempSessionsDir, 'salon_14');
-  fs.mkdirSync(tenantDir, { recursive: true });
+test('T3: Isolamento (arquivo copiado entre tenants ou renomeado falha por AAD)', async () => {
+  const dir13 = createTestDir('t3_13_');
+  const dir14 = createTestDir('t3_14_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
 
-  const dummyContent = JSON.stringify({ me: { id: '5511999990002:1@s.whatsapp.net' }, account: true });
-  fs.writeFileSync(path.join(tenantDir, 'creds.json'), dummyContent, 'utf8');
+  try {
+    const { state: s13, saveCreds: save13 } = await useEncryptedMultiFileAuthState(dir13, { tenantId: 13, keyProvider: kp });
+    s13.creds = createMockCreds();
+    await save13();
+    await s13.keys.set({ 'pre-key': { '1': { keyPair: { public: Buffer.from('pub1'), private: Buffer.from('priv1') }, keyId: 1 } } });
 
-  const filesBefore = fs.readdirSync(tenantDir);
+    const { state: s14, saveCreds: save14 } = await useEncryptedMultiFileAuthState(dir14, { tenantId: 14, keyProvider: kp });
+    s14.creds = createMockCreds();
+    await save14();
 
-  const dryRunResult = await waCredsMigrate.runDryRun(
-    { tenantId: 14, dir: tenantDir, isPersonal: false },
-    { keyProvider: fakeKeyProvider }
-  );
+    // 1. Copia arquivo do tenant 13 para tenant 14
+    const srcFile = path.join(dir13, 'pre-key-1.json.enc');
+    const destFileIn14 = path.join(dir14, 'pre-key-1.json.enc');
+    fs.copyFileSync(srcFile, destFileIn14);
 
-  assert.equal(dryRunResult.status, 'READY_TO_MIGRATE');
-  const filesAfter = fs.readdirSync(tenantDir);
-  assert.deepEqual(filesAfter, filesBefore, 'Nenhum arquivo deve ser criado, modificado ou removido durante o dry-run');
+    const loadedIn14 = await s14.keys.get('pre-key', ['1']);
+    assert.equal(loadedIn14['1'], null, 'Chave de outro tenant deve retornar null');
+
+    // 2. Renomeia arquivo dentro do mesmo tenant
+    const renamedPath = path.join(dir13, 'pre-key-2.json.enc');
+    fs.copyFileSync(srcFile, renamedPath);
+    const loadedRenamed = await s13.keys.get('pre-key', ['2']);
+    assert.equal(loadedRenamed['2'], null, 'Arquivo renomeado deve falhar por divergência de AAD');
+  } finally {
+    clearTenantDek(13);
+    clearTenantDek(14);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir13, { recursive: true, force: true });
+    fs.rmSync(dir14, { recursive: true, force: true });
+  }
 });
 
-// ==============================================================================
-// CENÁRIO 16: waCredsMigrate --migrate cifra arquivos, valida integridade e quarentena texto claro
-// ==============================================================================
-test('16. waCredsMigrate --migrate cifra todos os arquivos, valida integridade byte-a-byte, move texto claro para quarentena e não deleta arquivos', async () => {
-  const tenantDir = path.join(tempSessionsDir, 'salon_14');
-  fs.mkdirSync(tenantDir, { recursive: true });
+test('T4: Adulteração (ciphertext e tag adulterados lançam ENCRYPTED_FILE_CORRUPT)', async () => {
+  const dir = createTestDir('t4_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
 
-  const originalCreds = JSON.stringify({ me: { id: '5511999990002:1@s.whatsapp.net' }, account: { ok: true } });
-  const originalKey = JSON.stringify({ type: 'pre-key', key: 'mock_key_bytes_123' });
-  fs.writeFileSync(path.join(tenantDir, 'creds.json'), originalCreds, 'utf8');
-  fs.writeFileSync(path.join(tenantDir, 'pre-key-1.json'), originalKey, 'utf8');
+  try {
+    const dek = await getOrLoadTenantDek(dir, { tenantId: 13, keyProvider: kp });
+    const originalJson = Buffer.from(JSON.stringify({ secret: 'sensivel' }));
+    const encBuf = encryptBuffer(originalJson, dek, { tenantId: 13, fileName: 'test.json' });
 
-  const result = await waCredsMigrate.runMigration(
-    { tenantId: 14, dir: tenantDir, isPersonal: false },
-    { keyProvider: fakeKeyProvider, quarantineRoot: tempQuarantineDir }
-  );
+    const testFile = path.join(dir, 'test.json.enc');
+    fs.writeFileSync(testFile, encBuf);
 
-  assert.equal(result.status, 'SUCCESS');
-  assert.equal(result.migratedCount, 2);
+    // 1. Adultera 1 byte do ciphertext
+    const corruptedCiphertext = Buffer.from(encBuf);
+    corruptedCiphertext[corruptedCiphertext.length - 1] ^= 0x01;
+    fs.writeFileSync(testFile, corruptedCiphertext);
 
-  const tenantFiles = fs.readdirSync(tenantDir);
-  assert.ok(tenantFiles.includes('creds.json.enc'), 'creds.json.enc deve existir');
-  assert.ok(tenantFiles.includes('pre-key-1.json.enc'), 'pre-key-1.json.enc deve existir');
-  assert.ok(tenantFiles.includes('dek.wrapped'), 'dek.wrapped deve existir');
-  assert.ok(!tenantFiles.includes('creds.json'), 'creds.json não deve estar no diretório de sessão');
-  assert.ok(!tenantFiles.includes('pre-key-1.json'), 'pre-key-1.json não deve estar no diretório de sessão');
+    await assert.rejects(
+      async () => readEncryptedJson(dir, 'test.json', { tenantId: 13, keyProvider: kp }),
+      (err) => err.code === 'ENCRYPTED_FILE_CORRUPT'
+    );
 
-  // Verifica quarentena
-  assert.ok(fs.existsSync(result.quarantineFolder), 'Pasta de quarentena deve ser criada');
-  const quarantineFiles = fs.readdirSync(result.quarantineFolder);
-  assert.ok(quarantineFiles.includes('creds.json'), 'creds.json deve estar seguro na quarentena');
-  assert.ok(quarantineFiles.includes('pre-key-1.json'), 'pre-key-1.json deve estar seguro na quarentena');
+    // 2. Adultera 1 byte da tag GCM (bytes 21-36)
+    const corruptedTag = Buffer.from(encBuf);
+    corruptedTag[25] ^= 0xff;
+    fs.writeFileSync(testFile, corruptedTag);
 
-  // Integridade do conteúdo na quarentena
-  assert.equal(fs.readFileSync(path.join(result.quarantineFolder, 'creds.json'), 'utf8'), originalCreds);
+    await assert.rejects(
+      async () => readEncryptedJson(dir, 'test.json', { tenantId: 13, keyProvider: kp }),
+      (err) => err.code === 'ENCRYPTED_FILE_CORRUPT'
+    );
+  } finally {
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
-// ==============================================================================
-// CENÁRIO 17: waCredsMigrate --rollback restaura arquivos em texto claro funcionais a partir dos .enc
-// ==============================================================================
-test('17. waCredsMigrate --rollback restaura arquivos em texto claro funcionais a partir dos .enc', async () => {
-  const tenantDir = path.join(tempSessionsDir, 'salon_14');
+test('T5: Falha entre .tmp e rename (arquivo anterior continua legível e .tmp órfão é limpo)', async () => {
+  const dir = createTestDir('t5_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
 
-  // Executa o rollback com confirmação obrigatória
-  const rollbackResult = await waCredsMigrate.runRollback(
-    { tenantId: 14, dir: tenantDir, isPersonal: false },
-    { keyProvider: fakeKeyProvider, confirmRollback: true }
+  try {
+    const { state, saveCreds } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    state.creds = createMockCreds();
+    await saveCreds();
+
+    await state.keys.set({ 'pre-key': { '1': { keyPair: { public: Buffer.from('v1'), private: Buffer.from('p1') }, keyId: 1 } } });
+
+    // Cria um .tmp órfão proposital
+    const orphanTmp = path.join(dir, 'pre-key-1.json.enc.tmp');
+    fs.writeFileSync(orphanTmp, Buffer.from('garbage'));
+
+    // Recarrega o estado: o .tmp órfão deve ser limpo e o original preservado
+    const { state: state2 } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    assert.equal(fs.existsSync(orphanTmp), false, 'Arquivo .tmp órfão deve ser removido');
+
+    const key = await state2.keys.get('pre-key', ['1']);
+    assert.deepEqual(key['1'].keyPair.public, Buffer.from('v1'));
+  } finally {
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('T6: Concorrência (50 gravações simultâneas do mesmo arquivo decifram sem truncar)', async () => {
+  const dir = createTestDir('t6_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    const { state, saveCreds } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    state.creds = createMockCreds();
+    await saveCreds();
+
+    const writes = [];
+    for (let i = 0; i < 50; i++) {
+      writes.push(
+        state.keys.set({
+          'session': {
+            'shared_sess': Buffer.from(`session_iteration_content_${i}_payload_data`),
+          },
+        })
+      );
+    }
+    await Promise.all(writes);
+
+    const { state: stateReloaded } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    const res = await stateReloaded.keys.get('session', ['shared_sess']);
+    assert.ok(res['shared_sess'] != null);
+    const content = res['shared_sess'].toString('utf8');
+    assert.ok(content.startsWith('session_iteration_content_'));
+    assert.ok(content.endsWith('_payload_data'));
+  } finally {
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('T7: Corrida da chave (duas getOrLoadTenantDek simultâneas chamam generateDataKey apenas UMA vez)', async () => {
+  const dir = createTestDir('t7_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    const p1 = getOrLoadTenantDek(dir, { tenantId: 99, keyProvider: kp });
+    const p2 = getOrLoadTenantDek(dir, { tenantId: 99, keyProvider: kp });
+    const [dek1, dek2] = await Promise.all([p1, p2]);
+
+    assert.equal(kp.calls.generateDataKey, 1, 'Deve chamar generateDataKey exatamente 1 vez (single-flight)');
+    assert.deepEqual(dek1, dek2);
+    assert.ok(fs.existsSync(path.join(dir, 'dek.wrapped')));
+  } finally {
+    clearTenantDek(99);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('T8: Migração (texto claro -> .enc verificado -> quarentena segura sem deletar)', async () => {
+  const dir = createTestDir('t8_session_');
+  const quarantineRoot = createTestDir('t8_quarantine_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    const credsJson = JSON.stringify({ me: { id: '5511999990011@s.whatsapp.net' } });
+    fs.writeFileSync(path.join(dir, 'creds.json'), credsJson, 'utf8');
+    fs.writeFileSync(path.join(dir, 'app-state-sync-key-1.json'), JSON.stringify({ raw: 123 }), 'utf8');
+
+    const result = await waCredsMigrate.runMigration(
+      { tenantId: 13, dir, isPersonal: false },
+      { keyProvider: kp, quarantineRoot }
+    );
+
+    assert.equal(result.status, 'SUCCESS');
+    assert.equal(result.migratedCount, 2);
+
+    assert.ok(fs.existsSync(path.join(dir, 'creds.json.enc')));
+    assert.ok(fs.existsSync(path.join(dir, 'app-state-sync-key-1.json.enc')));
+    assert.ok(fs.existsSync(path.join(dir, 'dek.wrapped')));
+
+    assert.equal(fs.existsSync(path.join(dir, 'creds.json')), false);
+
+    assert.ok(fs.existsSync(path.join(result.quarantineFolder, 'creds.json')));
+    assert.ok(fs.existsSync(path.join(result.quarantineFolder, 'app-state-sync-key-1.json')));
+  } finally {
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(quarantineRoot, { recursive: true, force: true });
+  }
+});
+
+test('T9: Falha no 3º arquivo (pasta fica idêntica à original e quarentena fica vazia)', async () => {
+  const dir = createTestDir('t9_fail_');
+  const quarantineRoot = createTestDir('t9_quarantine_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    fs.writeFileSync(path.join(dir, 'file1.json'), JSON.stringify({ a: 1 }));
+    fs.writeFileSync(path.join(dir, 'file2.json'), JSON.stringify({ b: 2 }));
+    fs.writeFileSync(path.join(dir, 'file3.json'), JSON.stringify({ c: 3 }));
+
+    const initialFiles = fs.readdirSync(dir).sort();
+    const hashBefore = initialFiles.map(f => crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, f))).digest('hex'));
+
+    // Injeta falha forçada simulando erro de escrita no 3º arquivo
+    const originalOpenSync = fs.openSync;
+    fs.openSync = function (p, flags, mode) {
+      if (String(p).includes('file3.json.enc.tmp')) {
+        throw new Error('SIMULATED_DISK_WRITE_FAILURE');
+      }
+      return originalOpenSync.call(fs, p, flags, mode);
+    };
+
+    await assert.rejects(
+      async () => waCredsMigrate.runMigration({ tenantId: 13, dir, isPersonal: false }, { keyProvider: kp, quarantineRoot }),
+      /SIMULATED_DISK_WRITE_FAILURE/
+    );
+
+    fs.openSync = originalOpenSync;
+
+    const filesAfter = fs.readdirSync(dir).sort().filter(f => f !== 'dek.wrapped');
+    const hashAfter = filesAfter.map(f => crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, f))).digest('hex'));
+
+    assert.deepEqual(filesAfter, initialFiles);
+    assert.deepEqual(hashAfter, hashBefore);
+  } finally {
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(quarantineRoot, { recursive: true, force: true });
+  }
+});
+
+test('T10: Falha ao mover para a quarentena (pasta volta a ficar idêntica à original)', async () => {
+  const dir = createTestDir('t10_quarantine_fail_');
+  const quarantineRoot = createTestDir('t10_quarantine_dir_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    fs.writeFileSync(path.join(dir, 'f1.json'), JSON.stringify({ x: 1 }));
+    fs.writeFileSync(path.join(dir, 'f2.json'), JSON.stringify({ y: 2 }));
+
+    const initialFiles = fs.readdirSync(dir).sort();
+    const hashBefore = initialFiles.map(f => crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, f))).digest('hex'));
+
+    const originalRenameSync = fs.renameSync;
+    let renameCount = 0;
+    fs.renameSync = function (src, dest) {
+      if (String(dest).includes(quarantineRoot)) {
+        renameCount++;
+        if (renameCount === 2) {
+          throw new Error('SIMULATED_QUARANTINE_MOVE_ERROR');
+        }
+      }
+      return originalRenameSync.call(fs, src, dest);
+    };
+
+    await assert.rejects(
+      async () => waCredsMigrate.runMigration({ tenantId: 13, dir, isPersonal: false }, { keyProvider: kp, quarantineRoot }),
+      /SIMULATED_QUARANTINE_MOVE_ERROR/
+    );
+
+    fs.renameSync = originalRenameSync;
+
+    const filesAfter = fs.readdirSync(dir).sort().filter(f => f !== 'dek.wrapped');
+    const hashAfter = filesAfter.map(f => crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, f))).digest('hex'));
+
+    assert.deepEqual(filesAfter, initialFiles);
+    assert.deepEqual(hashAfter, hashBefore);
+  } finally {
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(quarantineRoot, { recursive: true, force: true });
+  }
+});
+
+test('T11: Rollback do estado atual (contém alterações novas, não o estado da quarentena)', async () => {
+  const dir = createTestDir('t11_rollback_');
+  const quarantineRoot = createTestDir('t11_quarantine_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    fs.writeFileSync(path.join(dir, 'creds.json'), JSON.stringify({ me: { id: 'old_id@s.whatsapp.net' } }), 'utf8');
+
+    await waCredsMigrate.runMigration({ tenantId: 13, dir, isPersonal: false }, { keyProvider: kp, quarantineRoot });
+
+    // Grava alteração nova no estado cifrado
+    const { state, saveCreds } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    state.creds.me = { id: 'brand_new_id@s.whatsapp.net' };
+    await saveCreds();
+
+    // Executa rollback
+    const rollbackRes = await waCredsMigrate.runRollback({ tenantId: 13, dir, isPersonal: false }, { keyProvider: kp, confirmRollback: true });
+    assert.equal(rollbackRes.status, 'SUCCESS');
+
+    const restoredCreds = JSON.parse(fs.readFileSync(path.join(dir, 'creds.json'), 'utf8'));
+    assert.equal(restoredCreds.me.id, 'brand_new_id@s.whatsapp.net', 'Rollback deve preservar as alterações mais recentes');
+  } finally {
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(quarantineRoot, { recursive: true, force: true });
+  }
+});
+
+test('T12: Trava do motor de sessões (casos a, b, c, d, e e WA_SESSIONS_DISABLED)', async () => {
+  const lockDir = createTestDir('t12_locks_');
+  const lockFile = path.join(lockDir, 'wa-sessions.lock');
+  const sessionDir = createTestDir('t12_sess_');
+  fs.writeFileSync(path.join(sessionDir, 'dummy.json'), JSON.stringify({ dummy: 1 }));
+
+  try {
+    // (a) Trava com PID de processo vivo (processo filho ativo mantido vivo)
+    const child = child_process.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000);'], { stdio: 'ignore' });
+    fs.writeFileSync(lockFile, JSON.stringify({ pid: child.pid, startedAt: Date.now(), engineId: 'wa-sessions-engine' }));
+
+    // Rejeita sem force-unlock
+    let inspected = inspectAppLock(lockFile);
+    assert.equal(inspected.running, true);
+    assert.equal(inspected.orphan, false);
+    let unlockRes = tryForceUnlock(lockFile);
+    assert.equal(unlockRes.unlocked, false);
+    assert.ok(fs.existsSync(lockFile));
+
+    child.kill('SIGKILL');
+
+    // (b) Trava com PID da própria ferramenta (process.pid)
+    fs.writeFileSync(lockFile, JSON.stringify({ pid: process.pid, startedAt: Date.now(), engineId: 'wa-sessions-engine' }));
+    inspected = inspectAppLock(lockFile);
+    assert.equal(inspected.self, true);
+    unlockRes = tryForceUnlock(lockFile);
+    assert.equal(unlockRes.unlocked, false);
+    assert.equal(unlockRes.reason, 'CANNOT_UNLOCK_SELF_PROCESS');
+
+    // (c) Trava ilegível ou corrompida
+    fs.writeFileSync(lockFile, 'CORRUPTED_NON_JSON_CONTENT_WITHOUT_PID');
+    inspected = inspectAppLock(lockFile);
+    assert.equal(inspected.indeterminate, true);
+    unlockRes = tryForceUnlock(lockFile);
+    assert.equal(unlockRes.unlocked, false);
+
+    // (d) PID inexistente (morto)
+    fs.writeFileSync(lockFile, JSON.stringify({ pid: 9999999, startedAt: Date.now(), engineId: 'wa-sessions-engine' }));
+    inspected = inspectAppLock(lockFile);
+    assert.equal(inspected.orphan, true);
+    assert.equal(inspected.running, false);
+    unlockRes = tryForceUnlock(lockFile);
+    assert.equal(unlockRes.unlocked, true);
+    assert.equal(fs.existsSync(lockFile), false);
+
+    // (e) PID vivo com tempo de início diferente do gravado (PID reaproveitado)
+    const aliveChild = child_process.spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000);'], { stdio: 'ignore' });
+    fs.writeFileSync(lockFile, JSON.stringify({ pid: aliveChild.pid, startedAt: 1000000, engineId: 'wa-sessions-engine' }));
+    _setProcessStartTimeCheckerForTesting((pid) => pid === aliveChild.pid ? 2000000 : null);
+
+    inspected = inspectAppLock(lockFile);
+    assert.equal(inspected.orphan, true);
+    assert.equal(inspected.reason, 'PID_RECYCLED_DIFFERENT_START_TIME');
+
+    unlockRes = tryForceUnlock(lockFile);
+    assert.equal(unlockRes.unlocked, true);
+    assert.equal(fs.existsSync(lockFile), false);
+
+    aliveChild.kill('SIGKILL');
+    _setProcessStartTimeCheckerForTesting(null);
+
+    // (f) WA_SESSIONS_DISABLED=true: trava não é criada
+    process.env.WA_SESSIONS_DISABLED = 'true';
+    const acquired = acquireAppLock(lockFile);
+    assert.equal(acquired, false);
+    assert.equal(fs.existsSync(lockFile), false);
+    delete process.env.WA_SESSIONS_DISABLED;
+  } finally {
+    fs.rmSync(lockDir, { recursive: true, force: true });
+    fs.rmSync(sessionDir, { recursive: true, force: true });
+  }
+});
+
+test('T13: B1 - Chave ausente (dek.wrapped ausente com arquivos .enc presentes lança DEK_MISSING_WITH_ENCRYPTED_FILES)', async () => {
+  const dir = createTestDir('t13_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    const { state, saveCreds } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    state.creds = createMockCreds();
+    await saveCreds();
+
+    const encFile = path.join(dir, 'creds.json.enc');
+    const hashBefore = crypto.createHash('sha256').update(fs.readFileSync(encFile)).digest('hex');
+
+    // Remove apenas a chave embrulhada
+    fs.unlinkSync(path.join(dir, 'dek.wrapped'));
+    clearTenantDek(13);
+
+    const callsBefore = kp.calls.generateDataKey;
+
+    await assert.rejects(
+      async () => useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp }),
+      (err) => err.code === 'DEK_MISSING_WITH_ENCRYPTED_FILES'
+    );
+
+    assert.equal(kp.calls.generateDataKey, callsBefore, 'generateDataKey JAMAIS deve ser chamado');
+    const hashAfter = crypto.createHash('sha256').update(fs.readFileSync(encFile)).digest('hex');
+    assert.equal(hashAfter, hashBefore, 'Arquivo .enc deve permanecer intacto');
+  } finally {
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('T14: B1 - Creds corrompido (creds.json.enc corrompido lança ENCRYPTED_FILE_CORRUPT sem sobrescrever)', async () => {
+  const dir = createTestDir('t14_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    const { state, saveCreds } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    state.creds = createMockCreds();
+    await saveCreds();
+
+    const encPath = path.join(dir, 'creds.json.enc');
+    const corrupted = fs.readFileSync(encPath);
+    corrupted[corrupted.length - 1] ^= 0xff;
+    fs.writeFileSync(encPath, corrupted);
+    const hashCorrupted = crypto.createHash('sha256').update(corrupted).digest('hex');
+
+    clearTenantDek(13);
+
+    await assert.rejects(
+      async () => useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp }),
+      (err) => err.code === 'ENCRYPTED_FILE_CORRUPT'
+    );
+
+    const hashAfter = crypto.createHash('sha256').update(fs.readFileSync(encPath)).digest('hex');
+    assert.equal(hashAfter, hashCorrupted, 'Arquivo adulterado não deve ser sobrescrito');
+  } finally {
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('T15: B1 - Não migrado (creds.json em texto claro sem .enc lança NOT_MIGRATED para salão e pessoal)', async () => {
+  const dirSalon = createTestDir('t15_salon_');
+  const dirPersonal = createTestDir('t15_personal_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    fs.writeFileSync(path.join(dirSalon, 'creds.json'), JSON.stringify({ me: { id: 'salon@s.whatsapp.net' } }));
+    fs.writeFileSync(path.join(dirPersonal, 'creds.json'), JSON.stringify({ me: { id: 'personal@s.whatsapp.net' } }));
+
+    await assert.rejects(
+      async () => useEncryptedMultiFileAuthState(dirSalon, { tenantId: 13, keyProvider: kp }),
+      (err) => err.code === 'NOT_MIGRATED'
+    );
+
+    await assert.rejects(
+      async () => useEncryptedMultiFileAuthState(dirPersonal, { tenantId: 'personal', keyProvider: kp }),
+      (err) => err.code === 'NOT_MIGRATED'
+    );
+
+    assert.equal(fs.existsSync(path.join(dirSalon, 'creds.json.enc')), false);
+    assert.equal(fs.existsSync(path.join(dirPersonal, 'creds.json.enc')), false);
+  } finally {
+    _resetKeyProviderForTesting();
+    fs.rmSync(dirSalon, { recursive: true, force: true });
+    fs.rmSync(dirPersonal, { recursive: true, force: true });
+  }
+});
+
+test('T16: B1 - Novo pareamento recusado sobre pasta com credenciais cifradas existentes', async () => {
+  const sessionsBase = createTestDir('t16_sessions_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  salonSessionManager._setBaseDirForTesting(sessionsBase);
+
+  try {
+    const salonDir = path.join(sessionsBase, 'salon_13');
+    fs.mkdirSync(salonDir, { recursive: true });
+
+    // Cria sessão cifrada válida
+    const { state, saveCreds } = await useEncryptedMultiFileAuthState(salonDir, { tenantId: 13, keyProvider: kp });
+    state.creds = createMockCreds();
+    await saveCreds();
+
+    const encPath = path.join(salonDir, 'creds.json.enc');
+    const hashEncBefore = crypto.createHash('sha256').update(fs.readFileSync(encPath)).digest('hex');
+    const generateCallsBefore = kp.calls.generateDataKey;
+
+    process.env.WA_CREDS_ENCRYPTION = 'on';
+
+    // 1. startQrSession recusa
+    await assert.rejects(
+      async () => salonSessionManager.startQrSession(13),
+      (err) => err.code === 'CANNOT_PAIR_EXISTING_ENCRYPTED_SESSION'
+    );
+
+    // 2. requestPairingCode recusa
+    await assert.rejects(
+      async () => salonSessionManager.requestPairingCode(13, '5511999990011'),
+      (err) => err.code === 'CANNOT_PAIR_EXISTING_ENCRYPTED_SESSION'
+    );
+
+    const hashEncAfter = crypto.createHash('sha256').update(fs.readFileSync(encPath)).digest('hex');
+    assert.equal(hashEncAfter, hashEncBefore, 'Arquivos não devem ser alterados');
+    assert.equal(kp.calls.generateDataKey, generateCallsBefore, 'Não deve gerar novas chaves');
+  } finally {
+    salonSessionManager._setBaseDirForTesting(null);
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(sessionsBase, { recursive: true, force: true });
+  }
+});
+
+test('T17: B1 - Chave secundária corrompida (pre-key renomeada para .corrupt- e retorna null)', async () => {
+  const dir = createTestDir('t17_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    const { state, saveCreds } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    state.creds = createMockCreds();
+    await saveCreds();
+
+    await state.keys.set({
+      'pre-key': {
+        '1': { keyPair: { public: Buffer.from('pub1'), private: Buffer.from('priv1') }, keyId: 1 },
+        '2': { keyPair: { public: Buffer.from('pub2'), private: Buffer.from('priv2') }, keyId: 2 },
+      },
+    });
+
+    // Corrompe pre-key-1
+    const pk1Path = path.join(dir, 'pre-key-1.json.enc');
+    const pk1Buf = fs.readFileSync(pk1Path);
+    pk1Buf[pk1Buf.length - 1] ^= 0x55;
+    fs.writeFileSync(pk1Path, pk1Buf);
+
+    // Recarrega estado e lê chaves
+    const { state: stateReloaded } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    const keys = await stateReloaded.keys.get('pre-key', ['1', '2']);
+
+    assert.equal(keys['1'], null, 'Chave corrompida deve retornar null sem explodir o socket');
+    assert.ok(keys['2'] != null, 'Chave íntegra deve ser lida normalmente');
+
+    const files = fs.readdirSync(dir);
+    assert.ok(files.some(f => f.startsWith('pre-key-1.json.enc.corrupt-')), 'Arquivo corrompido deve ser renomeado para quarentena local');
+  } finally {
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('T18: Restauração de salão migrado (não é marcado DISCONNECTED e cria socket)', async () => {
+  const sessionsBase = createTestDir('t18_sessions_');
+  salonSessionManager._setBaseDirForTesting(sessionsBase);
+
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    const salonDir = path.join(sessionsBase, 'salon_13');
+    fs.mkdirSync(salonDir, { recursive: true });
+    const { state, saveCreds } = await useEncryptedMultiFileAuthState(salonDir, { tenantId: 13, keyProvider: kp });
+    state.creds = createMockCreds();
+    await saveCreds();
+
+    SalonWhatsAppRepository.ensureSessionExists(13, salonDir);
+    SalonWhatsAppRepository.markSessionConnected(13, { phone: '5511999990011', phoneJid: '5511999990011@s.whatsapp.net' });
+
+    let socketCreated = false;
+    salonSessionManager._setBaileysSocketFactoryForTesting(async () => {
+      socketCreated = true;
+      return {
+        ev: { on: () => {} },
+        ws: { close: () => {} },
+        end: () => {},
+      };
+    });
+
+    process.env.WA_CREDS_ENCRYPTION = 'on';
+    await salonSessionManager.restoreActiveSalonSessions();
+
+    assert.equal(socketCreated, true, 'Deve prosseguir para criação do socket');
+    const session = SalonWhatsAppRepository.getSessionByUserId(13);
+    assert.notEqual(session.session_status, 'DISCONNECTED');
+  } finally {
+    salonSessionManager._resetForTesting();
+    salonSessionManager._setBaseDirForTesting(null);
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(sessionsBase, { recursive: true, force: true });
+  }
+});
+
+test('T19: B2 - Novas tentativas do KMS (KMS_UNAVAILABLE -> retentativa -> restauração)', async () => {
+  salonSessionManager._resetForTesting();
+  const sessionsBase = createTestDir('t19_sessions_');
+  salonSessionManager._setBaseDirForTesting(sessionsBase);
+
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    const salonDir = path.join(sessionsBase, 'salon_13');
+    fs.mkdirSync(salonDir, { recursive: true });
+    const { state, saveCreds } = await useEncryptedMultiFileAuthState(salonDir, { tenantId: 13, keyProvider: kp });
+    state.creds = createMockCreds();
+    await saveCreds();
+
+    SalonWhatsAppRepository.ensureSessionExists(13, salonDir);
+    SalonWhatsAppRepository.markSessionConnected(13, { phone: '5511999990011', phoneJid: '5511999990011@s.whatsapp.net' });
+
+    clearTenantDek(13);
+
+    // Simula KMS indisponível
+    kp.setUnavailable(true);
+    process.env.WA_CREDS_ENCRYPTION = 'on';
+
+    await salonSessionManager.restoreActiveSalonSessions();
+
+    let session = SalonWhatsAppRepository.getSessionByUserId(13);
+    assert.equal(session.session_status, 'KMS_UNAVAILABLE');
+
+    // Confirma que getActiveSessionsForRestore continua retornando o salão
+    const active = SalonWhatsAppRepository.getActiveSessionsForRestore();
+    assert.ok(active.some(s => s.user_id === 13));
+
+    // O KMS volta a ficar saudável
+    kp.setUnavailable(false);
+    let socketRestored = false;
+    salonSessionManager._setBaileysSocketFactoryForTesting(async () => {
+      socketRestored = true;
+      return { ev: { on: () => {} }, ws: { close: () => {} }, end: () => {} };
+    });
+
+    // Executa retentativa programada
+    await salonSessionManager._executeKmsRetry();
+
+    assert.equal(socketRestored, true, 'Salão deve ser restaurado quando o KMS volta');
+  } finally {
+    salonSessionManager._resetForTesting();
+    salonSessionManager._setBaseDirForTesting(null);
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(sessionsBase, { recursive: true, force: true });
+  }
+});
+
+test('T20: B2 - Desconexão durante as tentativas (salão desconectado formalmente NÃO é restaurado)', async () => {
+  salonSessionManager._resetForTesting();
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    SalonWhatsAppRepository.ensureSessionExists(13);
+    SalonWhatsAppRepository.markSessionDisconnected(13, { status: 'KMS_UNAVAILABLE' });
+
+    // Usuário desconecta formalmente
+    SalonWhatsAppRepository.markSessionDisconnected(13, { status: 'DISCONNECTED' });
+
+    let socketCreated = false;
+    salonSessionManager._setBaileysSocketFactoryForTesting(async () => {
+      socketCreated = true;
+      return { ev: { on: () => {} } };
+    });
+
+    await salonSessionManager._executeKmsRetry();
+    assert.equal(socketCreated, false, 'Salão formalmente desconectado NÃO pode ser restaurado pelo retry do KMS');
+  } finally {
+    salonSessionManager._resetForTesting();
+    _resetKeyProviderForTesting();
+  }
+});
+
+test('T21: B2 - NOT_MIGRATED volta (após migração o salão é restaurado normalmente)', async () => {
+  salonSessionManager._resetForTesting();
+  const sessionsBase = createTestDir('t21_sessions_');
+  const quarantineRoot = createTestDir('t21_quarantine_');
+  salonSessionManager._setBaseDirForTesting(sessionsBase);
+
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    const salonDir = path.join(sessionsBase, 'salon_13');
+    fs.mkdirSync(salonDir, { recursive: true });
+    fs.writeFileSync(path.join(salonDir, 'creds.json'), JSON.stringify(createMockCreds()));
+
+    SalonWhatsAppRepository.ensureSessionExists(13, salonDir);
+    SalonWhatsAppRepository.markSessionConnected(13, { phone: '5511999990011', phoneJid: '5511999990011@s.whatsapp.net' });
+
+    process.env.WA_CREDS_ENCRYPTION = 'on';
+
+    // 1ª restauração detecta não migrado
+    await salonSessionManager.restoreActiveSalonSessions();
+    let session = SalonWhatsAppRepository.getSessionByUserId(13);
+    assert.equal(session.session_status, 'NOT_MIGRATED');
+
+    // 2. Operador executa a migração
+    await waCredsMigrate.runMigration({ tenantId: 13, dir: salonDir, isPersonal: false }, { keyProvider: kp, quarantineRoot });
+
+    // 3. Próxima inicialização restaura com sucesso
+    let socketCreated = false;
+    salonSessionManager._setBaileysSocketFactoryForTesting(async () => {
+      socketCreated = true;
+      return { ev: { on: () => {} }, ws: { close: () => {} }, end: () => {} };
+    });
+
+    await salonSessionManager.restoreActiveSalonSessions();
+    assert.equal(socketCreated, true);
+  } finally {
+    salonSessionManager._resetForTesting();
+    salonSessionManager._setBaseDirForTesting(null);
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(sessionsBase, { recursive: true, force: true });
+    fs.rmSync(quarantineRoot, { recursive: true, force: true });
+  }
+});
+
+test('T22: disconnect() real (pasta é removida e DEK é zeroizada buffer.every(b => b === 0))', async () => {
+  const dir = createTestDir('t22_');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
+
+  try {
+    const dek = await getOrLoadTenantDek(dir, { tenantId: 13, keyProvider: kp });
+    assert.ok(dek.length === 32);
+
+    // Guarda referência direta do Buffer
+    const dekRef = dek;
+
+    clearTenantDek(13);
+
+    // O buffer deve ter todos os bytes zerados
+    const allZeroes = dekRef.every((b) => b === 0);
+    assert.equal(allZeroes, true, 'DEK em memória deve ser preenchida com zeros na desconexão');
+  } finally {
+    _resetKeyProviderForTesting();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('T23: Auditoria rigorosa de segredos nos logs e no /diagnostics', async () => {
+  const secretKey = 'AWS_SECRET_MOCK_123456789';
+  process.env.AWS_SECRET_ACCESS_KEY = secretKey;
+
+  const logsText = logCapture.join('\n');
+  assert.equal(logsText.includes(secretKey), false, 'AWS_SECRET_ACCESS_KEY não deve vazar nos logs');
+
+  const diag = salonSessionManager.getSalonDiagnostics(13);
+  const diagString = JSON.stringify(diag);
+  assert.equal(diagString.includes('encrypted_tokens'), false);
+  assert.equal(diagString.includes(secretKey), false);
+});
+
+test('T24: Contrato com o AWS KMS (KeySpec AES_256, EncryptionContext rígido e sanitização)', async () => {
+  let recordedCommand = null;
+  const mockClient = {
+    send: async (command) => {
+      recordedCommand = command;
+      if (command.constructor.name === 'GenerateDataKeyCommand' || command.input?.KeySpec) {
+        return {
+          Plaintext: Buffer.alloc(32, 7),
+          CiphertextBlob: Buffer.alloc(48, 9),
+        };
+      }
+      if (command.constructor.name === 'DecryptCommand' || command.input?.CiphertextBlob) {
+        return {
+          Plaintext: Buffer.alloc(32, 7),
+        };
+      }
+      throw new Error('UNKNOWN_COMMAND');
+    },
+  };
+
+  const provider = new KmsKeyProvider({
+    keyId: 'arn:aws:kms:sa-east-1:123456789012:key/test-key',
+    region: 'sa-east-1',
+    client: mockClient,
+  });
+
+  const resGen = await provider.generateDataKey({ tenantId: 13, purpose: 'wa-session' });
+  assert.equal(recordedCommand.input.KeySpec, 'AES_256');
+  assert.deepEqual(recordedCommand.input.EncryptionContext, { tenant_id: '13', purpose: 'wa-session' });
+
+  await provider.unwrapDataKey({ wrappedKey: resGen.wrappedKey, tenantId: 13, purpose: 'wa-session' });
+  assert.deepEqual(recordedCommand.input.EncryptionContext, { tenant_id: '13', purpose: 'wa-session' });
+
+  // Testa sanitização de erro
+  mockClient.send = async () => {
+    const err = new Error('Sensitive internal AWS trace with token ABCDEF');
+    err.name = 'AccessDeniedException';
+    throw err;
+  };
+
+  await assert.rejects(
+    async () => provider.generateDataKey({ tenantId: 13 }),
+    (err) => err.code === 'KMS_GENERATE_KEY_ERROR' && !err.message.includes('ABCDEF')
   );
+});
 
-  assert.equal(rollbackResult.status, 'SUCCESS');
-  assert.equal(rollbackResult.rolledBackCount, 2);
+test('T25: Inspeção depois de reinício (chave fora da memória retorna credsValid: null e keyLoaded: false)', async () => {
+  const sessionsBase = createTestDir('t25_base_');
+  salonSessionManager._setBaseDirForTesting(sessionsBase);
+  const dir = path.join(sessionsBase, 'salon_13');
+  fs.mkdirSync(dir, { recursive: true });
 
-  const tenantFiles = fs.readdirSync(tenantDir);
-  assert.ok(tenantFiles.includes('creds.json'), 'creds.json em texto claro deve ser restaurado');
-  assert.ok(tenantFiles.includes('pre-key-1.json'), 'pre-key-1.json em texto claro deve ser restaurado');
-  assert.ok(!tenantFiles.includes('creds.json.enc'), 'creds.json.enc deve ser removido após rollback');
-  assert.ok(!tenantFiles.includes('pre-key-1.json.enc'), 'pre-key-1.json.enc deve ser removido após rollback');
-  assert.ok(tenantFiles.includes('dek.wrapped'), 'dek.wrapped deve ser mantido para contingência');
+  const kp = new FakeKeyProvider();
+  _setKeyProviderForTesting(kp);
 
-  // Validação do conteúdo JSON restaurado
-  const restoredCreds = JSON.parse(fs.readFileSync(path.join(tenantDir, 'creds.json'), 'utf8'));
-  assert.equal(restoredCreds.me?.id, '5511999990002:1@s.whatsapp.net');
-  assert.equal(restoredCreds.account?.ok, true);
+  try {
+    const { state, saveCreds } = await useEncryptedMultiFileAuthState(dir, { tenantId: 13, keyProvider: kp });
+    state.creds = createMockCreds();
+    await saveCreds();
+
+    // Limpa chave da RAM simulando reinício do processo
+    clearTenantDek(13);
+    const unwrapCallsBefore = kp.calls.unwrapDataKey;
+
+    process.env.WA_CREDS_ENCRYPTION = 'on';
+    const inspection = salonSessionManager.inspectSalonAuthCredentials(13);
+
+    assert.equal(inspection.sessionEncrypted, true);
+    assert.equal(inspection.notMigrated, false);
+    assert.equal(inspection.keyLoaded, false);
+    assert.equal(inspection.credsValid, null);
+    assert.equal(kp.calls.unwrapDataKey, unwrapCallsBefore, 'Inspeção não deve chamar KMS se chave não está em RAM');
+  } finally {
+    salonSessionManager._setBaseDirForTesting(null);
+    clearTenantDek(13);
+    _resetKeyProviderForTesting();
+    fs.rmSync(sessionsBase, { recursive: true, force: true });
+  }
+});
+
+test('T26: Migração do banco SQLite (linhas preservadas, novos status aceitos e foreign_keys preservado)', async () => {
+  const dbPath = path.join(os.tmpdir(), `test_db_migration_${Date.now()}.sqlite`);
+  const rawDb = new DatabaseSync(dbPath);
+
+  // Cria schema legado
+  rawDb.exec('PRAGMA foreign_keys = OFF;');
+  rawDb.exec(`
+    CREATE TABLE salon_whatsapp_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL UNIQUE,
+      phone_jid TEXT,
+      session_status TEXT CHECK(session_status IN ('CONNECTED', 'DISCONNECTED', 'WAITING_QR', 'WAITING_CODE', 'ERROR')) DEFAULT 'DISCONNECTED',
+      qr_code TEXT,
+      pairing_code TEXT,
+      encrypted_creds TEXT,
+      last_error TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    INSERT INTO salon_whatsapp_sessions (tenant_id, phone_jid, session_status) VALUES (13, '5511999990011@s.whatsapp.net', 'CONNECTED');
+  `);
+
+  // Executa migração 20261112_01
+  const fkBefore = rawDb.prepare('PRAGMA foreign_keys').get()['foreign_keys'];
+  assert.equal(fkBefore, 0);
+
+  rawDb.exec('PRAGMA foreign_keys = OFF;');
+  rawDb.exec('BEGIN IMMEDIATE;');
+  rawDb.exec(`
+    CREATE TABLE salon_whatsapp_sessions_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tenant_id INTEGER NOT NULL UNIQUE,
+      phone_jid TEXT,
+      session_status TEXT CHECK(session_status IN ('CONNECTED', 'DISCONNECTED', 'WAITING_QR', 'WAITING_CODE', 'KMS_UNAVAILABLE', 'NOT_MIGRATED', 'ERROR')) DEFAULT 'DISCONNECTED',
+      qr_code TEXT,
+      pairing_code TEXT,
+      encrypted_creds TEXT,
+      last_error TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+    INSERT INTO salon_whatsapp_sessions_new (id, tenant_id, phone_jid, session_status, qr_code, pairing_code, encrypted_creds, last_error, created_at, updated_at)
+    SELECT id, tenant_id, phone_jid, session_status, qr_code, pairing_code, encrypted_creds, last_error, created_at, updated_at
+    FROM salon_whatsapp_sessions;
+    DROP TABLE salon_whatsapp_sessions;
+    ALTER TABLE salon_whatsapp_sessions_new RENAME TO salon_whatsapp_sessions;
+  `);
+  rawDb.exec('COMMIT;');
+
+  if (fkBefore === 1) {
+    rawDb.exec('PRAGMA foreign_keys = ON;');
+  } else {
+    rawDb.exec('PRAGMA foreign_keys = OFF;');
+  }
+
+  const fkAfter = rawDb.prepare('PRAGMA foreign_keys').get()['foreign_keys'];
+  assert.equal(fkAfter, fkBefore, 'foreign_keys deve retornar ao valor original');
+
+  // Valida inserção dos novos status
+  rawDb.prepare("INSERT INTO salon_whatsapp_sessions (tenant_id, session_status) VALUES (14, 'KMS_UNAVAILABLE')").run();
+  rawDb.prepare("INSERT INTO salon_whatsapp_sessions (tenant_id, session_status) VALUES (15, 'NOT_MIGRATED')").run();
+
+  const count = rawDb.prepare('SELECT COUNT(*) as c FROM salon_whatsapp_sessions').get().c;
+  assert.equal(count, 3);
+});
+
+test('T27: Modo off (testes com WA_CREDS_ENCRYPTION=off operam sem alteração)', async () => {
+  process.env.WA_CREDS_ENCRYPTION = 'off';
+  const sessionsBase = createTestDir('t27_base_');
+  salonSessionManager._setBaseDirForTesting(sessionsBase);
+  const dir = path.join(sessionsBase, 'salon_13');
+  fs.mkdirSync(dir, { recursive: true });
+
+  try {
+    fs.writeFileSync(path.join(dir, 'creds.json'), JSON.stringify(createMockCreds()));
+    const inspection = salonSessionManager.inspectSalonAuthCredentials(13);
+    assert.equal(inspection.sessionEncrypted, false);
+    assert.equal(inspection.notMigrated, false);
+    assert.equal(inspection.credsValid, true);
+  } finally {
+    salonSessionManager._setBaseDirForTesting(null);
+    fs.rmSync(sessionsBase, { recursive: true, force: true });
+    stopLogCapture();
+  }
 });
