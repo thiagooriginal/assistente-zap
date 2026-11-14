@@ -352,7 +352,24 @@ async function dispatchMessage(salonUserId, sock, msg) {
 
   let replyText = '';
 
-  // 5. Verificação Universal de Cancelamento/Desistência em qualquer estado ativo
+  // 5. Verificação Universal de Revogação de Lembretes (LGPD Opt-out)
+  const isRevocation = /(parar lembretes|cancelar lembretes|revogar lembretes|sem lembretes|nao quero lembretes|parar lembrete|cancelar lembrete)/i.test(normText);
+  if (isRevocation) {
+    const salonReminderService = require('../services/salonReminderService');
+    salonReminderService.revokeClientConsent(uid, cleanPhone, 'Opt-out solicitado pelo cliente via WhatsApp');
+    session.state = 'IDLE';
+    session.lastAppointmentId = null;
+    replyText = `Entendido! Seus lembretes automáticos de WhatsApp foram cancelados com sucesso. ✨\n\nSeus agendamentos marcados continuam confirmados. Se desejar reativar os lembretes futuramente, é só nos avisar!`;
+    try {
+      if (!sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) return false;
+      await sock.sendMessage(senderJid, { text: replyText });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // 5.1 Verificação Universal de Cancelamento/Desistência em qualquer estado ativo
   const isCancellation = /^(cancelar|cancela|cancelamento|desisto|sair|parar|deixa pra la|deixa para la)\b/i.test(normText);
   if (session.state !== 'IDLE' && isCancellation) {
     session.state = 'IDLE';
@@ -417,7 +434,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
       const num = parseInt(normText, 10);
       let chosenStaff = null;
 
-      if (/^(qualquer|tanto faz|sem preferencia|qualquer um|qualquer profissional)\b/i.test(normText) || num === (available.length + 1)) {
+      if (/(qualquer|tanto faz|sem preferencia|qualquer um|qualquer profissional|pode ser qualquer)/i.test(normText) || num === (available.length + 1)) {
         chosenStaff = null;
       } else if (!isNaN(num) && num >= 1 && num <= available.length) {
         chosenStaff = available[num - 1];
@@ -426,7 +443,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
         chosenStaff = available.find((st) => {
           const stNorm = st.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
           return normText.includes(stNorm) || stNorm.includes(normText);
-        }) || null;
+        }) || undefined;
       }
 
       if (chosenStaff === undefined) {
@@ -570,8 +587,8 @@ async function dispatchMessage(salonUserId, sock, msg) {
           time: session.selectedSlot.time,
           durationMin: validService.duration_min,
           origin: 'WHATSAPP_BOT',
-          reminderConsent: 1,
-          reminderConsentOrigin: 'whatsapp_bot_agendamento',
+          reminderConsent: 0,
+          reminderConsentOrigin: null,
         });
 
         const displayDate = formatDisplayDate(session.selectedSlot.date);
@@ -587,11 +604,15 @@ async function dispatchMessage(salonUserId, sock, msg) {
           `• *Data:* ${displayDate}\n` +
           `• *Horário:* ${session.selectedSlot.time}\n` +
           `• *Valor:* R$ ${priceFormatted}\n\n` +
-          `Você receberá lembretes pelo WhatsApp antes do atendimento. Caso precise remarcar ou tirar dúvidas, pode me chamar por aqui a qualquer momento!\n\n` +
-          `Até breve! 💖`;
+          `🔔 *Lembrete 24h por WhatsApp (Opcional):*\n` +
+          `Você gostaria de receber um lembrete automático por aqui 24 horas antes do seu horário?\n` +
+          `• Digite *Sim* ou *1* para autorizar o lembrete\n` +
+          `• (Se não quiser, não precisa responder nada — seu agendamento já está confirmado!)\n\n` +
+          `Caso precise remarcar ou tirar dúvidas, pode me chamar por aqui a qualquer momento. Até breve! 💖`;
 
-        // Limpeza de estado após sucesso
-        session.state = 'IDLE';
+        // Transiciona para aguardar opt-in opcional de lembretes (LGPD)
+        session.state = 'AWAITING_REMINDER_OPTIN';
+        session.lastAppointmentId = booked.id;
         session.selectedService = null;
         session.selectedStaff = null;
         session.candidateSlots = [];
@@ -605,6 +626,35 @@ async function dispatchMessage(salonUserId, sock, msg) {
         session.selectedSlot = null;
         replyText = `Ops! Não conseguimos reservar esse horário: ${bookErr.message}\n\nPara escolher um novo horário, digite *Agendar*! ✨`;
       }
+      break;
+    }
+
+    case 'AWAITING_REMINDER_OPTIN': {
+      const isAffirmative = /^(sim|1|lembrete|quero|ativar|pode ser|com certeza|positivo|confirmo|por favor)\b/i.test(normText);
+      const isNegative = /^(nao|não|2|sem lembrete|nao quero|dispensa|cancelar|deixa)\b/i.test(normText);
+
+      if (isAffirmative && session.lastAppointmentId) {
+        const salonReminderService = require('../services/salonReminderService');
+        salonAppointmentService.updateAppointmentConsent(session.lastAppointmentId, uid, 1, 'whatsapp_bot_optin');
+        salonReminderService.registerClientConsent(uid, cleanPhone, 'whatsapp_bot_optin');
+
+        session.state = 'IDLE';
+        session.lastAppointmentId = null;
+        replyText = `Combinado! Lembrete de 24h ativado com sucesso. ✨\n\nCaso queira cancelar os lembretes no futuro, basta digitar *Parar lembretes* a qualquer momento.\n\nNos vemos em breve no *${salonName}*! 💖`;
+        break;
+      }
+
+      if (isNegative) {
+        session.state = 'IDLE';
+        session.lastAppointmentId = null;
+        replyText = `Tudo bem! Seu agendamento permanece confirmado normalmente sem lembretes automáticos. Se precisar de qualquer informação, estarei por aqui! ✨`;
+        break;
+      }
+
+      // Se a mensagem for outra coisa, encerra o opt-in mantendo reminderConsent = 0 e responde cordialmente
+      session.state = 'IDLE';
+      session.lastAppointmentId = null;
+      replyText = `Olá! Seu agendamento anterior já está confirmado. ✨\n\nComo posso te ajudar agora?\n• Digite *Serviços* para ver nosso catálogo\n• Digite *Agendar* para marcar outro horário`;
       break;
     }
 
