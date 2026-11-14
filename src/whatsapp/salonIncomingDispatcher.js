@@ -83,57 +83,263 @@ function formatPrice(val) {
 }
 
 /**
+ * Qualificadores lexicais para desambiguação de serviços no salão
+ */
+const QUALIFIER_RULES = [
+  { key: 'feminino', terms: ['feminino', 'feminina', 'mulher', 'mulheres', 'dama', 'damas'] },
+  { key: 'masculino', terms: ['masculino', 'masculina', 'homem', 'homens', 'barbearia'] },
+  { key: 'infantil', terms: ['infantil', 'crianca', 'criancas', 'kids'] },
+  { key: 'barba', terms: ['barba', 'barbear', 'barbeiro', 'bigode'] },
+  { key: 'fade', terms: ['fade', 'degrade', 'disfarcado'] },
+  { key: 'camadas', terms: ['camadas', 'camada', 'bordado'] },
+  { key: 'quimica', terms: ['quimica', 'luzes', 'mechas', 'tintura', 'coloracao', 'morena iluminada', 'loiro', 'loira', 'platinado'] },
+  { key: 'alisamento', terms: ['botox', 'progressiva', 'alisamento', 'selagem', 'definitiva', 'prancha', 'chapinha'] },
+  { key: 'alongamento_gel', terms: ['gel', 'alongamento', 'fibra', 'acrigel', 'esmalte em gel', 'esmaltacao em gel'] },
+  { key: 'unha_tradicional', terms: ['tradicional', 'simples'] },
+];
+
+/**
+ * Famílias de serviços e seus termos de busca/gatilho
+ */
+const SERVICE_FAMILIES = [
+  {
+    family: 'corte',
+    triggers: ['corte', 'cortar', 'aparar', 'cabelo', 'pontas'],
+    serviceTerms: ['corte', 'cortar', 'aparar'],
+  },
+  {
+    family: 'escova_alisamento',
+    triggers: ['escova', 'escovar', 'prancha', 'chapinha', 'alisamento', 'botox', 'progressiva', 'selagem'],
+    serviceTerms: ['escova', 'alisamento', 'progressiva', 'botox', 'selagem', 'prancha', 'chapinha'],
+  },
+  {
+    family: 'manicure',
+    triggers: ['manicure', 'unha', 'unhas', 'esmaltacao', 'esmalte', 'cuticula', 'alongamento', 'gel', 'fibra'],
+    serviceTerms: ['manicure', 'unha', 'unhas', 'alongamento', 'esmaltacao', 'cuticula'],
+  },
+  {
+    family: 'pedicure',
+    triggers: ['pedicure', 'pe', 'pes'],
+    serviceTerms: ['pedicure', 'pes', 'pe'],
+  },
+  {
+    family: 'sobrancelha',
+    triggers: ['sobrancelha', 'sombrancelha', 'henna', 'design', 'micropigmentacao'],
+    serviceTerms: ['sobrancelha', 'sombrancelha', 'design', 'henna', 'micropigmentacao'],
+  },
+  {
+    family: 'barba',
+    triggers: ['barba', 'barbear', 'barbeiro', 'bigode'],
+    serviceTerms: ['barba', 'barbear', 'bigode'],
+  },
+  {
+    family: 'coloracao',
+    triggers: ['coloracao', 'pintar', 'mechas', 'luzes', 'tintura', 'morena iluminada', 'loiro', 'loira', 'platinado', 'tonalizante'],
+    serviceTerms: ['coloracao', 'mechas', 'luzes', 'tintura', 'loiro', 'iluminada', 'tonalizante'],
+  },
+  {
+    family: 'hidratacao',
+    triggers: ['hidratacao', 'hidratar', 'nutricao', 'cauterizacao', 'cronograma', 'reconstrucao', 'terapia capilar', 'tratamento'],
+    serviceTerms: ['hidratacao', 'cauterizacao', 'tratamento', 'reconstrucao', 'nutricao', 'cronograma'],
+  },
+  {
+    family: 'depilacao',
+    triggers: ['depilacao', 'depilar', 'cera'],
+    serviceTerms: ['depilacao', 'depilar', 'cera'],
+  },
+  {
+    family: 'maquiagem',
+    triggers: ['maquiagem', 'make'],
+    serviceTerms: ['maquiagem', 'make'],
+  },
+];
+
+/**
+ * Normaliza cadeia de texto para comparações lexicais defensivas
+ * @private
+ * @param {string} str
+ * @returns {string}
+ */
+function normalizeText(str) {
+  if (!str || typeof str !== 'string') return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * Avalia um conjunto de serviços candidatos contra uma entrada textual limpa
+ * @private
+ * @param {Array<object>} pool
+ * @param {string} cleanInput
+ * @returns {{ status: 'EXACT'|'AMBIGUOUS'|'NONE', match?: object, candidates: Array<object> }}
+ */
+function evaluateCandidatePool(pool, cleanInput) {
+  if (!Array.isArray(pool) || pool.length === 0 || !cleanInput) {
+    return { status: 'NONE', candidates: [] };
+  }
+
+  // 1. Match exato por igualdade de string inteira
+  for (const s of pool) {
+    const sNorm = normalizeText(s.name);
+    if (sNorm && sNorm === cleanInput) {
+      return { status: 'EXACT', match: s };
+    }
+  }
+
+  // 2. Substring exata de nome completo contida na mensagem do usuário
+  const containedMatches = pool.filter((s) => {
+    const sNorm = normalizeText(s.name);
+    return sNorm.length >= 3 && cleanInput.includes(sNorm);
+  });
+
+  if (containedMatches.length === 1) {
+    return { status: 'EXACT', match: containedMatches[0] };
+  }
+  if (containedMatches.length > 1) {
+    containedMatches.sort((a, b) => normalizeText(b.name).length - normalizeText(a.name).length);
+    const longestLen = normalizeText(containedMatches[0].name).length;
+    const topMatches = containedMatches.filter((s) => normalizeText(s.name).length === longestLen);
+    if (topMatches.length === 1) {
+      return { status: 'EXACT', match: topMatches[0] };
+    }
+    return { status: 'AMBIGUOUS', candidates: topMatches };
+  }
+
+  // 3. Avaliação por Qualificadores e Famílias de Serviço
+  const matchedQualifiers = QUALIFIER_RULES.filter((q) =>
+    q.terms.some((term) => cleanInput.includes(term))
+  );
+
+  const triggeredFamilies = SERVICE_FAMILIES.filter((fam) =>
+    fam.triggers.some((trig) => cleanInput.includes(trig))
+  );
+
+  if (triggeredFamilies.length > 0) {
+    const familyCandidates = [];
+    for (const fam of triggeredFamilies) {
+      for (const s of pool) {
+        const sNorm = normalizeText(s.name);
+        const catNorm = normalizeText(s.category);
+        const belongs = fam.serviceTerms.some((term) => sNorm.includes(term) || (catNorm && catNorm === fam.family));
+        if (belongs && !familyCandidates.some((c) => c.id === s.id)) {
+          familyCandidates.push(s);
+        }
+      }
+    }
+
+    if (familyCandidates.length > 0) {
+      if (matchedQualifiers.length > 0) {
+        const qualified = familyCandidates.filter((s) => {
+          const sNorm = normalizeText(s.name);
+          return matchedQualifiers.some((q) => q.terms.some((term) => sNorm.includes(term)));
+        });
+
+        if (qualified.length === 1) {
+          return { status: 'EXACT', match: qualified[0] };
+        }
+        if (qualified.length > 1) {
+          return { status: 'AMBIGUOUS', candidates: qualified };
+        }
+        return { status: 'AMBIGUOUS', candidates: familyCandidates };
+      }
+
+      if (familyCandidates.length === 1) {
+        return { status: 'EXACT', match: familyCandidates[0] };
+      }
+      return { status: 'AMBIGUOUS', candidates: familyCandidates };
+    }
+  }
+
+  // 4. Token Matching de palavras significativas (>= 4 caracteres), excluindo stop-words comuns
+  const stopWords = ['quero', 'gostaria', 'agendar', 'marcar', 'horario', 'favor', 'fazer', 'atendimento', 'preciso'];
+  const tokens = cleanInput.split(/\s+/).filter((w) => w.length >= 4 && !stopWords.includes(w));
+  if (tokens.length > 0) {
+    const tokenMatches = pool.filter((s) => {
+      const sNorm = normalizeText(s.name);
+      return tokens.some((tok) => sNorm.includes(tok));
+    });
+
+    if (tokenMatches.length === 1) {
+      return { status: 'EXACT', match: tokenMatches[0] };
+    }
+    if (tokenMatches.length > 1) {
+      if (matchedQualifiers.length > 0) {
+        const qualified = tokenMatches.filter((s) => {
+          const sNorm = normalizeText(s.name);
+          return matchedQualifiers.some((q) => q.terms.some((term) => sNorm.includes(term)));
+        });
+        if (qualified.length === 1) return { status: 'EXACT', match: qualified[0] };
+        if (qualified.length > 1) return { status: 'AMBIGUOUS', candidates: qualified };
+      }
+      return { status: 'AMBIGUOUS', candidates: tokenMatches };
+    }
+  }
+
+  return { status: 'NONE', candidates: [] };
+}
+
+/**
+ * Resolução pura e segura de identificação de serviços (Comando 050)
+ *
+ * @param {Array<object>} allServices Catálogo ativo de serviços do tenant
+ * @param {string} text Texto bruto recebido do cliente
+ * @param {Array<object>|null} [scopedCandidates=null] Lista de serviços candidatos no diálogo atual
+ * @returns {{ status: 'EXACT'|'AMBIGUOUS'|'NONE', match?: object, candidates?: Array<object> }}
+ */
+function resolveServiceMatch(allServices, text, scopedCandidates = null) {
+  if (!Array.isArray(allServices) || allServices.length === 0 || !text || typeof text !== 'string') {
+    return { status: 'NONE', candidates: [] };
+  }
+
+  // REQ-SEC-01: Clamp textual de segurança em 150 caracteres
+  const cleanInput = normalizeText(text.slice(0, 150));
+  if (!cleanInput) {
+    return { status: 'NONE', candidates: [] };
+  }
+
+  // Precedência 1 (Índice Numérico): Ex: "1", "2", "opcao 1", "nº 2"
+  const numMatch = cleanInput.match(/^(?:opcao|numero|nº|n)?\s*(\d+)\.?$/i);
+  if (numMatch) {
+    const num = parseInt(numMatch[1], 10);
+    // REQ-SEC-05: Validação estrita de limites
+    if (Array.isArray(scopedCandidates) && scopedCandidates.length > 0) {
+      if (num >= 1 && num <= scopedCandidates.length) {
+        return { status: 'EXACT', match: scopedCandidates[num - 1] };
+      }
+      return { status: 'NONE', candidates: [] };
+    }
+    if (num >= 1 && num <= allServices.length) {
+      return { status: 'EXACT', match: allServices[num - 1] };
+    }
+    return { status: 'NONE', candidates: [] };
+  }
+
+  // Se houver scopedCandidates ativo, avalia primeiro o subconjunto contextual
+  if (Array.isArray(scopedCandidates) && scopedCandidates.length > 0) {
+    const scopedResult = evaluateCandidatePool(scopedCandidates, cleanInput);
+    if (scopedResult.status === 'EXACT' || scopedResult.status === 'AMBIGUOUS') {
+      return scopedResult;
+    }
+  }
+
+  // Avaliação contra o catálogo completo do tenant
+  return evaluateCandidatePool(allServices, cleanInput);
+}
+
+/**
  * Realiza matching inteligente de serviço a partir do texto do cliente
+ * (Wrapper de compatibilidade retroativa sobre resolveServiceMatch)
  * @private
  * @param {Array<object>} services
  * @param {string} text
  * @returns {object|null}
  */
 function findMatchingService(services, text) {
-  if (!services || services.length === 0 || !text) return null;
-  const cleanInput = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-
-  // 1. Seleção por índice numérico direto (ex: "1", "2")
-  const num = parseInt(cleanInput, 10);
-  if (!isNaN(num) && num >= 1 && num <= services.length) {
-    return services[num - 1];
-  }
-
-  // 2. Busca por substring exata no nome ou categoria do serviço
-  for (const s of services) {
-    const sNorm = s.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    if (cleanInput.includes(sNorm) || sNorm.includes(cleanInput)) {
-      return s;
-    }
-  }
-
-  // 3. Matching por palavras-chave e sinônimos usuais de salão
-  const keywordsMap = [
-    { triggers: ['corte', 'cortar', 'aparar', 'cabelo', 'pontas'], terms: ['corte', 'cabelo'] },
-    { triggers: ['escova', 'escovar', 'prancha', 'chapinha', 'alisamento', 'botox', 'progressiva'], terms: ['escova', 'alisamento', 'progressiva'] },
-    { triggers: ['manicure', 'unha', 'unhas', 'esmaltacao', 'esmalte', 'cuticula', 'alongamento', 'gel'], terms: ['manicure', 'unha', 'alongamento'] },
-    { triggers: ['pedicure', 'pe', 'pes'], terms: ['pedicure', 'pe'] },
-    { triggers: ['sobrancelha', 'sombrancelha', 'design', 'henna'], terms: ['sobrancelha', 'design'] },
-    { triggers: ['barba', 'barbear', 'barbeiro', 'bigode'], terms: ['barba'] },
-    { triggers: ['coloracao', 'pintar', 'mechas', 'luzes', 'tintura', 'morena iluminada', 'loiro'], terms: ['coloracao', 'mechas', 'luzes', 'tintura'] },
-    { triggers: ['hidratacao', 'hidratar', 'nutricao', 'cauterizacao', 'cronograma', 'reconstrucao'], terms: ['hidratacao', 'cauterizacao', 'tratamento', 'reconstrucao'] },
-    { triggers: ['depilacao', 'depilar', 'cera'], terms: ['depilacao'] },
-    { triggers: ['maquiagem', 'make'], terms: ['maquiagem', 'make'] },
-  ];
-
-  for (const km of keywordsMap) {
-    const matchesTrigger = km.triggers.some((t) => cleanInput.includes(t));
-    if (matchesTrigger) {
-      for (const s of services) {
-        const sNorm = s.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-        if (km.terms.some((t) => sNorm.includes(t))) {
-          return s;
-        }
-      }
-    }
-  }
-
-  return null;
+  const res = resolveServiceMatch(services, text);
+  return res.status === 'EXACT' ? res.match : null;
 }
 
 /**
@@ -333,6 +539,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
       lastActivity: now,
       messageCount: 0,
       selectedService: null,
+      candidateServices: null,
       selectedStaff: null,
       availableStaffList: [],
       candidateSlots: [],
@@ -375,6 +582,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
   if (isBookingFlowActive && isCancellation) {
     session.state = 'IDLE';
     session.selectedService = null;
+    session.candidateServices = null;
     session.selectedStaff = null;
     session.availableStaffList = [];
     session.candidateSlots = [];
@@ -394,14 +602,29 @@ async function dispatchMessage(salonUserId, sock, msg) {
   // 6. Máquina de Estados Conversacionais da Jéssica
   switch (session.state) {
     case 'AWAITING_SERVICE': {
-      const matchedService = findMatchingService(services, text);
-      if (!matchedService) {
-        const serviceMenu = services.map((s, i) => `${i + 1}. *${s.name}* — R$ ${formatPrice(s.price)}`).join('\n');
+      const serviceResolution = resolveServiceMatch(services, text, session.candidateServices);
+
+      if (serviceResolution.status === 'AMBIGUOUS') {
+        session.candidateServices = serviceResolution.candidates;
+        const candidateList = serviceResolution.candidates
+          .map((s, i) => `${i + 1}. *${s.name}* — R$ ${formatPrice(s.price)} (${s.duration_min} min)`)
+          .join('\n');
+        replyText = `Identifiquei mais de uma opção. Por favor, escolha digitando o número correspondente:\n\n${candidateList}\n\n(Ou digite *Cancelar* para desistir)`;
+        break;
+      }
+
+      if (serviceResolution.status !== 'EXACT') {
+        const listToDisplay = (session.candidateServices && session.candidateServices.length > 0)
+          ? session.candidateServices
+          : services;
+        const serviceMenu = listToDisplay.map((s, i) => `${i + 1}. *${s.name}* — R$ ${formatPrice(s.price)}`).join('\n');
         replyText = `Não consegui identificar o serviço desejado. Por favor, digite o número correspondente da lista:\n\n${serviceMenu}\n\n(Ou digite *Cancelar* para desistir)`;
         break;
       }
 
+      const matchedService = serviceResolution.match;
       session.selectedService = matchedService;
+      session.candidateServices = null;
 
       // Resolução de Profissionais Habilitados para o Serviço (Comando 040)
       const qualifiedStaff = getQualifiedStaffForService(uid, matchedService.id);
@@ -409,6 +632,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
       if (qualifiedStaff.length === 0) {
         session.state = 'IDLE';
         session.selectedService = null;
+        session.candidateServices = null;
         replyText = `No momento não temos profissionais disponíveis para o serviço *${matchedService.name}*. Gostaria de escolher outro serviço do nosso catálogo? Digite *Serviços* para ver as opções! ✨`;
       } else if (qualifiedStaff.length === 1) {
         session.selectedStaff = qualifiedStaff[0];
@@ -529,6 +753,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
       if (isNegative) {
         session.state = 'IDLE';
         session.selectedService = null;
+        session.candidateServices = null;
         session.selectedStaff = null;
         session.candidateSlots = [];
         session.selectedSlot = null;
@@ -616,6 +841,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
         session.state = 'AWAITING_REMINDER_OPTIN';
         session.lastAppointmentId = booked.id;
         session.selectedService = null;
+        session.candidateServices = null;
         session.selectedStaff = null;
         session.candidateSlots = [];
         session.selectedSlot = null;
@@ -623,6 +849,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
         console.error(`[salonIncomingDispatcher] Erro ao concluir agendamento #${uid}:`, bookErr.message);
         session.state = 'IDLE';
         session.selectedService = null;
+        session.candidateServices = null;
         session.selectedStaff = null;
         session.candidateSlots = [];
         session.selectedSlot = null;
@@ -646,7 +873,6 @@ async function dispatchMessage(salonUserId, sock, msg) {
       }
 
       // 2. Afirmação inequívoca de consentimento no contexto da pergunta sobre lembretes
-      // Não interpretar palavras soltas como "quero" ou "por favor" isoladamente como consentimento
       const isAffirmative =
         /^(1|sim|com certeza|positivo|autorizo)\b/i.test(normText) ||
         /^(sim,?\s*)?(quero|pode enviar|ativar|autorizo)\s+(o\s+|os\s+)?lembrete(s)?\b/i.test(normText) ||
@@ -663,8 +889,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
         break;
       }
 
-      // 3. Se a mensagem for outra solicitação da cliente (ex: "Quero agendar outro horário", "Por favor me mostre os serviços"),
-      // encerra o opt-in preservando reminder_consent = 0 e processa imediatamente a nova solicitação no fluxo IDLE
+      // 3. Se a mensagem for outra solicitação da cliente, encerra o opt-in e processa no IDLE
       session.state = 'IDLE';
       session.lastAppointmentId = null;
       // Fallthrough intencional para case 'IDLE' atender a nova solicitação imediatamente
@@ -678,10 +903,12 @@ async function dispatchMessage(salonUserId, sock, msg) {
 
       // Matching direto de agendamento na primeira mensagem (ex: "gostaria de agendar para cortar meu cabelo")
       if (isScheduleInquiry) {
-        const matchedService = findMatchingService(services, text);
+        const serviceResolution = resolveServiceMatch(services, text, session.candidateServices);
 
-        if (matchedService) {
+        if (serviceResolution.status === 'EXACT') {
+          const matchedService = serviceResolution.match;
           session.selectedService = matchedService;
+          session.candidateServices = null;
 
           // Resolução de Profissionais Habilitados para o Serviço (Comando 040)
           const qualifiedStaff = getQualifiedStaffForService(uid, matchedService.id);
@@ -689,6 +916,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
           if (qualifiedStaff.length === 0) {
             session.state = 'IDLE';
             session.selectedService = null;
+            session.candidateServices = null;
             replyText = `Olá! Adoraríamos te atender para *${matchedService.name}*, mas no momento não temos profissionais disponíveis habilitadas para este serviço. Nossa equipe entrará em contato com você em instantes! ✨`;
           } else if (qualifiedStaff.length === 1) {
             session.selectedStaff = qualifiedStaff[0];
@@ -708,9 +936,17 @@ async function dispatchMessage(salonUserId, sock, msg) {
             const staffMenu = qualifiedStaff.map((st, i) => `${i + 1}. *${st.name}*`).join('\n');
             replyText = `Olá! Seja muito bem-vinda ao *${salonName}*! ✨\n\nIdentifiquei seu interesse em *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}).\n\nCom qual de nossas profissionais você gostaria de realizar o atendimento?\n\n${staffMenu}\n${qualifiedStaff.length + 1}. *Qualquer profissional disponível*\n\nPor favor, digite o número da sua preferência:`;
           }
+        } else if (serviceResolution.status === 'AMBIGUOUS') {
+          session.candidateServices = serviceResolution.candidates;
+          session.state = 'AWAITING_SERVICE';
+          const candidateList = serviceResolution.candidates
+            .map((s, i) => `${i + 1}. *${s.name}* — R$ ${formatPrice(s.price)} (${s.duration_min} min)`)
+            .join('\n');
+          replyText = `Olá! Seja bem-vinda ao *${salonName}*! ✨\n\nIdentifiquei mais de uma opção correspondente ao seu pedido:\n\n${candidateList}\n\nPor favor, digite o *número* ou o *nome* da opção que você prefere (ou digite *Cancelar* para desistir):`;
         } else {
           // Não especificou o serviço ainda: apresenta catálogo numerado
           session.state = 'AWAITING_SERVICE';
+          session.candidateServices = null;
           if (services && services.length > 0) {
             const serviceMenu = services.map((s, i) => `${i + 1}. *${s.name}* — R$ ${formatPrice(s.price)} (${s.duration_min} min)`).join('\n');
             replyText = `Com certeza! Seja bem-vinda ao *${salonName}*! ✨\n\nPara qual serviço você gostaria de agendar seu horário?\n\n${serviceMenu}\n\nBasta responder com o número ou nome do serviço desejado!`;
@@ -758,5 +994,7 @@ function _resetForTesting() {
 
 module.exports = {
   dispatchMessage,
+  resolveServiceMatch,
+  findMatchingService,
   _resetForTesting,
 };
