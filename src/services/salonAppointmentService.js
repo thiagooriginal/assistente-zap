@@ -975,6 +975,7 @@ function bookAppointmentSync(userId, {
     const finalConsent = isConsentGiven ? 1 : 0;
     const finalConsentAt = isConsentGiven ? new Date().toISOString() : null;
     const finalConsentOrigin = isConsentGiven ? (reminderConsentOrigin || origin || 'painel') : null;
+    const initialReminder24hStatus = isConsentGiven ? 'PENDING' : 'DISABLED';
 
     const stmt = db.prepare(`
       INSERT INTO appointments (
@@ -983,7 +984,7 @@ function bookAppointmentSync(userId, {
         duration_min, origin, status, google_sync_status, whatsapp_notified,
         reminder_24h_status, reminder_consent, reminder_consent_at, reminder_consent_origin
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, 'PENDING', ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, ?, ?, ?)
     `);
 
     const info = stmt.run(
@@ -1000,6 +1001,7 @@ function bookAppointmentSync(userId, {
       finalDurationMin,
       origin,
       finalStatus,
+      initialReminder24hStatus,
       finalConsent,
       finalConsentAt,
       finalConsentOrigin
@@ -1050,6 +1052,8 @@ function bookAppointmentSync(userId, {
       status: finalStatus,
       has_conflict: 0,
       google_sync_status: 'PENDING',
+      reminder_consent: finalConsent,
+      reminder_24h_status: initialReminder24hStatus,
     };
 
     // Notificar o outbox worker para processamento resiliente imediato
@@ -1559,7 +1563,7 @@ function updateAppointmentConsent(appointmentId, userId, consent, origin = 'pain
           reminder_consent_origin = ?,
           reminder_24h_status = CASE 
             WHEN ? = 0 THEN 'CANCELLED'
-            WHEN ? = 1 AND reminder_24h_status = 'CANCELLED' THEN 'PENDING'
+            WHEN ? = 1 AND reminder_24h_status IN ('CANCELLED', 'DISABLED') THEN 'PENDING'
             ELSE reminder_24h_status
           END,
           updated_at = CURRENT_TIMESTAMP

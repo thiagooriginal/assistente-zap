@@ -3666,6 +3666,19 @@
           </div>
           <!-- Alerta de Profissionais Elegíveis (Comando 040) -->
           <p id="aptStaffWarning" class="hidden text-[11px] text-amber-800 font-medium p-2 rounded-lg bg-amber-50 border border-amber-200"></p>
+          <!-- Indicação Provisória de Profissional Disponível (Comando 045) -->
+          <div id="aptAutoStaffAssignedHint" class="hidden p-2.5 rounded-xl bg-[#F7EFE9] border border-[#E6D6CA] text-[#4E3B31] flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2">
+              <div class="w-6 h-6 rounded-lg bg-[#C89B6D]/15 text-[#AD7B42] flex items-center justify-center flex-shrink-0">
+                <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
+              </div>
+              <div>
+                <span class="text-[11px] text-[#7A6255] block">Profissional disponível para este horário:</span>
+                <span id="aptAutoStaffAssignedName" class="font-bold text-[#4E3B31] text-xs"></span>
+              </div>
+            </div>
+            <span class="text-[10px] text-[#A48F83] bg-white/80 px-2 py-0.5 rounded-full border border-[#E6D6CA]/60 font-medium">Provisório até confirmação</span>
+          </div>
           <p id="aptServiceDurationHint" class="text-[11px] text-[#7A6255]"></p>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -7362,7 +7375,10 @@
       return '';
     }
 
-    function getReminder24hBadgeHtml(reminderStatus) {
+    function getReminder24hBadgeHtml(reminderStatus, reminderConsent) {
+      if (reminderConsent !== 1 && reminderConsent !== '1') {
+        return '';
+      }
       if (!reminderStatus || reminderStatus === 'PENDING') {
         return '<span class="apt-badge-reminder-24h inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20" title="Lembrete de 24h programado"><i data-lucide="bell" class="w-2.5 h-2.5"></i> Lembrete 24h: Pendente</span>';
       }
@@ -7389,9 +7405,9 @@
         return '<span class="apt-badge-consent inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" title="Consentimento LGPD ativo para lembretes WhatsApp"><i data-lucide="shield-check" class="w-2.5 h-2.5 text-emerald-400"></i> Consentimento: ATIVO</span>';
       }
       if (consentOrigin === 'revogado' || consentOrigin === 'painel_revogado' || reminderStatus === 'CANCELLED') {
-        return '<span class="apt-badge-consent inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20" title="Consentimento de lembretes revogado"><i data-lucide="shield-alert" class="w-2.5 h-2.5 text-amber-400"></i> Consentimento: REVOGADO</span>';
+        return '<span class="apt-badge-consent inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20" title="Consentimento de lembretes revogado"><i data-lucide="shield-alert" class="w-2.5 h-2.5 text-amber-400"></i> Sem autorização para lembretes</span>';
       }
-      return '<span class="apt-badge-consent inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/20" title="Sem autorização prévia de lembretes WhatsApp"><i data-lucide="shield-off" class="w-2.5 h-2.5 text-slate-400"></i> Consentimento: SEM CONSENTIMENTO</span>';
+      return '<span class="apt-badge-consent inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/20" title="Sem autorização prévia de lembretes WhatsApp"><i data-lucide="shield-off" class="w-2.5 h-2.5 text-slate-400"></i> Sem autorização para lembretes</span>';
     }
 
     async function loadAppointments() {
@@ -7476,7 +7492,7 @@
                 ${conflictTag}
                 ${getGoogleSyncBadgeHtml(a.google_sync_status, appointmentsState.isGoogleConnected)}
                 ${getReminderConsentBadgeHtml(a.reminder_consent, a.reminder_24h_status, a.reminder_consent_origin)}
-                ${getReminder24hBadgeHtml(a.reminder_24h_status)}
+                ${getReminder24hBadgeHtml(a.reminder_24h_status, a.reminder_consent)}
                 ${originTag}
               </div>
 
@@ -8078,8 +8094,13 @@
       const container = document.getElementById('aptSuggestedSlotsContainer');
       const pills = document.getElementById('aptSuggestedSlotsPills');
       const alertMsg = document.getElementById('aptConflictAlertMessage');
+      const autoStaffHint = document.getElementById('aptAutoStaffAssignedHint');
+      const autoStaffName = document.getElementById('aptAutoStaffAssignedName');
 
-      if (!date || !time) return;
+      if (!date || !time) {
+        if (autoStaffHint) autoStaffHint.classList.add('hidden');
+        return;
+      }
 
       if (aptCheckSlotAbortCtrl) aptCheckSlotAbortCtrl.abort();
       aptCheckSlotAbortCtrl = new AbortController();
@@ -8091,6 +8112,7 @@
 
         if (data.available === false) {
           // Bloqueio imediato! Horário ocupado ou em conflito
+          if (autoStaffHint) autoStaffHint.classList.add('hidden');
           if (alertMsg) alertMsg.innerText = data.message || 'Horário solicitado já ocupado ou indisponível.';
           if (pills) {
             pills.innerHTML = '';
@@ -8125,6 +8147,16 @@
         } else if (data.available === true) {
           // Horário liberado!
           if (container) container.classList.add('hidden');
+
+          // Indicação provisória de profissional no modo Automático (Comando 045)
+          if ((!staffId || staffId === 'ANY') && data.assignedStaffName) {
+            if (autoStaffName) autoStaffName.innerText = data.assignedStaffName;
+            if (autoStaffHint) autoStaffHint.classList.remove('hidden');
+            safeLucideCreateIcons();
+          } else {
+            if (autoStaffHint) autoStaffHint.classList.add('hidden');
+          }
+
           if (submitBtn) {
             submitBtn.disabled = false;
             submitBtn.removeAttribute('disabled');
@@ -8862,6 +8894,7 @@
       document.getElementById('aptSuggestedSlotsContainer')?.classList.add('hidden');
       document.getElementById('aptTimeDropdown')?.classList.add('hidden');
       document.getElementById('aptBeautyCalendarPopover')?.classList.add('hidden');
+      document.getElementById('aptAutoStaffAssignedHint')?.classList.add('hidden');
 
       const statusSelect = document.getElementById('aptStatusSelect');
       if (statusSelect) statusSelect.value = 'CONFIRMADO';
@@ -8882,6 +8915,7 @@
       RaiaModalManager.close('modalNewAppointment');
       document.getElementById('aptTimeDropdown')?.classList.add('hidden');
       document.getElementById('aptBeautyCalendarPopover')?.classList.add('hidden');
+      document.getElementById('aptAutoStaffAssignedHint')?.classList.add('hidden');
       const reminderConsent = document.getElementById('aptReminderConsent');
       if (reminderConsent) reminderConsent.checked = false;
     };
@@ -8971,7 +9005,9 @@
       if (document.getElementById('aptTime')?.value) checkNewAppointmentSlot();
     });
 
-    document.getElementById('aptStaffSelect')?.addEventListener('change', () => {
+    document.getElementById('aptStaffSelect')?.addEventListener('change', (e) => {
+      const autoStaffHint = document.getElementById('aptAutoStaffAssignedHint');
+      if (e?.target?.value && autoStaffHint) autoStaffHint.classList.add('hidden');
       fetchNewAppointmentSlots();
       if (document.getElementById('aptTime')?.value) checkNewAppointmentSlot();
     });
