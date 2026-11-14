@@ -138,6 +138,7 @@ function checkInternalSlotAvailability(userId, {
   excludeAppointmentId = null,
   bypassPastCheck = false,
   bypassHoursCheck = false,
+  skipConflictCheck = false,
 }) {
   const startDate = new Date(startDt);
   const endDate = new Date(endDt);
@@ -218,6 +219,10 @@ function checkInternalSlotAvailability(userId, {
         };
       }
     }
+  }
+
+  if (skipConflictCheck) {
+    return { available: true };
   }
 
   // 3. Verificação de Folgas do Profissional
@@ -354,25 +359,178 @@ async function checkGoogleAvailability(userId, { startDt, endDt, staffId = null,
 }
 
 /**
- * Checks if a specific candidate slot is free from conflicts and compliant with business hours
+ * Checks if a specific candidate slot is free from conflicts and compliant with business hours (Comando 042.1)
  */
 async function checkSlotAvailability(userId, params) {
-  let resolvedStaffId = (params?.staffId && params.staffId !== 'ANY') ? Number(params.staffId) : null;
-  if (!resolvedStaffId) {
-    try {
-      const eff = resolveEffectiveStaff(userId, {
-        serviceId: params?.serviceId || null,
-        staffId: null,
-        date: params?.date || (params?.startDt ? params.startDt.split('T')[0] : null),
-        time: params?.time || (params?.startDt ? params.startDt.split('T')[1]?.substring(0, 5) : null),
-        durationMin: params?.durationMin || 45,
-      });
-      resolvedStaffId = eff.staffId;
-    } catch (_) {}
+  const {
+    startDt,
+    endDt,
+    serviceId = null,
+    staffId = null,
+    durationMin = null,
+    excludeAppointmentId = null,
+    bypassPastCheck = false,
+    bypassHoursCheck = false,
+  } = params || {};
+
+  // 1. Validação global do salão: horário no passado e horário de funcionamento/almoço
+  const salonCheck = checkInternalSlotAvailability(userId, {
+    startDt,
+    endDt,
+    bypassPastCheck,
+    bypassHoursCheck,
+    skipConflictCheck: true,
+  });
+  if (!salonCheck.available) {
+    return salonCheck;
   }
-  const internal = checkInternalSlotAvailability(userId, { ...params, staffId: resolvedStaffId });
-  if (!internal.available) return internal;
-  return checkGoogleAvailability(userId, { ...params, staffId: resolvedStaffId });
+
+  const explicitStaffId = (staffId && staffId !== 'ANY') ? Number(staffId) : null;
+
+  // 2. Modo Seleção Manual (Profissional especificado)
+  if (explicitStaffId) {
+    if (serviceId) {
+      const isQual = db.prepare(`
+        SELECT 1 FROM client_service_staff
+        WHERE user_id = ? AND service_id = ? AND staff_id = ? AND confirmed = 1
+      `).get(userId, serviceId, explicitStaffId);
+
+      if (!isQual) {
+        return {
+          available: false,
+          reason: 'STAFF_NOT_QUALIFIED',
+          message: 'O profissional selecionado não está habilitado ou confirmado para realizar este serviço.',
+        };
+      }
+    }
+
+    const internal = checkInternalSlotAvailability(userId, {
+      startDt,
+      endDt,
+      staffId: explicitStaffId,
+      excludeAppointmentId,
+      bypassPastCheck,
+      bypassHoursCheck,
+    });
+    if (!internal.available) return internal;
+
+    const gCheck = await checkGoogleAvailability(userId, {
+      startDt,
+      endDt,
+      staffId: explicitStaffId,
+      timeoutMs: 4000,
+    });
+    if (!gCheck.available) return gCheck;
+
+    const st = db.prepare('SELECT id, name FROM client_staff WHERE id = ? AND user_id = ?').get(explicitStaffId, userId);
+    return {
+      available: true,
+      staffId: explicitStaffId,
+      staffName: st?.name || 'Profissional',
+      startDt,
+      endDt,
+      durationMin: durationMin || 45,
+    };
+  }
+
+  // 3. Modo Seleção Automática (Qualquer habilitado)
+  let candidateStaff = [];
+  if (serviceId) {
+    candidateStaff = db.prepare(`
+      SELECT cs.id, cs.name, cs.active, cs.google_calendar_id
+      FROM client_staff cs
+      JOIN client_service_staff css ON css.staff_id = cs.id AND css.user_id = cs.user_id
+      WHERE css.service_id = ? AND css.user_id = ? AND css.confirmed = 1 AND cs.active = 1
+      ORDER BY cs.id ASC
+    `).all(serviceId, userId);
+
+    if (candidateStaff.length === 0) {
+      return {
+        available: false,
+        reason: 'NO_QUALIFIED_STAFF_FOR_SERVICE',
+        message: 'Não há profissionais habilitados para realizar este serviço no momento.',
+      };
+    }
+  } else {
+    candidateStaff = db.prepare(`
+      SELECT id, name, active, google_calendar_id
+      FROM client_staff
+      WHERE user_id = ? AND active = 1
+      ORDER BY id ASC
+    `).all(userId);
+
+    if (candidateStaff.length === 0) {
+      return {
+        available: false,
+        reason: 'NO_ACTIVE_STAFF',
+        message: 'Nenhum profissional disponível no momento.',
+      };
+    }
+  }
+
+  const cleanDate = startDt.split('T')[0];
+  const availableCandidates = [];
+  let lastConflict = null;
+
+  for (const st of candidateStaff) {
+    const internal = checkInternalSlotAvailability(userId, {
+      startDt,
+      endDt,
+      staffId: st.id,
+      excludeAppointmentId,
+      bypassPastCheck: true,
+      bypassHoursCheck: true,
+    });
+
+    if (!internal.available) {
+      lastConflict = internal.conflict || null;
+      continue;
+    }
+
+    const gCheck = await checkGoogleAvailability(userId, {
+      startDt,
+      endDt,
+      staffId: st.id,
+      timeoutMs: 4000,
+    });
+
+    if (!gCheck.available) {
+      continue;
+    }
+
+    // Carga diária para balanceamento e desempate
+    const loadCount = db.prepare(`
+      SELECT COUNT(*) AS total
+      FROM appointments
+      WHERE user_id = ? AND staff_id = ? AND status NOT IN ('CANCELADO', 'CANCELLED')
+        AND start_datetime >= ? AND start_datetime <= ?
+    `).get(userId, st.id, `${cleanDate}T00:00:00`, `${cleanDate}T23:59:59`)?.total || 0;
+
+    availableCandidates.push({ staff: st, load: loadCount });
+  }
+
+  if (availableCandidates.length > 0) {
+    availableCandidates.sort((a, b) => a.load - b.load || a.staff.id - b.staff.id);
+    const chosen = availableCandidates[0].staff;
+    return {
+      available: true,
+      staffId: chosen.id,
+      staffName: chosen.name,
+      availableStaffCount: availableCandidates.length,
+      startDt,
+      endDt,
+      durationMin: durationMin || 45,
+    };
+  }
+
+  return {
+    available: false,
+    reason: 'SLOT_CONFLICT',
+    message: candidateStaff.length > 1
+      ? 'Todos os profissionais habilitados para este serviço estão ocupados neste horário.'
+      : 'O profissional habilitado para este serviço está ocupado neste horário.',
+    conflict: lastConflict,
+  };
 }
 
 /**
@@ -393,7 +551,15 @@ async function findAlternativeSlots(userId, { date, serviceDurationMin = 45, sta
 
   let targetStaffIds = [];
   if (staffId && staffId !== 'ANY') {
-    targetStaffIds = [Number(staffId)];
+    const sId = Number(staffId);
+    if (serviceId) {
+      const isQual = db.prepare(`
+        SELECT 1 FROM client_service_staff
+        WHERE user_id = ? AND service_id = ? AND staff_id = ? AND confirmed = 1
+      `).get(userId, serviceId, sId);
+      if (!isQual) return [];
+    }
+    targetStaffIds = [sId];
   } else if (serviceId) {
     const qRows = db.prepare(`
       SELECT cs.id
@@ -926,7 +1092,7 @@ async function bookAppointment(userId, params) {
     time: cleanTime,
     durationMin: calcDuration,
   } : null);
-  const resolvedStaffId = effectiveStaff.staffId;
+  let resolvedStaffId = effectiveStaff.staffId;
 
   const startDt = `${cleanDate}T${cleanTime}`;
   const startDate = new Date(startDt);
@@ -936,18 +1102,54 @@ async function bookAppointment(userId, params) {
 
     // 2. Consulta ao Google Calendar FORA da transação SQLite com timeout
     // Em modalidade STAFF, consulta necessariamente o calendário desse profissional
-    const gCheck = await checkGoogleAvailability(userId, {
+    let gCheck = await checkGoogleAvailability(userId, {
       startDt,
       endDt,
       staffId: resolvedStaffId,
       timeoutMs: 4000,
     });
 
+    if (!gCheck.available && (!staffId || staffId === 'ANY') && serviceId) {
+      const altCandidates = db.prepare(`
+        SELECT cs.id, cs.name
+        FROM client_staff cs
+        JOIN client_service_staff css ON css.staff_id = cs.id AND css.user_id = cs.user_id
+        WHERE css.service_id = ? AND css.user_id = ? AND css.confirmed = 1 AND cs.active = 1 AND cs.id != ?
+        ORDER BY cs.id ASC
+      `).all(serviceId, userId, resolvedStaffId);
+
+      for (const altStaff of altCandidates) {
+        const altInternal = checkInternalSlotAvailability(userId, {
+          startDt,
+          endDt,
+          staffId: altStaff.id,
+        });
+        if (altInternal.available) {
+          const altGCheck = await checkGoogleAvailability(userId, {
+            startDt,
+            endDt,
+            staffId: altStaff.id,
+            timeoutMs: 4000,
+          });
+          if (altGCheck.available) {
+            resolvedStaffId = altStaff.id;
+            gCheck = { available: true };
+            break;
+          }
+        }
+      }
+    }
+
     if (!gCheck.available) {
       const err = new Error(gCheck.message);
       err.code = gCheck.reason || 'GOOGLE_CALENDAR_BUSY';
       try {
-        err.suggestedSlots = await findAlternativeSlots(userId, { date: cleanDate, serviceDurationMin: calcDuration, staffId: resolvedStaffId });
+        err.suggestedSlots = await findAlternativeSlots(userId, {
+          date: cleanDate,
+          serviceDurationMin: calcDuration,
+          serviceId: serviceId || null,
+          staffId: (staffId && staffId !== 'ANY') ? Number(staffId) : null,
+        });
       } catch (_) {
         err.suggestedSlots = [];
       }
@@ -971,7 +1173,12 @@ async function bookAppointment(userId, params) {
   } catch (err) {
     if (err.code === 'SLOT_CONFLICT' && !err.suggestedSlots) {
       try {
-        err.suggestedSlots = await findAlternativeSlots(userId, { date: cleanDate, serviceDurationMin: calcDuration, staffId: resolvedStaffId });
+        err.suggestedSlots = await findAlternativeSlots(userId, {
+          date: cleanDate,
+          serviceDurationMin: calcDuration,
+          serviceId: serviceId || null,
+          staffId: (staffId && staffId !== 'ANY') ? Number(staffId) : null,
+        });
       } catch (_) {
         err.suggestedSlots = [];
       }
@@ -1064,6 +1271,7 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
       alternatives = await findAlternativeSlots(userId, {
         date: cleanNewDate,
         serviceDurationMin: durationMin,
+        serviceId: existing.service_id || null,
         staffId: targetStaffId,
         limit: 5,
       });
@@ -1092,6 +1300,7 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
         alternatives = await findAlternativeSlots(userId, {
           date: cleanNewDate,
           serviceDurationMin: durationMin,
+          serviceId: existing.service_id || null,
           staffId: targetStaffId,
           limit: 5,
         });

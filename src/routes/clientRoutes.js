@@ -1585,7 +1585,8 @@ router.get('/appointments/available-slots', clientAuthMiddleware, requireProduct
   const slots = await salonAppointmentService.findAlternativeSlots(req.clientUser.id, {
     date: cleanDate,
     serviceDurationMin: durationMin,
-    staffId: staff_id ? Number(staff_id) : null,
+    serviceId: service_id ? Number(service_id) : null,
+    staffId: (staff_id && staff_id !== 'ANY') ? Number(staff_id) : null,
     limit: limit ? Number(limit) : 50,
   });
 
@@ -1627,7 +1628,9 @@ router.get('/appointments/check-slot', clientAuthMiddleware, requireProductAcces
   const check = await salonAppointmentService.checkSlotAvailability(req.clientUser.id, {
     startDt,
     endDt,
-    staffId: staff_id ? Number(staff_id) : null,
+    serviceId: service_id ? Number(service_id) : null,
+    staffId: (staff_id && staff_id !== 'ANY') ? Number(staff_id) : null,
+    durationMin,
     excludeAppointmentId: exclude_id ? Number(exclude_id) : null,
   });
 
@@ -1635,7 +1638,8 @@ router.get('/appointments/check-slot', clientAuthMiddleware, requireProductAcces
     const suggestedSlots = await salonAppointmentService.findAlternativeSlots(req.clientUser.id, {
       date: cleanDate,
       serviceDurationMin: durationMin,
-      staffId: staff_id ? Number(staff_id) : null,
+      serviceId: service_id ? Number(service_id) : null,
+      staffId: (staff_id && staff_id !== 'ANY') ? Number(staff_id) : null,
       limit: 6,
     });
 
@@ -1655,6 +1659,8 @@ router.get('/appointments/check-slot', clientAuthMiddleware, requireProductAcces
     startDt,
     endDt,
     durationMin,
+    assignedStaffId: check.staffId || null,
+    assignedStaffName: check.staffName || null,
   });
 });
 

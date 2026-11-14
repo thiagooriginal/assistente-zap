@@ -8125,6 +8125,12 @@
         } else if (data.available === true) {
           // Horário liberado!
           if (container) container.classList.add('hidden');
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.removeAttribute('disabled');
+            submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            submitBtn.removeAttribute('title');
+          }
           validateAppointmentFormCompletion();
         }
       } catch (err) {
@@ -8278,6 +8284,7 @@
           if (container) container.classList.add('hidden');
           if (submitBtn) {
             submitBtn.disabled = false;
+            submitBtn.removeAttribute('disabled');
             submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             submitBtn.removeAttribute('title');
           }
