@@ -352,8 +352,8 @@ async function dispatchMessage(salonUserId, sock, msg) {
 
   let replyText = '';
 
-  // 5. Verificação Universal de Revogação de Lembretes (LGPD Opt-out)
-  const isRevocation = /(parar lembretes|cancelar lembretes|revogar lembretes|sem lembretes|nao quero lembretes|parar lembrete|cancelar lembrete)/i.test(normText);
+  // 5. Verificação Universal de Revogação de Lembretes (LGPD Opt-out fora do diálogo de opt-in)
+  const isRevocation = session.state !== 'AWAITING_REMINDER_OPTIN' && /(parar lembretes|cancelar lembretes|revogar lembretes|sem lembretes|nao quero lembretes|parar lembrete|cancelar lembrete)/i.test(normText);
   if (isRevocation) {
     const salonReminderService = require('../services/salonReminderService');
     salonReminderService.revokeClientConsent(uid, cleanPhone, 'Opt-out solicitado pelo cliente via WhatsApp');
@@ -369,15 +369,17 @@ async function dispatchMessage(salonUserId, sock, msg) {
     }
   }
 
-  // 5.1 Verificação Universal de Cancelamento/Desistência em qualquer estado ativo
+  // 5.1 Verificação de Cancelamento/Desistência durante o fluxo de agendamento em andamento
+  const isBookingFlowActive = ['AWAITING_SERVICE', 'AWAITING_STAFF', 'AWAITING_SLOT', 'AWAITING_CONFIRMATION'].includes(session.state);
   const isCancellation = /^(cancelar|cancela|cancelamento|desisto|sair|parar|deixa pra la|deixa para la)\b/i.test(normText);
-  if (session.state !== 'IDLE' && isCancellation) {
+  if (isBookingFlowActive && isCancellation) {
     session.state = 'IDLE';
     session.selectedService = null;
     session.selectedStaff = null;
     session.availableStaffList = [];
     session.candidateSlots = [];
     session.selectedSlot = null;
+    session.lastAppointmentId = null;
 
     replyText = `Tudo bem! O agendamento foi cancelado. Se você precisar de qualquer informação sobre nossos serviços ou quiser agendar em outro momento, estarei à sua disposição! ✨`;
     try {
@@ -630,8 +632,25 @@ async function dispatchMessage(salonUserId, sock, msg) {
     }
 
     case 'AWAITING_REMINDER_OPTIN': {
-      const isAffirmative = /^(sim|1|lembrete|quero|ativar|pode ser|com certeza|positivo|confirmo|por favor)\b/i.test(normText);
-      const isNegative = /^(nao|não|2|sem lembrete|nao quero|dispensa|cancelar|deixa)\b/i.test(normText);
+      // 1. Recusa ou cancelamento de lembretes (precedência estrita)
+      const isNegative =
+        /^(nao|não|2|dispensa|cancelar|deixa pra la|deixa)\b/i.test(normText) ||
+        /\b(nao|não)\s+quero\b/i.test(normText) ||
+        /\bsem\s+lembrete/i.test(normText);
+
+      if (isNegative) {
+        session.state = 'IDLE';
+        session.lastAppointmentId = null;
+        replyText = `Tudo bem! Seu agendamento permanece confirmado normalmente sem lembretes automáticos. Se precisar de qualquer informação, estarei por aqui! ✨`;
+        break;
+      }
+
+      // 2. Afirmação inequívoca de consentimento no contexto da pergunta sobre lembretes
+      // Não interpretar palavras soltas como "quero" ou "por favor" isoladamente como consentimento
+      const isAffirmative =
+        /^(1|sim|com certeza|positivo|autorizo)\b/i.test(normText) ||
+        /^(sim,?\s*)?(quero|pode enviar|ativar|autorizo)\s+(o\s+|os\s+)?lembrete(s)?\b/i.test(normText) ||
+        /^(sim,?\s*)?quero\s+receber\s+(o\s+|os\s+)?lembrete(s)?\b/i.test(normText);
 
       if (isAffirmative && session.lastAppointmentId) {
         const salonReminderService = require('../services/salonReminderService');
@@ -644,18 +663,11 @@ async function dispatchMessage(salonUserId, sock, msg) {
         break;
       }
 
-      if (isNegative) {
-        session.state = 'IDLE';
-        session.lastAppointmentId = null;
-        replyText = `Tudo bem! Seu agendamento permanece confirmado normalmente sem lembretes automáticos. Se precisar de qualquer informação, estarei por aqui! ✨`;
-        break;
-      }
-
-      // Se a mensagem for outra coisa, encerra o opt-in mantendo reminderConsent = 0 e responde cordialmente
+      // 3. Se a mensagem for outra solicitação da cliente (ex: "Quero agendar outro horário", "Por favor me mostre os serviços"),
+      // encerra o opt-in preservando reminder_consent = 0 e processa imediatamente a nova solicitação no fluxo IDLE
       session.state = 'IDLE';
       session.lastAppointmentId = null;
-      replyText = `Olá! Seu agendamento anterior já está confirmado. ✨\n\nComo posso te ajudar agora?\n• Digite *Serviços* para ver nosso catálogo\n• Digite *Agendar* para marcar outro horário`;
-      break;
+      // Fallthrough intencional para case 'IDLE' atender a nova solicitação imediatamente
     }
 
     case 'IDLE':

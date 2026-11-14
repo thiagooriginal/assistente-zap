@@ -446,3 +446,143 @@ test('Complementar 10: Persistência correta e revogação posterior de lembrete
   assert.strictEqual(rowAfterRevoke.reminder_consent, 0, 'Consentimento deve ter sido revogado');
   assert.strictEqual(rowAfterRevoke.reminder_24h_status, 'CANCELLED', 'Lembrete deve ter sido cancelado');
 });
+
+// ============================================================================
+// 4. TESTES ESPECÍFICOS DO COMANDO 048.1 (CONSENTIMENTO EXPLÍCITO & CANCELAMENTO)
+// ============================================================================
+
+test('Comando 048.1: "Quero agendar outro horário" na pergunta de lembretes NÃO concede consentimento e inicia novo agendamento', async () => {
+  const sock = createMockSocket();
+  const phone = '5511988880011';
+
+  // 1. Conclui agendamento inicial
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Agendar corte feminino' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: '1' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: '1' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Sim, pode confirmar' }));
+
+  // Agendamento anterior gravado com reminder_consent = 0
+  const initialApt = db.prepare('SELECT id, reminder_consent, reminder_24h_status, status FROM appointments WHERE user_id = ? AND client_phone = ?').get(SALON_A.id, phone);
+  assert.strictEqual(initialApt.reminder_consent, 0);
+  assert.strictEqual(initialApt.reminder_24h_status, 'DISABLED');
+  assert.strictEqual(initialApt.status, 'AGENDADO');
+
+  // 2. Cliente responde com nova intenção: "Quero agendar outro horário"
+  sock.clear();
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Quero agendar outro horário' }));
+  const reply = sock.getLastText();
+
+  // Validação: NÃO concedeu consentimento
+  const aptAfter = db.prepare('SELECT reminder_consent, reminder_24h_status, status FROM appointments WHERE id = ?').get(initialApt.id);
+  assert.strictEqual(aptAfter.reminder_consent, 0, 'Agendamento anterior NÃO pode ter recebido consentimento');
+  assert.strictEqual(aptAfter.reminder_24h_status, 'DISABLED');
+  assert.strictEqual(aptAfter.status, 'AGENDADO', 'Agendamento anterior deve permanecer intacto');
+
+  // Validação: Atendeu imediatamente a nova solicitação
+  assert.ok(reply.includes('Para qual serviço você gostaria de agendar') || reply.includes('Corte Feminino em Camadas'), 'Deve atender a nova solicitação de agendamento');
+});
+
+test('Comando 048.1: "Por favor, me mostre os serviços" na pergunta de lembretes NÃO concede consentimento e lista procedimentos', async () => {
+  const sock = createMockSocket();
+  const phone = '5511988880012';
+
+  // 1. Conclui agendamento inicial
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Agendar corte feminino' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: '1' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: '1' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Sim' }));
+
+  const initialApt = db.prepare('SELECT id, reminder_consent, reminder_24h_status, status FROM appointments WHERE user_id = ? AND client_phone = ?').get(SALON_A.id, phone);
+
+  // 2. Cliente responde: "Por favor, me mostre os serviços"
+  sock.clear();
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Por favor, me mostre os serviços' }));
+  const reply = sock.getLastText();
+
+  // Validação: NÃO concedeu consentimento
+  const aptAfter = db.prepare('SELECT reminder_consent, reminder_24h_status, status FROM appointments WHERE id = ?').get(initialApt.id);
+  assert.strictEqual(aptAfter.reminder_consent, 0, 'Não pode conceder consentimento');
+  assert.strictEqual(aptAfter.reminder_24h_status, 'DISABLED');
+  assert.strictEqual(aptAfter.status, 'AGENDADO');
+
+  // Validação: Atendeu imediatamente apresentando o catálogo
+  assert.ok(reply.includes('procedimentos disponíveis no') || reply.includes('Corte Feminino em Camadas'), 'Deve listar os serviços');
+});
+
+test('Comando 048.1: "Não quero lembretes" mantém consentimento desativado e preserva agendamento', async () => {
+  const sock = createMockSocket();
+  const phone = '5511988880013';
+
+  // Conclui agendamento inicial
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Agendar corte feminino' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: '1' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: '1' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Sim' }));
+
+  const initialApt = db.prepare('SELECT id, reminder_consent, reminder_24h_status, status FROM appointments WHERE user_id = ? AND client_phone = ?').get(SALON_A.id, phone);
+
+  // Cliente recusa expressamente: "Não quero lembretes"
+  sock.clear();
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Não quero lembretes' }));
+  const reply = sock.getLastText();
+
+  assert.ok(reply.includes('permanece confirmado normalmente sem lembretes automáticos'), 'Deve confirmar recusa cordial');
+  assert.ok(!reply.includes('agendamento foi cancelado'), 'NÃO pode dizer que o agendamento foi cancelado');
+
+  const aptAfter = db.prepare('SELECT reminder_consent, reminder_24h_status, status FROM appointments WHERE id = ?').get(initialApt.id);
+  assert.strictEqual(aptAfter.reminder_consent, 0);
+  assert.strictEqual(aptAfter.reminder_24h_status, 'DISABLED');
+  assert.strictEqual(aptAfter.status, 'AGENDADO', 'Agendamento deve permanecer válido e confirmado');
+});
+
+test('Comando 048.1: "Cancelar" na pergunta de lembretes NÃO cancela o agendamento confirmado', async () => {
+  const sock = createMockSocket();
+  const phone = '5511988880014';
+
+  // Conclui agendamento inicial
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Agendar corte feminino' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: '1' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: '1' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Sim, pode confirmar' }));
+
+  const initialApt = db.prepare('SELECT id, reminder_consent, reminder_24h_status, status FROM appointments WHERE user_id = ? AND client_phone = ?').get(SALON_A.id, phone);
+  assert.strictEqual(initialApt.status, 'AGENDADO');
+
+  // Cliente responde "Cancelar" na pergunta de lembretes
+  sock.clear();
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Cancelar' }));
+  const reply = sock.getLastText();
+
+  // NÃO pode dizer que o agendamento foi cancelado!
+  assert.ok(!reply.includes('O agendamento foi cancelado'), 'NÃO pode informar cancelamento do agendamento');
+  assert.ok(reply.includes('permanece confirmado normalmente sem lembretes automáticos'), 'Deve confirmar que o agendamento permanece confirmado');
+
+  const aptAfter = db.prepare('SELECT reminder_consent, reminder_24h_status, status FROM appointments WHERE id = ?').get(initialApt.id);
+  assert.strictEqual(aptAfter.status, 'AGENDADO', 'Agendamento deve permanecer 100% íntegro e confirmado');
+  assert.strictEqual(aptAfter.reminder_consent, 0);
+  assert.strictEqual(aptAfter.reminder_24h_status, 'DISABLED');
+});
+
+test('Comando 048.1: Aceite explícito ("Sim, quero receber lembretes") ativa o consentimento com segurança', async () => {
+  const sock = createMockSocket();
+  const phone = '5511988880015';
+
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Agendar corte feminino' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: '1' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: '1' }));
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Sim' }));
+
+  const initialApt = db.prepare('SELECT id, reminder_consent FROM appointments WHERE user_id = ? AND client_phone = ?').get(SALON_A.id, phone);
+  assert.strictEqual(initialApt.reminder_consent, 0);
+
+  // Cliente autoriza expressamente
+  sock.clear();
+  await salonIncomingDispatcher.dispatchMessage(SALON_A.id, sock, createIncomingMsg({ fromPhone: phone, text: 'Sim, quero receber lembretes' }));
+  const reply = sock.getLastText();
+
+  assert.ok(reply.includes('Lembrete de 24h ativado com sucesso'));
+  const aptAfter = db.prepare('SELECT reminder_consent, reminder_24h_status, reminder_consent_origin FROM appointments WHERE id = ?').get(initialApt.id);
+  assert.strictEqual(aptAfter.reminder_consent, 1);
+  assert.strictEqual(aptAfter.reminder_24h_status, 'PENDING');
+  assert.strictEqual(aptAfter.reminder_consent_origin, 'whatsapp_bot_optin');
+});
