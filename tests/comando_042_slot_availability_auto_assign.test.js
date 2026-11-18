@@ -156,10 +156,10 @@ test.before(async () => {
     VALUES (?, ?, ?, 1)
   `).run(SALON.id, serviceId, staffCamilaId);
 
-  // Insere agendamento existente: Jéssica Ramos ocupada das 09:00 às 10:00 em 2026-11-16
+  // Insere agendamento existente: Jéssica Ramos ocupada das 09:00 às 10:00 em 2026-11-30
   db.prepare(`
     INSERT INTO appointments (user_id, title, client_name, client_phone, service_id, staff_id, start_datetime, end_datetime, status, duration_min)
-    VALUES (?, 'Corte Feminino em Camadas', 'Cliente Mariana', '5511988887777', ?, ?, '2026-11-16T09:00:00', '2026-11-16T10:00:00', 'AGENDADO', 60)
+    VALUES (?, 'Corte Feminino em Camadas', 'Cliente Mariana', '5511988887777', ?, ?, '2026-11-30T09:00:00', '2026-11-30T10:00:00', 'AGENDADO', 60)
   `).run(SALON.id, serviceId, staffJessicaId);
 });
 
@@ -177,8 +177,8 @@ test.after(async () => {
 });
 
 test('Cenário 1 (Reprodução do Staging): Jéssica ocupada às 09:00 e Camila livre -> Automático deve permitir 09:00 sem falso conflito', async () => {
-  // Chamada check-slot para 2026-11-16 às 09:00 com staff_id vazio (Automático)
-  const res = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-16&time=09:00&service_id=${serviceId}&staff_id=`);
+  // Chamada check-slot para 2026-11-30 às 09:00 com staff_id vazio (Automático)
+  const res = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-30&time=09:00&service_id=${serviceId}&staff_id=`);
 
   assert.strictEqual(res.status, 200);
   assert.strictEqual(res.body.success, true);
@@ -187,7 +187,7 @@ test('Cenário 1 (Reprodução do Staging): Jéssica ocupada às 09:00 e Camila 
 });
 
 test('Cenário 2: Consistência entre horários livres e check-slot (09:00 aparece na lista de disponíveis)', async () => {
-  const res = await apiRequest(`/api/client/appointments/available-slots?date=2026-11-16&service_id=${serviceId}&staff_id=&limit=50`);
+  const res = await apiRequest(`/api/client/appointments/available-slots?date=2026-11-30&service_id=${serviceId}&staff_id=&limit=50`);
 
   assert.strictEqual(res.status, 200);
   assert.strictEqual(res.body.success, true);
@@ -203,7 +203,7 @@ test('Cenário 3: O agendamento automático às 09:00 deve ser atribuído nomina
       clientPhone: '5511999991111',
       serviceId,
       staffId: '', // Automático
-      date: '2026-11-16',
+      date: '2026-11-30',
       time: '09:00',
     },
   });
@@ -220,11 +220,11 @@ test('Cenário 3: O agendamento automático às 09:00 deve ser atribuído nomina
 });
 
 test('Cenário 4: Preservação de agendamentos simultâneos entre profissionais distintos', async () => {
-  // Neste momento, às 09:00 de 2026-11-16, temos dois agendamentos simultâneos: Jéssica e Camila
+  // Neste momento, às 09:00 de 2026-11-30, temos dois agendamentos simultâneos: Jéssica e Camila
   const apts = db.prepare(`
     SELECT id, client_name, staff_id, start_datetime, end_datetime
     FROM appointments
-    WHERE user_id = ? AND start_datetime = '2026-11-16T09:00:00' AND status = 'AGENDADO'
+    WHERE user_id = ? AND start_datetime = '2026-11-30T09:00:00' AND status = 'AGENDADO'
   `).all(SALON.id);
 
   assert.strictEqual(apts.length, 2, 'Devem coexistir 2 agendamentos simultâneos para profissionais distintas');
@@ -235,7 +235,7 @@ test('Cenário 4: Preservação de agendamentos simultâneos entre profissionais
 test('Cenário 5: Conflito real quando todos os profissionais habilitados estão ocupados (Jéssica e Camila ocupadas)', async () => {
   // Agora tanto Jéssica quanto Camila estão ocupadas das 09:00 às 10:00
   // Tentativa de check-slot para 09:00 no modo Automático deve retornar available = false
-  const checkRes = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-16&time=09:00&service_id=${serviceId}&staff_id=`);
+  const checkRes = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-30&time=09:00&service_id=${serviceId}&staff_id=`);
   assert.strictEqual(checkRes.status, 200);
   assert.strictEqual(checkRes.body.available, false, 'Com todas as habilitadas ocupadas, horário deve ser rejeitado');
   assert.strictEqual(checkRes.body.reason, 'SLOT_CONFLICT');
@@ -250,7 +250,7 @@ test('Cenário 5: Conflito real quando todos os profissionais habilitados estão
       clientPhone: '5511999993333',
       serviceId,
       staffId: '', // Automático
-      date: '2026-11-16',
+      date: '2026-11-30',
       time: '09:00',
     },
   });
@@ -263,23 +263,23 @@ test('Cenário 6: Profissional escolhido manualmente mantém a verificação ind
   // Insere agendamento apenas para Jéssica às 11:00 às 12:00
   db.prepare(`
     INSERT INTO appointments (user_id, title, client_name, client_phone, service_id, staff_id, start_datetime, end_datetime, status, duration_min)
-    VALUES (?, 'Corte Feminino em Camadas', 'Cliente Carla', '5511988886666', ?, ?, '2026-11-16T11:00:00', '2026-11-16T12:00:00', 'AGENDADO', 60)
+    VALUES (?, 'Corte Feminino em Camadas', 'Cliente Carla', '5511988886666', ?, ?, '2026-11-30T11:00:00', '2026-11-30T12:00:00', 'AGENDADO', 60)
   `).run(SALON.id, serviceId, staffJessicaId);
 
   // 1. Jéssica selecionada manualmente às 11:00 -> Conflito
-  const resJessica = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-16&time=11:00&service_id=${serviceId}&staff_id=${staffJessicaId}`);
+  const resJessica = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-30&time=11:00&service_id=${serviceId}&staff_id=${staffJessicaId}`);
   assert.strictEqual(resJessica.status, 200);
   assert.strictEqual(resJessica.body.available, false);
   assert.strictEqual(resJessica.body.reason, 'SLOT_CONFLICT');
 
   // 2. Camila selecionada manualmente às 11:00 -> Disponível
-  const resCamila = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-16&time=11:00&service_id=${serviceId}&staff_id=${staffCamilaId}`);
+  const resCamila = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-30&time=11:00&service_id=${serviceId}&staff_id=${staffCamilaId}`);
   assert.strictEqual(resCamila.status, 200);
   assert.strictEqual(resCamila.body.available, true);
   assert.strictEqual(resCamila.body.assignedStaffId, staffCamilaId);
 
   // 3. Automático às 11:00 -> Disponível (atribuído à Camila)
-  const resAuto = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-16&time=11:00&service_id=${serviceId}&staff_id=`);
+  const resAuto = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-30&time=11:00&service_id=${serviceId}&staff_id=`);
   assert.strictEqual(resAuto.status, 200);
   assert.strictEqual(resAuto.body.available, true);
   assert.strictEqual(resAuto.body.assignedStaffId, staffCamilaId);
@@ -287,7 +287,7 @@ test('Cenário 6: Profissional escolhido manualmente mantém a verificação ind
 
 test('Cenário 7: Profissional não habilitado nunca pode ser selecionado nem pelo automático', async () => {
   // Rafael (id 3) não possui vínculo confirmado para Corte Feminino
-  const res = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-16&time=14:00&service_id=${serviceId}&staff_id=${staffRafaelId}`);
+  const res = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-30&time=14:00&service_id=${serviceId}&staff_id=${staffRafaelId}`);
   assert.strictEqual(res.status, 200);
   assert.strictEqual(res.body.available, false);
   assert.strictEqual(res.body.reason, 'STAFF_NOT_QUALIFIED');
@@ -299,7 +299,7 @@ test('Cenário 7: Profissional não habilitado nunca pode ser selecionado nem pe
       clientName: 'Cliente Tentativa',
       serviceId,
       staffId: staffRafaelId,
-      date: '2026-11-16',
+      date: '2026-11-30',
       time: '14:00',
     },
   });
@@ -315,7 +315,7 @@ test('Cenário 8: Nenhum agendamento duplicado para o mesmo profissional', async
       clientName: 'Cliente Duplicada',
       serviceId,
       staffId: staffJessicaId,
-      date: '2026-11-16',
+      date: '2026-11-30',
       time: '11:00',
     },
   });

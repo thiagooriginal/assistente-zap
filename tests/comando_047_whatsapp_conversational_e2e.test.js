@@ -316,16 +316,16 @@ test('Complementar 4: Conflito parcial (uma profissional ocupada e outra livre)'
   const sock = createMockSocket();
   const phone = '5511988880005';
 
-  // Ocupar Jéssica no dia 17/11/2026 das 10:00 às 11:00
+  // Ocupar Jéssica no dia 27/11/2026 das 10:00 às 11:00
   db.prepare(`
     INSERT INTO appointments (user_id, title, client_name, client_phone, service_id, staff_id, start_datetime, end_datetime, duration_min, origin, status)
-    VALUES (?, 'Corte', 'Ocupante Jéssica', '5511911112222', ?, ?, '2026-11-17T10:00:00', '2026-11-17T11:00:00', 60, 'PAINEL', 'CONFIRMADO')
+    VALUES (?, 'Corte', 'Ocupante Jéssica', '5511911112222', ?, ?, '2026-11-27T10:00:00', '2026-11-27T11:00:00', 60, 'PAINEL', 'CONFIRMADO')
   `).run(SALON_A.id, serviceCorteId, staffJessicaId);
 
   // Solicitar verificação de slot para Camila no mesmo horário (deve estar livre)
   const check = await salonAppointmentService.checkSlotAvailability(SALON_A.id, {
-    startDt: '2026-11-17T10:00:00',
-    endDt: '2026-11-17T11:00:00',
+    startDt: '2026-11-27T10:00:00',
+    endDt: '2026-11-27T11:00:00',
     serviceId: serviceCorteId,
     staffId: null, // modo automático
     durationMin: 60,
@@ -336,16 +336,16 @@ test('Complementar 4: Conflito parcial (uma profissional ocupada e outra livre)'
 });
 
 test('Complementar 5: Conflito real quando todas as profissionais estão ocupadas', async () => {
-  // Ocupar Jéssica e Camila no dia 17/11/2026 das 14:00 às 15:00
+  // Ocupar Jéssica e Camila no dia 27/11/2026 das 14:00 às 15:00
   db.prepare(`
     INSERT INTO appointments (user_id, title, client_name, client_phone, service_id, staff_id, start_datetime, end_datetime, duration_min, origin, status)
-    VALUES (?, 'Corte', 'Ocupante Jéssica', '5511911112222', ?, ?, '2026-11-17T14:00:00', '2026-11-17T15:00:00', 60, 'PAINEL', 'CONFIRMADO'),
-           (?, 'Corte', 'Ocupante Camila', '5511911113333', ?, ?, '2026-11-17T14:00:00', '2026-11-17T15:00:00', 60, 'PAINEL', 'CONFIRMADO')
+    VALUES (?, 'Corte', 'Ocupante Jéssica', '5511911112222', ?, ?, '2026-11-27T14:00:00', '2026-11-27T15:00:00', 60, 'PAINEL', 'CONFIRMADO'),
+           (?, 'Corte', 'Ocupante Camila', '5511911113333', ?, ?, '2026-11-27T14:00:00', '2026-11-27T15:00:00', 60, 'PAINEL', 'CONFIRMADO')
   `).run(SALON_A.id, serviceCorteId, staffJessicaId, SALON_A.id, serviceCorteId, staffCamilaId);
 
   const check = await salonAppointmentService.checkSlotAvailability(SALON_A.id, {
-    startDt: '2026-11-17T14:00:00',
-    endDt: '2026-11-17T15:00:00',
+    startDt: '2026-11-27T14:00:00',
+    endDt: '2026-11-27T15:00:00',
     serviceId: serviceCorteId,
     staffId: null,
     durationMin: 60,

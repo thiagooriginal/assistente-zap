@@ -163,7 +163,7 @@ test.before(async () => {
       user_id, title, client_name, client_phone, service_id, staff_id,
       start_datetime, end_datetime, duration_min, origin, status, reminder_consent
     )
-    VALUES (?, 'Corte Feminino em Camadas', 'Cliente Ocupante', '5511988887777', ?, ?, '2026-11-16T09:00:00', '2026-11-16T10:00:00', 60, 'PAINEL', 'CONFIRMADO', 1)
+    VALUES (?, 'Corte Feminino em Camadas', 'Cliente Ocupante', '5511988887777', ?, ?, '2026-11-30T09:00:00', '2026-11-30T10:00:00', 60, 'PAINEL', 'CONFIRMADO', 1)
   `).run(SALON.id, serviceCorteId, staffJessicaId);
 });
 
@@ -181,7 +181,7 @@ test.after(async () => {
 
 test('Melhoria 1: Consulta /check-slot no modo Automático retorna a profissional disponível antes da confirmação', async () => {
   // Segunda-feira 16/11/2026 às 09:00: Jéssica ocupada, Camila livre
-  const res = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-16&time=09:00&service_id=${serviceCorteId}&staff_id=`);
+  const res = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-30&time=09:00&service_id=${serviceCorteId}&staff_id=`);
 
   assert.strictEqual(res.status, 200);
   assert.strictEqual(res.data.available, true);
@@ -191,7 +191,7 @@ test('Melhoria 1: Consulta /check-slot no modo Automático retorna a profissiona
 
 test('Melhoria 1: Consulta /check-slot omite indicação de profissional quando há conflito de horário', async () => {
   // Segunda-feira 16/11/2026 às 09:00 para Coloração: apenas Jéssica realiza e ela está ocupada
-  const res = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-16&time=09:00&service_id=${serviceColoracaoId}&staff_id=`);
+  const res = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-30&time=09:00&service_id=${serviceColoracaoId}&staff_id=`);
 
   assert.strictEqual(res.status, 200);
   assert.strictEqual(res.data.available, false);
@@ -201,12 +201,12 @@ test('Melhoria 1: Consulta /check-slot omite indicação de profissional quando 
 
 test('Melhoria 1: Consulta com profissional selecionado manualmente preserva resolução individual', async () => {
   // Consulta explícita por Camila
-  const resCamila = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-16&time=09:00&service_id=${serviceCorteId}&staff_id=${staffCamilaId}`);
+  const resCamila = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-30&time=09:00&service_id=${serviceCorteId}&staff_id=${staffCamilaId}`);
   assert.strictEqual(resCamila.data.available, true);
   assert.strictEqual(resCamila.data.assignedStaffName, 'Camila Santos');
 
   // Consulta explícita por Jéssica (ocupada)
-  const resJessica = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-16&time=09:00&service_id=${serviceCorteId}&staff_id=${staffJessicaId}`);
+  const resJessica = await apiRequest(`/api/client/appointments/check-slot?date=2026-11-30&time=09:00&service_id=${serviceCorteId}&staff_id=${staffJessicaId}`);
   assert.strictEqual(resJessica.data.available, false);
 });
 
@@ -215,7 +215,7 @@ test('Melhoria 2: Agendamento criado sem consentimento grava reminder_consent = 
     serviceId: serviceCorteId,
     clientName: 'Ana Beatriz',
     clientPhone: '5511977776666',
-    date: '2026-11-16',
+    date: '2026-11-30',
     time: '11:00',
     reminderConsent: 0,
     origin: 'PAINEL',
@@ -248,7 +248,7 @@ test('Melhoria 2: Agendamento criado com consentimento grava reminder_consent = 
     serviceId: serviceCorteId,
     clientName: 'Carla Cristina',
     clientPhone: '5511977775555',
-    date: '2026-11-16',
+    date: '2026-11-30',
     time: '14:00',
     reminderConsent: 1,
     origin: 'PAINEL',
@@ -268,7 +268,7 @@ test('Melhoria 2: Atualização de consentimento via updateAppointmentConsent tr
     serviceId: serviceCorteId,
     clientName: 'Fernanda Lima',
     clientPhone: '5511977774444',
-    date: '2026-11-16',
+    date: '2026-11-30',
     time: '16:00',
     reminderConsent: 0,
     origin: 'PAINEL',

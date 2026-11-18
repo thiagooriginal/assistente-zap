@@ -12,6 +12,7 @@
 const db = require('../database/db');
 const phoneUtils = require('../utils/phoneUtils');
 const salonAppointmentService = require('../services/salonAppointmentService');
+const jessicaNluService = require('../services/jessicaNluService');
 
 /**
  * Acesso preguiçoso (lazy) ao salonSessionManager para eliminar advertência de dependência circular
@@ -418,6 +419,283 @@ async function findCandidateSlots(userId, service, staff = null) {
 }
 
 /**
+ * Processa a mensagem através da Jéssica Conversacional 2.0 (NLU) com validação defensiva
+ * e ancoragem no backend determinístico.
+ *
+ * @private
+ * @param {object} params
+ * @returns {Promise<string|null>} Retorna texto da resposta ou null para acionar fallback
+ */
+async function handleConversationalV2({
+  nluResult,
+  uid,
+  cleanPhone,
+  salonName,
+  services,
+  staffList,
+  session,
+  text,
+  normText,
+}) {
+  if (!nluResult || !nluResult.intent) return null;
+  const intent = nluResult.intent;
+
+  // 1. Desistência ou Cancelamento voluntário do fluxo
+  if (intent === 'CANCEL_OR_DISMISS' || /^(cancelar|cancela|desisto|sair|parar|deixa pra la)\b/i.test(normText)) {
+    session.state = 'IDLE';
+    session.selectedService = null;
+    session.candidateServices = null;
+    session.selectedStaff = null;
+    session.availableStaffList = [];
+    session.candidateSlots = [];
+    session.selectedSlot = null;
+    session.lastAppointmentId = null;
+    return nluResult.friendlyMessage || `Tudo bem! O agendamento foi cancelado. Se precisar de qualquer informação ou quiser marcar em outro momento, estarei por aqui! ✨`;
+  }
+
+  // 2. Opt-in ou Opt-out de Lembretes 24h (LGPD)
+  if (session.state === 'AWAITING_REMINDER_OPTIN' || intent === 'REMINDER_OPTIN') {
+    const isNegative = nluResult.optInConsent === false || /^(nao|não|2|dispensa|cancelar|sem lembrete)/i.test(normText) || /\bsem\s+lembrete/i.test(normText);
+    const isAffirmative = nluResult.optInConsent === true || /^(1|sim|quero|autorizo|pode enviar)/i.test(normText) || /quero\s+(receber\s+)?(o\s+|os\s+)?lembrete/i.test(normText);
+
+    if (isNegative) {
+      session.state = 'IDLE';
+      session.lastAppointmentId = null;
+      return `Tudo bem! Seu agendamento permanece confirmado normalmente sem lembretes automáticos. Se precisar de algo, estarei à disposição! ✨`;
+    }
+
+    if (isAffirmative && session.lastAppointmentId) {
+      const salonReminderService = require('../services/salonReminderService');
+      salonAppointmentService.updateAppointmentConsent(session.lastAppointmentId, uid, 1, 'whatsapp_bot_optin');
+      salonReminderService.registerClientConsent(uid, cleanPhone, 'whatsapp_bot_optin');
+
+      session.state = 'IDLE';
+      session.lastAppointmentId = null;
+      return `Combinado! Lembrete de 24h ativado com sucesso. ✨\n\nCaso queira cancelar os lembretes no futuro, basta digitar *Parar lembretes* a qualquer momento.\n\nNos vemos em breve no *${salonName}*! 💖`;
+    }
+
+    session.state = 'IDLE';
+    session.lastAppointmentId = null;
+  }
+
+  // 3. Confirmação Final do Agendamento
+  if (session.state === 'AWAITING_CONFIRMATION' && (intent === 'CONFIRM_BOOKING' || /^(sim|confirmo|pode agendar|ok|positivo|1)\b/i.test(normText))) {
+    const validService = db.prepare(`
+      SELECT id, name, price, duration_min
+      FROM client_services
+      WHERE id = ? AND user_id = ? AND active = 1
+    `).get(session.selectedService.id, uid);
+
+    if (!validService) {
+      throw new Error('SECURITY_VIOLATION_IDOR: Serviço inválido.');
+    }
+
+    let finalStaffId = session.selectedStaff ? session.selectedStaff.id : null;
+    if (!finalStaffId) {
+      const eff = salonAppointmentService.resolveEffectiveStaff(uid, {
+        serviceId: validService.id,
+        staffId: null,
+        date: session.selectedSlot.date,
+        time: session.selectedSlot.time,
+        durationMin: validService.duration_min,
+      });
+      finalStaffId = eff.staffId;
+      session.selectedStaff = { id: eff.staffId, name: eff.staffName };
+    }
+
+    const booked = await salonAppointmentService.bookAppointment(uid, {
+      clientName: session.customerName || 'Cliente WhatsApp',
+      clientPhone: cleanPhone,
+      serviceId: validService.id,
+      staffId: finalStaffId,
+      date: session.selectedSlot.date,
+      time: session.selectedSlot.time,
+      durationMin: validService.duration_min,
+      origin: 'WHATSAPP_BOT',
+      reminderConsent: 0,
+      reminderConsentOrigin: null,
+    });
+
+    const displayDate = formatDisplayDate(session.selectedSlot.date);
+    const staffName = session.selectedStaff ? session.selectedStaff.name : (booked?.staff_name || 'Equipe do Salão');
+    const priceFormatted = formatPrice(session.selectedService.price);
+
+    session.state = 'AWAITING_REMINDER_OPTIN';
+    session.lastAppointmentId = booked.id;
+    session.selectedService = null;
+    session.candidateServices = null;
+    session.selectedStaff = null;
+    session.candidateSlots = [];
+    session.selectedSlot = null;
+
+    return `🎉 *Agendamento confirmado com sucesso!* 🎉\n\n` +
+      `Estamos muito felizes em te receber no *${salonName}*! ✨\n\n` +
+      `📋 *Detalhes do Atendimento:*\n` +
+      `• *Espaço:* ${salonName}\n` +
+      `• *Serviço:* ${validService.name}\n` +
+      `• *Profissional:* ${staffName}\n` +
+      `• *Data:* ${displayDate}\n` +
+      `• *Horário:* ${booked.start_time || session.selectedSlot?.time}\n` +
+      `• *Valor:* R$ ${priceFormatted}\n\n` +
+      `🔔 *Lembrete 24h por WhatsApp (Opcional):*\n` +
+      `Gostaria de receber um lembrete automático 24 horas antes do seu horário?\n` +
+      `• Digite *Sim* para autorizar\n` +
+      `• (Se não quiser, não precisa responder nada — seu agendamento já está confirmado!)\n\n` +
+      `Até breve! 💖`;
+  }
+
+  // 4. Consulta de Preço / Valores (sem perder o serviço em andamento se já estiver selecionado)
+  if (intent === 'PRICE_INQUIRY' || intent === 'PRICE_SERVICE_INQUIRY' || intent === 'SERVICE_INQUIRY') {
+    const queryTerm = nluResult.serviceName || text;
+    const resMatch = resolveServiceMatch(services, queryTerm);
+    if (resMatch.status === 'EXACT') {
+      const s = resMatch.match;
+      let extra = '';
+      if (session.selectedService && session.selectedService.id !== s.id) {
+        extra = `\n\n(Seu agendamento para *${session.selectedService.name}* continua em andamento! Deseja trocar para este serviço ou continuar?)`;
+      } else {
+        extra = `\n\nGostaria de verificar os horários livres para agendar? É só me falar o dia de sua preferência! ✨`;
+      }
+      return `O procedimento *${s.name}* no *${salonName}* custa *R$ ${formatPrice(s.price)}* (duração estimada de ${s.duration_min} minutos).${extra}`;
+    }
+  }
+
+  // 5. Seleção de Horário/Slot
+  if (session.state === 'AWAITING_SLOT' && (session.candidateSlots?.length > 0)) {
+    const slots = session.candidateSlots;
+    const num = parseInt(normText, 10);
+    let pickedSlot = null;
+
+    if (intent === 'CHANGE_PREFERENCE' && nluResult.serviceName) {
+      // Cliente mudou de ideia sobre o serviço mesmo estando na tela de slots
+      session.selectedService = null;
+      session.selectedStaff = null;
+      session.candidateSlots = [];
+      session.state = 'IDLE';
+    } else {
+      if (!isNaN(num) && num >= 1 && num <= slots.length) {
+        pickedSlot = slots[num - 1];
+      } else if (normText.includes('primeiro') || normText.includes('primeiro horario') || normText.includes('primeira vaga')) {
+        pickedSlot = slots[0];
+      } else if (nluResult.time) {
+        const cleanT = nluResult.time.replace('h', ':');
+        pickedSlot = slots.find((s) => s.time.includes(cleanT) || cleanT.includes(s.time)) || null;
+      } else {
+        pickedSlot = slots.find((s) => normText.includes(s.time.replace(':', 'h')) || normText.includes(s.time)) || null;
+      }
+
+      if (pickedSlot) {
+        session.selectedSlot = { date: pickedSlot.date, time: pickedSlot.time };
+        session.state = 'AWAITING_CONFIRMATION';
+
+        if (!session.selectedStaff) {
+          try {
+            const eff = salonAppointmentService.resolveEffectiveStaff(uid, {
+              serviceId: session.selectedService.id,
+              staffId: null,
+              date: pickedSlot.date,
+              time: pickedSlot.time,
+              durationMin: session.selectedService.duration_min,
+            });
+            session.selectedStaff = { id: eff.staffId, name: eff.staffName };
+          } catch (_) {}
+        }
+
+        const displayDate = formatDisplayDate(pickedSlot.date);
+        const staffName = session.selectedStaff ? session.selectedStaff.name : 'Equipe do Salão';
+        const priceFormatted = formatPrice(session.selectedService.price);
+
+        return `Perfeito! Já separei esse horário para você:\n\n` +
+          `📍 *Espaço:* ${salonName}\n` +
+          `💇‍♀️ *Serviço:* ${session.selectedService.name}\n` +
+          `👤 *Profissional:* ${staffName}\n` +
+          `📅 *Data:* ${displayDate} (${pickedSlot.dayLabel.split(' ')[0]})\n` +
+          `⏰ *Horário:* ${pickedSlot.time}\n` +
+          `💰 *Valor:* R$ ${priceFormatted}\n\n` +
+          `Posso confirmar o agendamento? Digite *Sim* para confirmar ou *Cancelar* para desistir. ✨`;
+      }
+    }
+  }
+
+  // 6. Agendamento com Resolução do Serviço
+  if (intent === 'SCHEDULE_INQUIRY' || intent === 'CHANGE_PREFERENCE' || !session.selectedService) {
+    const queryTerm = nluResult.serviceName || text;
+    const resMatch = resolveServiceMatch(services, queryTerm, session.candidateServices);
+
+    if (resMatch.status === 'EXACT') {
+      const matchedService = resMatch.match;
+      session.selectedService = matchedService;
+      session.candidateServices = null;
+
+      const qualifiedStaff = getQualifiedStaffForService(uid, matchedService.id);
+      if (qualifiedStaff.length === 0) {
+        session.state = 'IDLE';
+        return `Adoraríamos te atender para *${matchedService.name}*, mas no momento não temos profissionais com agenda aberta para este procedimento. Nossa equipe entrará em contato em instantes! ✨`;
+      }
+
+      // Se o cliente pediu profissional específico
+      let pickedStaff = null;
+      if (nluResult.staffName && nluResult.staffName !== 'ANY') {
+        const staffNorm = nluResult.staffName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+        pickedStaff = qualifiedStaff.find((st) => {
+          const stNorm = st.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          return stNorm.includes(staffNorm) || staffNorm.includes(stNorm);
+        }) || null;
+      }
+
+      const wantsAny = Boolean(nluResult.staffName === 'ANY' || /(qualquer|tanto faz|sem preferencia|qualquer um|qualquer profissional)/i.test(normText));
+
+      if (pickedStaff) {
+        session.selectedStaff = pickedStaff;
+      } else if (qualifiedStaff.length === 1 || wantsAny) {
+        session.selectedStaff = qualifiedStaff.length === 1 ? qualifiedStaff[0] : null;
+      } else {
+        session.availableStaffList = qualifiedStaff;
+        session.state = 'AWAITING_STAFF';
+        const staffMenu = qualifiedStaff.map((st, i) => `${i + 1}. *${st.name}*`).join('\n');
+        return `Perfeito! Você escolheu *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}).\n\nCom qual de nossas profissionais você gostaria de ser atendida?\n\n${staffMenu}\n${qualifiedStaff.length + 1}. *Qualquer profissional disponível*\n\nPode me dizer o nome ou o número da sua preferência! ✨`;
+      }
+
+      // Busca slots de horários com o serviço e profissional (ou qualquer)
+      let slots = await findCandidateSlots(uid, session.selectedService, session.selectedStaff);
+
+      // Filtro de turno se cliente especificou (manhã, tarde, noite)
+      if (nluResult.period && slots.length > 0) {
+        const period = nluResult.period;
+        const filtered = slots.filter((sl) => {
+          const hour = parseInt(sl.time.split(':')[0], 10);
+          if (period === 'manha') return hour < 12;
+          if (period === 'tarde') return hour >= 12 && hour < 18;
+          if (period === 'noite') return hour >= 18;
+          return true;
+        });
+        if (filtered.length > 0) slots = filtered;
+      }
+
+      if (slots.length > 0) {
+        session.candidateSlots = slots;
+        session.state = 'AWAITING_SLOT';
+        const slotList = slots.map((s, i) => `${i + 1}. ${s.dayLabel} às *${s.time}*`).join('\n');
+        const staffDesc = session.selectedStaff ? `com *${session.selectedStaff.name}*` : 'com nossa equipe';
+        return `Excelente! Para *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}) ${staffDesc}, separei os seguintes horários disponíveis:\n\n${slotList}\n\nQual desses horários fica melhor para você? (Ou pode me dizer outro horário desejado) ✨`;
+      } else {
+        session.state = 'IDLE';
+        return `No momento não encontrei horários livres para *${matchedService.name}* nessa data/período. Deseja verificar para outro dia? Digite o dia de sua preferência! ✨`;
+      }
+    } else if (resMatch.status === 'AMBIGUOUS') {
+      session.candidateServices = resMatch.candidates;
+      session.state = 'AWAITING_SERVICE';
+      const candidateList = resMatch.candidates
+        .map((s, i) => `${i + 1}. *${s.name}* — R$ ${formatPrice(s.price)} (${s.duration_min} min)`)
+        .join('\n');
+      return `Temos mais de uma opção de corte disponível no *${salonName}*:\n\n${candidateList}\n\nPor favor, me diga qual dessas opções você prefere! ✨`;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Formata data YYYY-MM-DD para DD/MM/YYYY
  * @private
  * @param {string} dateStr
@@ -599,7 +877,38 @@ async function dispatchMessage(salonUserId, sock, msg) {
     }
   }
 
+  // 5.2 Execução Opcional da Jéssica Conversacional 2.0 (Sob Feature Flag e Timeout)
+  const isV2Enabled = process.env.JESSICA_CONVERSATIONAL_V2 === 'true';
+  if (isV2Enabled) {
+    try {
+      const nluResult = await jessicaNluService.parseMessage({
+        text,
+        salonName,
+        services,
+        staffList,
+        session,
+      });
+      const v2Response = await handleConversationalV2({
+        nluResult,
+        uid,
+        cleanPhone,
+        salonName,
+        services,
+        staffList,
+        session,
+        text,
+        normText,
+      });
+      if (v2Response) {
+        replyText = v2Response;
+      }
+    } catch (v2Err) {
+      console.warn(`[salonIncomingDispatcher] Jéssica V2 NLU falhou ou expirou (${v2Err.message}). Fallback determinístico acionado com sucesso.`);
+    }
+  }
+
   // 6. Máquina de Estados Conversacionais da Jéssica
+  if (!replyText) {
   switch (session.state) {
     case 'AWAITING_SERVICE': {
       const serviceResolution = resolveServiceMatch(services, text, session.candidateServices);
@@ -969,6 +1278,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
       }
       break;
     }
+  }
   }
 
   // 7. Envio da resposta exclusivamente pelo socket do próprio salão

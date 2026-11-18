@@ -120,6 +120,57 @@ function build24hReminderMessage({ clientName, serviceName, staffName, salonName
 }
 
 /**
+ * Expira lembretes de agendamentos cujo horário de início já passou.
+ * Atualiza reminder_24h_status de PENDING/QUEUED para EXPIRED e cancela
+ * mensagens pendentes associadas na Transactional Outbox.
+ *
+ * @param {Object} options
+ * @param {number} [options.now] Timestamp em ms (default: Date.now())
+ * @param {number} [options.userId] Filtro por salão (opcional)
+ * @returns {{ expiredCount: number }}
+ */
+function expirePastReminders({ now = Date.now(), userId = null } = {}) {
+  const nowIso = toLocalISOString(now);
+  if (!nowIso) return { expiredCount: 0 };
+
+  let updateAptSql = `
+    UPDATE appointments
+    SET reminder_24h_status = 'EXPIRED',
+        updated_at = CURRENT_TIMESTAMP
+    WHERE reminder_24h_status IN ('PENDING', 'QUEUED')
+      AND start_datetime < ?
+  `;
+  const params = [nowIso];
+  if (userId) {
+    updateAptSql += ` AND user_id = ?`;
+    params.push(userId);
+  }
+
+  const result = db.prepare(updateAptSql).run(...params);
+
+  let updateOutboxSql = `
+    UPDATE whatsapp_notification_outbox
+    SET status = 'CANCELLED',
+        last_error = 'Expirado: data do atendimento já passou',
+        locked_at = NULL,
+        sent_at = CURRENT_TIMESTAMP
+    WHERE status IN ('PENDING', 'PROCESSING')
+      AND event_type = 'REMINDER_24H'
+      AND appointment_id IN (
+        SELECT id FROM appointments WHERE reminder_24h_status = 'EXPIRED'
+      )
+  `;
+  const outboxParams = [];
+  if (userId) {
+    updateOutboxSql += ` AND user_id = ?`;
+    outboxParams.push(userId);
+  }
+  db.prepare(updateOutboxSql).run(...outboxParams);
+
+  return { expiredCount: result.changes };
+}
+
+/**
  * Scans upcoming appointments and enqueues 24h reminders into the Transactional Outbox.
  * 
  * Rules:
@@ -136,6 +187,10 @@ function build24hReminderMessage({ clientName, serviceName, staffName, salonName
  * @returns {Array} List of processed / enqueued reminder results
  */
 function checkAndQueue24hReminders({ now = Date.now(), userId = null } = {}) {
+  // 1. Expira proativamente qualquer lembrete de atendimento já passado
+  expirePastReminders({ now, userId });
+
+  const nowIso = toLocalISOString(now);
   let query = `
     SELECT 
       a.id AS appointment_id,
@@ -161,12 +216,13 @@ function checkAndQueue24hReminders({ now = Date.now(), userId = null } = {}) {
       AND a.reminder_consent = 1
       AND sal.b2c_reminders_enabled = 1
       AND a.client_phone IS NOT NULL
+      AND a.start_datetime >= ?
       AND NOT EXISTS (
         SELECT 1 FROM salon_client_optouts o
         WHERE o.user_id = a.user_id AND (o.phone = a.client_phone OR o.phone = ('55' || a.client_phone))
       )
   `;
-  const params = [];
+  const params = [nowIso];
 
   if (userId) {
     query += ` AND a.user_id = ?`;
@@ -208,6 +264,15 @@ function checkAndQueue24hReminders({ now = Date.now(), userId = null } = {}) {
     }
 
     if (diffHours < 20) {
+      if (diffHours < 0) {
+        db.prepare(`
+          UPDATE appointments
+          SET reminder_24h_status = 'EXPIRED', updated_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(apt.appointment_id);
+        results.push({ appointmentId: apt.appointment_id, status: 'EXPIRED', diffHours });
+        continue;
+      }
       // Past the 24h window (e.g. booked last minute or window expired)
       // Do not send a confusing "reminder for tomorrow" when it is only a few hours away
       db.prepare(`
@@ -456,4 +521,5 @@ module.exports = {
   stopSalonReminderDaemon,
   revokeClientConsent,
   registerClientConsent,
+  expirePastReminders,
 };

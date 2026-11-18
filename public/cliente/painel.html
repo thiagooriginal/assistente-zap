@@ -7394,6 +7394,9 @@
       if (reminderStatus === 'CANCELLED') {
         return '<span class="apt-badge-reminder-24h inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-slate-500/10 text-slate-500 border border-slate-500/20" title="Lembrete cancelado"><i data-lucide="bell-off" class="w-2.5 h-2.5"></i> Lembrete 24h: Cancelado</span>';
       }
+      if (reminderStatus === 'EXPIRED') {
+        return '<span class="apt-badge-reminder-24h inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/20" title="Lembrete expirado (horário do atendimento já passou)"><i data-lucide="clock" class="w-2.5 h-2.5 text-slate-400"></i> Lembrete 24h: Expirado</span>';
+      }
       if (reminderStatus === 'DISABLED' || reminderStatus === 'SKIPPED_TOO_CLOSE') {
         return '<span class="apt-badge-reminder-24h inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-slate-800/40 text-slate-500 border border-slate-700/30" title="Lembrete 24h não aplicável ou desativado">Lembrete: Desativado</span>';
       }
@@ -7438,7 +7441,9 @@
             ? '<span class="apt-badge-conflict inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⚠️ Conflito Detectado</span>'
             : '';
 
-          const originTag = a.origin === 'whatsapp'
+          const normOrigin = String(a.origin || '').trim().toLowerCase();
+          const isWhatsAppOrigin = normOrigin === 'whatsapp' || normOrigin === 'whatsapp_bot';
+          const originTag = isWhatsAppOrigin
             ? '<span class="apt-badge-origin-wa inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><i data-lucide="message-circle" class="w-2.5 h-2.5"></i> WhatsApp</span>'
             : '<span class="apt-badge-origin-panel inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-slate-400 border border-white/10">Painel</span>';
 
