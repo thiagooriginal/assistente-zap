@@ -12,11 +12,13 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const config = require('../config');
 
 // Ordem mandatária de modelos Gemini para baixa latência e alta disponibilidade
-const GEMINI_MODELS = [
-  'gemini-1.5-flash',
-  'gemini-2.0-flash',
-  'gemini-flash-latest',
-];
+// Permite sobrescrita via variável de ambiente GEMINI_MODEL sem expor dados sensíveis
+const GEMINI_MODELS = process.env.GEMINI_MODEL
+  ? [process.env.GEMINI_MODEL.trim()]
+  : [
+      'gemini-3.5-flash-lite',
+      'gemini-3.8-flash',
+    ];
 
 const NLU_TIMEOUT_MS = 3500;
 const MAX_INPUT_CHARS = 500;
@@ -119,12 +121,19 @@ Intenções possíveis (intent):
 - REMINDER_OPTIN: Cliente respondendo sobre autorização de lembrete 24h por WhatsApp (ex: "sim", "quero", "não", "sem lembrete").
 - GENERAL_TALK: Saudação inicial, agradecimento simples ("obrigada", "valeu") ou conversa geral cordial.
 
+Parâmetros temporais obrigatórios quando mencionados pelo cliente:
+- datePreference: "hoje", "amanha", "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo", ou "YYYY-MM-DD".
+- period: "manha" (< 12h), "tarde" (12h às 18h), "noite" (>= 18h), ou null.
+- timeConstraint: restrições explícitas como "after_15h" ("depois das 15h"), "not_morning" ("não posso de manhã"), "first_available" ("primeiro horário"), etc.
+
 Schema JSON de saída:
 {
   "intent": "SCHEDULE_INQUIRY" | "SERVICE_INQUIRY" | "PRICE_INQUIRY" | "CHANGE_PREFERENCE" | "CONFIRM_BOOKING" | "CANCEL_OR_DISMISS" | "REMINDER_OPTIN" | "GENERAL_TALK",
   "serviceName": string | null,
   "staffName": string | null,
+  "datePreference": string | null,
   "period": "manha" | "tarde" | "noite" | null,
+  "timeConstraint": string | null,
   "date": string | null,
   "time": string | null,
   "optInConsent": boolean | null,

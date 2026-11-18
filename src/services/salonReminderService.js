@@ -124,50 +124,82 @@ function build24hReminderMessage({ clientName, serviceName, staffName, salonName
  * Atualiza reminder_24h_status de PENDING/QUEUED para EXPIRED e cancela
  * mensagens pendentes associadas na Transactional Outbox.
  *
- * @param {Object} options
+ * @param {Object} [options]
  * @param {number} [options.now] Timestamp em ms (default: Date.now())
  * @param {number} [options.userId] Filtro por salão (opcional)
- * @returns {{ expiredCount: number }}
+ * @param {boolean} [options._failForTest] Hook para validação de rollback em testes herméticos
+ * @returns {{ expiredCount: number, cancelledOutboxCount: number }}
  */
-function expirePastReminders({ now = Date.now(), userId = null } = {}) {
+function expirePastReminders({ now = Date.now(), userId = null, _failForTest = false } = {}) {
   const nowIso = toLocalISOString(now);
-  if (!nowIso) return { expiredCount: 0 };
+  if (!nowIso) return { expiredCount: 0, cancelledOutboxCount: 0 };
 
-  let updateAptSql = `
-    UPDATE appointments
-    SET reminder_24h_status = 'EXPIRED',
-        updated_at = CURRENT_TIMESTAMP
-    WHERE reminder_24h_status IN ('PENDING', 'QUEUED')
-      AND start_datetime < ?
-  `;
-  const params = [nowIso];
-  if (userId) {
-    updateAptSql += ` AND user_id = ?`;
-    params.push(userId);
+  try {
+    db.exec('BEGIN IMMEDIATE');
+
+    let updateAptSql = `
+      UPDATE appointments
+      SET reminder_24h_status = 'EXPIRED',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE reminder_24h_status IN ('PENDING', 'QUEUED')
+        AND start_datetime < ?
+    `;
+    const aptParams = [nowIso];
+    if (userId) {
+      updateAptSql += ` AND user_id = ?`;
+      aptParams.push(userId);
+    }
+
+    const aptResult = db.prepare(updateAptSql).run(...aptParams);
+
+    // Hook para teste hermético de atomicidade e rollback
+    if (_failForTest) {
+      throw new Error('SIMULATED_TRANSACTION_FAILURE_FOR_TEST');
+    }
+
+    let updateOutboxSql = `
+      UPDATE whatsapp_notification_outbox
+      SET status = 'CANCELLED',
+          last_error = 'Expirado: data do atendimento já passou',
+          locked_at = NULL,
+          sent_at = CURRENT_TIMESTAMP
+      WHERE status IN ('PENDING', 'PROCESSING')
+        AND event_type = 'REMINDER_24H'
+    `;
+    const outboxParams = [];
+    if (userId) {
+      updateOutboxSql += ` AND user_id = ?`;
+      outboxParams.push(userId);
+    }
+
+    updateOutboxSql += `
+        AND appointment_id IN (
+          SELECT id FROM appointments
+          WHERE reminder_24h_status = 'EXPIRED'
+            AND start_datetime < ?
+    `;
+    outboxParams.push(nowIso);
+
+    if (userId) {
+      updateOutboxSql += ` AND user_id = ?`;
+      outboxParams.push(userId);
+    }
+    updateOutboxSql += ` )`;
+
+    const outboxResult = db.prepare(updateOutboxSql).run(...outboxParams);
+
+    db.exec('COMMIT');
+
+    return {
+      expiredCount: aptResult.changes,
+      cancelledOutboxCount: outboxResult.changes,
+    };
+  } catch (err) {
+    try {
+      db.exec('ROLLBACK');
+    } catch (_) {}
+    throw err;
   }
-
-  const result = db.prepare(updateAptSql).run(...params);
-
-  let updateOutboxSql = `
-    UPDATE whatsapp_notification_outbox
-    SET status = 'CANCELLED',
-        last_error = 'Expirado: data do atendimento já passou',
-        locked_at = NULL,
-        sent_at = CURRENT_TIMESTAMP
-    WHERE status IN ('PENDING', 'PROCESSING')
-      AND event_type = 'REMINDER_24H'
-      AND appointment_id IN (
-        SELECT id FROM appointments WHERE reminder_24h_status = 'EXPIRED'
-      )
-  `;
-  const outboxParams = [];
-  if (userId) {
-    updateOutboxSql += ` AND user_id = ?`;
-    outboxParams.push(userId);
-  }
-  db.prepare(updateOutboxSql).run(...outboxParams);
-
-  return { expiredCount: result.changes };
 }
 
 /**

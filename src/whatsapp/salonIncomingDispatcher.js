@@ -26,6 +26,17 @@ const customerSessions = new Map();
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutos
 
 const WEEKDAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+const WEEKDAY_NAME_TO_INDEX = {
+  domingo: 0,
+  segunda: 1,
+  terca: 2,
+  terça: 2,
+  quarta: 3,
+  quinta: 4,
+  sexta: 5,
+  sabado: 6,
+  sábado: 6,
+};
 
 /**
  * Limpa periodicamente sessões conversacionais inativas da memória
@@ -344,14 +355,122 @@ function findMatchingService(services, text) {
 }
 
 /**
+ * Converte preferência de data em lista de dias alvo
+ * @param {string|null} datePreference "hoje", "amanha", "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo", ou "YYYY-MM-DD"
+ * @param {Date} [baseDate=new Date()]
+ * @returns {Array<{ dateStr: string, label: string, offset: number }>}
+ */
+function resolveCandidateDays(datePreference, baseDate = new Date()) {
+  const normPref = String(datePreference || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+  const pad = (n) => String(n).padStart(2, '0');
+  const makeDay = (d, offset, customLabel) => {
+    const y = d.getFullYear();
+    const m = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const dateStr = `${y}-${m}-${day}`;
+    let label = customLabel;
+    if (!label) {
+      if (offset === 0) label = `Hoje (${day}/${m})`;
+      else if (offset === 1) label = `Amanhã (${day}/${m})`;
+      else label = `${WEEKDAY_NAMES[d.getDay()]} (${day}/${m})`;
+    }
+    return { dateStr, label, offset };
+  };
+
+  if (!normPref || normPref === 'hoje') {
+    if (normPref === 'hoje') {
+      return [makeDay(new Date(baseDate), 0, null)];
+    }
+    return getUpcomingCandidateDays(4, baseDate);
+  }
+
+  if (normPref === 'amanha') {
+    const target = new Date(baseDate.getTime() + 24 * 60 * 60 * 1000);
+    return [makeDay(target, 1, null)];
+  }
+
+  // YYYY-MM-DD direto
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normPref)) {
+    const [y, m, d] = normPref.split('-').map(Number);
+    const target = new Date(y, m - 1, d);
+    const diffDays = Math.round((target.getTime() - baseDate.getTime()) / (24 * 60 * 60 * 1000));
+    return [makeDay(target, Math.max(0, diffDays), null)];
+  }
+
+  // Nome do dia da semana (ex: "sexta", "sabado", "segunda")
+  for (const [key, targetDayIdx] of Object.entries(WEEKDAY_NAME_TO_INDEX)) {
+    if (normPref.includes(key)) {
+      const currentDayIdx = baseDate.getDay();
+      let diff = targetDayIdx - currentDayIdx;
+      if (diff <= 0) diff += 7; // Próximo dia da semana
+      const target = new Date(baseDate.getTime() + diff * 24 * 60 * 60 * 1000);
+      return [makeDay(target, diff, null)];
+    }
+  }
+
+  return getUpcomingCandidateDays(4, baseDate);
+}
+
+/**
+ * Filtra slots de acordo com preferências de período e restrições de horário
+ * @param {Array<object>} slots
+ * @param {'manha'|'tarde'|'noite'|null} period
+ * @param {string|null} timeConstraint ex: "after_15h", "not_morning", "first_available"
+ * @returns {Array<object>}
+ */
+function filterSlotsByPreference(slots, period, timeConstraint) {
+  if (!Array.isArray(slots) || slots.length === 0) return [];
+  let filtered = [...slots];
+
+  if (period) {
+    filtered = filtered.filter((sl) => {
+      const hour = parseInt(sl.time.split(':')[0], 10);
+      if (period === 'manha') return hour < 12;
+      if (period === 'tarde') return hour >= 12 && hour < 18;
+      if (period === 'noite') return hour >= 18;
+      return true;
+    });
+  }
+
+  if (timeConstraint) {
+    const norm = String(timeConstraint).toLowerCase();
+    const afterMatch = norm.match(/(?:after|depois|apos)_?(\d{1,2})h?/i);
+    if (afterMatch) {
+      const minHour = parseInt(afterMatch[1], 10);
+      filtered = filtered.filter((sl) => {
+        const hour = parseInt(sl.time.split(':')[0], 10);
+        return hour >= minHour;
+      });
+    }
+    if (norm.includes('not_morning') || norm.includes('nao_manha')) {
+      filtered = filtered.filter((sl) => {
+        const hour = parseInt(sl.time.split(':')[0], 10);
+        return hour >= 12;
+      });
+    }
+    if (norm.includes('first_available') || norm.includes('primeiro')) {
+      if (filtered.length > 0) filtered = [filtered[0]];
+    }
+  }
+
+  return filtered;
+}
+
+/**
  * Gera lista de datas candidatas para busca de horários disponíveis
  * @private
  * @param {number} [count=4]
+ * @param {Date} [baseDate=new Date()]
  * @returns {Array<{ dateStr: string, label: string, offset: number }>}
  */
-function getUpcomingCandidateDays(count = 4) {
+function getUpcomingCandidateDays(count = 4, baseDate = new Date()) {
   const days = [];
-  const now = new Date();
+  const now = baseDate;
 
   for (let i = 0; i < 7 && days.length < count; i++) {
     const d = new Date(now.getTime() + i * 24 * 60 * 60 * 1000);
@@ -380,15 +499,19 @@ function getUpcomingCandidateDays(count = 4) {
  * @param {number} userId
  * @param {object} service
  * @param {object|null} staff
+ * @param {Array<object>|null} [targetDays=null]
  * @returns {Promise<Array<{ number: number, date: string, time: string, dayLabel: string }>>}
  */
-async function findCandidateSlots(userId, service, staff = null) {
+async function findCandidateSlots(userId, service, staff = null, targetDays = null) {
   const duration = service?.duration_min || 45;
   const staffId = staff ? staff.id : null;
-  const days = getUpcomingCandidateDays(4);
+  const days = Array.isArray(targetDays) && targetDays.length > 0
+    ? targetDays
+    : getUpcomingCandidateDays(4);
 
   const allCandidateSlots = [];
   let counter = 1;
+  const perDayLimit = days.length === 1 ? 15 : 4;
 
   for (const day of days) {
     try {
@@ -397,7 +520,7 @@ async function findCandidateSlots(userId, service, staff = null) {
         serviceDurationMin: duration,
         staffId,
         serviceId: service?.id || null,
-        limit: 3, // Limita a 3 sugestões por dia para não poluir o WhatsApp
+        limit: perDayLimit,
       });
 
       if (Array.isArray(freeSlots) && freeSlots.length > 0) {
@@ -408,11 +531,11 @@ async function findCandidateSlots(userId, service, staff = null) {
             time: slotTime,
             dayLabel: day.label,
           });
-          if (allCandidateSlots.length >= 6) break;
+          if (allCandidateSlots.length >= 15) break;
         }
       }
     } catch (_) {}
-    if (allCandidateSlots.length >= 6) break;
+    if (allCandidateSlots.length >= 15) break;
   }
 
   return allCandidateSlots;
@@ -440,23 +563,26 @@ async function handleConversationalV2({
   if (!nluResult || !nluResult.intent) return null;
   const intent = nluResult.intent;
 
-  // 1. Desistência ou Cancelamento voluntário do fluxo
-  if (intent === 'CANCEL_OR_DISMISS' || /^(cancelar|cancela|desisto|sair|parar|deixa pra la)\b/i.test(normText)) {
-    session.state = 'IDLE';
-    session.selectedService = null;
-    session.candidateServices = null;
-    session.selectedStaff = null;
-    session.availableStaffList = [];
-    session.candidateSlots = [];
-    session.selectedSlot = null;
-    session.lastAppointmentId = null;
-    return nluResult.friendlyMessage || `Tudo bem! O agendamento foi cancelado. Se precisar de qualquer informação ou quiser marcar em outro momento, estarei por aqui! ✨`;
-  }
-
-  // 2. Opt-in ou Opt-out de Lembretes 24h (LGPD)
+  // 1. Opt-in ou Opt-out de Lembretes 24h (LGPD - Prioridade Absoluta sobre Cancelamento Genérico)
   if (session.state === 'AWAITING_REMINDER_OPTIN' || intent === 'REMINDER_OPTIN') {
-    const isNegative = nluResult.optInConsent === false || /^(nao|não|2|dispensa|cancelar|sem lembrete)/i.test(normText) || /\bsem\s+lembrete/i.test(normText);
-    const isAffirmative = nluResult.optInConsent === true || /^(1|sim|quero|autorizo|pode enviar)/i.test(normText) || /quero\s+(receber\s+)?(o\s+|os\s+)?lembrete/i.test(normText);
+    // Zero-Trust: jamais conceder consentimento por mera inferência de IA
+    const isExplicitAffirmative =
+      /^(1|sim|autorizo|pode enviar)\b/i.test(normText) ||
+      /^sim,\s*quero(\s+receber)?(\s+o)?\s+lembrete/i.test(normText) ||
+      /^quero\s+receber(\s+os?)?\s+lembrete/i.test(normText);
+
+    // Expressões que NÃO concedem consentimento
+    const isFalsePositive =
+      /quero\s+(agendar|marcar|mudar|ver|trocar|outro)/i.test(normText) ||
+      /^quero\s*$/i.test(normText) ||
+      /mostre\s+os\s+servicos/i.test(normText);
+
+    const isNegative =
+      !isExplicitAffirmative &&
+      (nluResult.optInConsent === false ||
+        /^(nao|não|2|dispensa|cancelar|cancela|sem lembrete)/i.test(normText) ||
+        /\bsem\s+lembrete/i.test(normText) ||
+        isFalsePositive);
 
     if (isNegative) {
       session.state = 'IDLE';
@@ -464,7 +590,7 @@ async function handleConversationalV2({
       return `Tudo bem! Seu agendamento permanece confirmado normalmente sem lembretes automáticos. Se precisar de algo, estarei à disposição! ✨`;
     }
 
-    if (isAffirmative && session.lastAppointmentId) {
+    if (isExplicitAffirmative && !isFalsePositive && session.lastAppointmentId) {
       const salonReminderService = require('../services/salonReminderService');
       salonAppointmentService.updateAppointmentConsent(session.lastAppointmentId, uid, 1, 'whatsapp_bot_optin');
       salonReminderService.registerClientConsent(uid, cleanPhone, 'whatsapp_bot_optin');
@@ -476,6 +602,20 @@ async function handleConversationalV2({
 
     session.state = 'IDLE';
     session.lastAppointmentId = null;
+    return `Tudo bem! Seu agendamento permanece confirmado normalmente sem lembretes automáticos. Se precisar de algo, estarei à disposição! ✨`;
+  }
+
+  // 2. Desistência ou Cancelamento voluntário do fluxo durante agendamento
+  if (intent === 'CANCEL_OR_DISMISS' || /^(cancelar|cancela|desisto|sair|parar|deixa pra la)\b/i.test(normText)) {
+    session.state = 'IDLE';
+    session.selectedService = null;
+    session.candidateServices = null;
+    session.selectedStaff = null;
+    session.availableStaffList = [];
+    session.candidateSlots = [];
+    session.selectedSlot = null;
+    session.lastAppointmentId = null;
+    return nluResult.friendlyMessage || `Tudo bem! O agendamento foi cancelado. Se precisar de qualquer informação ou quiser marcar em outro momento, estarei por aqui! ✨`;
   }
 
   // 3. Confirmação Final do Agendamento
@@ -516,9 +656,12 @@ async function handleConversationalV2({
       reminderConsentOrigin: null,
     });
 
+    // Fix bug: capturar variáveis antes de resetar a sessão para evitar `${undefined}` no horário
     const displayDate = formatDisplayDate(session.selectedSlot.date);
+    const confirmedTime = session.selectedSlot.time;
+    const confirmedServiceName = validService.name;
+    const confirmedPrice = formatPrice(session.selectedService.price);
     const staffName = session.selectedStaff ? session.selectedStaff.name : (booked?.staff_name || 'Equipe do Salão');
-    const priceFormatted = formatPrice(session.selectedService.price);
 
     session.state = 'AWAITING_REMINDER_OPTIN';
     session.lastAppointmentId = booked.id;
@@ -532,11 +675,11 @@ async function handleConversationalV2({
       `Estamos muito felizes em te receber no *${salonName}*! ✨\n\n` +
       `📋 *Detalhes do Atendimento:*\n` +
       `• *Espaço:* ${salonName}\n` +
-      `• *Serviço:* ${validService.name}\n` +
+      `• *Serviço:* ${confirmedServiceName}\n` +
       `• *Profissional:* ${staffName}\n` +
       `• *Data:* ${displayDate}\n` +
-      `• *Horário:* ${booked.start_time || session.selectedSlot?.time}\n` +
-      `• *Valor:* R$ ${priceFormatted}\n\n` +
+      `• *Horário:* ${confirmedTime}\n` +
+      `• *Valor:* R$ ${confirmedPrice}\n\n` +
       `🔔 *Lembrete 24h por WhatsApp (Opcional):*\n` +
       `Gostaria de receber um lembrete automático 24 horas antes do seu horário?\n` +
       `• Digite *Sim* para autorizar\n` +
@@ -565,6 +708,14 @@ async function handleConversationalV2({
     const slots = session.candidateSlots;
     const num = parseInt(normText, 10);
     let pickedSlot = null;
+
+    if (/(mais opc|outros horar|ver mais|tem mais|outras opc)/i.test(normText)) {
+      if (slots.length > 3) {
+        const remainingSlots = slots.slice(3, 9);
+        const slotList = remainingSlots.map((s, i) => `${i + 4}. ${s.dayLabel} às *${s.time}*`).join('\n');
+        return `Aqui estão mais opções de horários disponíveis:\n\n${slotList}\n\nQual desses horários você prefere? ✨`;
+      }
+    }
 
     if (intent === 'CHANGE_PREFERENCE' && nluResult.serviceName) {
       // Cliente mudou de ideia sobre o serviço mesmo estando na tela de slots
@@ -656,31 +807,30 @@ async function handleConversationalV2({
         return `Perfeito! Você escolheu *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}).\n\nCom qual de nossas profissionais você gostaria de ser atendida?\n\n${staffMenu}\n${qualifiedStaff.length + 1}. *Qualquer profissional disponível*\n\nPode me dizer o nome ou o número da sua preferência! ✨`;
       }
 
-      // Busca slots de horários com o serviço e profissional (ou qualquer)
-      let slots = await findCandidateSlots(uid, session.selectedService, session.selectedStaff);
+      // Busca slots de horários com o serviço e profissional (ou qualquer), respeitando data alvo
+      const targetDays = resolveCandidateDays(nluResult.datePreference);
+      let slots = await findCandidateSlots(uid, session.selectedService, session.selectedStaff, targetDays);
 
-      // Filtro de turno se cliente especificou (manhã, tarde, noite)
-      if (nluResult.period && slots.length > 0) {
-        const period = nluResult.period;
-        const filtered = slots.filter((sl) => {
-          const hour = parseInt(sl.time.split(':')[0], 10);
-          if (period === 'manha') return hour < 12;
-          if (period === 'tarde') return hour >= 12 && hour < 18;
-          if (period === 'noite') return hour >= 18;
-          return true;
-        });
-        if (filtered.length > 0) slots = filtered;
+      const hadTimePreference = Boolean(nluResult.period || nluResult.timeConstraint);
+      if (hadTimePreference) {
+        slots = filterSlotsByPreference(slots, nluResult.period, nluResult.timeConstraint);
       }
 
       if (slots.length > 0) {
         session.candidateSlots = slots;
         session.state = 'AWAITING_SLOT';
-        const slotList = slots.map((s, i) => `${i + 1}. ${s.dayLabel} às *${s.time}*`).join('\n');
+        const displaySlots = slots.slice(0, 3);
+        const slotList = displaySlots.map((s, i) => `${i + 1}. ${s.dayLabel} às *${s.time}*`).join('\n');
         const staffDesc = session.selectedStaff ? `com *${session.selectedStaff.name}*` : 'com nossa equipe';
-        return `Excelente! Para *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}) ${staffDesc}, separei os seguintes horários disponíveis:\n\n${slotList}\n\nQual desses horários fica melhor para você? (Ou pode me dizer outro horário desejado) ✨`;
+        const moreHint = slots.length > 3 ? '\n\n(Quer ver mais opções? É só me falar!) ✨' : '';
+        return `Excelente! Para *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}) ${staffDesc}, separei os seguintes horários disponíveis:\n\n${slotList}${moreHint}\n\nQual desses horários fica melhor para você? (Ou pode me dizer outro horário desejado) ✨`;
       } else {
         session.state = 'IDLE';
-        return `No momento não encontrei horários livres para *${matchedService.name}* nessa data/período. Deseja verificar para outro dia? Digite o dia de sua preferência! ✨`;
+        if (hadTimePreference) {
+          const prefDesc = nluResult.period ? `no período da ${nluResult.period}` : 'no horário solicitado';
+          return `Não encontrei horários disponíveis para *${matchedService.name}* ${prefDesc} nessa data. Você teria disponibilidade em outro turno ou dia? Me avise para eu verificar! ✨`;
+        }
+        return `No momento não encontrei horários livres para *${matchedService.name}* nessa data. Deseja verificar para outro dia? Digite o dia de sua preferência! ✨`;
       }
     } else if (resMatch.status === 'AMBIGUOUS') {
       session.candidateServices = resMatch.candidates;
@@ -1306,5 +1456,7 @@ module.exports = {
   dispatchMessage,
   resolveServiceMatch,
   findMatchingService,
+  resolveCandidateDays,
+  filterSlotsByPreference,
   _resetForTesting,
 };
