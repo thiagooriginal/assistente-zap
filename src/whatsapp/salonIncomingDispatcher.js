@@ -477,6 +477,93 @@ function filterSlotsByPreference(slots, period, timeConstraint) {
 }
 
 /**
+ * Extrai preferências temporais deterministicamente a partir de texto normalizado
+ * @param {string} normText
+ * @returns {{ datePref: string|null, periodPref: 'manha'|'tarde'|'noite'|null }}
+ */
+function extractDeterministicTemporal(normText) {
+  if (!normText || typeof normText !== 'string') {
+    return { datePref: null, periodPref: null };
+  }
+
+  const clean = normalizeText(normText);
+  let datePref = null;
+  let periodPref = null;
+
+  if (/\bhoje\b/i.test(clean)) {
+    datePref = 'hoje';
+  } else if (/\bamanha\b/i.test(clean)) {
+    datePref = 'amanha';
+  } else {
+    for (const [key] of Object.entries(WEEKDAY_NAME_TO_INDEX)) {
+      const reg = new RegExp(`\\b${key}(-feira)?\\b`, 'i');
+      if (reg.test(clean)) {
+        datePref = key;
+        break;
+      }
+    }
+  }
+
+  if (/\b(manha|cedo|pela manha|de manha)\b/i.test(clean)) {
+    periodPref = 'manha';
+  } else if (/\b(tarde|a tarde|pela tarde|de tarde)\b/i.test(clean)) {
+    periodPref = 'tarde';
+  } else if (/\b(noite|a noite|pela noite|de noite)\b/i.test(clean)) {
+    periodPref = 'noite';
+  }
+
+  return { datePref, periodPref };
+}
+
+/**
+ * Formata descrição fluida do alvo temporal para acolhimento conversacional
+ * @param {string|null} datePref
+ * @param {'manha'|'tarde'|'noite'|null} periodPref
+ * @returns {string}
+ */
+function formatTemporalTarget(datePref, periodPref) {
+  if (datePref === 'hoje') {
+    if (periodPref === 'manha') return 'hoje de manhã';
+    if (periodPref === 'tarde') return 'hoje à tarde';
+    if (periodPref === 'noite') return 'hoje à noite';
+    return 'hoje';
+  }
+  if (datePref === 'amanha') {
+    if (periodPref === 'manha') return 'amanhã de manhã';
+    if (periodPref === 'tarde') return 'amanhã à tarde';
+    if (periodPref === 'noite') return 'amanhã à noite';
+    return 'amanhã';
+  }
+  if (datePref) {
+    const periodDesc = periodPref === 'manha' ? ' de manhã' : (periodPref === 'tarde' ? ' à tarde' : (periodPref === 'noite' ? ' à noite' : ''));
+    return `para ${datePref}${periodDesc}`;
+  }
+  if (periodPref === 'manha') return 'pela manhã';
+  if (periodPref === 'tarde') return 'à tarde';
+  if (periodPref === 'noite') return 'à noite';
+  return '';
+}
+
+/**
+ * Verifica se o texto expressa intenção de agendamento ou renovação visual
+ * @param {string} normText
+ * @returns {boolean}
+ */
+function isSchedulingOrCareIntent(normText) {
+  if (!normText) return false;
+  const clean = normalizeText(normText);
+  return /\b(agendar|marcar|horario|horarios|vaga|vagas|disponibilidade|atendimento|atender|atendem|atendendo|cortar|corte|renovar|visual|cuidar|trato|fazer|manicure|pedicure|escova|sobrancelha|barba)\b/i.test(clean) ||
+    /dar\s+uma\s+renovada/i.test(clean) ||
+    /renovar\s+o\s+visual/i.test(clean) ||
+    /dar\s+um\s+trato/i.test(clean) ||
+    /tem\s+(horario|vaga)/i.test(clean) ||
+    /tem\s+como\s+(atender|agendar|marcar)/i.test(clean) ||
+    /estao\s+atendendo/i.test(clean) ||
+    /está\s+atendendo/i.test(clean) ||
+    /quero\s+(mudar|arrumar|cuidar|cortar|fazer)/i.test(clean);
+}
+
+/**
  * Gera lista de datas candidatas para busca de horários disponíveis
  * @private
  * @param {number} [count=4]
@@ -716,6 +803,9 @@ async function handleConversationalV2({
     session.candidateSlots = [];
     session.selectedSlot = null;
     session.lastAppointmentId = null;
+    session.requestedDatePref = null;
+    session.requestedPeriod = null;
+    session.requestedTimeConstraint = null;
     return nluResult.friendlyMessage || `Tudo bem! O agendamento foi cancelado. Se precisar de qualquer informação ou quiser marcar em outro momento, estarei por aqui! ✨`;
   }
 
@@ -788,6 +878,9 @@ async function handleConversationalV2({
     session.selectedStaff = null;
     session.candidateSlots = [];
     session.selectedSlot = null;
+    session.requestedDatePref = null;
+    session.requestedPeriod = null;
+    session.requestedTimeConstraint = null;
 
     return `Prontinho! Agendamento confirmado com sucesso: seu agendamento para *${confirmedServiceName}* está marcado para ${datePrep}, às *${confirmedTime}*, com a *${staffName}*, por R$ ${confirmedPrice}. 😊\n\n` +
       `Quer que eu te mande um lembrete aqui no WhatsApp 24 horas antes do seu horário para você não esquecer? ✨\n\n` +
@@ -985,6 +1078,13 @@ async function handleConversationalV2({
       if (datePref) session.requestedDatePref = datePref;
       if (periodPref) session.requestedPeriod = periodPref;
 
+      if (nluResult.friendlyMessage) {
+        return nluResult.friendlyMessage;
+      }
+      if (nluResult.assistantResponse) {
+        return nluResult.assistantResponse;
+      }
+
       let timeTarget = '';
       if (datePref === 'hoje') {
         timeTarget = periodPref === 'manha' ? 'hoje de manhã' : (periodPref === 'tarde' ? 'hoje à tarde' : (periodPref === 'noite' ? 'hoje à noite' : 'hoje'));
@@ -1181,6 +1281,9 @@ async function dispatchMessage(salonUserId, sock, msg) {
     session.candidateSlots = [];
     session.selectedSlot = null;
     session.lastAppointmentId = null;
+    session.requestedDatePref = null;
+    session.requestedPeriod = null;
+    session.requestedTimeConstraint = null;
 
     replyText = `Tudo bem! O agendamento foi cancelado. Se você precisar de qualquer informação sobre nossos serviços ou quiser agendar em outro momento, estarei à sua disposição! ✨`;
     try {
@@ -1260,7 +1363,12 @@ async function dispatchMessage(salonUserId, sock, msg) {
         replyText = `Adoraríamos te atender para *${matchedService.name}*, mas no momento não temos profissionais com agenda aberta para este procedimento. Nossa equipe entrará em contato em instantes! ✨`;
       } else if (qualifiedStaff.length === 1) {
         session.selectedStaff = qualifiedStaff[0];
-        const slots = await findCandidateSlots(uid, session.selectedService, session.selectedStaff);
+        const targetDays = resolveCandidateDays(session.requestedDatePref);
+        let slots = await findCandidateSlots(uid, session.selectedService, session.selectedStaff, targetDays);
+        if (session.requestedPeriod || session.requestedTimeConstraint) {
+          slots = filterSlotsByPreference(slots, session.requestedPeriod, session.requestedTimeConstraint);
+        }
+
         if (slots.length > 0) {
           session.candidateSlots = slots;
           session.state = 'AWAITING_SLOT';
@@ -1268,7 +1376,12 @@ async function dispatchMessage(salonUserId, sock, msg) {
           replyText = `Excelente escolha: *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}) com a *${qualifiedStaff[0].name}*! ✨\n\nSeparei estes horários livres mais próximos para você:\n\n${slotList}\n\nAlgum desses horários fica bom para você? Me conta por aqui!`;
         } else {
           session.state = 'IDLE';
-          replyText = `No momento não encontramos horários disponíveis nos próximos dias para *${matchedService.name}* com ${qualifiedStaff[0].name}. Nossa equipe entrará em contato em breve para verificar um encaixe especial para você! ✨`;
+          const timeTargetDesc = formatTemporalTarget(session.requestedDatePref, session.requestedPeriod);
+          if (timeTargetDesc) {
+            replyText = `Não encontramos horários disponíveis para ${timeTargetDesc} para *${matchedService.name}* com ${qualifiedStaff[0].name}. Gostaria de verificar em outro turno ou dia? Me avise para eu pesquisar para você! ✨`;
+          } else {
+            replyText = `No momento não encontramos horários disponíveis nos próximos dias para *${matchedService.name}* com ${qualifiedStaff[0].name}. Nossa equipe entrará em contato em breve para verificar um encaixe especial para você! ✨`;
+          }
         }
       } else {
         session.availableStaffList = qualifiedStaff;
@@ -1303,7 +1416,11 @@ async function dispatchMessage(salonUserId, sock, msg) {
       }
 
       session.selectedStaff = chosenStaff;
-      const slots = await findCandidateSlots(uid, session.selectedService, session.selectedStaff);
+      const targetDays = resolveCandidateDays(session.requestedDatePref);
+      let slots = await findCandidateSlots(uid, session.selectedService, session.selectedStaff, targetDays);
+      if (session.requestedPeriod || session.requestedTimeConstraint) {
+        slots = filterSlotsByPreference(slots, session.requestedPeriod, session.requestedTimeConstraint);
+      }
 
       if (slots.length > 0) {
         session.candidateSlots = slots;
@@ -1313,7 +1430,12 @@ async function dispatchMessage(salonUserId, sock, msg) {
         replyText = `Maravilha! Para *${session.selectedService.name}* ${staffDesc}, temos os seguintes horários livres:\n\n${slotList}\n\nAlgum desses horários fica bom para você? É só me falar! ✨`;
       } else {
         session.state = 'IDLE';
-        replyText = `Não encontramos horários livres nos próximos dias para esta combinação. Gostaria de verificar com outra profissional ou para uma data mais adiante? Me avise para eu pesquisar para você! ✨`;
+        const timeTargetDesc = formatTemporalTarget(session.requestedDatePref, session.requestedPeriod);
+        if (timeTargetDesc) {
+          replyText = `Não encontramos horários disponíveis para ${timeTargetDesc} para esta combinação. Gostaria de verificar em outro turno ou dia? Me avise para eu pesquisar para você! ✨`;
+        } else {
+          replyText = `Não encontramos horários livres nos próximos dias para esta combinação. Gostaria de verificar com outra profissional ou para uma data mais adiante? Me avise para eu pesquisar para você! ✨`;
+        }
       }
       break;
     }
@@ -1379,6 +1501,9 @@ async function dispatchMessage(salonUserId, sock, msg) {
         session.selectedStaff = null;
         session.candidateSlots = [];
         session.selectedSlot = null;
+        session.requestedDatePref = null;
+        session.requestedPeriod = null;
+        session.requestedTimeConstraint = null;
         replyText = `Tudo bem! O agendamento foi cancelado. Se quiser agendar em outro momento, estarei por aqui! ✨`;
         break;
       }
@@ -1467,6 +1592,9 @@ async function dispatchMessage(salonUserId, sock, msg) {
         session.selectedStaff = null;
         session.candidateSlots = [];
         session.selectedSlot = null;
+        session.requestedDatePref = null;
+        session.requestedPeriod = null;
+        session.requestedTimeConstraint = null;
       } catch (bookErr) {
         console.error(`[salonIncomingDispatcher] Erro ao concluir agendamento #${uid}:`, bookErr.message);
         session.state = 'IDLE';
@@ -1475,6 +1603,9 @@ async function dispatchMessage(salonUserId, sock, msg) {
         session.selectedStaff = null;
         session.candidateSlots = [];
         session.selectedSlot = null;
+        session.requestedDatePref = null;
+        session.requestedPeriod = null;
+        session.requestedTimeConstraint = null;
         replyText = `Puxa, parece que esse horário acabou de ser reservado: ${bookErr.message}\n\nQuer tentar outro horário? É só me falar! ✨`;
       }
       break;
@@ -1556,7 +1687,11 @@ async function dispatchMessage(salonUserId, sock, msg) {
     default: {
       const isGreeting = /^(oi|ola|bom dia|boa tarde|boa noite|tudo bem|como vai|opa|oie)\b/i.test(normText);
       const isServiceInquiry = /(servico|servicos|valor|valores|preco|precos|quanto custa|tabela|cardapio|menu|catalogo)/i.test(normText);
-      const isScheduleInquiry = /(agendar|marcar|horario|vaga|disponibilidade|atendimento|cortar|corte|manicure|pedicure|escova|sobrancelha|barba)/i.test(normText);
+      const isScheduleInquiry = isSchedulingOrCareIntent(normText);
+      const temporal = extractDeterministicTemporal(normText);
+
+      if (temporal.datePref) session.requestedDatePref = temporal.datePref;
+      if (temporal.periodPref) session.requestedPeriod = temporal.periodPref;
 
       // Matching direto de agendamento na primeira mensagem (ex: "gostaria de agendar para cortar meu cabelo")
       if (isScheduleInquiry) {
@@ -1577,7 +1712,11 @@ async function dispatchMessage(salonUserId, sock, msg) {
             replyText = `Olá! Adoraríamos te atender para *${matchedService.name}*, mas no momento não temos profissionais disponíveis habilitadas para este serviço. Nossa equipe entrará em contato com você em instantes! ✨`;
           } else if (qualifiedStaff.length === 1) {
             session.selectedStaff = qualifiedStaff[0];
-            const slots = await findCandidateSlots(uid, session.selectedService, session.selectedStaff);
+            const targetDays = resolveCandidateDays(session.requestedDatePref);
+            let slots = await findCandidateSlots(uid, session.selectedService, session.selectedStaff, targetDays);
+            if (session.requestedPeriod || session.requestedTimeConstraint) {
+              slots = filterSlotsByPreference(slots, session.requestedPeriod, session.requestedTimeConstraint);
+            }
             if (slots.length > 0) {
               session.candidateSlots = slots;
               session.state = 'AWAITING_SLOT';
@@ -1585,7 +1724,12 @@ async function dispatchMessage(salonUserId, sock, msg) {
               replyText = `Olá! Com certeza! Para *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}) com a *${qualifiedStaff[0].name}*, temos estes horários livres:\n\n${slotList}\n\nQual desses horários fica melhor para você? (Ou pode me falar outro horário que preferir!) ✨`;
             } else {
               session.state = 'IDLE';
-              replyText = `Olá! Adoraríamos te atender para *${matchedService.name}*, mas no momento não encontramos horários disponíveis nos próximos dias com ${qualifiedStaff[0].name}. Nossa equipe entrará em contato com você em instantes! ✨`;
+              const timeTargetDesc = formatTemporalTarget(session.requestedDatePref, session.requestedPeriod);
+              if (timeTargetDesc) {
+                replyText = `Olá! Adoraríamos te atender para *${matchedService.name}* ${timeTargetDesc}, mas no momento não encontramos horários disponíveis com ${qualifiedStaff[0].name}. Gostaria de verificar em outro turno ou dia? Me avise para eu pesquisar para você! ✨`;
+              } else {
+                replyText = `Olá! Adoraríamos te atender para *${matchedService.name}*, mas no momento não encontramos horários disponíveis nos próximos dias com ${qualifiedStaff[0].name}. Nossa equipe entrará em contato com você em instantes! ✨`;
+              }
             }
           } else {
             session.availableStaffList = qualifiedStaff;
@@ -1601,15 +1745,17 @@ async function dispatchMessage(salonUserId, sock, msg) {
             .join('\n');
           replyText = `Olá! Seja bem-vinda ao *${salonName}*! ✨\n\nIdentifiquei mais de uma opção correspondente ao seu pedido:\n\n${candidateList}\n\nQual dessas opções você prefere? Me conta para eu já checar os horários! ✨`;
         } else {
-          // Não especificou o serviço ainda: apresenta catálogo numerado
+          // Não especificou o serviço ainda: acolhimento humanizado com retenção de data/turno
           session.state = 'AWAITING_SERVICE';
           session.candidateServices = null;
-          if (services && services.length > 0) {
+          const timeTarget = formatTemporalTarget(session.requestedDatePref, session.requestedPeriod);
+          if (timeTarget) {
+            replyText = `Oii! Tudo bem? 😊 Claro, posso verificar para ${timeTarget}! Qual procedimento você está pensando em fazer?`;
+          } else if (services && services.length > 0) {
             const serviceMenu = services.map((s, i) => `${i + 1}. *${s.name}* — R$ ${formatPrice(s.price)} (${s.duration_min} min)`).join('\n');
             replyText = `Com certeza! Seja bem-vinda ao *${salonName}*! ✨\n\nPara qual serviço você gostaria de agendar seu horário?\n\n${serviceMenu}\n\nÉ só me falar o nome ou como preferir!`;
           } else {
-            session.state = 'IDLE';
-            replyText = `Seja bem-vinda ao *${salonName}*! Nosso catálogo está sendo atualizado. Por favor, me informe qual procedimento você deseja para eu consultar nossa equipe! ✨`;
+            replyText = `Oii! Tudo bem? 😊 Claro, posso verificar para você! Qual procedimento você está pensando em fazer?`;
           }
         }
       } else if (isServiceInquiry) {
@@ -1650,11 +1796,22 @@ function _resetForTesting() {
   customerSessions.clear();
 }
 
+/**
+ * Hook para inspeção de sessão em testes herméticos
+ */
+function _getCustomerSessionForTesting(key) {
+  return customerSessions.get(key) || null;
+}
+
 module.exports = {
   dispatchMessage,
   resolveServiceMatch,
+  extractDeterministicTemporal,
+  formatTemporalTarget,
+  isSchedulingOrCareIntent,
   findMatchingService,
   resolveCandidateDays,
   filterSlotsByPreference,
   _resetForTesting,
+  _getCustomerSessionForTesting,
 };

@@ -9,6 +9,7 @@
  */
 
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { performance } = require('node:perf_hooks');
 const config = require('../config');
 
 // Ordem mandatária de modelos Gemini para baixa latência e alta disponibilidade
@@ -20,11 +21,36 @@ const GEMINI_MODELS = process.env.GEMINI_MODEL
       'gemini-3.8-flash',
     ];
 
-const NLU_TIMEOUT_MS = 3500;
+const DEFAULT_NLU_TIMEOUT_MS = 8000;
+const MIN_NLU_TIMEOUT_MS = 1000;
+const MAX_NLU_TIMEOUT_MS = 15000;
 const MAX_INPUT_CHARS = 500;
 
 let genAIClient = null;
 let _mockNluHandler = null;
+
+/**
+ * Sanitiza mensagens de erro de IA para prevenir vazamento de credenciais e chaves
+ * @param {any} err
+ * @returns {string}
+ */
+function sanitizeAiError(err) {
+  if (!err) return 'Erro desconhecido';
+  let msg = typeof err === 'string' ? err : (err.message || String(err));
+  msg = msg.replace(/AIza[0-9A-Za-z\-_]{35}/g, '[REDACTED_GEMINI_KEY]');
+  msg = msg.replace(/([?&]key=)[^&]+/gi, '$1[REDACTED_GEMINI_KEY]');
+  return msg.substring(0, 255);
+}
+
+/**
+ * Obtém o timeout configurado em milissegundos dentro dos limites seguros
+ * @returns {number}
+ */
+function getNluTimeoutMs() {
+  const envVal = parseInt(process.env.JESSICA_NLU_TIMEOUT_MS, 10);
+  if (isNaN(envVal)) return DEFAULT_NLU_TIMEOUT_MS;
+  return Math.max(MIN_NLU_TIMEOUT_MS, Math.min(MAX_NLU_TIMEOUT_MS, envVal));
+}
 
 /**
  * Obtém ou inicializa o cliente singleton do Google Generative AI
@@ -46,17 +72,24 @@ function getGenAI() {
  * Executa uma promise com timeout defensivo e desalocação do timer (unref)
  * @private
  * @param {Promise<any>} promise
- * @param {number} ms
+ * @param {number} [ms]
+ * @param {AbortController} [abortController]
  * @returns {Promise<any>}
  */
-function withTimeout(promise, ms = NLU_TIMEOUT_MS) {
+function withTimeout(promise, ms, abortController) {
+  const timeoutDuration = typeof ms === 'number' ? ms : getNluTimeoutMs();
   let timerId;
   const timeoutPromise = new Promise((_, reject) => {
     timerId = setTimeout(() => {
-      const err = new Error(`NLU_TIMEOUT: Processamento NLU excedeu o limite de ${ms}ms.`);
+      if (abortController && typeof abortController.abort === 'function') {
+        try {
+          abortController.abort();
+        } catch (_) {}
+      }
+      const err = new Error(`NLU_TIMEOUT: Processamento NLU excedeu o limite de ${timeoutDuration}ms.`);
       err.code = 'NLU_TIMEOUT';
       reject(err);
-    }, ms);
+    }, timeoutDuration);
     if (timerId && typeof timerId.unref === 'function') {
       timerId.unref();
     }
@@ -147,7 +180,7 @@ Schema JSON de saída:
  * Executa a chamada aos modelos do Gemini em ordem de prioridade
  * @private
  */
-async function executeGeminiCall({ text, salonName, services, staffList, session }) {
+async function executeGeminiCall({ text, salonName, services, staffList, session, abortSignal }) {
   const client = getGenAI();
   const systemInstruction = buildSystemInstruction(salonName);
 
@@ -167,6 +200,14 @@ async function executeGeminiCall({ text, salonName, services, staffList, session
   let lastError = null;
 
   for (const modelName of GEMINI_MODELS) {
+    if (abortSignal?.aborted) {
+      const abortErr = new Error('NLU_TIMEOUT: Processamento NLU cancelado por timeout.');
+      abortErr.code = 'NLU_TIMEOUT';
+      lastError = abortErr;
+      break;
+    }
+
+    const startTime = performance.now();
     try {
       const model = client.getGenerativeModel({
         model: modelName,
@@ -176,21 +217,37 @@ async function executeGeminiCall({ text, salonName, services, staffList, session
           temperature: 0.2,
           maxOutputTokens: 800,
         },
-      });
+      }, { signal: abortSignal });
 
       const response = await model.generateContent({
         contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-      });
+      }, { signal: abortSignal });
 
+      const durationMs = Math.round(performance.now() - startTime);
       const rawText = response.response.text();
       const parsed = extractJsonFromText(rawText);
       if (parsed && typeof parsed.intent === 'string') {
+        console.info(`[jessicaNluService] Chamada Gemini concluída com sucesso: modelo=${modelName}, latencia=${durationMs}ms`);
         return parsed;
       }
     } catch (err) {
+      const durationMs = Math.round(performance.now() - startTime);
+      const isTimeout = Boolean(abortSignal?.aborted || err.code === 'NLU_TIMEOUT' || err.name === 'AbortError');
+      const safeErrMsg = sanitizeAiError(err.name || err.message);
+      console.warn(`[jessicaNluService] Falha na chamada Gemini: modelo=${modelName}, latencia=${durationMs}ms, timeout=${isTimeout}, erro=${safeErrMsg}`);
+
+      if (isTimeout) {
+        const timeoutErr = new Error('NLU_TIMEOUT: Processamento NLU excedeu o limite ou foi cancelado.');
+        timeoutErr.code = 'NLU_TIMEOUT';
+        lastError = timeoutErr;
+        break; // Não tenta modelos adicionais após o timeout
+      }
       lastError = err;
-      // Tenta o próximo modelo da lista de prioridades
     }
+  }
+
+  if (lastError && (lastError.name === 'AbortError' || abortSignal?.aborted)) {
+    lastError.code = 'NLU_TIMEOUT';
   }
 
   throw lastError || new Error('NLU_MODELS_EXHAUSTED: Nenhum modelo Gemini retornou resposta estruturada válida.');
@@ -223,6 +280,9 @@ async function parseMessage({ text, salonName = 'Nosso Salão', services = [], s
   const clampedText = text.slice(0, MAX_INPUT_CHARS).trim();
   if (!clampedText) return null;
 
+  const timeoutMs = getNluTimeoutMs();
+  const abortController = new AbortController();
+
   // Interceptador para testes unitários herméticos
   if (typeof _mockNluHandler === 'function') {
     return withTimeout(
@@ -233,7 +293,8 @@ async function parseMessage({ text, salonName = 'Nosso Salão', services = [], s
         staffList,
         session,
       })),
-      NLU_TIMEOUT_MS
+      timeoutMs,
+      abortController
     );
   }
 
@@ -244,8 +305,10 @@ async function parseMessage({ text, salonName = 'Nosso Salão', services = [], s
       services,
       staffList,
       session,
+      abortSignal: abortController.signal,
     }),
-    NLU_TIMEOUT_MS
+    timeoutMs,
+    abortController
   );
 }
 
@@ -268,6 +331,10 @@ module.exports = {
   parseMessage,
   setMockNluHandler,
   resetMockNluHandler,
-  NLU_TIMEOUT_MS,
+  getNluTimeoutMs,
+  get NLU_TIMEOUT_MS() {
+    return getNluTimeoutMs();
+  },
   MAX_INPUT_CHARS,
+  sanitizeAiError,
 };
