@@ -173,7 +173,7 @@ test('1. Feature Flag Desativada -> Opera exclusivamente via motor determinísti
   assert.strictEqual(handled, true);
   const resp = sock.getLastText();
   assert.match(resp, /Seja muito bem-vinda ao \*Jéssica Beauty Studio\*/);
-  assert.match(resp, /Digite \*Serviços\*|Digite \*Agendar\*/);
+  assert.match(resp, /Como posso te ajudar hoje/i);
 });
 
 test('2. Agendamento em Linguagem Natural com Turno ("quero cortar o cabelo amanhã de manhã")', async () => {
@@ -256,10 +256,9 @@ test('3. Seleção de Profissional em Linguagem Natural e Escolha do "Primeiro H
   );
 
   resp = sock.getLastText();
-  assert.match(resp, /Posso confirmar o agendamento\?/i);
+  assert.match(resp, /posso confirmar.*agendamento/i);
   assert.match(resp, /Manicure Tradicional/);
   assert.match(resp, /Jéssica Ramos/);
-  assert.match(resp, /Digite \*Sim\* para confirmar/i);
 });
 
 test('4. Mudança de Ideia Durante o Atendimento ("na verdade quero manicure")', async () => {

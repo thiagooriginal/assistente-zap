@@ -283,7 +283,7 @@ test('2. Proteção LGPD Zero-Trust: IA retornar optInConsent: true com texto in
 
   const confirmMsg = sock.getLastText();
   assert.match(confirmMsg, /Agendamento confirmado com sucesso/);
-  assert.match(confirmMsg, /Lembrete 24h por WhatsApp \(Opcional\)/);
+  assert.match(confirmMsg, /lembrete.*WhatsApp/i);
 
   // Passo 4: Cliente manda "Quero agendar outro horário"
   // A IA respondeu optInConsent: true, mas o dispatcher Zero-Trust DEVE recusar consentimento!
@@ -536,7 +536,7 @@ test('8. Fluxo E2E Completo: Linguagem Natural -> Agendamento -> Opt-in Concedid
   );
 
   reply = sock.getLastText();
-  assert.match(reply, /Posso confirmar o agendamento\?/);
+  assert.match(reply, /posso confirmar.*agendamento/i);
 
   // 3. Confirmação
   await salonIncomingDispatcher.dispatchMessage(
@@ -565,4 +565,42 @@ test('8. Fluxo E2E Completo: Linguagem Natural -> Agendamento -> Opt-in Concedid
   assert.strictEqual(apt.status, 'AGENDADO');
   assert.strictEqual(apt.reminder_consent, 1);
   assert.strictEqual(apt.reminder_consent_origin, 'whatsapp_bot_optin');
+});
+
+test('9. Conversa Aberta e Fluida: Pedido de "renovar o visual amanhã de manhã" acolhe sem ordens mecânicas', async () => {
+  process.env.JESSICA_CONVERSATIONAL_V2 = 'true';
+  const sock = createMockSocket();
+  const phone = '5511999992009';
+
+  jessicaNluService.setMockNluHandler(async ({ text }) => {
+    return {
+      intent: 'SCHEDULE_INQUIRY',
+      serviceName: null,
+      staffName: null,
+      datePreference: 'amanha',
+      period: 'manha',
+      friendlyMessage: null,
+    };
+  });
+
+  const handled = await salonIncomingDispatcher.dispatchMessage(
+    SALON.id,
+    sock,
+    createIncomingMsg({
+      fromPhone: phone,
+      text: 'Oi, tudo bem? Tô querendo dar uma renovada no visual amanhã de manhã. Vocês conseguem me atender?',
+    })
+  );
+
+  assert.strictEqual(handled, true);
+  const reply = sock.getLastText();
+
+  // Garante acolhimento caloroso e menção a amanhã de manhã
+  assert.match(reply, /Com certeza.*Amanhã de manhã temos horários livres sim/i);
+  assert.match(reply, /Você já pensou no que gostaria de fazer\?/i);
+
+  // Garante AUSÊNCIA TOTAL de qualquer instrução mecânica ("digite", "escolha o número")
+  assert.doesNotMatch(reply, /digite/i);
+  assert.doesNotMatch(reply, /escolha digitando/i);
+  assert.doesNotMatch(reply, /número correspondente/i);
 });
