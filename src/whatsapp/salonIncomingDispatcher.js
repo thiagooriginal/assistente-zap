@@ -671,18 +671,9 @@ async function handleConversationalV2({
     session.candidateSlots = [];
     session.selectedSlot = null;
 
-    return `🎉 *Agendamento confirmado com sucesso!* 🎉\n\n` +
-      `Estamos muito felizes em te receber no *${salonName}*! ✨\n\n` +
-      `📋 *Detalhes do Atendimento:*\n` +
-      `• *Espaço:* ${salonName}\n` +
-      `• *Serviço:* ${confirmedServiceName}\n` +
-      `• *Profissional:* ${staffName}\n` +
-      `• *Data:* ${displayDate}\n` +
-      `• *Horário:* ${confirmedTime}\n` +
-      `• *Valor:* R$ ${confirmedPrice}\n\n` +
-      `Ah, e se você quiser, posso te mandar um lembrete aqui no WhatsApp 24 horas antes do seu horário para você não esquecer. O que acha, quer que eu te avise? ✨\n\n` +
-      `(Se não quiser o lembrete, não se preocupe: seu horário já está super confirmado!)\n\n` +
-      `Te esperamos com muito carinho! 💖`;
+    return `Prontinho! Agendamento confirmado com sucesso para *${confirmedServiceName}* em ${displayDate} às *${confirmedTime}* com a *${staffName}*, por R$ ${confirmedPrice}. 😊\n\n` +
+      `Quer que eu te mande um lembrete aqui no WhatsApp 24 horas antes do seu horário para você não esquecer? ✨\n\n` +
+      `(Se não quiser o lembrete, não precisa se preocupar: seu horário já está garantido!)`;
   }
 
   // 4. Consulta de Preço / Valores (sem perder o serviço em andamento se já estiver selecionado)
@@ -858,24 +849,28 @@ async function handleConversationalV2({
       const datePref = nluResult.datePreference || session.requestedDatePref;
       const periodPref = nluResult.period || session.requestedPeriod;
 
-      let timeGreeting = '';
+      if (datePref) session.requestedDatePref = datePref;
+      if (periodPref) session.requestedPeriod = periodPref;
+
+      let timeTarget = '';
       if (datePref === 'hoje') {
-        timeGreeting = periodPref === 'manha' ? 'Hoje de manhã' : (periodPref === 'tarde' ? 'Hoje à tarde' : 'Hoje');
+        timeTarget = periodPref === 'manha' ? 'hoje de manhã' : (periodPref === 'tarde' ? 'hoje à tarde' : (periodPref === 'noite' ? 'hoje à noite' : 'hoje'));
       } else if (datePref === 'amanha' || datePref === 'amanhã') {
-        timeGreeting = periodPref === 'manha' ? 'Amanhã de manhã' : (periodPref === 'tarde' ? 'Amanhã à tarde' : 'Amanhã');
+        timeTarget = periodPref === 'manha' ? 'amanhã de manhã' : (periodPref === 'tarde' ? 'amanhã à tarde' : (periodPref === 'noite' ? 'amanhã à noite' : 'amanhã'));
       } else if (periodPref === 'manha') {
-        timeGreeting = 'Pela manhã';
+        timeTarget = 'pela manhã';
       } else if (periodPref === 'tarde') {
-        timeGreeting = 'À tarde';
+        timeTarget = 'à tarde';
+      } else if (periodPref === 'noite') {
+        timeTarget = 'à noite';
+      } else if (datePref) {
+        timeTarget = `para ${datePref}`;
       }
 
-      const popularSample = services.slice(0, 4).map((s) => s.name).join(', ');
-      const sampleText = popularSample ? ` como ${popularSample}` : ' como corte, escova, mechas, manicure';
-
-      if (timeGreeting) {
-        return `Com certeza! ${timeGreeting} temos horários livres sim ✨\n\nVocê já pensou no que gostaria de fazer?${sampleText}... Me conta para eu já checar com a equipe!`;
+      if (timeTarget) {
+        return `Oii! Tudo bem? 😊 Claro, posso verificar para você ${timeTarget}! O que você está pensando em fazer no cabelo (como corte, escova, mechas...)? Me conta para eu já checar com a nossa equipe! ✨`;
       }
-      return `Com certeza, adoraríamos te atender! ✨\n\nVocê já tem em mente o que gostaria de fazer?${sampleText}... Me conta o que você está procurando!`;
+      return `Oii! Tudo bem? 😊 Claro, posso verificar para você! O que você está pensando em fazer no cabelo (como corte, escova, mechas...)? Me conta para eu já checar com a nossa equipe! ✨`;
     }
   }
 

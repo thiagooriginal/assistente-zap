@@ -390,11 +390,11 @@ test('4. Confirmação exibe Horário e Detalhes Sem Qualquer "undefined"', asyn
   assert.doesNotMatch(confirmMsg, /null/i);
 
   // Deve conter campos corretos
-  assert.match(confirmMsg, /• \*Horário:\* \d{2}:\d{2}/);
-  assert.match(confirmMsg, /• \*Data:\* \d{2}\/\d{2}\/\d{4}/);
-  assert.match(confirmMsg, /• \*Valor:\* R\$ 110,00/);
-  assert.match(confirmMsg, /• \*Serviço:\* Corte e Escova Modelada/);
-  assert.match(confirmMsg, /• \*Profissional:\* Paula Lima/);
+  assert.match(confirmMsg, /\*\d{2}:\d{2}\*/);
+  assert.match(confirmMsg, /\d{2}\/\d{2}\/\d{4}/);
+  assert.match(confirmMsg, /R\$ 110,00/);
+  assert.match(confirmMsg, /\*Corte e Escova Modelada\*/);
+  assert.match(confirmMsg, /\*Paula Lima\*/);
 });
 
 test('5. Resolução Temporal: resolveCandidateDays e filterSlotsByPreference', () => {
@@ -547,8 +547,8 @@ test('8. Fluxo E2E Completo: Linguagem Natural -> Agendamento -> Opt-in Concedid
 
   reply = sock.getLastText();
   assert.match(reply, /Agendamento confirmado com sucesso/);
-  assert.match(reply, /• \*Serviço:\* Escova Express/);
-  assert.match(reply, /• \*Valor:\* R\$ 50,00/);
+  assert.match(reply, /\*Escova Express\*/);
+  assert.match(reply, /R\$ 50,00/);
 
   // 4. Aceite explícito e inequívoco de lembrete
   await salonIncomingDispatcher.dispatchMessage(
@@ -595,9 +595,10 @@ test('9. Conversa Aberta e Fluida: Pedido de "renovar o visual amanhã de manhã
   assert.strictEqual(handled, true);
   const reply = sock.getLastText();
 
-  // Garante acolhimento caloroso e menção a amanhã de manhã
-  assert.match(reply, /Com certeza.*Amanhã de manhã temos horários livres sim/i);
-  assert.match(reply, /Você já pensou no que gostaria de fazer\?/i);
+  // Garante acolhimento caloroso e menção a amanhã de manhã sem promessa cega de vagas
+  assert.match(reply, /amanh[aã]\s+de\s+manh[aã]/i);
+  assert.doesNotMatch(reply, /temos hor[aá]rios livres sim/i);
+  assert.match(reply, /o que você está pensando em fazer/i);
 
   // Garante AUSÊNCIA TOTAL de qualquer instrução mecânica ("digite", "escolha o número")
   assert.doesNotMatch(reply, /digite/i);

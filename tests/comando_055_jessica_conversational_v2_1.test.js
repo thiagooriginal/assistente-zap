@@ -177,7 +177,7 @@ test.describe('COMANDO 055 — Jéssica Conversacional 2.1 (Conversa Natural Sem
         datePreference: 'amanha',
         period: 'manha',
         timeConstraint: null,
-        friendlyMessage: 'Com certeza! Amanhã de manhã temos horários livres sim ✨\n\nVocê já pensou no que gostaria de fazer? Me conta para eu já checar com a equipe!',
+        friendlyMessage: 'Oii! Tudo bem? 😊 Claro, posso verificar para você amanhã de manhã! O que você está pensando em fazer no cabelo? Me conta para eu já checar com a nossa equipe! ✨',
       };
     });
 
@@ -191,7 +191,8 @@ test.describe('COMANDO 055 — Jéssica Conversacional 2.1 (Conversa Natural Sem
     assert.ok(!reply1.includes('Digite Serviços'), 'NÃO deve conter "Digite Serviços"');
     assert.ok(!reply1.includes('Digite Agendar'), 'NÃO deve conter "Digite Agendar"');
     assert.ok(!/digite\s+o\s+n[úu]mero/i.test(reply1), 'NÃO deve conter ordem "digite o número"');
-    assert.ok(/amanh[aã]\s+de\s+manh[aã]/i.test(reply1), 'Deveria acolher confirmando a disponibilidade para amanhã de manhã');
+    assert.ok(/amanh[aã]\s+de\s+manh[aã]/i.test(reply1), 'Deveria acolher referenciando amanhã de manhã');
+    assert.ok(!/temos hor[aá]rios livres sim/i.test(reply1), 'NÃO deve prometer disponibilidade antes de saber o serviço');
 
     // Turno 2: Cliente especifica o serviço ("Quero fazer um corte feminino")
     const msgTurno2 = 'Quero fazer um corte feminino';
@@ -376,7 +377,7 @@ test.describe('COMANDO 055 — Jéssica Conversacional 2.1 (Conversa Natural Sem
 
     const confirmMsg = mockSock.getLastText();
     assert.ok(/Agendamento confirmado com sucesso/i.test(confirmMsg), 'Deveria enviar mensagem de sucesso');
-    assert.ok(/lembrete.*WhatsApp 24 horas antes/i.test(confirmMsg), 'Deveria fazer pergunta acolhedora sobre o lembrete 24h');
+    assert.ok(/lembrete.*24 horas antes/i.test(confirmMsg), 'Deveria fazer pergunta acolhedora sobre o lembrete 24h');
     assert.ok(!confirmMsg.includes('digite 1'), 'NÃO deve conter ordens mecânicas de digitação');
 
     // Validação no SQLite: Agendamento gravado com status AGENDADO e consentimento 0 (Zero-Trust)
