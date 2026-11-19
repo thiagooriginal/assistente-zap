@@ -37,22 +37,25 @@ function isLiveGoogleSyncAllowed(accountEmail = null) {
     return false;
   }
   const emailTrimmed = accountEmail.trim().toLowerCase();
-  if (!emailTrimmed) {
+  if (!emailTrimmed || !emailTrimmed.includes('@')) {
     return false;
   }
 
-  // 3. Exige lista GOOGLE_SYNC_ALLOWED_EMAILS não vazia
-  const allowedList = (process.env.GOOGLE_SYNC_ALLOWED_EMAILS || '')
-    .split(',')
-    .map(e => e.trim().toLowerCase())
-    .filter(Boolean);
+  // 3. Em modo de homologação restrita, exige allowlist institucional
+  if (process.env.GOOGLE_SYNC_HOMOLOGATION_MODE === 'true') {
+    const allowedList = (process.env.GOOGLE_SYNC_ALLOWED_EMAILS || process.env.GOOGLE_SYNC_AUTHORIZED_EMAIL || '')
+      .split(',')
+      .map(e => e.trim().toLowerCase())
+      .filter(Boolean);
 
-  if (allowedList.length === 0) {
-    return false;
+    if (allowedList.length === 0) {
+      return false;
+    }
+    return allowedList.includes(emailTrimmed);
   }
 
-  // 4. Exige email da conta conectada explicitamente presente na lista
-  return allowedList.includes(emailTrimmed);
+  // 4. Em produção comercial, a allowlist global de homologação não impede clientes comerciais legítimos
+  return true;
 }
 
 
@@ -759,8 +762,22 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
     .digest('hex')
     .substring(0, 32);
 
-  // Proteção de Homologação/Staging contra chamadas externas inadvertidas (Requisito 7)
-  if (!isLiveGoogleSyncAllowed(status.accountEmail)) {
+  // Proteção de Homologação/Staging contra chamadas externas inadvertidas (Requisito 7 e Gatekeeper Quíntuplo)
+  const gatekeeper = require('./googleCalendarGatekeeper');
+  const gateCheck = gatekeeper.evaluateGatekeeper({
+    userId,
+    calendarId: calId,
+    appointmentId: appointment.id,
+    accountEmail: status.accountEmail,
+  });
+
+  if (!gateCheck.allowed) {
+    if (gateCheck.isHomologation) {
+      const err = new Error(`HOMOLOGACAO_BLOCKED: Chamada direta de criação rejeitada pelo Gatekeeper (${gateCheck.reason}): ${gateCheck.message}`);
+      err.code = gateCheck.reason;
+      throw err;
+    }
+
     const simEventId = `sim_${stableEventId.substring(0, 28)}`;
 
     db.prepare(`
@@ -768,10 +785,10 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
       SET google_event_id = ?,
           google_calendar_id = ?,
           google_sync_status = 'SIMULATED',
-          google_sync_error = 'Ambiente de Homologação: Sincronização segura simulada (GOOGLE_SYNC_LIVE_ENABLED=false)',
+          google_sync_error = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND user_id = ?
-    `).run(simEventId, calId, appointment.id, userId);
+    `).run(simEventId, calId, `Ambiente Seguro: Sincronização simulada (${gateCheck.reason})`, appointment.id, userId);
 
     return {
       success: true,
@@ -931,8 +948,22 @@ async function updateCalendarEvent(userId, googleEventId, appointment, targetCal
     calId = status.selectedCalendarId || 'primary';
   }
 
-  // 1. Proteção de Homologação/Staging contra chamadas externas inadvertidas (Requisito 7 e Item 3)
-  if (!isLiveGoogleSyncAllowed(status.accountEmail)) {
+  // 1. Proteção de Homologação/Staging contra chamadas externas inadvertidas (Requisito 7, Item 3 e Gatekeeper)
+  const gatekeeper = require('./googleCalendarGatekeeper');
+  const gateCheck = gatekeeper.evaluateGatekeeper({
+    userId,
+    calendarId: calId,
+    appointmentId: appointment.id,
+    accountEmail: status.accountEmail,
+  });
+
+  if (!gateCheck.allowed) {
+    if (gateCheck.isHomologation) {
+      const err = new Error(`HOMOLOGACAO_BLOCKED: Chamada direta de atualização rejeitada pelo Gatekeeper (${gateCheck.reason}): ${gateCheck.message}`);
+      err.code = gateCheck.reason;
+      throw err;
+    }
+
     const simEventId = googleEventId.startsWith('sim_')
       ? googleEventId
       : `sim_${googleEventId.substring(0, 28)}`;
@@ -942,10 +973,10 @@ async function updateCalendarEvent(userId, googleEventId, appointment, targetCal
       SET google_event_id = ?,
           google_calendar_id = ?,
           google_sync_status = 'SIMULATED',
-          google_sync_error = 'Ambiente de Homologação: Sincronização segura simulada (GOOGLE_SYNC_LIVE_ENABLED=false)',
+          google_sync_error = ?,
           updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND user_id = ?
-    `).run(simEventId, calId, appointment.id, userId);
+    `).run(simEventId, calId, `Ambiente Seguro: Sincronização simulada (${gateCheck.reason})`, appointment.id, userId);
 
     return {
       success: true,
@@ -1035,8 +1066,40 @@ async function deleteCalendarEvent(userId, googleEventId, targetCalendarId = nul
 
   const calId = targetCalendarId || status.selectedCalendarId || 'primary';
 
-  // Proteção contra chamadas de rede em ambiente simulado OU se o evento for simulado (nunca existiu no Google)
-  if (!isLiveGoogleSyncAllowed(status.accountEmail) || googleEventId.startsWith('sim_')) {
+  let aptId = null;
+  try {
+    const aptRow = db.prepare('SELECT id FROM appointments WHERE (google_event_id = ? OR id = ?) AND user_id = ?').get(googleEventId, googleEventId, userId);
+    if (aptRow) aptId = aptRow.id;
+  } catch (_) {}
+
+  const gatekeeper = require('./googleCalendarGatekeeper');
+  const gateCheck = gatekeeper.evaluateGatekeeper({
+    userId,
+    calendarId: calId,
+    appointmentId: aptId,
+    accountEmail: status.accountEmail,
+  });
+
+  if (!gateCheck.allowed) {
+    if (gateCheck.isHomologation) {
+      const err = new Error(`HOMOLOGACAO_BLOCKED: Chamada direta de exclusão rejeitada pelo Gatekeeper (${gateCheck.reason}): ${gateCheck.message}`);
+      err.code = gateCheck.reason;
+      throw err;
+    }
+
+    db.prepare(`
+      UPDATE appointments
+      SET google_sync_status = 'CANCELLED',
+          google_sync_error = NULL,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE (google_event_id = ? OR id = ?) AND user_id = ?
+    `).run(googleEventId, googleEventId, userId);
+
+    return { success: true, isSimulated: true };
+  }
+
+  // Proteção contra chamadas de rede se o evento for simulado (nunca existiu no Google)
+  if (googleEventId.startsWith('sim_')) {
     db.prepare(`
       UPDATE appointments
       SET google_sync_status = 'CANCELLED',
@@ -1262,6 +1325,8 @@ module.exports = {
   getPreExistingSyncPreview,
   syncPreExistingAppointments,
   isLiveGoogleSyncAllowed,
+  isLiveGoogleSyncAuthorized: require('./googleCalendarGatekeeper').evaluateGatekeeper,
+  evaluateGatekeeper: require('./googleCalendarGatekeeper').evaluateGatekeeper,
   getOAuth2Client,
   setMockHandler,
   resetMockHandler,

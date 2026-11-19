@@ -52,6 +52,7 @@ function recoverStalledTasks() {
  */
 async function processGoogleSyncOutbox(filterUserId = null) {
   const googleCalendarService = require('./googleCalendarService');
+  const isHomologationMode = process.env.GOOGLE_SYNC_HOMOLOGATION_MODE === 'true';
 
   let sql = `
     SELECT * FROM google_sync_outbox
@@ -60,7 +61,24 @@ async function processGoogleSyncOutbox(filterUserId = null) {
       AND attempts < COALESCE(max_attempts, 5)
   `;
   const params = [];
-  if (filterUserId) {
+
+  if (isHomologationMode) {
+    const authTenantId = process.env.GOOGLE_SYNC_AUTHORIZED_TENANT_ID ? Number(process.env.GOOGLE_SYNC_AUTHORIZED_TENANT_ID) : null;
+    const authAptId = process.env.GOOGLE_SYNC_AUTHORIZED_APPOINTMENT_ID ? Number(process.env.GOOGLE_SYNC_AUTHORIZED_APPOINTMENT_ID) : null;
+
+    if (!authTenantId || !authAptId) {
+      // Fail-closed: modo de homologação restrita ativo mas sem parâmetros válidos: suspende sem tocar na fila
+      return 0;
+    }
+
+    if (filterUserId && Number(filterUserId) !== authTenantId) {
+      // Filtro de outro tenant solicitado durante homologação: não toca na fila
+      return 0;
+    }
+
+    sql += ' AND user_id = ? AND appointment_id = ?';
+    params.push(authTenantId, authAptId);
+  } else if (filterUserId) {
     sql += ' AND user_id = ?';
     params.push(filterUserId);
   }
@@ -203,16 +221,39 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         }
       }
 
-      // 4c. Proteção de Homologação/Staging: bloquear chamadas externas não autorizadas (Requisito 7)
-      const isLiveAllowed = googleCalendarService.isLiveGoogleSyncAllowed(tokenRow.account_email);
-      if (!isLiveAllowed) {
+      // 4c. Proteção de Homologação/Staging: Gatekeeper Quíntuplo de Homologação Real (COMANDO 059)
+      const gatekeeper = require('./googleCalendarGatekeeper');
+      const targetCalId = apt.google_calendar_id || tokenRow.selected_calendar_id;
+
+      const gatekeeperResult = gatekeeper.evaluateGatekeeper({
+        userId: item.user_id,
+        calendarId: targetCalId,
+        appointmentId: item.appointment_id,
+        accountEmail: tokenRow.account_email,
+        isDemo: userRow && Boolean(userRow.is_demo),
+      });
+
+      if (!gatekeeperResult.allowed) {
+        // Se estiver em modo de homologação restrita e o item NÃO for o autorizado:
+        // PRESERVAÇÃO INTEGRAL DA FILA: NUNCA converter para SIMULATED/CANCELLED/SENT!
+        // Reverte o lock imediatamente para PENDING e continua, mantendo a fila e o agendamento intactos.
+        if (gatekeeperResult.isHomologation) {
+          db.prepare(`
+            UPDATE google_sync_outbox
+            SET status = 'PENDING', locked_at = NULL
+            WHERE id = ?
+          `).run(item.id);
+          continue;
+        }
+
+        // Em modo de produção sem homologação, aplica o fallback simulado seguro existente
         const simId = 'sim_gcal_' + crypto.createHash('sha256').update(`sim_${item.user_id}_${apt.id}`).digest('hex').substring(0, 24);
         db.prepare(`
           UPDATE google_sync_outbox
           SET status = 'SIMULATED', processed_at = CURRENT_TIMESTAMP, 
-              last_error = 'HOMOLOGAÇÃO: Chamada externa bloqueada por segurança (GOOGLE_SYNC_LIVE_ENABLED=false) - Sincronização Simulada'
+              last_error = ?
           WHERE id = ?
-        `).run(item.id);
+        `).run(`PRODUÇÃO [${gatekeeperResult.reason}]: ${gatekeeperResult.message}`, item.id);
 
         const finalSyncStatus = item.action === 'DELETE' ? 'CANCELLED' : 'SIMULATED';
         const finalEventId = item.action === 'DELETE' ? null : (apt.google_event_id || simId);
@@ -221,10 +262,10 @@ async function processGoogleSyncOutbox(filterUserId = null) {
           UPDATE appointments
           SET google_event_id = ?,
               google_sync_status = ?,
-              google_sync_error = 'Ambiente de Homologação: Sincronização segura simulada',
+              google_sync_error = ?,
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
-        `).run(finalEventId, finalSyncStatus, item.appointment_id);
+        `).run(finalEventId, finalSyncStatus, `Ambiente Seguro: Sincronização simulada (${gatekeeperResult.reason})`, item.appointment_id);
 
         processedCount++;
         continue;

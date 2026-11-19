@@ -51,6 +51,35 @@ function toLocalISOString(dateInput) {
 }
 
 /**
+ * Normaliza datetimes para o formato canônico SQL 'YYYY-MM-DD HH:MM:SS'.
+ * Garante consistência lexicográfica estrita no SQLite, eliminando discrepâncias
+ * entre o separador 'T' (ASCII 84) e o espaço ' ' (ASCII 32).
+ *
+ * @param {string|Date} dt - Data/hora em formato ISO, SQL ou Date
+ * @returns {string} String no formato 'YYYY-MM-DD HH:MM:SS'
+ */
+function normalizeDateTime(dt) {
+  if (!dt) return null;
+  if (dt instanceof Date) {
+    if (isNaN(dt.getTime())) return null;
+    return `${dt.getFullYear()}-${padZero(dt.getMonth() + 1)}-${padZero(dt.getDate())} ${padZero(dt.getHours())}:${padZero(dt.getMinutes())}:${padZero(dt.getSeconds())}`;
+  }
+  let s = String(dt).trim();
+  if (s.includes('Z') || /[+-]\d{2}:\d{2}$/.test(s)) {
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return `${d.getFullYear()}-${padZero(d.getMonth() + 1)}-${padZero(d.getDate())} ${padZero(d.getHours())}:${padZero(d.getMinutes())}:${padZero(d.getSeconds())}`;
+    }
+  }
+  s = s.replace('T', ' ');
+  s = s.replace(/\.\d+$/, '');
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s)) {
+    s += ':00';
+  }
+  return s;
+}
+
+/**
  * Parses and normalizes salon opening hours JSON
  */
 function parseOpeningHours(rawHours) {
@@ -140,8 +169,15 @@ function checkInternalSlotAvailability(userId, {
   bypassHoursCheck = false,
   skipConflictCheck = false,
 }) {
-  const startDate = new Date(startDt);
-  const endDate = new Date(endDt);
+  const normStartDt = normalizeDateTime(startDt);
+  const normEndDt = normalizeDateTime(endDt);
+
+  if (!normStartDt || !normEndDt) {
+    return { available: false, reason: 'INVALID_DATES', message: 'Data e horário em formato inválido.' };
+  }
+
+  const startDate = new Date(normStartDt.replace(' ', 'T'));
+  const endDate = new Date(normEndDt.replace(' ', 'T'));
 
   if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
     return { available: false, reason: 'INVALID_DATES', message: 'Data e horário em formato inválido.' };
@@ -253,16 +289,18 @@ function checkInternalSlotAvailability(userId, {
   }
 
   // 4. Regra de Conflito Interno no SQLite
-  // inicio_novo < fim_existente AND fim_novo > inicio_existente
+  // Normalização defensiva: comparações lexicais utilizam replace(..., 'T', ' ')
+  // para garantir consistência entre registros legados (ISO) e novos (SQL),
+  // e os parâmetros normStartDt/normEndDt já foram canonicamente normalizados.
   let conflictQuery = `
     SELECT id, title, client_name, start_datetime, end_datetime, staff_id
     FROM appointments
     WHERE user_id = ?
       AND status NOT IN ('CANCELADO', 'CANCELLED')
-      AND start_datetime < ?
-      AND end_datetime > ?
+      AND replace(start_datetime, 'T', ' ') < ?
+      AND replace(end_datetime, 'T', ' ') > ?
   `;
-  const params = [userId, endDt, startDt];
+  const params = [userId, normEndDt, normStartDt];
 
   if (staffId !== null) {
     conflictQuery += ` AND (staff_id = ? OR staff_id IS NULL)`;
@@ -499,12 +537,13 @@ async function checkSlotAvailability(userId, params) {
     }
 
     // Carga diária para balanceamento e desempate
+    const normDate = cleanDate.replace('/', '-');
     const loadCount = db.prepare(`
       SELECT COUNT(*) AS total
       FROM appointments
       WHERE user_id = ? AND staff_id = ? AND status NOT IN ('CANCELADO', 'CANCELLED')
-        AND start_datetime >= ? AND start_datetime <= ?
-    `).get(userId, st.id, `${cleanDate}T00:00:00`, `${cleanDate}T23:59:59`)?.total || 0;
+        AND replace(start_datetime, 'T', ' ') >= ? AND replace(start_datetime, 'T', ' ') <= ?
+    `).get(userId, st.id, `${normDate} 00:00:00`, `${normDate} 23:59:59`)?.total || 0;
 
     availableCandidates.push({ staff: st, load: loadCount });
   }
@@ -786,12 +825,13 @@ function resolveEffectiveStaff(userId, serviceIdOrOptions = null, explicitStaffI
           });
           if (check.available) {
             // Carga diária para balanceamento
+            const normDate = cleanDate.replace('/', '-');
             const loadCount = db.prepare(`
               SELECT COUNT(*) AS total
               FROM appointments
               WHERE user_id = ? AND staff_id = ? AND status NOT IN ('CANCELADO', 'CANCELLED')
-                AND start_datetime >= ? AND start_datetime <= ?
-            `).get(userId, st.id, `${cleanDate}T00:00:00`, `${cleanDate}T23:59:59`)?.total || 0;
+                AND replace(start_datetime, 'T', ' ') >= ? AND replace(start_datetime, 'T', ' ') <= ?
+            `).get(userId, st.id, `${normDate} 00:00:00`, `${normDate} 23:59:59`)?.total || 0;
 
             freeCandidates.push({ staff: st, load: loadCount });
           }
@@ -916,14 +956,14 @@ function bookAppointmentSync(userId, {
   }
 
   const cleanTime = time.length === 5 ? time + ':00' : time;
-  const startDt = `${cleanDate}T${cleanTime}`;
-  const startDate = new Date(startDt);
+  const startDt = normalizeDateTime(`${cleanDate} ${cleanTime}`);
+  const startDate = new Date(startDt.replace(' ', 'T'));
   if (isNaN(startDate.getTime())) {
     throw new Error('Data ou horário inválido.');
   }
 
   const endDate = new Date(startDate.getTime() + finalDurationMin * 60000);
-  const endDt = `${endDate.getFullYear()}-${padZero(endDate.getMonth() + 1)}-${padZero(endDate.getDate())}T${padZero(endDate.getHours())}:${padZero(endDate.getMinutes())}:${padZero(endDate.getSeconds())}`;
+  const endDt = normalizeDateTime(endDate);
 
   // 3. Resolução do Profissional Efetivo (Staff) - Auto-assign resolve se staffId for nulo/'ANY'
   const effectiveStaff = resolveEffectiveStaff(userId, matchedService?.id || serviceId || null, staffId, {
@@ -1227,14 +1267,14 @@ async function rescheduleAppointment(appointmentId, userId, { newDate, newTime, 
 
   const durationMin = existing.duration_min || 45;
   const cleanNewTime = newTime.length === 5 ? newTime + ':00' : newTime;
-  const startDt = `${cleanNewDate}T${cleanNewTime}`;
-  const startDate = new Date(startDt);
+  const startDt = normalizeDateTime(`${cleanNewDate} ${cleanNewTime}`);
+  const startDate = new Date(startDt.replace(' ', 'T'));
   if (isNaN(startDate.getTime())) {
     throw new Error('Nova data ou horário em formato inválido.');
   }
 
   const endDate = new Date(startDate.getTime() + durationMin * 60000);
-  const endDt = `${endDate.getFullYear()}-${padZero(endDate.getMonth() + 1)}-${padZero(endDate.getDate())}T${padZero(endDate.getHours())}:${padZero(endDate.getMinutes())}:${padZero(endDate.getSeconds())}`;
+  const endDt = normalizeDateTime(endDate);
 
   const targetStaffId = newStaffId !== null ? Number(newStaffId) : existing.staff_id;
 
@@ -1714,8 +1754,8 @@ function detectAndFlagHistoricalConflicts(userId) {
           AND (a1.staff_id IS NULL OR a2.staff_id IS NULL OR a1.staff_id = a2.staff_id)
           AND a1.status NOT IN ('CANCELADO', 'CANCELLED')
           AND a2.status NOT IN ('CANCELADO', 'CANCELLED')
-          AND a1.start_datetime < a2.end_datetime
-          AND a1.end_datetime > a2.start_datetime
+          AND replace(a1.start_datetime, 'T', ' ') < replace(a2.end_datetime, 'T', ' ')
+          AND replace(a1.end_datetime, 'T', ' ') > replace(a2.start_datetime, 'T', ' ')
       )
   `).run(userId);
 
@@ -1729,8 +1769,8 @@ function detectAndFlagHistoricalConflicts(userId) {
       AND (a1.staff_id IS NULL OR a2.staff_id IS NULL OR a1.staff_id = a2.staff_id)
       AND a1.status NOT IN ('CANCELADO', 'CANCELLED')
       AND a2.status NOT IN ('CANCELADO', 'CANCELLED')
-      AND a1.start_datetime < a2.end_datetime
-      AND a1.end_datetime > a2.start_datetime
+      AND replace(a1.start_datetime, 'T', ' ') < replace(a2.end_datetime, 'T', ' ')
+      AND replace(a1.end_datetime, 'T', ' ') > replace(a2.start_datetime, 'T', ' ')
     WHERE a1.user_id = ?
   `).all(userId);
 
@@ -1754,4 +1794,5 @@ module.exports = {
   listAppointments,
   detectAndFlagHistoricalConflicts,
   toLocalISOString,
+  normalizeDateTime,
 };
