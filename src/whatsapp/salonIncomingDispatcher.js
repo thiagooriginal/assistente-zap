@@ -12,6 +12,7 @@
 const db = require('../database/db');
 const phoneUtils = require('../utils/phoneUtils');
 const salonAppointmentService = require('../services/salonAppointmentService');
+const salonNotificationService = require('../services/salonNotificationService');
 const jessicaNluService = require('../services/jessicaNluService');
 
 /**
@@ -701,11 +702,12 @@ function formatCandidateSlotsMessage(slots, service, selectedStaff, requestedPer
 
   const slotPhrases = displaySlots.map((s) => {
     const timeFormatted = formatTimeFriendly(s.time);
+    const dayPrefix = !sameDay ? `${s.dayLabel.split(' ')[0]} às ` : '';
     const stName = s.staffName || selectedStaff?.name;
     if (hasDistinctStaff && stName) {
-      return `${timeFormatted} com a *${stName}*`;
+      return `${dayPrefix}${timeFormatted} com a *${stName}*`;
     }
-    return `*${timeFormatted}*`;
+    return `${dayPrefix}*${timeFormatted}*`;
   });
 
   const countWord = count === 1 ? 'um horário' : (count === 2 ? 'dois horários' : (count === 3 ? 'três horários' : `${count} horários`));
@@ -727,16 +729,119 @@ function formatCandidateSlotsMessage(slots, service, selectedStaff, requestedPer
 
   const question = count === 1
     ? `Esse horário fica bom para você? 😊`
-    : `Qual fica melhor pra você? 😊`;
+    : `Qual fica melhor para você? 😊`;
 
-  const listItems = displaySlots.map((s, i) => {
-    const stDesc = (hasDistinctStaff && s.staffName) ? ` (com ${s.staffName})` : '';
-    return `${i + 1}. ${s.dayLabel} às *${s.time}*${stDesc}`;
-  }).join('\n');
+  const moreHint = slots.length > 3 ? ' (Quer ver mais opções? É só me falar!) ✨' : '';
 
-  const moreHint = slots.length > 3 ? '\n\n(Quer ver mais opções? É só me falar!) ✨' : '';
+  return `${intro} ${question}${moreHint}`;
+}
 
-  return `${intro} ${question}\n\n${listItems}${moreHint}\n\nVocê pode responder pelo número ou me falar o horário!`;
+/**
+ * Trata solicitação de remarcação com encaminhamento real ou orientação transparente (Comando 058.1)
+ *
+ * @private
+ * @param {number} uid ID do salão (tenant)
+ * @param {string} cleanPhone Telefone normalizado da cliente
+ * @param {object} session Sessão conversacional da cliente
+ * @param {object} salon Registro do salão no banco
+ * @returns {Promise<string>}
+ */
+async function dispatchRescheduleHandoff(uid, cleanPhone, session, salon = null) {
+  if (!salon) {
+    try {
+      salon = db.prepare('SELECT salon_name, phone FROM client_salons WHERE user_id = ?').get(uid);
+    } catch (_) {}
+  }
+  // 1. Localiza o agendamento original ativo do cliente no escopo estrito do tenant
+  let apt = null;
+  const targetAptId = session.lastConfirmedAppointmentId || session.lastAppointmentId;
+  if (targetAptId) {
+    try {
+      apt = db.prepare(`
+        SELECT a.id, a.client_name, a.client_phone, a.start_datetime, a.end_datetime, a.price,
+               s.name AS service_name, st.name AS staff_name
+        FROM appointments a
+        LEFT JOIN client_services s ON s.id = a.service_id
+        LEFT JOIN client_staff st ON st.id = a.staff_id
+        WHERE a.id = ? AND a.user_id = ?
+      `).get(targetAptId, uid);
+    } catch (_) {}
+  }
+  if (!apt) {
+    try {
+      apt = db.prepare(`
+        SELECT a.id, a.client_name, a.client_phone, a.start_datetime, a.end_datetime, a.price,
+               s.name AS service_name, st.name AS staff_name
+        FROM appointments a
+        LEFT JOIN client_services s ON s.id = a.service_id
+        LEFT JOIN client_staff st ON st.id = a.staff_id
+        WHERE a.user_id = ?
+          AND a.client_phone = ?
+          AND a.status = 'AGENDADO'
+          AND a.start_datetime >= datetime('now', '-2 hours')
+        ORDER BY a.start_datetime ASC
+        LIMIT 1
+      `).get(uid, cleanPhone);
+    } catch (_) {}
+  }
+
+  // 2. Consulta configurações de notificação do salão
+  let notifSettings = null;
+  try {
+    notifSettings = salonNotificationService.getNotificationSettings(uid);
+  } catch (_) {}
+
+  const canNotify = Boolean(
+    notifSettings &&
+    notifSettings.notificationsEnabled &&
+    notifSettings.notificationPhone &&
+    notifSettings.notifyReschedule
+  );
+
+  session.state = 'IDLE';
+  session.lastAppointmentId = null;
+  session.lastConfirmedAppointmentId = null;
+  session.isRescheduling = false;
+
+  // Contato oficial de recepção (exclusivamente o telefone comercial do salão, autorizado para divulgação)
+  const officialPhone = salon?.phone && typeof salon.phone === 'string' ? salon.phone.trim() : '';
+  const contactInfo = officialPhone ? `pelo telefone ${officialPhone}` : `diretamente com a nossa equipe`;
+
+  // 3. Encaminhamento real se houver infraestrutura e canal habilitado
+  if (canNotify) {
+    let queueRes = null;
+    try {
+      queueRes = await salonNotificationService.queueNotification(uid, apt ? apt.id : 0, 'RESCHEDULE_REQUEST', {
+        clientName: apt?.client_name || session.customerName || 'Cliente WhatsApp',
+        clientPhone: cleanPhone,
+        serviceName: apt?.service_name || 'Procedimento',
+        staffName: apt?.staff_name || 'Equipe',
+        startDt: apt?.start_datetime || new Date().toISOString(),
+        endDt: apt?.end_datetime || null,
+      });
+    } catch (err) {
+      console.warn(`[salonIncomingDispatcher] Falha ao enfileirar notificação de remarcação (#${uid}):`, err.message);
+    }
+
+    const outboxStatus = queueRes?.status || (queueRes?.success ? 'PENDING' : 'FAILED');
+
+    // Confirmação transparente baseada no estado real de entrega (Comando 058.1)
+    if (outboxStatus === 'SENT') {
+      return `Sem problemas! Seu agendamento atual continua 100% garantido e confirmado. ✨\n\n` +
+        `Nossa equipe da recepção já foi notificada sobre o seu pedido de remarcação, e uma de nossas atendentes vai te responder por aqui em instantes para ajustar o seu horário com todo o carinho!`;
+    }
+
+    if (outboxStatus === 'PENDING' || outboxStatus === 'SIMULATED') {
+      return `Sem problemas! Seu agendamento atual continua 100% garantido e confirmado. ✨\n\n` +
+        `Já registrei seu pedido de remarcação para a nossa equipe da recepção, e assim que uma de nossas atendentes visualizar ela vai te responder por aqui para ajustar o seu horário com todo o carinho!`;
+    }
+
+    // Se o status for FAILED ou houver erro no enfileiramento, não afirma que notificou e orienta contato
+  }
+
+  // 4. Se o encaminhamento automático não puder ser garantido ou falhar, fornece orientação verdadeira sem falsas promessas
+  return `Sem problemas! Seu agendamento atual continua 100% garantido e confirmado. ✨\n\n` +
+    `Para remarcar ou ajustar seu horário, por favor entre em contato com a nossa recepção ${contactInfo}. Assim nossa equipe encontra o melhor horário para você!`;
 }
 
 /**
@@ -827,6 +932,7 @@ async function handleConversationalV2({
   uid,
   cleanPhone,
   salonName,
+  salon,
   services,
   staffList,
   session,
@@ -931,12 +1037,7 @@ async function handleConversationalV2({
     const isNovo = /\b(novo|marcar\s+(um\s+)?novo|novo\s+atendimento|outro\s+atendimento|outro|mais\s+um)\b/i.test(normText);
 
     if (isRemarcar) {
-      // Desvio transparente e seguro para atendimento humano; agendamento anterior permanece 100% INTACTO
-      session.state = 'IDLE';
-      session.lastAppointmentId = null;
-      session.lastConfirmedAppointmentId = null;
-      session.isRescheduling = false;
-      return `Sem problemas! Seu agendamento atual continua 100% garantido e confirmado. ✨\n\nVou transferir sua solicitação de remarcação para a nossa equipe da recepção, e uma de nossas atendentes vai te responder por aqui em instantes para ajustar o seu horário com todo o carinho!`;
+      return await dispatchRescheduleHandoff(uid, cleanPhone, session, salon);
     }
 
     if (isNovo) {
@@ -1137,6 +1238,11 @@ async function handleConversationalV2({
           `Posso confirmar o seu agendamento? 🥰`;
       }
     }
+  }
+
+  // 5.1 Solicitação Direta de Remarcação (Comando 058.1)
+  if (intent === 'RESCHEDULE' || /\b(remarcar|remarca[çc][aã]o|mudar\s+(o\s+)?(hor[aá]rio|dia|data)|trocar\s+(o\s+)?(hor[aá]rio|dia|data))\b/i.test(normText)) {
+    return await dispatchRescheduleHandoff(uid, cleanPhone, session, salon);
   }
 
   // 6. Conversa Geral / Saudação
@@ -1470,6 +1576,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
         uid,
         cleanPhone,
         salonName,
+        salon,
         services,
         staffList,
         session,
@@ -1492,11 +1599,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
       const isNovo = /\b(novo|marcar\s+(um\s+)?novo|novo\s+atendimento|outro\s+atendimento|outro|mais\s+um)\b/i.test(normText);
 
       if (isRemarcar) {
-        session.state = 'IDLE';
-        session.lastAppointmentId = null;
-        session.lastConfirmedAppointmentId = null;
-        session.isRescheduling = false;
-        replyText = `Sem problemas! Seu agendamento atual continua 100% garantido e confirmado. ✨\n\nVou transferir sua solicitação de remarcação para a nossa equipe da recepção, e uma de nossas atendentes vai te responder por aqui em instantes para ajustar o seu horário com todo o carinho!`;
+        replyText = await dispatchRescheduleHandoff(uid, cleanPhone, session, salon);
         break;
       }
 
@@ -1820,8 +1923,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
       const isNovo = /\b(novo|marcar\s+(um\s+)?novo|novo\s+atendimento|outro\s+atendimento|outro|mais\s+um)\b/i.test(normText);
 
       if (isRemarcar) {
-        session.state = 'IDLE';
-        replyText = `Perfeito! Me fala qual dia e horário você prefere para remarcar o seu atendimento. Vou verificar nossa disponibilidade agora mesmo! ✨`;
+        replyText = await dispatchRescheduleHandoff(uid, cleanPhone, session, salon);
         break;
       }
 
@@ -1891,6 +1993,11 @@ async function dispatchMessage(salonUserId, sock, msg) {
     default: {
       const isGreeting = /^(oi|ola|bom dia|boa tarde|boa noite|tudo bem|como vai|opa|oie)\b/i.test(normText);
       const isServiceInquiry = /(servico|servicos|valor|valores|preco|precos|quanto custa|tabela|cardapio|menu|catalogo)/i.test(normText);
+      const isRescheduleDirect = /\b(remarcar|remarca[çc][aã]o|mudar\s+(o\s+)?(hor[aá]rio|dia|data)|trocar\s+(o\s+)?(hor[aá]rio|dia|data))\b/i.test(normText);
+      if (isRescheduleDirect) {
+        replyText = await dispatchRescheduleHandoff(uid, cleanPhone, session, salon);
+        break;
+      }
       const isScheduleInquiry = isSchedulingOrCareIntent(normText);
       const temporal = extractDeterministicTemporal(normText);
 
@@ -2018,6 +2125,8 @@ module.exports = {
   findMatchingService,
   resolveCandidateDays,
   filterSlotsByPreference,
+  formatCandidateSlotsMessage,
+  dispatchRescheduleHandoff,
   _resetForTesting,
   _getCustomerSessionForTesting,
 };

@@ -204,14 +204,15 @@ test('2. Agendamento em Linguagem Natural com Turno ("quero cortar o cabelo aman
   assert.match(resp, /Corte Feminino em Camadas/);
   assert.match(resp, /R\$\s*90,00/);
   // Todos os horários oferecidos devem ser do período da manhã (< 12:00)
-  const lines = resp.split('\n').filter((l) => /^\d+\.\s+/.test(l));
-  assert.ok(lines.length > 0, 'Deve ter oferecido horários');
-  for (const line of lines) {
-    const matchTime = line.match(/às\s+\*?(\d{2}):(\d{2})\*?/);
-    if (matchTime) {
-      const hour = parseInt(matchTime[1], 10);
-      assert.ok(hour < 12, `Horário ${matchTime[1]}:${matchTime[2]} deve ser do turno da manhã (< 12h)`);
-    }
+  assert.ok(resp.includes('Encontrei') || resp.includes('horários'), 'Deve ter oferecido horários');
+  const timeMatches = [...resp.matchAll(/\*?(\d{1,2})(?:h|:)(\d{2})?\*?/g)];
+  assert.ok(timeMatches.length > 0, 'Deve ter encontrado horários na resposta');
+  for (const m of timeMatches) {
+    const hour = parseInt(m[1], 10);
+    // Ignora preços (ex: R$ 90) checando se não é precedido por R$
+    const beforeMatch = resp.slice(Math.max(0, m.index - 5), m.index);
+    if (beforeMatch.includes('R$') || beforeMatch.includes('$')) continue;
+    assert.ok(hour >= 8 && hour < 12, `Horário ${hour}h deve ser do turno da manhã (entre 8h e 12h)`);
   }
 });
 

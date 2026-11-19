@@ -190,6 +190,28 @@ function buildRescheduleMessage({
 }
 
 /**
+ * Generates message for client reschedule request (human handoff)
+ */
+function buildRescheduleRequestMessage({
+  clientName,
+  clientPhone,
+  serviceName,
+  staffName,
+  startDt,
+  endDt,
+}) {
+  const { dateStr, startTimeStr } = formatDateTimeStrings(startDt, endDt);
+
+  return `🔄 Solicitação de remarcação recebida!\n\n` +
+         `Cliente: ${clientName || 'Cliente'}\n` +
+         `WhatsApp: ${clientPhone || 'Não informado'}\n` +
+         `Serviço: ${serviceName || 'Atendimento'}\n` +
+         `Profissional: ${staffName || 'Equipe'}\n` +
+         `Horário Atual: ${dateStr} às ${startTimeStr}\n\n` +
+         `ℹ️ A cliente solicitou a remarcação pelo WhatsApp. O agendamento original permanece confirmado na sua agenda até que você combine o novo horário com ela.`;
+}
+
+/**
  * Generates message for Google sync failure alert
  */
 function buildSyncFailureMessage({ clientName, serviceName, staffName, startDt, error }) {
@@ -221,7 +243,7 @@ function enqueueNotificationTx(userId, appointmentId, eventType, data = {}) {
   // Check event-specific toggle
   if (eventType === 'NEW_APPOINTMENT' && !settings.notifyNewAppointment) return { success: false, reason: 'TOGGLE_DISABLED' };
   if (eventType === 'CANCELLATION' && !settings.notifyCancellation) return { success: false, reason: 'TOGGLE_DISABLED' };
-  if (eventType === 'RESCHEDULE' && !settings.notifyReschedule) return { success: false, reason: 'TOGGLE_DISABLED' };
+  if ((eventType === 'RESCHEDULE' || eventType === 'RESCHEDULE_REQUEST') && !settings.notifyReschedule) return { success: false, reason: 'TOGGLE_DISABLED' };
   if (eventType === 'SYNC_FAILURE' && !settings.notifySyncFailure) return { success: false, reason: 'TOGGLE_DISABLED' };
 
   let messageText = '';
@@ -234,6 +256,9 @@ function enqueueNotificationTx(userId, appointmentId, eventType, data = {}) {
       break;
     case 'RESCHEDULE':
       messageText = buildRescheduleMessage(data);
+      break;
+    case 'RESCHEDULE_REQUEST':
+      messageText = buildRescheduleRequestMessage(data);
       break;
     case 'SYNC_FAILURE':
       messageText = buildSyncFailureMessage(data);
@@ -294,8 +319,9 @@ async function queueNotification(userId, appointmentId, eventType, data = {}) {
 
   const outboxWorker = require('./outboxWorker');
 
+  let dispatchResult = null;
   try {
-    await dispatchOutboxItem(enq.outboxId);
+    dispatchResult = await dispatchOutboxItem(enq.outboxId);
   } catch (err) {
     console.warn(`[SalonNotificationService] Aviso no envio assíncrono do outbox #${enq.outboxId}:`, err.message);
   }
@@ -304,7 +330,16 @@ async function queueNotification(userId, appointmentId, eventType, data = {}) {
     outboxWorker.notify();
   } catch (_) {}
 
-  return enq;
+  // Busca o status atualizado da outbox para retorno preciso
+  let finalStatus = 'PENDING';
+  try {
+    const row = db.prepare('SELECT status, last_error FROM whatsapp_notification_outbox WHERE id = ?').get(enq.outboxId);
+    if (row?.status) {
+      finalStatus = row.status;
+    }
+  } catch (_) {}
+
+  return { ...enq, status: finalStatus, dispatchResult };
 }
 
 /**
@@ -401,6 +436,7 @@ module.exports = {
   buildNewAppointmentMessage,
   buildCancellationMessage,
   buildRescheduleMessage,
+  buildRescheduleRequestMessage,
   buildSyncFailureMessage,
   queueNotification,
   enqueueNotificationTx,
