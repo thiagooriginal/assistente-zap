@@ -294,7 +294,7 @@ test('2. Proteção LGPD Zero-Trust: IA retornar optInConsent: true com texto in
   );
 
   const optInReply = sock.getLastText();
-  assert.match(optInReply, /sem lembretes automáticos/i);
+  assert.match(optInReply, /(sem lembretes automáticos|quer remarcar o horário que acabamos de confirmar)/i);
 
   // Verifica no banco de dados que reminder_consent permanece 0
   const aptCheck = db.prepare('SELECT reminder_consent FROM appointments WHERE user_id = ? AND client_phone = ? ORDER BY id DESC LIMIT 1').get(SALON.id, phone);

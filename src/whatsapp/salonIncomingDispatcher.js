@@ -599,16 +599,23 @@ async function handleConversationalV2({
     // Zero-Trust: jamais conceder consentimento por mera inferência de IA
     const isFalsePositive =
       /^(eu\s+)?quero\s*$/i.test(normText) ||
-      /quero\s+(agendar|marcar|mudar|ver|trocar|outro|fazer|cancelar|saber)/i.test(normText) ||
+      /^(eu\s+)?quero\s+receber\s*$/i.test(normText) ||
+      /\b(orcamento|orçamento|catalogo|catálogo|valores?|precos?|preços?|tabela|menu)\b/i.test(normText) ||
+      /quero\s+(agendar|marcar|mudar|ver|trocar|outro|outra|fazer|cancelar|saber)\b/i.test(normText) ||
+      /pode\s+(mandar|enviar)\s+(os?\s+)?(valores?|precos?|preços?|orcamentos?|orçamentos?|catalogo|catálogo)/i.test(normText) ||
       /mostre\s+os\s+servicos/i.test(normText) ||
       /\b(nao|não)\s+quero\b/i.test(normText) ||
       /\bsem\s+lembrete/i.test(normText);
 
     const isExplicitAffirmative =
       !isFalsePositive && (
-        /^(1|sim|com certeza|autorizo|pode enviar|pode mandar)\b/i.test(normText) ||
+        // Resposta afirmativa direta e inequívoca à oferta de lembrete
+        /^(1|sim|com certeza|autorizo|pode sim|claro)\s*(!|\.|\?)*$/i.test(normText) ||
+        // Menção direta e obrigatória ao termo lembrete(s)
         /^(sim,?\s*)?(quero|pode enviar|pode mandar|ativar|autorizo)\s+(receber\s+)?(o\s+|os\s+)?lembrete(s)?\b/i.test(normText) ||
-        /^(sim,?\s*)?quero\s+receber(\s+lembretes?)?\b/i.test(normText)
+        /^(sim,?\s*)?quero\s+receber\s+(o\s+|os\s+)?lembrete(s)?\b/i.test(normText) ||
+        /^(sim,?\s*)?pode\s+(enviar|mandar)\s+(o\s+|os\s+)?lembrete(s)?\b/i.test(normText) ||
+        /^(sim,?\s*)?pode\s+(mandar|enviar)\s*(por favor|sim)?\s*(!|\.|\?)*$/i.test(normText)
       );
 
     const isExplicitNegative =
@@ -617,12 +624,7 @@ async function handleConversationalV2({
       /\bsem\s+lembrete/i.test(normText) ||
       nluResult.optInConsent === false;
 
-    if (isExplicitNegative || /^(eu\s+)?quero\s*$/i.test(normText)) {
-      session.state = 'IDLE';
-      session.lastAppointmentId = null;
-      return `Tudo bem! Seu agendamento permanece confirmado normalmente sem lembretes automáticos. Se precisar de algo, estarei à disposição! ✨`;
-    }
-
+    // Se for afirmação explícita de consentimento de lembrete
     if (isExplicitAffirmative && session.lastAppointmentId) {
       const salonReminderService = require('../services/salonReminderService');
       salonAppointmentService.updateAppointmentConsent(session.lastAppointmentId, uid, 1, 'whatsapp_bot_optin');
@@ -633,10 +635,75 @@ async function handleConversationalV2({
       return `Combinado! Lembrete de 24h ativado com sucesso. ✨\n\nCaso queira cancelar os lembretes no futuro, basta digitar *Parar lembretes* a qualquer momento.\n\nNos vemos em breve no *${salonName}*! 💖`;
     }
 
-    // Se for outra intenção (ex: "Quero agendar outro horário", "Quero mudar o corte"), encerra o opt-in sem consentimento
+    // Se for recusa explícita de lembrete OU a palavra isolada "quero"
+    if (isExplicitNegative || /^(eu\s+)?quero\s*$/i.test(normText)) {
+      session.state = 'IDLE';
+      session.lastAppointmentId = null;
+      return `Tudo bem! Seu agendamento permanece confirmado normalmente sem lembretes automáticos. Se precisar de algo, estarei à disposição! ✨`;
+    }
+
+    // Continuidade da Conversa (COMANDO 056.1):
+    // Se a cliente manifestar intenção de agendar outro horário, remarcar ou mudar atendimento:
+    const isScheduleOrRescheduleInquiry =
+      intent === 'RESCHEDULE' ||
+      intent === 'SCHEDULE_INQUIRY' ||
+      /(outro\s+(hor[aá]rio|dia|atendimento)|remarcar|mudar\s+(o\s+)?(hor[aá]rio|corte|servi[çc]o|dia|data)|novo\s+(hor[aá]rio|atendimento|agendamento)|agendar\s+outro|marcar\s+outro)/i.test(normText);
+
+    if (isScheduleOrRescheduleInquiry) {
+      // Consentimento permanece 0 (Zero-Trust) e agendamento confirmado permanece INTACTO no SQLite
+      session.lastConfirmedAppointmentId = session.lastAppointmentId;
+      session.state = 'AWAITING_RESCHEDULE_OR_NEW';
+      return `Claro! Você quer remarcar o horário que acabamos de confirmar ou marcar um novo atendimento?`;
+    }
+
+    // Se a cliente perguntar valores / orçamento / catálogo / serviços
+    if (intent === 'PRICE_INQUIRY' || intent === 'PRICE_SERVICE_INQUIRY' || intent === 'SERVICE_INQUIRY' || /\b(orcamento|orçamento|catalogo|catálogo|valores?|precos?|preços?|tabela|menu)\b/i.test(normText)) {
+      session.state = 'IDLE';
+      session.lastAppointmentId = null;
+      const queryTerm = nluResult.serviceName || text;
+      const resMatch = resolveServiceMatch(services, queryTerm);
+      if (resMatch.status === 'EXACT') {
+        const s = resMatch.match;
+        return `O procedimento *${s.name}* no *${salonName}* custa *R$ ${formatPrice(s.price)}* (duração estimada de ${s.duration_min} minutos).\n\n(Seu agendamento anterior continua confirmadíssimo! ✨ Se quiser marcar mais um horário para esse ou outro procedimento, é só me falar!)`;
+      }
+      const serviceList = services.slice(0, 5).map((s) => `• *${s.name}* — R$ ${formatPrice(s.price)}`).join('\n');
+      return `Com certeza! Aqui estão nossos principais procedimentos e valores no *${salonName}*:\n\n${serviceList}\n\n(Seu agendamento já está confirmado normalmente! ✨ Se quiser marcar outro atendimento, é só me avisar!)`;
+    }
+
+    // Se for conversa geral / dúvidas
+    if (intent === 'GENERAL_TALK' && nluResult.friendlyMessage) {
+      session.state = 'IDLE';
+      session.lastAppointmentId = null;
+      return nluResult.friendlyMessage;
+    }
+
+    // Qualquer outra intenção encerra o opt-in cordial sem conceder consentimento
     session.state = 'IDLE';
     session.lastAppointmentId = null;
     return `Tudo bem! Seu agendamento permanece confirmado normalmente sem lembretes automáticos. Se precisar de algo, estarei à disposição! ✨`;
+  }
+
+  // 1.1 Continuidade de Agendamento: Esclarecimento entre Remarcação ou Novo Atendimento (COMANDO 056.1)
+  if (session.state === 'AWAITING_RESCHEDULE_OR_NEW') {
+    const isRemarcar = /\b(remarcar|mudar|trocar|o\s+(que\s+)?acabamos\s+de\s+confirmar|o\s+de\s+agora|esse\s+mesmo)\b/i.test(normText);
+    const isNovo = /\b(novo|marcar\s+(um\s+)?novo|novo\s+atendimento|outro\s+atendimento|outro|mais\s+um)\b/i.test(normText);
+
+    if (isRemarcar) {
+      // O agendamento anterior permanece 100% intacto no SQLite até que um novo seja confirmado
+      session.state = 'IDLE';
+      session.isRescheduling = true;
+      return `Perfeito! Me fala qual dia e horário você prefere para remarcar o seu atendimento. Vou verificar nossa disponibilidade agora mesmo! ✨`;
+    }
+
+    if (isNovo) {
+      // O agendamento anterior permanece 100% intacto no SQLite
+      session.state = 'IDLE';
+      session.isRescheduling = false;
+      return `Combinado! O seu agendamento anterior continua confirmado com carinho. ✨ Para o novo atendimento, qual serviço você gostaria de agendar?`;
+    }
+
+    // Se a cliente enviar outra mensagem direta (ex: serviço ou data), transiciona para IDLE e processa
+    session.state = 'IDLE';
   }
 
   // 2. Desistência ou Cancelamento voluntário do fluxo durante agendamento
@@ -1413,14 +1480,45 @@ async function dispatchMessage(salonUserId, sock, msg) {
       break;
     }
 
+    case 'AWAITING_RESCHEDULE_OR_NEW': {
+      const isRemarcar = /\b(remarcar|mudar|trocar|o\s+(que\s+)?acabamos\s+de\s+confirmar|o\s+de\s+agora|esse\s+mesmo)\b/i.test(normText);
+      const isNovo = /\b(novo|marcar\s+(um\s+)?novo|novo\s+atendimento|outro\s+atendimento|outro|mais\s+um)\b/i.test(normText);
+
+      if (isRemarcar) {
+        session.state = 'IDLE';
+        replyText = `Perfeito! Me fala qual dia e horário você prefere para remarcar o seu atendimento. Vou verificar nossa disponibilidade agora mesmo! ✨`;
+        break;
+      }
+
+      if (isNovo) {
+        session.state = 'IDLE';
+        replyText = `Combinado! O seu agendamento anterior continua confirmado com carinho. ✨ Para o novo atendimento, qual serviço você gostaria de agendar?`;
+        break;
+      }
+
+      session.state = 'IDLE';
+      break;
+    }
+
     case 'AWAITING_REMINDER_OPTIN': {
-      // 1. Recusa ou cancelamento de lembretes (precedência estrita)
-      const isNegative =
-        /^(nao|não|2|dispensa|cancelar|deixa pra la|deixa)\b/i.test(normText) ||
+      // Zero-Trust: Falsos positivos
+      const isFalsePositive =
+        /^(eu\s+)?quero\s*$/i.test(normText) ||
+        /^(eu\s+)?quero\s+receber\s*$/i.test(normText) ||
+        /\b(orcamento|orçamento|catalogo|catálogo|valores?|precos?|preços?|tabela|menu)\b/i.test(normText) ||
+        /quero\s+(agendar|marcar|mudar|ver|trocar|outro|outra|fazer|cancelar|saber)\b/i.test(normText) ||
+        /pode\s+(mandar|enviar)\s+(os?\s+)?(valores?|precos?|preços?|orcamentos?|orçamentos?|catalogo|catálogo)/i.test(normText) ||
+        /mostre\s+os\s+servicos/i.test(normText) ||
         /\b(nao|não)\s+quero\b/i.test(normText) ||
         /\bsem\s+lembrete/i.test(normText);
 
-      if (isNegative) {
+      // 1. Recusa ou cancelamento de lembretes (precedência estrita)
+      const isNegative =
+        /^(nao|não|2|dispensa|cancelar|deixa pra la|deixa)\b/i.test(normText) ||
+        /\b(nao|não)\s+quero(\s+lembrete)?/i.test(normText) ||
+        /\bsem\s+lembrete/i.test(normText);
+
+      if (isNegative || /^(eu\s+)?quero\s*$/i.test(normText)) {
         session.state = 'IDLE';
         session.lastAppointmentId = null;
         replyText = `Tudo bem! Seu agendamento permanece confirmado normalmente sem lembretes automáticos. Se precisar de qualquer informação, estarei por aqui! ✨`;
@@ -1429,9 +1527,13 @@ async function dispatchMessage(salonUserId, sock, msg) {
 
       // 2. Afirmação inequívoca de consentimento no contexto da pergunta sobre lembretes
       const isAffirmative =
-        /^(1|sim|com certeza|positivo|autorizo)\b/i.test(normText) ||
-        /^(sim,?\s*)?(quero|pode enviar|ativar|autorizo)\s+(o\s+|os\s+)?lembrete(s)?\b/i.test(normText) ||
-        /^(sim,?\s*)?quero\s+receber\s+(o\s+|os\s+)?lembrete(s)?\b/i.test(normText);
+        !isFalsePositive && (
+          /^(1|sim|com certeza|positivo|autorizo|pode sim|claro)\s*(!|\.|\?)*$/i.test(normText) ||
+          /^(sim,?\s*)?(quero|pode enviar|ativar|autorizo)\s+(o\s+|os\s+)?lembrete(s)?\b/i.test(normText) ||
+          /^(sim,?\s*)?quero\s+receber\s+(o\s+|os\s+)?lembrete(s)?\b/i.test(normText) ||
+          /^(sim,?\s*)?pode\s+(enviar|mandar)\s+(o\s+|os\s+)?lembrete(s)?\b/i.test(normText) ||
+          /^(sim,?\s*)?pode\s+(mandar|enviar)\s*(por favor|sim)?\s*(!|\.|\?)*$/i.test(normText)
+        );
 
       if (isAffirmative && session.lastAppointmentId) {
         const salonReminderService = require('../services/salonReminderService');
