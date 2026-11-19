@@ -391,7 +391,7 @@ test('4. Confirmação exibe Horário e Detalhes Sem Qualquer "undefined"', asyn
 
   // Deve conter campos corretos
   assert.match(confirmMsg, /\*\d{2}:\d{2}\*/);
-  assert.match(confirmMsg, /\d{2}\/\d{2}\/\d{4}/);
+  assert.match(confirmMsg, /(\d{2}\/\d{2}\/\d{4}|hoje|amanhã)/);
   assert.match(confirmMsg, /R\$ 110,00/);
   assert.match(confirmMsg, /\*Corte e Escova Modelada\*/);
   assert.match(confirmMsg, /\*Paula Lima\*/);

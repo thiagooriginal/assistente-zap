@@ -507,4 +507,106 @@ test.describe('COMANDO 055 — Jéssica Conversacional 2.1 (Conversa Natural Sem
 
     assert.strictEqual(freeAppointments.length, 0, 'Backend determinístico NUNCA deve aceitar gratuidade fraudulenta ou injeção de prompt');
   });
+
+  // =========================================================================
+  // CENÁRIO 8: Blindagem LGPD de Consentimento e Refinamento Gramatical (COMANDO 056)
+  // =========================================================================
+  test('Cenário 8: Validação dos 5 Casos LGPD e Refinamento Gramatical (COMANDO 056)', async () => {
+    const mockSock = createMockSocket();
+
+    // Função auxiliar para criar agendamento pendente de opt-in
+    async function setupPendingOptIn() {
+      salonIncomingDispatcher._resetForTesting();
+      salonSessionManager._resetForTesting();
+      db.prepare('DELETE FROM appointments WHERE user_id = ?').run(tenantId);
+      mockSock.clearSent();
+
+      // Solicita serviço
+      jessicaNluService.setMockNluHandler(() => ({
+        intent: 'SCHEDULE_INQUIRY',
+        serviceName: 'Corte Feminino',
+        staffName: 'Bia',
+        datePreference: 'amanha',
+        period: 'manha',
+      }));
+      await salonIncomingDispatcher.dispatchMessage(tenantId, mockSock, createIncomingMessage('Quero corte amanhã de manhã com a Bia', clientPhone));
+
+      // Seleciona horário
+      jessicaNluService.setMockNluHandler(() => ({
+        intent: 'SCHEDULE_INQUIRY',
+        time: '10:00',
+      }));
+      await salonIncomingDispatcher.dispatchMessage(tenantId, mockSock, createIncomingMessage('10:00', clientPhone));
+
+      // Confirmação usando "Pode sim" (Caso 4 do COMANDO 056)
+      jessicaNluService.setMockNluHandler(() => ({
+        intent: 'CONFIRM_BOOKING',
+      }));
+      await salonIncomingDispatcher.dispatchMessage(tenantId, mockSock, createIncomingMessage('Pode sim', clientPhone));
+
+      const confirmMsg = mockSock.getLastText();
+      // Verificação da gramática: NÃO pode conter "em amanhã"
+      assert.doesNotMatch(confirmMsg, /em\s+amanhã/i, 'NÃO deve conter o vício gramatical "em amanhã"');
+      assert.match(confirmMsg, /marcado para amanhã, às \*10:00\*, com a \*Bia\*, por R\$ 95,00/i, 'Construção gramatical refinada esperada');
+
+      const apt = db.prepare('SELECT id, reminder_consent FROM appointments WHERE user_id = ? AND client_phone = ? ORDER BY id DESC LIMIT 1').get(tenantId, clientPhone);
+      assert.strictEqual(apt.reminder_consent, 0, 'Confirmação via "Pode sim" NÃO deve conceder opt-in de lembrete');
+      return apt.id;
+    }
+
+    // 1. Caso 1: "Quero agendar outro horário" no estado AWAITING_REMINDER_OPTIN -> reminder_consent === 0
+    const aptId1 = await setupPendingOptIn();
+    mockSock.clearSent();
+    jessicaNluService.setMockNluHandler(() => ({
+      intent: 'SCHEDULE_INQUIRY',
+      friendlyMessage: 'Vamos agendar outro horário!',
+    }));
+    await salonIncomingDispatcher.dispatchMessage(tenantId, mockSock, createIncomingMessage('Quero agendar outro horário', clientPhone));
+    const aptCheck1 = db.prepare('SELECT reminder_consent FROM appointments WHERE id = ?').get(aptId1);
+    assert.strictEqual(aptCheck1.reminder_consent, 0, 'Quero agendar outro horário NÃO deve conceder consentimento');
+
+    // 2. Caso 2: "Quero mudar o corte" no estado AWAITING_REMINDER_OPTIN -> reminder_consent === 0
+    const aptId2 = await setupPendingOptIn();
+    mockSock.clearSent();
+    jessicaNluService.setMockNluHandler(() => ({
+      intent: 'SCHEDULE_INQUIRY',
+      friendlyMessage: 'Qual corte você deseja?',
+    }));
+    await salonIncomingDispatcher.dispatchMessage(tenantId, mockSock, createIncomingMessage('Quero mudar o corte', clientPhone));
+    const aptCheck2 = db.prepare('SELECT reminder_consent FROM appointments WHERE id = ?').get(aptId2);
+    assert.strictEqual(aptCheck2.reminder_consent, 0, 'Quero mudar o corte NÃO deve conceder consentimento');
+
+    // 3. Caso 3: "quero" (palavra isolada) no estado AWAITING_REMINDER_OPTIN -> reminder_consent === 0
+    const aptId3 = await setupPendingOptIn();
+    mockSock.clearSent();
+    jessicaNluService.setMockNluHandler(() => ({
+      intent: 'REMINDER_OPTIN',
+      optInConsent: true, // Gemini alucinando consentimento
+    }));
+    await salonIncomingDispatcher.dispatchMessage(tenantId, mockSock, createIncomingMessage('quero', clientPhone));
+    const aptCheck3 = db.prepare('SELECT reminder_consent FROM appointments WHERE id = ?').get(aptId3);
+    assert.strictEqual(aptCheck3.reminder_consent, 0, 'Palavra isolada "quero" NÃO deve conceder consentimento mesmo se Gemini inferir true');
+
+    // 4. Caso 5: "Não quero lembretes" -> reminder_consent === 0
+    const aptId4 = await setupPendingOptIn();
+    mockSock.clearSent();
+    jessicaNluService.setMockNluHandler(() => ({
+      intent: 'REMINDER_OPTIN',
+      optInConsent: false,
+    }));
+    await salonIncomingDispatcher.dispatchMessage(tenantId, mockSock, createIncomingMessage('Não quero lembretes', clientPhone));
+    const aptCheck4 = db.prepare('SELECT reminder_consent FROM appointments WHERE id = ?').get(aptId4);
+    assert.strictEqual(aptCheck4.reminder_consent, 0, 'Opt-out explícito NÃO deve conceder consentimento');
+
+    // 5. Caso 6: "Quero receber lembretes" -> reminder_consent === 1
+    const aptId5 = await setupPendingOptIn();
+    mockSock.clearSent();
+    jessicaNluService.setMockNluHandler(() => ({
+      intent: 'REMINDER_OPTIN',
+      optInConsent: true,
+    }));
+    await salonIncomingDispatcher.dispatchMessage(tenantId, mockSock, createIncomingMessage('Quero receber lembretes', clientPhone));
+    const aptCheck5 = db.prepare('SELECT reminder_consent FROM appointments WHERE id = ?').get(aptId5);
+    assert.strictEqual(aptCheck5.reminder_consent, 1, 'Manifestação inequívoca "Quero receber lembretes" DEVE conceder consentimento 1');
+  });
 });

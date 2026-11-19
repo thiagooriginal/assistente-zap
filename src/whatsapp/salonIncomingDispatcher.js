@@ -95,6 +95,21 @@ function formatPrice(val) {
 }
 
 /**
+ * Formata horário de forma fluida e coloquial (ex: "09:00" -> "9h", "10:30" -> "10h30")
+ * @private
+ * @param {string} timeStr
+ * @returns {string}
+ */
+function formatTimeFriendly(timeStr) {
+  if (!timeStr || typeof timeStr !== 'string') return '';
+  const parts = timeStr.split(':');
+  const h = parseInt(parts[0], 10);
+  const m = parts[1] ? parseInt(parts[1], 10) : 0;
+  if (isNaN(h)) return timeStr;
+  return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`;
+}
+
+/**
  * Qualificadores lexicais para desambiguação de serviços no salão
  */
 const QUALIFIER_RULES = [
@@ -525,11 +540,27 @@ async function findCandidateSlots(userId, service, staff = null, targetDays = nu
 
       if (Array.isArray(freeSlots) && freeSlots.length > 0) {
         for (const slotTime of freeSlots) {
+          let assignedStaffName = staff ? staff.name : null;
+          if (!assignedStaffName && service?.id) {
+            try {
+              const eff = salonAppointmentService.resolveEffectiveStaff(userId, {
+                serviceId: service.id,
+                staffId: null,
+                date: day.dateStr,
+                time: slotTime,
+                durationMin: duration,
+              });
+              if (eff && eff.staffName) {
+                assignedStaffName = eff.staffName;
+              }
+            } catch (_) {}
+          }
           allCandidateSlots.push({
             number: counter++,
             date: day.dateStr,
             time: slotTime,
             dayLabel: day.label,
+            staffName: assignedStaffName,
           });
           if (allCandidateSlots.length >= 15) break;
         }
@@ -566,31 +597,33 @@ async function handleConversationalV2({
   // 1. Opt-in ou Opt-out de Lembretes 24h (LGPD - Prioridade Absoluta sobre Cancelamento Genérico)
   if (session.state === 'AWAITING_REMINDER_OPTIN' || intent === 'REMINDER_OPTIN') {
     // Zero-Trust: jamais conceder consentimento por mera inferência de IA
-    const isExplicitAffirmative =
-      /^(1|sim|autorizo|pode enviar)\b/i.test(normText) ||
-      /^sim,\s*quero(\s+receber)?(\s+o)?\s+lembrete/i.test(normText) ||
-      /^quero\s+receber(\s+os?)?\s+lembrete/i.test(normText);
-
-    // Expressões que NÃO concedem consentimento
     const isFalsePositive =
-      /quero\s+(agendar|marcar|mudar|ver|trocar|outro)/i.test(normText) ||
-      /^quero\s*$/i.test(normText) ||
-      /mostre\s+os\s+servicos/i.test(normText);
+      /^(eu\s+)?quero\s*$/i.test(normText) ||
+      /quero\s+(agendar|marcar|mudar|ver|trocar|outro|fazer|cancelar|saber)/i.test(normText) ||
+      /mostre\s+os\s+servicos/i.test(normText) ||
+      /\b(nao|não)\s+quero\b/i.test(normText) ||
+      /\bsem\s+lembrete/i.test(normText);
 
-    const isNegative =
-      !isExplicitAffirmative &&
-      (nluResult.optInConsent === false ||
-        /^(nao|não|2|dispensa|cancelar|cancela|sem lembrete)/i.test(normText) ||
-        /\bsem\s+lembrete/i.test(normText) ||
-        isFalsePositive);
+    const isExplicitAffirmative =
+      !isFalsePositive && (
+        /^(1|sim|com certeza|autorizo|pode enviar|pode mandar)\b/i.test(normText) ||
+        /^(sim,?\s*)?(quero|pode enviar|pode mandar|ativar|autorizo)\s+(receber\s+)?(o\s+|os\s+)?lembrete(s)?\b/i.test(normText) ||
+        /^(sim,?\s*)?quero\s+receber(\s+lembretes?)?\b/i.test(normText)
+      );
 
-    if (isNegative) {
+    const isExplicitNegative =
+      /^(nao|não|2|dispensa|cancelar|cancela|sem lembrete)/i.test(normText) ||
+      /\b(nao|não)\s+quero(\s+lembrete)?/i.test(normText) ||
+      /\bsem\s+lembrete/i.test(normText) ||
+      nluResult.optInConsent === false;
+
+    if (isExplicitNegative || /^(eu\s+)?quero\s*$/i.test(normText)) {
       session.state = 'IDLE';
       session.lastAppointmentId = null;
       return `Tudo bem! Seu agendamento permanece confirmado normalmente sem lembretes automáticos. Se precisar de algo, estarei à disposição! ✨`;
     }
 
-    if (isExplicitAffirmative && !isFalsePositive && session.lastAppointmentId) {
+    if (isExplicitAffirmative && session.lastAppointmentId) {
       const salonReminderService = require('../services/salonReminderService');
       salonAppointmentService.updateAppointmentConsent(session.lastAppointmentId, uid, 1, 'whatsapp_bot_optin');
       salonReminderService.registerClientConsent(uid, cleanPhone, 'whatsapp_bot_optin');
@@ -600,6 +633,7 @@ async function handleConversationalV2({
       return `Combinado! Lembrete de 24h ativado com sucesso. ✨\n\nCaso queira cancelar os lembretes no futuro, basta digitar *Parar lembretes* a qualquer momento.\n\nNos vemos em breve no *${salonName}*! 💖`;
     }
 
+    // Se for outra intenção (ex: "Quero agendar outro horário", "Quero mudar o corte"), encerra o opt-in sem consentimento
     session.state = 'IDLE';
     session.lastAppointmentId = null;
     return `Tudo bem! Seu agendamento permanece confirmado normalmente sem lembretes automáticos. Se precisar de algo, estarei à disposição! ✨`;
@@ -619,7 +653,7 @@ async function handleConversationalV2({
   }
 
   // 3. Confirmação Final do Agendamento
-  if (session.state === 'AWAITING_CONFIRMATION' && (intent === 'CONFIRM_BOOKING' || /^(sim|confirmo|pode agendar|ok|positivo|1)\b/i.test(normText))) {
+  if (session.state === 'AWAITING_CONFIRMATION' && (intent === 'CONFIRM_BOOKING' || /^(sim|confirmo|pode agendar|pode sim|pode confirmar|pode|ok|positivo|com certeza|1)\b/i.test(normText))) {
     const validService = db.prepare(`
       SELECT id, name, price, duration_min
       FROM client_services
@@ -657,7 +691,24 @@ async function handleConversationalV2({
     });
 
     // Fix bug: capturar variáveis antes de resetar a sessão para evitar `${undefined}` no horário
-    const displayDate = formatDisplayDate(session.selectedSlot.date);
+    const rawDate = session.selectedSlot.date;
+    let displayDate = formatDisplayDate(rawDate);
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const todayStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const tomorrowStr = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}`;
+
+    if (rawDate === 'amanha' || rawDate === 'amanhã' || rawDate === tomorrowStr || (session.selectedSlot.dayLabel && session.selectedSlot.dayLabel.toLowerCase().includes('amanhã'))) {
+      displayDate = 'amanhã';
+    } else if (rawDate === 'hoje' || rawDate === todayStr || (session.selectedSlot.dayLabel && session.selectedSlot.dayLabel.toLowerCase().includes('hoje'))) {
+      displayDate = 'hoje';
+    }
+
+    const datePrep = (displayDate.toLowerCase() === 'amanhã' || displayDate.toLowerCase() === 'hoje')
+      ? displayDate.toLowerCase()
+      : 'o dia ' + displayDate;
+
     const confirmedTime = session.selectedSlot.time;
     const confirmedServiceName = validService.name;
     const confirmedPrice = formatPrice(session.selectedService.price);
@@ -671,7 +722,7 @@ async function handleConversationalV2({
     session.candidateSlots = [];
     session.selectedSlot = null;
 
-    return `Prontinho! Agendamento confirmado com sucesso para *${confirmedServiceName}* em ${displayDate} às *${confirmedTime}* com a *${staffName}*, por R$ ${confirmedPrice}. 😊\n\n` +
+    return `Prontinho! Agendamento confirmado com sucesso: seu agendamento para *${confirmedServiceName}* está marcado para ${datePrep}, às *${confirmedTime}*, com a *${staffName}*, por R$ ${confirmedPrice}. 😊\n\n` +
       `Quer que eu te mande um lembrete aqui no WhatsApp 24 horas antes do seu horário para você não esquecer? ✨\n\n` +
       `(Se não quiser o lembrete, não precisa se preocupar: seu horário já está garantido!)`;
   }
@@ -825,6 +876,21 @@ async function handleConversationalV2({
         const slotList = displaySlots.map((s, i) => `${i + 1}. ${s.dayLabel} às *${s.time}*`).join('\n');
         const staffDesc = session.selectedStaff ? `com *${session.selectedStaff.name}*` : 'com nossa equipe';
         const moreHint = slots.length > 3 ? '\n\n(Quer ver mais opções? É só me falar!) ✨' : '';
+
+        if (displaySlots.length === 2) {
+          const timeDesc1 = formatTimeFriendly(displaySlots[0].time);
+          const st1 = displaySlots[0].staffName || session.selectedStaff?.name;
+          const staffDesc1 = st1 ? ` com a *${st1}*` : '';
+
+          const timeDesc2 = formatTimeFriendly(displaySlots[1].time);
+          const st2 = displaySlots[1].staffName || session.selectedStaff?.name;
+          const staffDesc2 = st2 ? ` com a *${st2}*` : '';
+
+          return `Encontrei ${timeDesc1}${staffDesc1} e ${timeDesc2}${staffDesc2}. Qual fica melhor pra você? ✨\n\n` +
+            `${slotList}\n\n` +
+            `Você pode responder pelo número ou me falar o horário! 😊`;
+        }
+
         return `Excelente! Para *${matchedService.name}* (R$ ${formatPrice(matchedService.price)}) ${staffDesc}, separei os seguintes horários disponíveis:\n\n${slotList}${moreHint}\n\nAlgum desses horários fica bom para você? ✨`;
       } else {
         session.state = 'IDLE';
@@ -1236,7 +1302,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
     }
 
     case 'AWAITING_CONFIRMATION': {
-      const isAffirmative = /^(sim|confirmo|pode agendar|agendar|ok|confirma|com certeza|positivo|pode ser|1)\b/i.test(normText);
+      const isAffirmative = /^(sim|confirmo|pode agendar|pode sim|pode confirmar|pode|agendar|ok|confirma|com certeza|positivo|pode ser|1)\b/i.test(normText);
       const isNegative = /^(nao|não|cancelar|cancela|desisto|deixa)\b/i.test(normText);
 
       if (isNegative) {
