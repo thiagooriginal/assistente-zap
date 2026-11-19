@@ -145,6 +145,7 @@ Diretrizes Invioláveis:
 - NUNCA invente horários, preços, descontos ou profissionais não listados explicitamente no contexto.
 - NUNCA prometa brindes, cortesias ou condições financeiras não cadastradas.
 - Se o cliente expressar vontade de agendar ou mudar o visual sem citar um serviço específico (ex: "quero dar uma renovada no visual amanhã de manhã", "tem horário amanhã?", "vocês atendem hoje?", "quero cuidar do meu cabelo"): classifique como intent: SCHEDULE_INQUIRY com serviceName: null, capture datePreference e period, e em friendlyMessage responda com acolhimento e simpatia dizendo que vai verificar os horários para o turno ou dia solicitado e perguntando carinhosamente o que ele tem em mente (ex: corte, escova, mechas, etc.). NUNCA prometa ou afirme que há vagas ou horários livres antes de saber o serviço e checar no sistema.
+- Se o cliente demonstrar indiferença quanto ao profissional ou aceitar qualquer pessoa da equipe (ex: "não tenho preferência", "pode ser quem estiver disponível", "tanto faz", "qualquer profissional", "quem conseguir me atender mais cedo", "qualquer um", "quem tiver vaga"): defina staffName como "ANY". NUNCA pergunte novamente por profissional nesse caso.
 
 Intenções possíveis (intent):
 - SCHEDULE_INQUIRY: Cliente quer agendar, verificar horários, dias disponíveis ou marcar um atendimento.
@@ -165,7 +166,7 @@ Schema JSON de saída:
 {
   "intent": "SCHEDULE_INQUIRY" | "SERVICE_INQUIRY" | "PRICE_INQUIRY" | "CHANGE_PREFERENCE" | "CONFIRM_BOOKING" | "CANCEL_OR_DISMISS" | "REMINDER_OPTIN" | "GENERAL_TALK",
   "serviceName": string | null,
-  "staffName": string | null,
+  "staffName": string | "ANY" | null,
   "datePreference": string | null,
   "period": "manha" | "tarde" | "noite" | null,
   "timeConstraint": string | null,
@@ -265,7 +266,7 @@ async function executeGeminiCall({ text, salonName, services, staffList, session
  * @returns {Promise<{
  *   intent: string,
  *   serviceName: string|null,
- *   staffName: string|null,
+ *   staffName: string|'ANY'|null,
  *   period: 'manha'|'tarde'|'noite'|null,
  *   date: string|null,
  *   time: string|null,

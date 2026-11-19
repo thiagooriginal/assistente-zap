@@ -256,6 +256,7 @@ test('2. Proteção LGPD Zero-Trust: IA retornar optInConsent: true com texto in
       intent: 'SCHEDULE_INQUIRY',
       serviceName: 'Corte e Escova Modelada',
       staffName: 'Paula Lima',
+      datePreference: 'sabado',
       friendlyMessage: null,
     };
   });
@@ -317,6 +318,7 @@ test('3. Cancelar no estado AWAITING_REMINDER_OPTIN NÃO cancela o agendamento c
       intent: 'SCHEDULE_INQUIRY',
       serviceName: 'Corte e Escova Modelada',
       staffName: 'Paula Lima',
+      datePreference: 'sabado',
     };
   });
 
@@ -513,6 +515,7 @@ test('8. Fluxo E2E Completo: Linguagem Natural -> Agendamento -> Opt-in Concedid
       intent: 'SCHEDULE_INQUIRY',
       serviceName: 'Escova Express',
       staffName: 'Paula Lima',
+      datePreference: 'sabado',
       period: 'tarde',
     };
   });

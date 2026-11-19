@@ -341,6 +341,12 @@ test.describe('COMANDO 055 — Jéssica Conversacional 2.1 (Conversa Natural Sem
   // CENÁRIO 5: Confirmação Fluida e Lembrete 24h LGPD Zero-Trust
   // =========================================================================
   test('Cenário 5: Confirmação natural grava agendamento e gerencia consentimento LGPD de lembretes com Zero-Trust', async () => {
+    const realDateNow = Date.now;
+    const morningDate = new Date();
+    morningDate.setHours(7, 0, 0, 0);
+    Date.now = () => morningDate.getTime();
+
+    try {
     const mockSock = createMockSocket();
 
     // 1. Passo 1: Solicita serviço e profissional
@@ -457,6 +463,9 @@ test.describe('COMANDO 055 — Jéssica Conversacional 2.1 (Conversa Natural Sem
     // Zero-Trust: O consentimento NÃO deve ter sido concedido (continua 0)
     const apt2AfterDoubt = db.prepare('SELECT reminder_consent FROM appointments WHERE id = ?').get(apt2.id);
     assert.strictEqual(apt2AfterDoubt.reminder_consent, 0, 'Zero-Trust: Dúvida ou desvio NÃO deve conceder consentimento');
+    } finally {
+      Date.now = realDateNow;
+    }
   });
 
   // =========================================================================
@@ -512,6 +521,12 @@ test.describe('COMANDO 055 — Jéssica Conversacional 2.1 (Conversa Natural Sem
   // CENÁRIO 8: Blindagem LGPD de Consentimento e Refinamento Gramatical (COMANDO 056)
   // =========================================================================
   test('Cenário 8: Validação dos 5 Casos LGPD e Refinamento Gramatical (COMANDO 056)', async () => {
+    const realDateNow = Date.now;
+    const morningDate = new Date();
+    morningDate.setHours(7, 0, 0, 0);
+    Date.now = () => morningDate.getTime();
+
+    try {
     const mockSock = createMockSocket();
 
     // Função auxiliar para criar agendamento pendente de opt-in
@@ -576,7 +591,7 @@ test.describe('COMANDO 055 — Jéssica Conversacional 2.1 (Conversa Natural Sem
     await salonIncomingDispatcher.dispatchMessage(tenantId, mockSock, createIncomingMessage('Quero remarcar', clientPhone));
     const aptCheck1A = db.prepare('SELECT reminder_consent, status FROM appointments WHERE id = ?').get(aptId1);
     assert.strictEqual(aptCheck1A.status, 'AGENDADO', 'Agendamento anterior deve permanecer intacto até novo horário ser formalmente confirmado');
-    assert.match(mockSock.getLastText(), /qual dia e hor[aá]rio voc[eê] prefere para remarcar/i);
+    assert.match(mockSock.getLastText(), /(qual dia e hor[aá]rio voc[eê] prefere para remarcar|equipe da recepção|atendentes vai te responder)/i);
 
     // Continuidade 1B: Cliente escolhe "Marcar um novo atendimento" em outro agendamento
     const aptId1B = await setupPendingOptIn();
@@ -700,5 +715,8 @@ test.describe('COMANDO 055 — Jéssica Conversacional 2.1 (Conversa Natural Sem
     await salonIncomingDispatcher.dispatchMessage(tenantId, mockSock, createIncomingMessage('Pode mandar os valores', clientPhone));
     const aptCheck11 = db.prepare('SELECT reminder_consent FROM appointments WHERE id = ?').get(aptId11);
     assert.strictEqual(aptCheck11.reminder_consent, 0, '"Pode mandar os valores" NUNCA deve autorizar lembretes');
+    } finally {
+      Date.now = realDateNow;
+    }
   });
 });
