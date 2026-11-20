@@ -5168,8 +5168,8 @@
       const spotGrid = document.getElementById('hubSpotlightGrid');
       try {
         const [subRes, catRes] = await Promise.all([
-          fetch('/api/cliente/my-products'),
-          fetch('/api/cliente/products-catalog'),
+          authFetch('/api/cliente/my-products'),
+          authFetch('/api/cliente/products-catalog'),
         ]);
 
         if (!subRes.ok || !catRes.ok) {
@@ -5678,7 +5678,7 @@
     // ==========================================
     async function loadMySubscriptions() {
       try {
-        const res = await fetch('/api/cliente/my-subscriptions');
+        const res = await authFetch('/api/cliente/my-subscriptions');
         const data = await res.json();
         const container = document.getElementById('subscriptionsTableContainer');
         const subs = data.subscriptions || [];
@@ -5790,7 +5790,7 @@
     // ==========================================
     async function loadMyInvoices() {
       try {
-        const res = await fetch('/api/cliente/my-invoices');
+        const res = await authFetch('/api/cliente/my-invoices');
         const data = await res.json();
         const container = document.getElementById('invoicesListContainer');
         const invoices = data.invoices || [];
@@ -6013,6 +6013,25 @@
     // ==========================================
     // 5. PROFILE INITIALIZER & JÉSSICA MODULE DATA
     // ==========================================
+    function getClientAuthToken() {
+      try {
+        return sessionStorage.getItem('raia_client_token');
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function authFetch(url, options = {}) {
+      const opts = { ...options };
+      opts.credentials = opts.credentials || 'include';
+      opts.headers = { ...(opts.headers || {}) };
+      const token = getClientAuthToken();
+      if (token && !opts.headers['Authorization']) {
+        opts.headers['Authorization'] = `Bearer ${token}`;
+      }
+      return fetch(url, opts);
+    }
+
     async function loadProfile() {
       // Limpeza preventiva da chave legada compartilhada
       try {
@@ -6031,7 +6050,7 @@
       try {
         const controller = new AbortController();
         const fetchTimeout = setTimeout(() => controller.abort(), 6500);
-        res = await fetch('/api/cliente/profile', { signal: controller.signal });
+        res = await authFetch('/api/cliente/profile', { signal: controller.signal });
         clearTimeout(fetchTimeout);
       } catch (netErr) {
         console.error('Erro de conexão ao buscar perfil:', netErr);

@@ -48,18 +48,28 @@ function isSecureConnection(req) {
 
 function setSessionCookie(res, name, token, maxAgeSeconds = 30 * 24 * 3600, req = null) {
   const secureFlag = isSecureConnection(req) ? '; Secure' : '';
-  res.setHeader(
-    'Set-Cookie',
-    `${name}=${token}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Lax${secureFlag}`
-  );
+  const cookie = `${name}=${token}; Path=/; Max-Age=${maxAgeSeconds}; HttpOnly; SameSite=Lax${secureFlag}`;
+  const existing = res.getHeader('Set-Cookie');
+  if (!existing) {
+    res.setHeader('Set-Cookie', cookie);
+  } else if (Array.isArray(existing)) {
+    res.setHeader('Set-Cookie', [...existing, cookie]);
+  } else {
+    res.setHeader('Set-Cookie', [existing, cookie]);
+  }
 }
 
 function clearSessionCookie(res, name, req = null) {
   const secureFlag = isSecureConnection(req) ? '; Secure' : '';
-  res.setHeader(
-    'Set-Cookie',
-    `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secureFlag}`
-  );
+  const cookie = `${name}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secureFlag}`;
+  const existing = res.getHeader('Set-Cookie');
+  if (!existing) {
+    res.setHeader('Set-Cookie', cookie);
+  } else if (Array.isArray(existing)) {
+    res.setHeader('Set-Cookie', [...existing, cookie]);
+  } else {
+    res.setHeader('Set-Cookie', [existing, cookie]);
+  }
 }
 
 // Client Multi-Tenant Authentication & Subscription Enforcement Middleware (Proteção 01 & 17)
