@@ -746,9 +746,14 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
     calId = status.selectedCalendarId || 'primary';
   }
 
-
-  const oauth2 = getOAuth2Client(userId);
-  const calendar = google.calendar({ version: 'v3', auth: oauth2 });
+  // Consulta autônoma de is_demo do tenant no banco (COMANDO 059.1)
+  let isDemo = false;
+  try {
+    const userRow = db.prepare('SELECT is_demo FROM users WHERE id = ?').get(userId);
+    if (userRow && Boolean(userRow.is_demo)) {
+      isDemo = true;
+    }
+  } catch (_) {}
 
   const clientName = appointment.client_name || 'Cliente';
   const serviceName = appointment.service_name || appointment.title || 'Atendimento';
@@ -769,6 +774,7 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
     calendarId: calId,
     appointmentId: appointment.id,
     accountEmail: status.accountEmail,
+    isDemo,
   });
 
   if (!gateCheck.allowed) {
@@ -797,6 +803,30 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
       isSimulated: true,
     };
   }
+
+  // Bloqueio fail-closed absoluto imediatamente antes de chamadas de rede à API do Google (COMANDO 059.1)
+  if (process.env.GOOGLE_SYNC_LIVE_ENABLED !== 'true' || !isLiveGoogleSyncAllowed(status.accountEmail) || isDemo) {
+    const simEventId = `sim_${stableEventId.substring(0, 28)}`;
+    db.prepare(`
+      UPDATE appointments
+      SET google_event_id = ?,
+          google_calendar_id = ?,
+          google_sync_status = 'SIMULATED',
+          google_sync_error = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ?
+    `).run(simEventId, calId, 'Ambiente Seguro: Sincronização simulada (LIVE_SYNC_DISABLED)', appointment.id, userId);
+
+    return {
+      success: true,
+      googleEventId: simEventId,
+      calendarId: calId,
+      isSimulated: true,
+    };
+  }
+
+  const oauth2 = getOAuth2Client(userId);
+  const calendar = google.calendar({ version: 'v3', auth: oauth2 });
 
   const eventPayload = {
     id: stableEventId,
@@ -948,6 +978,15 @@ async function updateCalendarEvent(userId, googleEventId, appointment, targetCal
     calId = status.selectedCalendarId || 'primary';
   }
 
+  // Consulta autônoma de is_demo do tenant no banco (COMANDO 059.1)
+  let isDemo = false;
+  try {
+    const userRow = db.prepare('SELECT is_demo FROM users WHERE id = ?').get(userId);
+    if (userRow && Boolean(userRow.is_demo)) {
+      isDemo = true;
+    }
+  } catch (_) {}
+
   // 1. Proteção de Homologação/Staging contra chamadas externas inadvertidas (Requisito 7, Item 3 e Gatekeeper)
   const gatekeeper = require('./googleCalendarGatekeeper');
   const gateCheck = gatekeeper.evaluateGatekeeper({
@@ -955,6 +994,7 @@ async function updateCalendarEvent(userId, googleEventId, appointment, targetCal
     calendarId: calId,
     appointmentId: appointment.id,
     accountEmail: status.accountEmail,
+    isDemo,
   });
 
   if (!gateCheck.allowed) {
@@ -991,6 +1031,30 @@ async function updateCalendarEvent(userId, googleEventId, appointment, targetCal
   // Nunca enviar IDs simulados para a API do Google (evita 404). Executa criação segura e idempotente.
   if (googleEventId.startsWith('sim_')) {
     return createCalendarEvent(userId, appointment, calId);
+  }
+
+  // Bloqueio fail-closed absoluto imediatamente antes de chamadas de rede à API do Google (COMANDO 059.1)
+  if (process.env.GOOGLE_SYNC_LIVE_ENABLED !== 'true' || !isLiveGoogleSyncAllowed(status.accountEmail) || isDemo) {
+    const simEventId = googleEventId.startsWith('sim_')
+      ? googleEventId
+      : `sim_${googleEventId.substring(0, 28)}`;
+
+    db.prepare(`
+      UPDATE appointments
+      SET google_event_id = ?,
+          google_calendar_id = ?,
+          google_sync_status = 'SIMULATED',
+          google_sync_error = ?,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ? AND user_id = ?
+    `).run(simEventId, calId, 'Ambiente Seguro: Sincronização simulada (LIVE_SYNC_DISABLED)', appointment.id, userId);
+
+    return {
+      success: true,
+      googleEventId: simEventId,
+      calendarId: calId,
+      isSimulated: true,
+    };
   }
 
   const oauth2 = getOAuth2Client(userId);
@@ -1066,6 +1130,15 @@ async function deleteCalendarEvent(userId, googleEventId, targetCalendarId = nul
 
   const calId = targetCalendarId || status.selectedCalendarId || 'primary';
 
+  // Consulta autônoma de is_demo do tenant no banco (COMANDO 059.1)
+  let isDemo = false;
+  try {
+    const userRow = db.prepare('SELECT is_demo FROM users WHERE id = ?').get(userId);
+    if (userRow && Boolean(userRow.is_demo)) {
+      isDemo = true;
+    }
+  } catch (_) {}
+
   let aptId = null;
   try {
     const aptRow = db.prepare('SELECT id FROM appointments WHERE (google_event_id = ? OR id = ?) AND user_id = ?').get(googleEventId, googleEventId, userId);
@@ -1078,6 +1151,7 @@ async function deleteCalendarEvent(userId, googleEventId, targetCalendarId = nul
     calendarId: calId,
     appointmentId: aptId,
     accountEmail: status.accountEmail,
+    isDemo,
   });
 
   if (!gateCheck.allowed) {
@@ -1100,6 +1174,19 @@ async function deleteCalendarEvent(userId, googleEventId, targetCalendarId = nul
 
   // Proteção contra chamadas de rede se o evento for simulado (nunca existiu no Google)
   if (googleEventId.startsWith('sim_')) {
+    db.prepare(`
+      UPDATE appointments
+      SET google_sync_status = 'CANCELLED',
+          google_sync_error = NULL,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE (google_event_id = ? OR id = ?) AND user_id = ?
+    `).run(googleEventId, googleEventId, userId);
+
+    return { success: true, isSimulated: true };
+  }
+
+  // Bloqueio fail-closed absoluto imediatamente antes de chamadas de rede à API do Google (COMANDO 059.1)
+  if (process.env.GOOGLE_SYNC_LIVE_ENABLED !== 'true' || !isLiveGoogleSyncAllowed(status.accountEmail) || isDemo) {
     db.prepare(`
       UPDATE appointments
       SET google_sync_status = 'CANCELLED',

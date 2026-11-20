@@ -61,8 +61,27 @@ function checkAllowedEmail(accountEmail) {
 function evaluateGatekeeper({ userId, calendarId, appointmentId, accountEmail, isDemo }) {
   const isHomologationMode = process.env.GOOGLE_SYNC_HOMOLOGATION_MODE === 'true';
 
+  // 0. Pino Master Switch: Bloqueio fail-closed se GOOGLE_SYNC_LIVE_ENABLED !== 'true'
+  if (process.env.GOOGLE_SYNC_LIVE_ENABLED !== 'true') {
+    return {
+      allowed: false,
+      reason: 'LIVE_SYNC_DISABLED',
+      message: 'Master switch GOOGLE_SYNC_LIVE_ENABLED desativado. Sincronização real bloqueada.',
+      isHomologation: isHomologationMode,
+    };
+  }
+
   // 1. Pino Universal: Demo Shield (Prioridade Máxima em qualquer ambiente)
-  if (Boolean(isDemo)) {
+  let effectiveIsDemo = isDemo;
+  if (effectiveIsDemo === undefined && userId) {
+    try {
+      const db = require('../database/db');
+      const user = db.prepare('SELECT is_demo FROM users WHERE id = ?').get(userId);
+      effectiveIsDemo = user ? Boolean(user.is_demo) : false;
+    } catch (_) {}
+  }
+
+  if (Boolean(effectiveIsDemo)) {
     return {
       allowed: false,
       reason: 'DEMO_TENANT_BLOCKED',

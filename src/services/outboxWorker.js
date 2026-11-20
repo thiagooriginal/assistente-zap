@@ -114,7 +114,7 @@ async function processGoogleSyncOutbox(filterUserId = null) {
 
       // 1.5. Pre-Flight Revalidation: revalida se a conta permanece conectada antes de qualquer operação externa
       const tokenRow = db.prepare(`
-        SELECT encrypted_tokens, is_connected, connected_at, initial_connection_at, sync_existing_authorized, account_email
+        SELECT encrypted_tokens, is_connected, connected_at, initial_connection_at, sync_existing_authorized, account_email, selected_calendar_id, sync_mode
         FROM google_calendar_tokens
         WHERE user_id = ?
       `).get(item.user_id);
@@ -223,7 +223,14 @@ async function processGoogleSyncOutbox(filterUserId = null) {
 
       // 4c. Proteção de Homologação/Staging: Gatekeeper Quíntuplo de Homologação Real (COMANDO 059)
       const gatekeeper = require('./googleCalendarGatekeeper');
-      const targetCalId = apt.google_calendar_id || tokenRow.selected_calendar_id;
+      let targetCalId = apt.google_calendar_id;
+      if (!targetCalId && tokenRow.sync_mode === 'STAFF' && apt.staff_id) {
+        const staffRow = db.prepare('SELECT google_calendar_id FROM client_staff WHERE id = ? AND user_id = ?').get(apt.staff_id, item.user_id);
+        if (staffRow?.google_calendar_id) targetCalId = staffRow.google_calendar_id;
+      }
+      if (!targetCalId) {
+        targetCalId = tokenRow.selected_calendar_id || 'primary';
+      }
 
       const gatekeeperResult = gatekeeper.evaluateGatekeeper({
         userId: item.user_id,
@@ -271,28 +278,28 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         continue;
       }
 
-      // 5. Executar ação idempotente
+      // 5. Executar ação idempotente garantindo repasse do targetCalId validado
       let result = null;
       if (item.action === 'CREATE') {
         if (hasRealGoogleEvent) {
           // Idempotência: evento já foi criado anteriormente no Google
-          result = await googleCalendarService.updateCalendarEvent(item.user_id, apt.google_event_id, apt, apt.google_calendar_id);
+          result = await googleCalendarService.updateCalendarEvent(item.user_id, apt.google_event_id, apt, targetCalId);
         } else {
-          result = await googleCalendarService.createCalendarEvent(item.user_id, apt);
+          result = await googleCalendarService.createCalendarEvent(item.user_id, apt, targetCalId);
         }
       } else if (item.action === 'UPDATE') {
         if (hasRealGoogleEvent) {
-          result = await googleCalendarService.updateCalendarEvent(item.user_id, apt.google_event_id, apt, apt.google_calendar_id);
+          result = await googleCalendarService.updateCalendarEvent(item.user_id, apt.google_event_id, apt, targetCalId);
         } else {
           // Transição de simulação para real: agendamento com sim_ ou sem evento é criado no Google
-          result = await googleCalendarService.createCalendarEvent(item.user_id, apt);
+          result = await googleCalendarService.createCalendarEvent(item.user_id, apt, targetCalId);
         }
       } else if (item.action === 'DELETE') {
         if (hasRealGoogleEvent) {
-          result = await googleCalendarService.deleteCalendarEvent(item.user_id, apt.google_event_id, apt.google_calendar_id);
+          result = await googleCalendarService.deleteCalendarEvent(item.user_id, apt.google_event_id, targetCalId);
         } else {
           // Evento nunca existiu no Google ou é simulado: trata cancelamento localmente sem chamada de rede
-          result = await googleCalendarService.deleteCalendarEvent(item.user_id, apt.google_event_id || `sim_${apt.id}`, apt.google_calendar_id);
+          result = await googleCalendarService.deleteCalendarEvent(item.user_id, apt.google_event_id || `sim_${apt.id}`, targetCalId);
         }
       }
 
