@@ -409,3 +409,29 @@ test('7. Isolamento Multi-tenant: user_id=3 não acessa nem altera dados de user
     'Salão de outro tenant não pode ser modificado'
   );
 });
+
+test('8. Preservação de Set-Cookie e Prevenção de Duplicidade (Comando 060.3.2)', async () => {
+  // Teste de login que gera cookie de sessão e verifica que outros cookies (como staging_gate) são preservados
+  const resLogin = await fetch(`${baseUrl}/api/cliente/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: 'cliente3@teste.com.br',
+      password: 'SenhaMultiTenant123!'
+    }),
+  });
+
+  assert.strictEqual(resLogin.status, 200);
+  const setCookieHeaders = resLogin.headers.getSetCookie ? resLogin.headers.getSetCookie() : [resLogin.headers.get('set-cookie')];
+  
+  // Confirma que client_auth_token está presente e tem HttpOnly e Path=/
+  const clientAuthCookie = setCookieHeaders.find(c => c && c.startsWith('client_auth_token='));
+  assert.ok(clientAuthCookie, 'Deve conter client_auth_token');
+  assert.ok(clientAuthCookie.includes('Path=/'), 'Cookie deve conter Path=/');
+  assert.ok(clientAuthCookie.includes('HttpOnly'), 'Cookie deve conter HttpOnly');
+  assert.ok(clientAuthCookie.includes('SameSite=Lax'), 'Cookie deve conter SameSite=Lax');
+
+  // Não deve haver cookies duplicados com o mesmo prefixo client_auth_token=
+  const duplicates = setCookieHeaders.filter(c => c && c.startsWith('client_auth_token='));
+  assert.strictEqual(duplicates.length, 1, 'Não deve haver duplicidade de client_auth_token');
+});

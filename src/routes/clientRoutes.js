@@ -52,10 +52,12 @@ function setSessionCookie(res, name, token, maxAgeSeconds = 30 * 24 * 3600, req 
   const existing = res.getHeader('Set-Cookie');
   if (!existing) {
     res.setHeader('Set-Cookie', cookie);
-  } else if (Array.isArray(existing)) {
-    res.setHeader('Set-Cookie', [...existing, cookie]);
   } else {
-    res.setHeader('Set-Cookie', [existing, cookie]);
+    // Preserva cookies existentes (ex: raia_staging_gate, csrf_token) e previne duplicidade pelo mesmo nome
+    const list = (Array.isArray(existing) ? existing : [existing]).filter(
+      c => typeof c === 'string' && !c.startsWith(`${name}=`)
+    );
+    res.setHeader('Set-Cookie', [...list, cookie]);
   }
 }
 
@@ -65,10 +67,12 @@ function clearSessionCookie(res, name, req = null) {
   const existing = res.getHeader('Set-Cookie');
   if (!existing) {
     res.setHeader('Set-Cookie', cookie);
-  } else if (Array.isArray(existing)) {
-    res.setHeader('Set-Cookie', [...existing, cookie]);
   } else {
-    res.setHeader('Set-Cookie', [existing, cookie]);
+    // Remove cookie pelo nome preservando os demais
+    const list = (Array.isArray(existing) ? existing : [existing]).filter(
+      c => typeof c === 'string' && !c.startsWith(`${name}=`)
+    );
+    res.setHeader('Set-Cookie', [...list, cookie]);
   }
 }
 
