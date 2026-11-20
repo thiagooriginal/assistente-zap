@@ -145,75 +145,84 @@ function clientAuthMiddleware(req, res, next) {
     if (activeSub) hasAnyActiveSub = true;
   } catch (e) {}
 
+  let isExpired = false;
+  let expiredCode = null;
+  let expiredReason = null;
+
   if (!hasAnyActiveSub && !isDemo && user.role !== 'ADMIN') {
     const subStatus = user.subscription_status || 'INACTIVE';
 
     if (['DIRECT', 'ASAAS'].includes(user.subscription_origin) &&
         (!user.paid_until || !Number.isFinite(Date.parse(user.paid_until)) ||
          Date.parse(user.paid_until) <= Date.now())) {
-      return res.status(403).json({ success: false, code: 'PAYMENT_REQUIRED',
-        error: 'Pagamento não confirmado ou período contratado encerrado.' });
-    }
-
-    if (subStatus === 'REFUNDED' || subStatus === 'CHARGEBACK') {
-      return res.status(403).json({
-        success: false,
-        error: 'Acesso suspenso por reembolso ou contestação de pagamento.',
-        code: 'SUBSCRIPTION_REFUNDED',
-      });
-    }
-
-    if (subStatus === 'OVERDUE') {
+      isExpired = true;
+      expiredCode = 'PAYMENT_REQUIRED';
+      expiredReason = 'Pagamento não confirmado ou período contratado encerrado.';
+    } else if (subStatus === 'REFUNDED' || subStatus === 'CHARGEBACK') {
+      isExpired = true;
+      expiredCode = 'SUBSCRIPTION_REFUNDED';
+      expiredReason = 'Acesso suspenso por reembolso ou contestação de pagamento.';
+    } else if (subStatus === 'OVERDUE') {
       const paidUntilMs = user.paid_until ? Date.parse(user.paid_until) : 0;
       if (!Number.isFinite(paidUntilMs) || paidUntilMs <= Date.now()) {
-        return res.status(403).json({
-          success: false,
-          error: 'Sua assinatura está em atraso. Regularize seu pagamento para reativar o acesso.',
-          code: 'SUBSCRIPTION_OVERDUE',
-        });
+        isExpired = true;
+        expiredCode = 'SUBSCRIPTION_OVERDUE';
+        expiredReason = 'Sua assinatura está em atraso. Regularize seu pagamento para reativar o acesso.';
       }
-    }
-
-    if (subStatus === 'CANCELED') {
+    } else if (subStatus === 'CANCELED') {
       const paidUntilMs = user.paid_until ? Date.parse(user.paid_until) : 0;
       if (!Number.isFinite(paidUntilMs) || paidUntilMs <= Date.now()) {
-        return res.status(403).json({
-          success: false,
-          error: 'Sua assinatura foi cancelada e o período contratado encerrou.',
-          code: 'SUBSCRIPTION_CANCELED',
-        });
+        isExpired = true;
+        expiredCode = 'SUBSCRIPTION_CANCELED';
+        expiredReason = 'Sua assinatura foi cancelada e o período contratado encerrou.';
       }
-    }
-
-    if (subStatus === 'INACTIVE') {
-      return res.status(403).json({
-        success: false,
-        error: 'Assinatura inativa. Confirme o pagamento para liberar seu acesso.',
-        code: 'SUBSCRIPTION_INACTIVE',
-      });
-    }
-
-    if (subStatus === 'PENDING') {
-      return res.status(403).json({
-        success: false,
-        error: 'Conta pendente de ativação. Ative sua conta pelo link enviado para criar sua senha.',
-        code: 'ACCOUNT_PENDING_ACTIVATION',
-      });
-    }
-
-    if (user.paid_until) {
+    } else if (subStatus === 'INACTIVE') {
+      isExpired = true;
+      expiredCode = 'SUBSCRIPTION_INACTIVE';
+      expiredReason = 'Assinatura inativa. Confirme o pagamento para liberar seu acesso.';
+    } else if (subStatus === 'PENDING') {
+      isExpired = true;
+      expiredCode = 'ACCOUNT_PENDING_ACTIVATION';
+      expiredReason = 'Conta pendente de ativação. Ative sua conta pelo link enviado para criar sua senha.';
+    } else if (user.paid_until) {
       const paidUntil = new Date(user.paid_until);
       const now = new Date();
       if (paidUntil < now) {
-        return res.status(403).json({
-          success: false,
-          error: subStatus === 'CANCELED'
-            ? 'Sua assinatura foi cancelada e o período pago já expirou. Renove para continuar acessando.'
-            : 'O período da sua assinatura expirou.',
-          code: 'SUBSCRIPTION_EXPIRED',
-        });
+        isExpired = true;
+        expiredCode = 'SUBSCRIPTION_EXPIRED';
+        expiredReason = subStatus === 'CANCELED'
+          ? 'Sua assinatura foi cancelada e o período pago já expirou. Renove para continuar acessando.'
+          : 'O período da sua assinatura expirou.';
       }
     }
+  }
+
+  req.subscriptionExpired = isExpired;
+  req.subscriptionExpiredCode = expiredCode;
+  req.subscriptionExpiredReason = expiredReason;
+
+  // Rotas seguras de autogestão e regularização permitidas quando a assinatura estiver expirada (ASVS V2/V3 vs V4)
+  // Requisito COMANDO 060.3: Validação combinada estrita de Método HTTP + Path exato.
+  // Somente leitura em autogestão, permitindo escrita unicamente para logout e alteração defensiva de senha.
+  if (isExpired) {
+    const isSafePath = (
+      (req.method === 'GET' && ['/profile', '/my-products', '/my-subscriptions', '/my-invoices'].includes(req.path)) ||
+      (req.method === 'POST' && req.path === '/auth/logout') ||
+      (req.method === 'PUT' && req.path === '/profile/password')
+    );
+
+    if (isSafePath) {
+      return next();
+    }
+
+    // Bloqueio rigoroso 403 fail-closed para todas as rotas operacionais pagas e métodos de escrita não autorizados
+    return res.status(403).json({
+      success: false,
+      code: expiredCode || 'SUBSCRIPTION_EXPIRED',
+      error: expiredReason || 'O período da sua assinatura expirou. Regularize seu pagamento para continuar acessando esta funcionalidade.',
+      subscriptionExpired: true,
+      paidUntil: user.paid_until || null,
+    });
   }
 
   return next();
@@ -379,7 +388,15 @@ router.post('/auth/logout', clientAuthMiddleware, (req, res) => {
 
 router.get('/profile', clientAuthMiddleware, (req, res) => {
   const data = clientAuth.getSanitizedUser(req.clientUser.id);
-  res.json({ success: true, profile: data });
+  res.json({
+    success: true,
+    profile: {
+      ...data,
+      subscriptionExpired: Boolean(req.subscriptionExpired),
+      expiredCode: req.subscriptionExpiredCode || null,
+      expiredReason: req.subscriptionExpiredReason || null,
+    },
+  });
 });
 
 // MULTIPRODUCT CLIENT PORTAL: "Meus Produtos" Hub & Portfolio

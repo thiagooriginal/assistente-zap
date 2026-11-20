@@ -1406,6 +1406,26 @@
         </a>
       </div>
     </div>
+
+    <!-- Conteúdo de Assinatura Expirada / Regularização Sem Ejeção (Comando 060.2) -->
+    <div id="curtainExpiredContent" class="hidden flex-col items-center justify-center text-center p-6 max-w-md select-none">
+      <div class="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mb-4 text-amber-400">
+        <i data-lucide="alert-circle" class="w-7 h-7"></i>
+      </div>
+      <h3 id="curtainExpiredTitle" class="text-base font-bold text-white">Assinatura Expirada ou Pendente</h3>
+      <p id="curtainExpiredMessage" class="text-xs text-slate-300 mt-2 mb-5 leading-relaxed">
+        O período da sua assinatura encerrou. Regularize seu pagamento para reativar todos os recursos do seu assistente.
+      </p>
+      <div class="flex flex-col sm:flex-row items-center gap-3 w-full">
+        <button type="button" id="btnGoToInvoicesFromCurtain" class="w-full sm:flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#00F59B] to-emerald-500 text-black font-bold text-xs hover:opacity-95 transition-all shadow-md flex items-center justify-center gap-2">
+          <i data-lucide="receipt" class="w-4 h-4"></i>
+          <span>Minhas Faturas & Regularização</span>
+        </button>
+        <button type="button" id="btnLogoutFromCurtain" class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-semibold text-xs transition-all border border-white/10">
+          Sair da Conta
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Demo Notice Banner if Demo Account -->
@@ -1596,6 +1616,17 @@
 
   <!-- Main Content Area -->
   <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+
+    <!-- Banner de Assinatura Expirada / Aviso de Regularização (Comando 060.2) -->
+    <div id="subscriptionExpiredBanner" class="hidden bg-gradient-to-r from-rose-950 via-amber-950 to-rose-950 border-b border-rose-500/30 text-white text-xs font-semibold py-2.5 px-6 z-40 flex items-center justify-between shadow-md">
+      <div class="flex items-center gap-2.5">
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0"></i>
+        <span id="subscriptionExpiredBannerMsg">Sua assinatura está expirada. As automações do salão estão temporariamente suspensas.</span>
+      </div>
+      <button type="button" onclick="switchTab('my-invoices')" class="shrink-0 px-3 py-1 rounded-lg bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 hover:text-white font-bold text-[11px] border border-amber-400/40 transition-all cursor-pointer">
+        Ver Faturas & Regularizar &rarr;
+      </button>
+    </div>
 
     <!-- Topbar Header -->
     <header class="bg-[#11131a]/80 backdrop-blur-md border-b border-white/10 px-6 py-4 flex items-center justify-between sticky top-0 z-30">
@@ -5876,12 +5907,76 @@
       const errContent = document.getElementById('curtainErrorContent');
       const jContent = document.getElementById('curtainJessicaContent');
       const rContent = document.getElementById('curtainRaiaContent');
+      const expContent = document.getElementById('curtainExpiredContent');
       if (errContent) {
         errContent.classList.add('hidden');
         errContent.style.removeProperty('display');
       }
+      if (expContent) {
+        expContent.classList.add('hidden');
+        expContent.style.removeProperty('display');
+      }
       if (jContent) jContent.style.removeProperty('display');
       if (rContent) rContent.style.removeProperty('display');
+    }
+
+    function showCurtainSubscriptionExpired(errData) {
+      const jContent = document.getElementById('curtainJessicaContent');
+      const rContent = document.getElementById('curtainRaiaContent');
+      const errContent = document.getElementById('curtainErrorContent');
+      const expContent = document.getElementById('curtainExpiredContent');
+      const expMsg = document.getElementById('curtainExpiredMessage');
+      const expTitle = document.getElementById('curtainExpiredTitle');
+
+      if (jContent) jContent.style.setProperty('display', 'none', 'important');
+      if (rContent) rContent.style.setProperty('display', 'none', 'important');
+      if (errContent) {
+        errContent.classList.add('hidden');
+        errContent.style.removeProperty('display');
+      }
+
+      if (expContent) {
+        expContent.classList.remove('hidden');
+        expContent.style.setProperty('display', 'flex', 'important');
+      }
+
+      if (expTitle && errData && errData.code === 'PAYMENT_REQUIRED') {
+        expTitle.textContent = 'Pagamento Pendente';
+      }
+
+      if (expMsg) {
+        let msg = errData?.error || 'O período da sua assinatura encerrou. Regularize seu pagamento para reativar o acesso completo.';
+        if (errData?.paidUntil) {
+          try {
+            const dt = new Date(errData.paidUntil).toLocaleDateString('pt-BR');
+            msg += ` (Vigência encerrada em: ${dt})`;
+          } catch (_) {}
+        }
+        expMsg.textContent = msg;
+      }
+
+      const btnInvoices = document.getElementById('btnGoToInvoicesFromCurtain');
+      if (btnInvoices) {
+        btnInvoices.onclick = () => {
+          revealInterface();
+          switchTab('my-invoices');
+        };
+      }
+
+      const btnLogout = document.getElementById('btnLogoutFromCurtain');
+      if (btnLogout) {
+        btnLogout.onclick = async () => {
+          try {
+            await fetch('/api/cliente/auth/logout', { method: 'POST' });
+          } catch (_) {}
+          try {
+            sessionStorage.clear();
+          } catch (_) {}
+          window.location.href = '/cliente/login';
+        };
+      }
+
+      safeLucideCreateIcons();
     }
 
     function retryAppInit() {
@@ -5948,7 +6043,8 @@
         return;
       }
 
-      if (res.status === 401 || res.status === 403) {
+      if (res.status === 401) {
+        // Sessão inválida, revogada ou expirada no tempo: ejetar para login
         clientData = null;
         try {
           sessionStorage.clear();
@@ -5960,6 +6056,26 @@
         if (window.location.protocol.startsWith('http')) {
           window.location.href = '/cliente/login';
         }
+        return;
+      }
+
+      if (res.status === 403) {
+        // Acesso negado ou assinatura expirada: NÃO ejetar para o login! NÃO limpar sessionStorage!
+        if (window._appInitWatchdog) {
+          clearTimeout(window._appInitWatchdog);
+          window._appInitWatchdog = null;
+        }
+        let errData = {};
+        try {
+          errData = await res.json();
+        } catch (_) {}
+
+        if (errData && (errData.code === 'SUBSCRIPTION_EXPIRED' || errData.code === 'PAYMENT_REQUIRED' || errData.code === 'SUBSCRIPTION_OVERDUE' || errData.subscriptionExpired)) {
+          showCurtainSubscriptionExpired(errData);
+          return;
+        }
+
+        showCurtainError(errData.error || 'Acesso negado aos recursos do painel.');
         return;
       }
 
@@ -5993,6 +6109,18 @@
         renderProfileData(clientData);
       } catch (renderErr) {
         console.error('Erro defensivo ao renderizar dados do perfil:', renderErr);
+      }
+
+      // Indicador não obstrutivo de assinatura expirada dentro do painel (Comando 060.2)
+      if (clientData && clientData.subscriptionExpired) {
+        const expiredBanner = document.getElementById('subscriptionExpiredBanner');
+        if (expiredBanner) {
+          expiredBanner.classList.remove('hidden');
+          const expiredMsg = document.getElementById('subscriptionExpiredBannerMsg');
+          if (expiredMsg && clientData.expiredReason) {
+            expiredMsg.textContent = clientData.expiredReason;
+          }
+        }
       }
 
       // 2. Notificações de retorno OAuth Google Calendar e Resolução de Aba Canônica

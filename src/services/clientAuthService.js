@@ -154,39 +154,7 @@ function login(email, password) {
     return { success: false, error: 'E-mail ou senha incorretos.', code: 'INVALID_CREDENTIALS' };
   }
 
-  // Check subscription status
   const subStatus = user.subscription_status || 'ACTIVE';
-  if (['DIRECT', 'ASAAS'].includes(user.subscription_origin) &&
-    (!user.paid_until || !Number.isFinite(Date.parse(user.paid_until)) || Date.parse(user.paid_until) <= Date.now())) {
-    return { success: false, error: 'Assinatura sem pagamento válido ou período encerrado.', code: 'PAYMENT_REQUIRED' };
-  }
-
-  if (subStatus === 'OVERDUE') {
-    const paidUntilMs = user.paid_until ? Date.parse(user.paid_until) : 0;
-    if (!Number.isFinite(paidUntilMs) || paidUntilMs <= Date.now()) {
-      return {
-        success: false,
-        error: 'Sua assinatura está em atraso. Regularize seu pagamento para reativar o acesso.',
-        code: 'SUBSCRIPTION_OVERDUE',
-      };
-    }
-  }
-
-  if (subStatus === 'REFUNDED' || subStatus === 'CHARGEBACK') {
-    return {
-      success: false,
-      error: 'Acesso suspenso devido a reembolso ou contestação de pagamento. Contate o suporte da RAIA.',
-      code: 'SUBSCRIPTION_REFUNDED',
-    };
-  }
-
-  if (subStatus === 'INACTIVE') {
-    return {
-      success: false,
-      error: 'Assinatura inativa. Confirme o pagamento na Hotmart para liberar seu acesso.',
-      code: 'SUBSCRIPTION_INACTIVE',
-    };
-  }
 
   if (subStatus === 'PENDING' || !user.password_hash || !user.password_salt) {
     return {
@@ -207,20 +175,49 @@ function login(email, password) {
     return { success: false, error: 'E-mail ou senha incorretos.', code: 'INVALID_CREDENTIALS' };
   }
 
+  // Suspensão permanente por fraude ou estorno (OWASP ASVS V2/V3)
+  if (subStatus === 'REFUNDED' || subStatus === 'CHARGEBACK') {
+    return {
+      success: false,
+      error: 'Acesso suspenso devido a reembolso ou contestação de pagamento. Contate o suporte da RAIA.',
+      code: 'SUBSCRIPTION_REFUNDED',
+    };
+  }
+
+  // Avaliação do estado de vigência da assinatura para autenticação com privilégio de regularização
+  let isSubscriptionExpired = false;
+  let expiredReason = null;
   let warning = null;
-  if (subStatus === 'CANCELED') {
+
+  const paidUntilMs = user.paid_until ? Date.parse(user.paid_until) : 0;
+  const isPaidUntilExpired = !Number.isFinite(paidUntilMs) || paidUntilMs <= Date.now();
+
+  if (['DIRECT', 'ASAAS'].includes(user.subscription_origin) && isPaidUntilExpired) {
+    isSubscriptionExpired = true;
+    expiredReason = 'Assinatura sem pagamento válido ou período encerrado.';
+    warning = 'Sua assinatura expirou. Regularize para reativar todos os recursos.';
+  } else if (subStatus === 'OVERDUE' && isPaidUntilExpired) {
+    isSubscriptionExpired = true;
+    expiredReason = 'Sua assinatura está em atraso. Regularize seu pagamento para reativar o acesso.';
+    warning = 'Identificamos uma pendência na renovação da sua assinatura. Regularize para não perder o atendimento da Jéssica.';
+  } else if (subStatus === 'CANCELED') {
     const paidUntil = user.paid_until ? new Date(user.paid_until) : null;
     const now = new Date();
     if (paidUntil && paidUntil > now) {
       warning = `Sua assinatura foi cancelada, mas você tem acesso garantido até ${paidUntil.toLocaleDateString('pt-BR')}.`;
     } else {
-      return {
-        success: false,
-        error: 'Sua assinatura foi cancelada e o período pago já expirou. Renove para continuar acessando.',
-      };
+      isSubscriptionExpired = true;
+      expiredReason = 'Sua assinatura foi cancelada e o período pago já expirou. Renove para continuar acessando.';
+      warning = 'Sua assinatura foi cancelada e o período pago expirou. Renove para continuar utilizando as automações.';
     }
-  } else if (subStatus === 'OVERDUE') {
-    warning = 'Identificamos uma pendência na renovação da sua assinatura. Regularize para não perder o atendimento da Jéssica.';
+  } else if (subStatus === 'INACTIVE') {
+    isSubscriptionExpired = true;
+    expiredReason = 'Assinatura inativa. Confirme o pagamento para liberar seu acesso.';
+    warning = 'Assinatura inativa. Confirme o pagamento para liberar seu acesso.';
+  } else if (user.paid_until && new Date(user.paid_until) <= new Date()) {
+    isSubscriptionExpired = true;
+    expiredReason = 'O período da sua assinatura expirou.';
+    warning = 'Sua assinatura expirou. Regularize para reativar todos os recursos.';
   }
 
   // Update session with 30-day expiration & last login (Proteção 01 & 17)
@@ -251,6 +248,8 @@ function login(email, password) {
     success: true,
     token: sessionToken,
     warning,
+    subscriptionExpired: isSubscriptionExpired,
+    expiredReason,
     user: getSanitizedUser(user.id),
   };
 }
