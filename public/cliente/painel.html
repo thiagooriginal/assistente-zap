@@ -2096,7 +2096,7 @@
             <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-[#00F59B]/10 rounded-full blur-xl group-hover:scale-125 transition-transform"></div>
             <div class="flex items-center justify-between mb-3">
               <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Agente de IA</span>
-              <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+              <span id="jessicaAgentStatusBadge" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ATIVA 24H
               </span>
             </div>
@@ -2136,7 +2136,7 @@
             </h3>
             <p class="text-xs text-slate-400 mt-1">Conecte o WhatsApp do seu salão via QR Code ou Código de Pareamento de 8 dígitos para a Jéssica atender suas clientes.</p>
           </div>
-          <button type="button" onclick="switchTab('integrations-whatsapp')" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#AD7B42] to-[#C89B6D] hover:opacity-95 text-white font-bold text-xs transition-all flex items-center gap-2 w-fit shrink-0 shadow-lg shadow-[#AD7B42]/20">
+          <button id="btnOverviewConnectWa" type="button" onclick="switchTab('integrations-whatsapp')" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#AD7B42] to-[#C89B6D] hover:opacity-95 text-white font-bold text-xs transition-all flex items-center gap-2 w-fit shrink-0 shadow-lg shadow-[#AD7B42]/20">
             <i data-lucide="smartphone" class="w-4 h-4"></i>
             <span>Gerenciar Conexão WhatsApp</span>
           </button>
@@ -5215,14 +5215,20 @@
               CANCELLED: sub.isAccessActive ? 'Cancelado (Acesso até Fim do Ciclo)' : 'Cancelado',
             };
 
-            const statusClass = statusColors[sub.status] || 'bg-slate-500/10 text-slate-400 border-slate-500/30';
-            const statusLabel = statusLabels[sub.status] || sub.status;
+            let statusClass = statusColors[sub.status] || 'bg-slate-500/10 text-slate-400 border-slate-500/30';
+            let statusLabel = statusLabels[sub.status] || sub.status;
+
+            if (sub.status === 'ACTIVE' && !sub.isAccessActive) {
+              statusLabel = 'Vigência Expirada';
+              statusClass = 'bg-rose-500/10 text-rose-400 border-rose-500/30';
+            }
 
             const paidUntilText = sub.paidUntil
               ? new Date(sub.paidUntil).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
               : 'Período contratado em vigor';
 
-            const originBadge = sub.origin === 'HOTMART' ? 'HOTMART' : 'ASAAS (DIRETO)';
+            const originLabels = { HOTMART: 'HOTMART', ASAAS: 'ASAAS (DIRETO)', MANUAL: 'CONTRATO DIRETO / MANUAL', DIRECT: 'VENDA DIRETA' };
+            const originBadge = originLabels[sub.origin] || (sub.origin ? sub.origin.toUpperCase() : 'CONTRATO DIRETO');
 
             card.innerHTML = `
               <div class="flex items-start justify-between gap-3">
@@ -5255,12 +5261,19 @@
               </div>
 
               <div class="pt-1 flex items-center justify-between gap-3">
-                ${sub.productCode === 'JESSICA' ? `
-                  <button onclick="switchTab('overview')" class="flex-1 px-4 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#00F59B]/20">
-                    <i data-lucide="scissors" class="w-4 h-4"></i>
-                    <span>Acessar Módulo Jéssica</span>
-                  </button>
-                ` : `
+                ${sub.productCode === 'JESSICA' ? (
+                  !sub.isAccessActive ? `
+                    <button onclick="switchTab('my-invoices')" class="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 text-white font-bold text-xs hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20">
+                      <i data-lucide="receipt" class="w-4 h-4"></i>
+                      <span>Regularizar Assinatura</span>
+                    </button>
+                  ` : `
+                    <button onclick="switchTab('overview')" class="flex-1 px-4 py-2.5 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#00F59B]/20">
+                      <i data-lucide="scissors" class="w-4 h-4"></i>
+                      <span>Acessar Módulo Jéssica</span>
+                    </button>
+                  `
+                ) : `
                   <button onclick="showToast('Módulo operacional em homologação.', 'info')" class="flex-1 px-4 py-2.5 rounded-xl bg-white/10 text-white font-bold text-xs hover:bg-white/20 transition-all flex items-center justify-center gap-2">
                     <i data-lucide="external-link" class="w-4 h-4"></i>
                     <span>Acessar Módulo</span>
@@ -5704,9 +5717,21 @@
             <tbody class="divide-y divide-white/5">
               ${subs.map(s => {
                 const isPaidValid = s.isAccessActive;
-                const statusColor = s.status === 'ACTIVE' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                let statusLabel = s.status === 'ACTIVE' ? 'Ativo'
+                  : (s.status === 'OVERDUE' ? 'Em Atraso'
+                  : (s.status === 'CANCELLED' ? 'Cancelado'
+                  : (s.status === 'PENDING' ? 'Aguardando Ativação' : s.status)));
+                let statusColor = s.status === 'ACTIVE' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
                   : (s.status === 'OVERDUE' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
                   : 'text-slate-400 bg-slate-500/10 border-slate-500/20');
+
+                if (s.status === 'ACTIVE' && !isPaidValid) {
+                  statusLabel = 'Vigência Expirada';
+                  statusColor = 'text-rose-400 bg-rose-500/10 border-rose-500/20';
+                }
+
+                const originLabels = { HOTMART: 'HOTMART', ASAAS: 'ASAAS (DIRETO)', MANUAL: 'CONTRATO DIRETO / MANUAL', DIRECT: 'VENDA DIRETA' };
+                const originLabel = originLabels[s.origin] || (s.origin ? s.origin.toUpperCase() : 'CONTRATO DIRETO');
 
                 const paidDate = s.paidUntil ? new Date(s.paidUntil).toLocaleDateString('pt-BR') : 'Vigente';
 
@@ -5725,20 +5750,24 @@
                       <span class="text-[10px] text-slate-500">${s.billingCycle === 'MONTHLY' ? 'Mensal' : 'Anual'}</span>
                     </td>
                     <td class="py-3.5 px-3">
-                      <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10">${escapeHtml(s.origin)}</span>
+                      <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-white/5 border border-white/10">${escapeHtml(originLabel)}</span>
                     </td>
                     <td class="py-3.5 px-3">
-                      <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${statusColor}">${escapeHtml(s.status)}</span>
+                      <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${statusColor}">${escapeHtml(statusLabel)}</span>
                     </td>
                     <td class="py-3.5 px-3 font-medium ${isPaidValid ? 'text-slate-300' : 'text-rose-400'}">${escapeHtml(paidDate)}</td>
                     <td class="py-3.5 px-3 text-right">
-                      ${s.status === 'ACTIVE' ? `
+                      ${s.status === 'ACTIVE' && isPaidValid ? `
                         <button onclick="requestCancelSubscription(${Number(s.id)}, '${escapeHtml(s.productName).replace(/'/g, "\\'")}')" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 text-xs font-semibold transition-all">
                           Cancelar
                         </button>
+                      ` : (s.status === 'ACTIVE' && !isPaidValid ? `
+                        <button onclick="switchTab('my-invoices')" class="px-2.5 py-1 rounded-lg text-amber-400 hover:text-amber-300 hover:bg-amber-500/10 text-xs font-semibold transition-all">
+                          Regularizar
+                        </button>
                       ` : `
                         <span class="text-slate-500 text-[11px]">—</span>
-                      `}
+                      `)}
                     </td>
                   </tr>
                 `;
@@ -5796,7 +5825,24 @@
         const invoices = data.invoices || [];
 
         if (invoices.length === 0) {
-          container.innerHTML = `<div class="p-8 text-center text-slate-400 text-xs">Nenhuma fatura registrada no histórico recente.</div>`;
+          container.innerHTML = `
+            <div class="p-6 rounded-2xl bg-[#0c0e15] border border-white/10 text-center space-y-3">
+              <div class="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/20">
+                <i data-lucide="receipt" class="w-6 h-6"></i>
+              </div>
+              <div class="text-sm font-bold text-white">Nenhuma fatura automática registrada</div>
+              <p class="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                Assinaturas via <strong>Contratação Direta / Manual</strong> ou novas adesões não geram cobranças automáticas pelo gateway Asaas. Para obter 2ª via, comprovantes ou regularizar a vigência da sua assinatura, fale diretamente com nosso time comercial.
+              </p>
+              <div class="pt-2">
+                <a href="https://wa.me/5511951364159?text=Ol%C3%A1%21+Preciso+de+informa%C3%A7%C3%B5es+sobre+faturas+e+renova%C3%A7%C3%A3o+da+minha+assinatura" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#AD7B42] to-[#C89B6D] text-white font-bold text-xs hover:opacity-95 shadow-md shadow-[#AD7B42]/20 transition-all">
+                  <i data-lucide="message-circle" class="w-4 h-4"></i>
+                  <span>Falar com o Suporte Comercial</span>
+                </a>
+              </div>
+            </div>
+          `;
+          safeLucideCreateIcons();
           return;
         }
 
@@ -6240,6 +6286,33 @@
         : 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-red-500/10 text-red-400 border border-red-500/30';
       document.getElementById('waStatusText').innerText = isConnected ? 'Pronto para Atender' : 'Aguardando Conexão';
 
+      // Jéssica Agent Status & WhatsApp Action Button in tab-overview
+      const jessicaBadge = document.getElementById('jessicaAgentStatusBadge');
+      const btnOverviewWa = document.getElementById('btnOverviewConnectWa');
+
+      if (p.subscriptionExpired === true) {
+        if (jessicaBadge) {
+          jessicaBadge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-1';
+          jessicaBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> SUSPENSA';
+        }
+        if (btnOverviewWa) {
+          btnOverviewWa.className = 'px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 hover:opacity-95 text-white font-bold text-xs transition-all flex items-center gap-2 w-fit shrink-0 shadow-lg shadow-rose-500/20';
+          btnOverviewWa.innerHTML = '<i data-lucide="receipt" class="w-4 h-4"></i><span>Regularizar Assinatura</span>';
+          btnOverviewWa.onclick = () => switchTab('my-invoices');
+        }
+      } else {
+        if (jessicaBadge) {
+          jessicaBadge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1';
+          jessicaBadge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> ATIVA 24H';
+        }
+        if (btnOverviewWa) {
+          btnOverviewWa.className = 'px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#AD7B42] to-[#C89B6D] hover:opacity-95 text-white font-bold text-xs transition-all flex items-center gap-2 w-fit shrink-0 shadow-lg shadow-[#AD7B42]/20';
+          btnOverviewWa.innerHTML = '<i data-lucide="smartphone" class="w-4 h-4"></i><span>Gerenciar Conexão WhatsApp</span>';
+          btnOverviewWa.onclick = () => switchTab('integrations-whatsapp');
+        }
+      }
+      safeLucideCreateIcons();
+
       // Populate Salon Form
       document.getElementById('salonName').value = p.salon?.name || '';
       document.getElementById('salonPhone').value = p.salon?.phone || '';
@@ -6369,6 +6442,23 @@
         const data = await res.json();
         const list = document.getElementById('servicesList');
         list.innerHTML = '';
+
+        if (res.status === 403 || data.code === 'SUBSCRIPTION_EXPIRED' || Boolean(data.subscriptionExpired)) {
+          list.innerHTML = `
+            <div class="p-8 text-center rounded-2xl bg-rose-500/10 border border-rose-500/20 space-y-3">
+              <div class="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center mx-auto">
+                <i data-lucide="shield-alert" class="w-5 h-5"></i>
+              </div>
+              <div class="text-sm font-bold text-white">Módulo suspenso temporariamente</div>
+              <p class="text-xs text-rose-300/80 max-w-md mx-auto">Regularize sua assinatura para gerenciar serviços.</p>
+              <button onclick="switchTab('my-invoices')" class="px-4 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-amber-500 text-white font-bold text-xs hover:opacity-95 shadow-md shadow-rose-500/20 transition-all">
+                Regularizar Assinatura
+              </button>
+            </div>
+          `;
+          safeLucideCreateIcons();
+          return;
+        }
 
         if (!data.success || !data.services) {
           list.innerHTML = '<div class="p-6 text-center text-slate-400 text-xs">Erro ao carregar serviços.</div>';
@@ -9763,6 +9853,77 @@
         const res = await fetch('/api/cliente/whatsapp/status');
         const data = await res.json();
         if (pollSeq !== salonWaPollSeq) return; // Descarte de resposta defasada / fora de ordem
+
+        const isExpired = res.status === 403 || data.code === 'SUBSCRIPTION_EXPIRED' || Boolean(data.subscriptionExpired);
+        if (isExpired) {
+          if (salonWaPollTimer) {
+            clearTimeout(salonWaPollTimer);
+            salonWaPollTimer = null;
+          }
+          const errorAlert = document.getElementById('waConnectionErrorAlert');
+          const errorTitle = document.getElementById('waConnectionErrorTitle');
+          const errorMsg = document.getElementById('waConnectionErrorMessage');
+          const btnGenQr = document.getElementById('btnGenerateNewQr');
+          const btnRetry = document.getElementById('btnConnectionErrorRetry');
+
+          if (errorAlert) {
+            errorAlert.classList.remove('hidden');
+            errorAlert.className = 'p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+            if (errorTitle) {
+              errorTitle.innerText = 'Conexão Temporariamente Suspensa';
+              errorTitle.className = 'font-bold text-rose-200';
+            }
+            if (errorMsg) {
+              errorMsg.innerText = 'A conexão está temporariamente suspensa por término da vigência da assinatura. Regularize para reconectar.';
+            }
+            if (btnGenQr) {
+              btnGenQr.innerHTML = '<i data-lucide="receipt" class="w-3.5 h-3.5"></i><span>Regularizar Assinatura</span>';
+              btnGenQr.onclick = () => switchTab('my-invoices');
+              btnGenQr.className = 'px-4 py-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer';
+            }
+            if (btnRetry) {
+              btnRetry.classList.add('hidden');
+            }
+          }
+
+          // Desabilitar botões de geração de QR Code e código de pareamento
+          const btnChooseQr = document.getElementById('btnChooseQrMode');
+          const btnChooseCode = document.getElementById('btnChooseCodeMode');
+          const btnRefreshQr = document.getElementById('btnRefreshSalonQr');
+          const btnGenPairing = document.getElementById('btnGeneratePairingCode');
+
+          if (btnChooseQr) {
+            btnChooseQr.disabled = true;
+            btnChooseQr.classList.add('opacity-40', 'cursor-not-allowed', 'pointer-events-none');
+          }
+          if (btnChooseCode) {
+            btnChooseCode.disabled = true;
+            btnChooseCode.classList.add('opacity-40', 'cursor-not-allowed', 'pointer-events-none');
+          }
+          if (btnRefreshQr) btnRefreshQr.disabled = true;
+          if (btnGenPairing) btnGenPairing.disabled = true;
+
+          const badge = document.getElementById('salonWaStatusBadge');
+          const dot = document.getElementById('salonWaStatusDot');
+          const label = document.getElementById('salonWaStatusLabel');
+          if (badge && dot && label) {
+            badge.className = 'px-3.5 py-1.5 rounded-full text-xs font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-2';
+            dot.className = 'w-2 h-2 rounded-full bg-rose-400';
+            label.innerText = 'Assinatura Suspensa';
+          }
+
+          const ovBadge = document.getElementById('waStatusBadge');
+          const ovText = document.getElementById('waStatusText');
+          if (ovBadge && ovText) {
+            ovBadge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30';
+            ovBadge.innerText = 'SUSPENSO';
+            ovText.innerText = 'Vigência Expirada';
+          }
+
+          safeLucideCreateIcons();
+          return;
+        }
+
         if (!data.success) return;
 
         renderSalonWhatsAppUI(data);

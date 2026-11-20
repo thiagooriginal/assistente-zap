@@ -1483,6 +1483,8 @@ function formatSubscriptionRow(row) {
     isAccessActive = true;
   }
 
+  const effectiveStatus = (row.status === 'ACTIVE' && !isPaidPeriodValid) ? 'EXPIRED' : row.status;
+
   return {
     id: row.id,
     userId: row.user_id,
@@ -1503,6 +1505,7 @@ function formatSubscriptionRow(row) {
     gatewayCustomerId: row.gateway_customer_id,
     gatewayPaymentId: row.gateway_payment_id,
     status: row.status,
+    effectiveStatus,
     isAccessActive,
     priceCents: row.price_cents,
     priceFormatted: (row.price_cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),

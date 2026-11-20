@@ -112,6 +112,34 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         continue;
       }
 
+      // 1.2. Pre-Flight Guard de Assinatura para Módulo Jéssica (Comando 060.3.4)
+      // Se a assinatura expirou entre a criação do agendamento e o processamento da outbox,
+      // cancela o sync imediatamente (fail-closed) para impedir alterações externas indevidas.
+      if (item.user_id) {
+        const productService = require('./productService');
+        const access = productService.hasProductAccess(item.user_id, 'JESSICA');
+        if (!access || !access.hasAccess) {
+          db.prepare(`
+            UPDATE google_sync_outbox
+            SET status = 'CANCELLED',
+                last_error = 'SUBSCRIPTION_EXPIRED: Assinatura do módulo Jéssica suspensa ou expirada',
+                processed_at = CURRENT_TIMESTAMP,
+                locked_at = NULL
+            WHERE id = ?
+          `).run(item.id);
+
+          db.prepare(`
+            UPDATE appointments
+            SET google_sync_status = 'NOT_SYNCED',
+                google_sync_error = 'Assinatura do módulo Jéssica suspensa ou expirada',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ? AND google_sync_status IN ('PENDING', 'PROCESSING')
+          `).run(item.appointment_id);
+          processedCount++;
+          continue;
+        }
+      }
+
       // 1.5. Pre-Flight Revalidation: revalida se a conta permanece conectada antes de qualquer operação externa
       const tokenRow = db.prepare(`
         SELECT encrypted_tokens, is_connected, connected_at, initial_connection_at, sync_existing_authorized, account_email, selected_calendar_id, sync_mode
@@ -448,6 +476,34 @@ async function _processSingleWhatsAppItem(item) {
   const whatsappClient = require('../whatsapp/client');
 
   try {
+    // 0.5. Pre-Flight Guard de Assinatura para Notificações de Salão (Comando 060.3.4)
+    // Se a assinatura do salão expirou após o enfileiramento na outbox,
+    // cancela o envio imediatamente (fail-closed) para impedir processamento indevido pós-vencimento.
+    if (item.user_id && item.user_id > 0) {
+      const productService = require('./productService');
+      const access = productService.hasProductAccess(item.user_id, 'JESSICA');
+      if (!access || !access.hasAccess) {
+        db.prepare(`
+          UPDATE whatsapp_notification_outbox
+          SET status = 'CANCELLED',
+              last_error = 'SUBSCRIPTION_EXPIRED: Assinatura do módulo Jéssica suspensa ou expirada',
+              locked_at = NULL,
+              sent_at = CURRENT_TIMESTAMP
+          WHERE id = ?
+        `).run(item.id);
+
+        if (item.appointment_id && item.appointment_id > 0) {
+          if (item.event_type === 'REMINDER_24H') {
+            db.prepare(`
+              UPDATE appointments
+              SET reminder_24h_status = 'CANCELLED', updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(item.appointment_id);
+          }
+        }
+        return { success: false, skipped: true, preflightFailed: true, status: 'CANCELLED', reason: 'SUBSCRIPTION_EXPIRED' };
+      }
+    }
     // 1. Deduplicação Fina Baseada em Hash de Conteúdo (dedup_hash nos últimos 5 minutos)
     // Permite remarcações ou alterações legítimas com conteúdo diferente sem bloqueio espúrio
     if (item.dedup_hash) {

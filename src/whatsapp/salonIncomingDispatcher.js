@@ -1421,6 +1421,18 @@ async function dispatchMessage(salonUserId, sock, msg) {
     return false;
   }
 
+  // 1.1 Verificação defensiva de assinatura ativa do salão (Módulo Jéssica)
+  try {
+    const productService = require('../services/productService');
+    const access = productService.hasProductAccess(uid, 'JESSICA');
+    if (!access || !access.hasAccess) {
+      console.warn(`[salonIncomingDispatcher] Salão #${uid} com assinatura inativa ou expirada (${access?.status || 'NO_ACCESS'}). Mensagem descartada.`);
+      return false;
+    }
+  } catch (subErr) {
+    console.error(`[salonIncomingDispatcher] Erro ao verificar assinatura para #${uid}:`, subErr.message);
+  }
+
   // A5 / CORREÇÃO 4: Resolução defensiva do telefone do remetente via identificadores alternativos e mapeamento
   const sessionMgr = getSessionManager();
   let authDir = null;

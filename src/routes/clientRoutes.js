@@ -565,6 +565,12 @@ router.get('/products/:code/access', clientAuthMiddleware, (req, res) => {
   res.json({ success: true, access });
 });
 
+router.get('/salon', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
+  clientAuth.ensureSalonForUser(req.clientUser.id, req.clientUser.name);
+  const user = clientAuth.getSanitizedUser(req.clientUser.id);
+  res.json({ success: true, salon: user.salon });
+});
+
 router.put('/salon', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   const { salonName, phone, address, openingHours, customInstructions } = req.body || {};
   const userId = req.clientUser.id;

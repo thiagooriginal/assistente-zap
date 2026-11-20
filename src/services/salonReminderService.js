@@ -223,6 +223,7 @@ function checkAndQueue24hReminders({ now = Date.now(), userId = null } = {}) {
   expirePastReminders({ now, userId });
 
   const nowIso = toLocalISOString(now);
+  const nowIsoParam = new Date(now).toISOString();
   let query = `
     SELECT 
       a.id AS appointment_id,
@@ -241,6 +242,7 @@ function checkAndQueue24hReminders({ now = Date.now(), userId = null } = {}) {
       sal.b2c_reminders_enabled
     FROM appointments a
     JOIN client_salons sal ON a.user_id = sal.user_id
+    JOIN users u ON a.user_id = u.id
     LEFT JOIN client_services cs ON a.service_id = cs.id
     LEFT JOIN client_staff st ON a.staff_id = st.id
     WHERE (a.reminder_24h_status IN ('PENDING', 'QUEUED') OR a.reminder_24h_status IS NULL)
@@ -249,12 +251,35 @@ function checkAndQueue24hReminders({ now = Date.now(), userId = null } = {}) {
       AND sal.b2c_reminders_enabled = 1
       AND a.client_phone IS NOT NULL
       AND a.start_datetime >= ?
+      AND (
+        u.is_demo = 1
+        OR u.role = 'ADMIN'
+        OR EXISTS (
+          SELECT 1 FROM customer_subscriptions csub
+          JOIN products p ON p.id = csub.product_id
+          WHERE csub.user_id = a.user_id
+            AND UPPER(p.code) = 'JESSICA'
+            AND (
+              (csub.status = 'ACTIVE' AND (csub.paid_until IS NULL OR csub.paid_until >= ?))
+              OR (csub.status IN ('CANCELLED', 'OVERDUE') AND csub.paid_until IS NOT NULL AND csub.paid_until >= ?)
+            )
+        )
+        OR (
+          NOT EXISTS (
+            SELECT 1 FROM customer_subscriptions csub
+            JOIN products p ON p.id = csub.product_id
+            WHERE csub.user_id = a.user_id AND UPPER(p.code) = 'JESSICA'
+          )
+          AND u.subscription_status IN ('ACTIVE', 'TRIAL')
+          AND (u.paid_until IS NULL OR u.paid_until >= ?)
+        )
+      )
       AND NOT EXISTS (
         SELECT 1 FROM salon_client_optouts o
         WHERE o.user_id = a.user_id AND (o.phone = a.client_phone OR o.phone = ('55' || a.client_phone))
       )
   `;
-  const params = [nowIso];
+  const params = [nowIso, nowIsoParam, nowIsoParam, nowIsoParam];
 
   if (userId) {
     query += ` AND a.user_id = ?`;
@@ -267,6 +292,16 @@ function checkAndQueue24hReminders({ now = Date.now(), userId = null } = {}) {
   const results = [];
 
   for (const apt of candidates) {
+    // Validação defensiva adicional: verificar acesso ativo do salão
+    try {
+      const productService = require('./productService');
+      const access = productService.hasProductAccess(apt.user_id, 'JESSICA');
+      if (!access || !access.hasAccess) {
+        results.push({ appointmentId: apt.appointment_id, status: 'SKIPPED_SUBSCRIPTION_EXPIRED' });
+        continue;
+      }
+    } catch (_) {}
+
     const cleanPhone = normalizePhone(apt.client_phone);
     if (!cleanPhone || cleanPhone.length < 10) {
       // Invalid phone -> disable reminder
