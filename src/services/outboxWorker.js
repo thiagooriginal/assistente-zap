@@ -173,19 +173,30 @@ async function processGoogleSyncOutbox(filterUserId = null) {
       const userRow = db.prepare('SELECT is_demo FROM users WHERE id = ?').get(item.user_id);
       if (userRow && Boolean(userRow.is_demo)) {
         const simId = 'sim_demo_' + item.appointment_id;
-        db.prepare(`
-          UPDATE google_sync_outbox
-          SET status = 'SIMULATED', processed_at = CURRENT_TIMESTAMP, last_error = 'Conta de demonstração (is_demo) - sincronização simulada'
-          WHERE id = ?
-        `).run(item.id);
-        db.prepare(`
-          UPDATE appointments
-          SET google_event_id = COALESCE(google_event_id, ?),
-              google_sync_status = 'SIMULATED',
-              google_sync_error = 'Conta de demonstração: sincronização simulada',
-              updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `).run(simId, item.appointment_id);
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          db.prepare(`
+            UPDATE google_sync_outbox
+            SET status = 'SIMULATED', locked_at = NULL, processed_at = CURRENT_TIMESTAMP,
+                last_error = 'Conta de demonstração (is_demo) - sincronização simulada'
+            WHERE id = ?
+          `).run(item.id);
+          db.prepare(`
+            UPDATE appointments
+            SET google_event_id = CASE
+                  WHEN google_event_id IS NOT NULL AND google_event_id NOT LIKE 'sim_%' THEN google_event_id
+                  ELSE ?
+                END,
+                google_sync_status = 'SIMULATED',
+                google_sync_error = 'Conta de demonstração: sincronização simulada',
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(simId, item.appointment_id);
+          db.exec('COMMIT');
+        } catch (demoErr) {
+          try { db.exec('ROLLBACK'); } catch (_) {}
+          throw demoErr;
+        }
         processedCount++;
         continue;
       }
@@ -272,7 +283,7 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         // Se estiver em modo de homologação restrita e o item NÃO for o autorizado:
         // PRESERVAÇÃO INTEGRAL DA FILA: NUNCA converter para SIMULATED/CANCELLED/SENT!
         // Reverte o lock imediatamente para PENDING e continua, mantendo a fila e o agendamento intactos.
-        if (gatekeeperResult.isHomologation) {
+        if (gatekeeperResult.isHomologation && !gatekeeperResult.isAuthorizedHomologation) {
           db.prepare(`
             UPDATE google_sync_outbox
             SET status = 'PENDING', locked_at = NULL
@@ -281,26 +292,43 @@ async function processGoogleSyncOutbox(filterUserId = null) {
           continue;
         }
 
-        // Em modo de produção sem homologação, aplica o fallback simulado seguro existente
+        // Para itens autorizados com LIVE_SYNC_DISABLED ou fallback de produção:
+        // Aplica transação atômica (BEGIN IMMEDIATE / COMMIT)
         const simId = 'sim_gcal_' + crypto.createHash('sha256').update(`sim_${item.user_id}_${apt.id}`).digest('hex').substring(0, 24);
-        db.prepare(`
-          UPDATE google_sync_outbox
-          SET status = 'SIMULATED', processed_at = CURRENT_TIMESTAMP, 
-              last_error = ?
-          WHERE id = ?
-        `).run(`PRODUÇÃO [${gatekeeperResult.reason}]: ${gatekeeperResult.message}`, item.id);
-
         const finalSyncStatus = item.action === 'DELETE' ? 'CANCELLED' : 'SIMULATED';
-        const finalEventId = item.action === 'DELETE' ? null : (apt.google_event_id || simId);
+        const fallbackEventId = item.action === 'DELETE' ? null : (apt.google_event_id || simId);
+        const syncLabel = gatekeeperResult.isHomologation ? 'HOMOLOGAÇÃO' : 'PRODUÇÃO';
+        const outboxErrorMsg = `${syncLabel} [${gatekeeperResult.reason}]: ${gatekeeperResult.message}`;
+        const aptErrorMsg = `Ambiente Seguro: Sincronização simulada (${gatekeeperResult.reason})`;
 
-        db.prepare(`
-          UPDATE appointments
-          SET google_event_id = ?,
-              google_sync_status = ?,
-              google_sync_error = ?,
-              updated_at = CURRENT_TIMESTAMP
-          WHERE id = ?
-        `).run(finalEventId, finalSyncStatus, `Ambiente Seguro: Sincronização simulada (${gatekeeperResult.reason})`, item.appointment_id);
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          db.prepare(`
+            UPDATE google_sync_outbox
+            SET status = 'SIMULATED',
+                locked_at = NULL,
+                processed_at = CURRENT_TIMESTAMP, 
+                last_error = ?
+            WHERE id = ?
+          `).run(outboxErrorMsg, item.id);
+
+          db.prepare(`
+            UPDATE appointments
+            SET google_event_id = CASE
+                  WHEN google_event_id IS NOT NULL AND google_event_id NOT LIKE 'sim_%' THEN google_event_id
+                  ELSE ?
+                END,
+                google_sync_status = ?,
+                google_sync_error = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+          `).run(fallbackEventId, finalSyncStatus, aptErrorMsg, item.appointment_id);
+
+          db.exec('COMMIT');
+        } catch (simErr) {
+          try { db.exec('ROLLBACK'); } catch (_) {}
+          throw simErr;
+        }
 
         processedCount++;
         continue;

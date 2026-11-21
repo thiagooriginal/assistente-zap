@@ -778,7 +778,7 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
   });
 
   if (!gateCheck.allowed) {
-    if (gateCheck.isHomologation) {
+    if (gateCheck.isHomologation && gateCheck.reason !== 'LIVE_SYNC_DISABLED') {
       const err = new Error(`HOMOLOGACAO_BLOCKED: Chamada direta de criação rejeitada pelo Gatekeeper (${gateCheck.reason}): ${gateCheck.message}`);
       err.code = gateCheck.reason;
       throw err;
@@ -998,7 +998,7 @@ async function updateCalendarEvent(userId, googleEventId, appointment, targetCal
   });
 
   if (!gateCheck.allowed) {
-    if (gateCheck.isHomologation) {
+    if (gateCheck.isHomologation && gateCheck.reason !== 'LIVE_SYNC_DISABLED') {
       const err = new Error(`HOMOLOGACAO_BLOCKED: Chamada direta de atualização rejeitada pelo Gatekeeper (${gateCheck.reason}): ${gateCheck.message}`);
       err.code = gateCheck.reason;
       throw err;
@@ -1155,7 +1155,7 @@ async function deleteCalendarEvent(userId, googleEventId, targetCalendarId = nul
   });
 
   if (!gateCheck.allowed) {
-    if (gateCheck.isHomologation) {
+    if (gateCheck.isHomologation && gateCheck.reason !== 'LIVE_SYNC_DISABLED') {
       const err = new Error(`HOMOLOGACAO_BLOCKED: Chamada direta de exclusão rejeitada pelo Gatekeeper (${gateCheck.reason}): ${gateCheck.message}`);
       err.code = gateCheck.reason;
       throw err;

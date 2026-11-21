@@ -56,20 +56,10 @@ function checkAllowedEmail(accountEmail) {
  * @param {number|string} [params.appointmentId] - ID do agendamento
  * @param {string} [params.accountEmail] - E-mail da conta Google conectada
  * @param {boolean|number} [params.isDemo] - Flag indicando se é conta de demonstração
- * @returns {{ allowed: boolean, reason: string, message: string, isHomologation: boolean }}
+ * @returns {{ allowed: boolean, reason: string, message: string, isHomologation: boolean, isAuthorizedHomologation: boolean }}
  */
 function evaluateGatekeeper({ userId, calendarId, appointmentId, accountEmail, isDemo }) {
   const isHomologationMode = process.env.GOOGLE_SYNC_HOMOLOGATION_MODE === 'true';
-
-  // 0. Pino Master Switch: Bloqueio fail-closed se GOOGLE_SYNC_LIVE_ENABLED !== 'true'
-  if (process.env.GOOGLE_SYNC_LIVE_ENABLED !== 'true') {
-    return {
-      allowed: false,
-      reason: 'LIVE_SYNC_DISABLED',
-      message: 'Master switch GOOGLE_SYNC_LIVE_ENABLED desativado. Sincronização real bloqueada.',
-      isHomologation: isHomologationMode,
-    };
-  }
 
   // 1. Pino Universal: Demo Shield (Prioridade Máxima em qualquer ambiente)
   let effectiveIsDemo = isDemo;
@@ -87,6 +77,7 @@ function evaluateGatekeeper({ userId, calendarId, appointmentId, accountEmail, i
       reason: 'DEMO_TENANT_BLOCKED',
       message: 'Conta de demonstração (is_demo=1) estritamente proibida de sincronizar dados reais.',
       isHomologation: isHomologationMode,
+      isAuthorizedHomologation: false,
     };
   }
 
@@ -104,6 +95,7 @@ function evaluateGatekeeper({ userId, calendarId, appointmentId, accountEmail, i
         reason: 'UNAUTHORIZED_TENANT',
         message: `Tenant ${userId} não autorizado para sincronização em homologação restrita.`,
         isHomologation: true,
+        isAuthorizedHomologation: false,
       };
     }
 
@@ -116,6 +108,7 @@ function evaluateGatekeeper({ userId, calendarId, appointmentId, accountEmail, i
         reason: 'PRIMARY_CALENDAR_PROHIBITED',
         message: 'Em homologação, a sincronização com o calendário principal ("primary" ou "default") é estritamente proibida pelo Anti-Primary Shield.',
         isHomologation: true,
+        isAuthorizedHomologation: false,
       };
     }
 
@@ -127,6 +120,7 @@ function evaluateGatekeeper({ userId, calendarId, appointmentId, accountEmail, i
         reason: 'DIVERGENT_CALENDAR',
         message: `Calendário "${calendarId}" não corresponde ao calendário autorizado de homologação.`,
         isHomologation: true,
+        isAuthorizedHomologation: false,
       };
     }
 
@@ -140,6 +134,7 @@ function evaluateGatekeeper({ userId, calendarId, appointmentId, accountEmail, i
         reason: 'UNAUTHORIZED_APPOINTMENT',
         message: `Agendamento #${appointmentId} não autorizado para sincronização em homologação restrita.`,
         isHomologation: true,
+        isAuthorizedHomologation: false,
       };
     }
 
@@ -152,6 +147,18 @@ function evaluateGatekeeper({ userId, calendarId, appointmentId, accountEmail, i
         reason: 'DIVERGENT_EMAIL',
         message: `E-mail "${accountEmail}" não corresponde ao e-mail autorizado de homologação.`,
         isHomologation: true,
+        isAuthorizedHomologation: false,
+      };
+    }
+
+    // Pino 0 em Homologação: Avaliado APÓS os pinos de autorização estrutural
+    if (process.env.GOOGLE_SYNC_LIVE_ENABLED !== 'true') {
+      return {
+        allowed: false,
+        reason: 'LIVE_SYNC_DISABLED',
+        message: 'Master switch GOOGLE_SYNC_LIVE_ENABLED desativado. Sincronização real bloqueada.',
+        isHomologation: true,
+        isAuthorizedHomologation: true,
       };
     }
 
@@ -160,12 +167,24 @@ function evaluateGatekeeper({ userId, calendarId, appointmentId, accountEmail, i
       reason: 'AUTHORIZED_HOMOLOGATION',
       message: 'Agendamento e tenant 100% autorizados pelo Gatekeeper Quíntuplo de Homologação.',
       isHomologation: true,
+      isAuthorizedHomologation: true,
     };
   }
 
   // ---------------------------------------------------------------------------
   // FLUXO B: MODO PRODUÇÃO NORMAL (Fluxo Comercial Autônomo Multi-tenant)
   // ---------------------------------------------------------------------------
+  // Pino 0 em Produção: Bloqueio fail-closed se GOOGLE_SYNC_LIVE_ENABLED !== 'true'
+  if (process.env.GOOGLE_SYNC_LIVE_ENABLED !== 'true') {
+    return {
+      allowed: false,
+      reason: 'LIVE_SYNC_DISABLED',
+      message: 'Master switch GOOGLE_SYNC_LIVE_ENABLED desativado. Sincronização real bloqueada.',
+      isHomologation: false,
+      isAuthorizedHomologation: false,
+    };
+  }
+
   // Em produção comercial:
   // 1. Permitir calendários principais ("primary"/"default") ou secundários expressamente
   //    autorizados pelo próprio salão (via painel ou OAuth).
@@ -176,6 +195,7 @@ function evaluateGatekeeper({ userId, calendarId, appointmentId, accountEmail, i
       reason: 'INVALID_ACCOUNT_EMAIL',
       message: 'Conta Google sem e-mail válido para sincronização comercial.',
       isHomologation: false,
+      isAuthorizedHomologation: false,
     };
   }
 
@@ -186,6 +206,7 @@ function evaluateGatekeeper({ userId, calendarId, appointmentId, accountEmail, i
       reason: 'NO_CALENDAR_SPECIFIED',
       message: 'Nenhum calendário principal ou secundário especificado para o salão.',
       isHomologation: false,
+      isAuthorizedHomologation: false,
     };
   }
 
@@ -194,6 +215,7 @@ function evaluateGatekeeper({ userId, calendarId, appointmentId, accountEmail, i
     reason: 'AUTHORIZED_PRODUCTION',
     message: 'Sincronização em produção autorizada para o salão comercial (calendário principal ou secundário).',
     isHomologation: false,
+    isAuthorizedHomologation: false,
   };
 }
 

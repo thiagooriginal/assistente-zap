@@ -134,6 +134,21 @@ test.before(() => {
       user_id, account_email, encrypted_tokens, selected_calendar_id, is_connected, sync_existing_authorized, initial_connection_at, connected_at
     ) VALUES (202, ?, ?, ?, 1, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
   `).run('outro.salao202@gmail.com', encTokens101, AUTH_CALENDAR_ID);
+
+  const jessicaProd = db.prepare("SELECT id FROM products WHERE code = 'JESSICA'").get();
+  if (jessicaProd) {
+    db.prepare(`
+      INSERT OR REPLACE INTO customer_subscriptions (
+        user_id, product_id, status, price_cents, access_expires_at, paid_until
+      ) VALUES (?, ?, 'ACTIVE', 9700, datetime('now', '+30 days'), datetime('now', '+30 days'))
+    `).run(AUTH_TENANT_ID, jessicaProd.id);
+
+    db.prepare(`
+      INSERT OR REPLACE INTO customer_subscriptions (
+        user_id, product_id, status, price_cents, access_expires_at, paid_until
+      ) VALUES (202, ?, 'ACTIVE', 9700, datetime('now', '+30 days'), datetime('now', '+30 days'))
+    `).run(jessicaProd.id);
+  }
 });
 
 test.after(async () => {
