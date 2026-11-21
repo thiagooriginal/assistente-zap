@@ -7650,6 +7650,54 @@
       return '<span class="apt-badge-consent inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/20" title="Sem autorização prévia de lembretes WhatsApp"><i data-lucide="shield-off" class="w-2.5 h-2.5 text-slate-400"></i> Sem autorização para lembretes</span>';
     }
 
+    // --- UTILITÁRIO UNIVERSAL DE DATA/HORA DE AGENDAMENTOS (JÉSSICA) ---
+    function parseAppointmentDateTime(raw) {
+      if (!raw || typeof raw !== 'string') {
+        return { date: '', time: '', brDate: '', displayFull: '', datePart: '', timePart: '', displayDate: '', displayTime: '' };
+      }
+      const trimmed = raw.trim();
+      if (!trimmed) {
+        return { date: '', time: '', brDate: '', displayFull: '', datePart: '', timePart: '', displayDate: '', displayTime: '' };
+      }
+
+      // Suporte a delimitador 'T' (ISO) ou espaço ' ' (SQL)
+      const delimiter = trimmed.includes('T') ? 'T' : ' ';
+      const parts = trimmed.split(delimiter);
+      const datePart = parts[0] || '';
+      let timePart = parts[1] || '';
+
+      if (timePart.includes('.')) {
+        timePart = timePart.split('.')[0];
+      }
+      if (timePart.endsWith('Z')) {
+        timePart = timePart.slice(0, -1);
+      }
+      if (timePart.length >= 5) {
+        timePart = timePart.slice(0, 5);
+      }
+
+      let brDate = '';
+      if (datePart && datePart.includes('-')) {
+        const dParts = datePart.split('-');
+        if (dParts.length === 3) {
+          brDate = `${dParts[2].padStart(2, '0')}/${dParts[1].padStart(2, '0')}/${dParts[0]}`;
+        }
+      }
+
+      const displayFull = brDate && timePart ? `${brDate} às ${timePart}` : (brDate || datePart);
+
+      return {
+        date: datePart,
+        time: timePart,
+        brDate: brDate,
+        displayFull: displayFull,
+        datePart: datePart,
+        timePart: timePart,
+        displayDate: brDate,
+        displayTime: timePart
+      };
+    }
+
     async function loadAppointments() {
       const list = document.getElementById('appointmentsList');
       function renderAppointmentList(appointments) {
@@ -7663,12 +7711,13 @@
         }
 
         appointments.forEach(a => {
-          const dt = new Date(a.start_datetime);
-          const dtFormatted = dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-          const startFormatted = dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          const parsedStart = parseAppointmentDateTime(a.start_datetime);
+          const parsedEnd = parseAppointmentDateTime(a.end_datetime);
+          const dtFormatted = parsedStart.displayDate || (a.start_datetime ? new Date(a.start_datetime).toLocaleDateString('pt-BR') : '');
+          const startFormatted = parsedStart.displayTime || '';
           let endFormatted = '';
-          if (a.end_datetime) {
-            endFormatted = ' às ' + new Date(a.end_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+          if (parsedEnd.displayTime) {
+            endFormatted = ' às ' + parsedEnd.displayTime;
           }
 
           const card = document.createElement('div');
@@ -7867,13 +7916,14 @@
           const apt = appointmentsState.appointments.find(a => a.id === id);
           if (!apt) return;
 
-          const aptDatePart = apt.start_datetime.split('T')[0];
-          const aptTimePart = apt.start_datetime.split('T')[1].slice(0, 5);
+          const parsedDt = parseAppointmentDateTime(apt.start_datetime);
+          const aptDatePart = parsedDt.datePart;
+          const aptTimePart = parsedDt.timePart;
 
           document.getElementById('rescheduleAptId').value = apt.id;
           document.getElementById('rescheduleAptInfo').innerHTML = `
-            <strong>${escapeHtml(apt.client_name)}</strong> • ${escapeHtml(apt.service_name)} (${apt.duration_formatted})<br>
-            <span class="text-[#7A6255]">Horário Atual: ${new Date(apt.start_datetime).toLocaleDateString('pt-BR')} às ${new Date(apt.start_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • ${escapeHtml(apt.staff_name)}</span>
+            <strong>${escapeHtml(apt.client_name)}</strong> • ${escapeHtml(apt.service_name)} (${escapeHtml(apt.duration_formatted || '')})<br>
+            <span class="text-[#7A6255]">Horário Atual: ${parsedDt.displayFull} • ${escapeHtml(apt.staff_name)}</span>
           `;
 
           // Inicializar campos de Nova Data (BR e ISO)
@@ -7942,10 +7992,11 @@
           const apt = appointmentsState.appointments.find(a => a.id === id);
           if (!apt) return;
 
+          const parsedDt = parseAppointmentDateTime(apt.start_datetime);
           document.getElementById('cancelAptId').value = apt.id;
           document.getElementById('cancelAptInfo').innerHTML = `
             <strong>${escapeHtml(apt.client_name)}</strong> — ${escapeHtml(apt.service_name)}<br>
-            Data: ${new Date(apt.start_datetime).toLocaleDateString('pt-BR')} às ${new Date(apt.start_datetime).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}<br>
+            Data: ${parsedDt.displayFull}<br>
             Profissional: ${escapeHtml(apt.staff_name)}
           `;
           document.getElementById('cancelReasonInput').value = '';
