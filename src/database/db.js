@@ -965,6 +965,34 @@ runVersionedMigration('20261113_02_client_service_staff_confirmed', 'Add confirm
   db.exec('CREATE INDEX IF NOT EXISTS idx_css_tenant_confirmed ON client_service_staff(user_id, confirmed);');
 });
 
+// Versioned migration: Safe Homologation Google Calendar Test Sessions (Comando 063.2)
+runVersionedMigration('20261121_01_google_sync_test_sessions', 'Create google_sync_test_sessions table for safe homologation testing', () => {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS google_sync_test_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_token TEXT UNIQUE NOT NULL,
+      user_id INTEGER NOT NULL,
+      appointment_id INTEGER NOT NULL,
+      calendar_id TEXT NOT NULL,
+      account_email TEXT NOT NULL,
+      allowed_action TEXT NOT NULL DEFAULT 'CREATE' CHECK(allowed_action IN ('CREATE', 'UPDATE', 'DELETE', 'ANY')),
+      max_executions INTEGER NOT NULL DEFAULT 1,
+      executions_count INTEGER NOT NULL DEFAULT 0,
+      created_by INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK(status IN ('ACTIVE', 'COMPLETED', 'EXPIRED', 'REVOKED')),
+      reason TEXT,
+      revoked_by INTEGER,
+      revocation_reason TEXT,
+      expires_at TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_gtest_status_expires ON google_sync_test_sessions(status, expires_at);
+    CREATE INDEX IF NOT EXISTS idx_gtest_user_apt ON google_sync_test_sessions(user_id, appointment_id);
+    CREATE INDEX IF NOT EXISTS idx_gtest_created_at ON google_sync_test_sessions(created_at);
+  `);
+});
+
 ensureColumnExists('client_service_staff', 'confirmed', 'INTEGER NOT NULL DEFAULT 1 CHECK(confirmed IN (0, 1))');
 db.exec('CREATE INDEX IF NOT EXISTS idx_css_tenant_confirmed ON client_service_staff(user_id, confirmed);');
 

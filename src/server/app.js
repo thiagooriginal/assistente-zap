@@ -672,6 +672,7 @@ function authMiddleware(req, res, next) {
         '/api/admin/products',
         '/api/admin/plans',
         '/api/admin/segments',
+        '/api/admin/google-sync/test-session',
       ];
       if (prohibitedPrefixesForApiKey.some(p => req.path.startsWith(p))) {
         try {
@@ -3528,6 +3529,180 @@ app.post('/api/admin/system/backup', requireInteractiveAdmin, (req, res) => {
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// =========================================================================
+// SESSÕES CONTROLADAS DE TESTE GOOGLE CALENDAR (COMANDO 063.2)
+// =========================================================================
+
+/**
+ * Inicia uma sessão de teste de homologação real controlada.
+ * Exige sessão administrativa interativa com MFA validado.
+ */
+app.post(['/api/admin/google-sync/test-session/start', '/api/admin/google-sync/test-session/create'], requireInteractiveAdmin, adminActionLimiter, (req, res) => {
+  const {
+    userId,
+    appointmentId,
+    calendarId,
+    accountEmail,
+    allowedAction = 'CREATE',
+    durationMinutes = 15,
+    maxExecutions = 1,
+    reason,
+  } = req.body || {};
+
+  // Validação dos campos obrigatórios
+  const uId = Number(userId);
+  const aptId = Number(appointmentId);
+  if (!uId || !aptId || !calendarId || !accountEmail) {
+    return res.status(400).json({
+      success: false,
+      error: 'Parâmetros obrigatórios ausentes: userId, appointmentId, calendarId e accountEmail são mandatórios.',
+      code: 'MISSING_REQUIRED_FIELDS',
+    });
+  }
+
+  // Anti-Primary Shield: Rejeição imediata de 'primary' ou 'default'
+  const normCal = String(calendarId).trim().toLowerCase();
+  if (normCal === 'primary' || normCal === 'default') {
+    return res.status(400).json({
+      success: false,
+      error: 'O Anti-Primary Shield proíbe expressamente a seleção do calendário principal ("primary" ou "default") para testes em homologação.',
+      code: 'ANTI_PRIMARY_VIOLATION',
+    });
+  }
+
+  // Demo Shield: Rejeição imediata de contas demo
+  const userRow = db.prepare('SELECT id, is_demo FROM users WHERE id = ?').get(uId);
+  if (!userRow) {
+    return res.status(404).json({
+      success: false,
+      error: `Tenant #${uId} não encontrado no banco de dados.`,
+      code: 'TENANT_NOT_FOUND',
+    });
+  }
+  if (Boolean(userRow.is_demo)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Contas de demonstração (is_demo=1) estão estritamente proibidas de iniciar sessões de teste real.',
+      code: 'DEMO_TENANT_PROHIBITED',
+    });
+  }
+
+  // Validação do agendamento pertencente ao tenant
+  const aptRow = db.prepare('SELECT id, user_id, status FROM appointments WHERE id = ? AND user_id = ?').get(aptId, uId);
+  if (!aptRow) {
+    return res.status(404).json({
+      success: false,
+      error: `Agendamento #${aptId} não pertence ao tenant #${uId} ou não existe.`,
+      code: 'APPOINTMENT_NOT_FOUND',
+    });
+  }
+
+  try {
+    const sessionService = require('../services/googleCalendarSessionService');
+    const session = sessionService.createTestSession({
+      userId: uId,
+      appointmentId: aptId,
+      calendarId: String(calendarId).trim(),
+      accountEmail: String(accountEmail).trim().toLowerCase(),
+      allowedAction,
+      durationMinutes,
+      maxExecutions,
+      createdBy: req.user.id,
+      reason,
+    });
+
+    logSecurityEvent({
+      eventType: 'GOOGLE_SYNC_TEST_SESSION_STARTED',
+      userId: req.user.id,
+      req,
+      status: 'SUCCESS',
+      details: {
+        sessionId: session.id,
+        targetUserId: uId,
+        appointmentId: aptId,
+        calendarId: session.calendar_id,
+        accountEmail: session.account_email,
+        expiresAt: session.expires_at,
+        maxExecutions: session.max_executions,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Sessão temporária de teste criada com sucesso.',
+      session,
+    });
+  } catch (err) {
+    return res.status(400).json({
+      success: false,
+      error: err.message || 'Erro ao inicializar sessão de teste.',
+      code: err.code || 'SESSION_CREATION_FAILED',
+    });
+  }
+});
+
+/**
+ * Retorna a sessão ativa de teste e o TTL restante em segundos.
+ */
+app.get('/api/admin/google-sync/test-session/active', requireInteractiveAdmin, (req, res) => {
+  const sessionService = require('../services/googleCalendarSessionService');
+  const session = sessionService.getActiveSession();
+
+  return res.json({
+    success: true,
+    active: Boolean(session),
+    session: session || null,
+  });
+});
+
+/**
+ * Revogação imediata (Kill-switch / Botão de Pânico).
+ */
+app.post('/api/admin/google-sync/test-session/revoke', requireInteractiveAdmin, adminActionLimiter, (req, res) => {
+  const { sessionId, reason } = req.body || {};
+  const sessionService = require('../services/googleCalendarSessionService');
+
+  const result = sessionService.revokeTestSession(sessionId || null, {
+    revokedBy: req.user.id,
+    revocationReason: reason || 'Manual admin panic button invocation',
+  });
+
+  logSecurityEvent({
+    eventType: 'GOOGLE_SYNC_TEST_SESSION_REVOKED',
+    userId: req.user.id,
+    req,
+    status: 'SUCCESS',
+    details: {
+      targetSessionId: sessionId || 'ACTIVE_SESSION',
+      changes: result.changes,
+      reason: reason || 'Manual admin panic button invocation',
+    },
+  });
+
+  return res.json({
+    success: true,
+    message: result.revoked
+      ? 'Sessão de teste revogada com sucesso.'
+      : 'Nenhuma sessão ativa encontrada para revogação.',
+    changes: result.changes,
+  });
+});
+
+/**
+ * Lista as últimas sessões de teste para auditoria forense.
+ */
+app.get('/api/admin/google-sync/test-session/history', requireInteractiveAdmin, (req, res) => {
+  const limit = parseInt(req.query.limit, 10) || 20;
+  const sessionService = require('../services/googleCalendarSessionService');
+  const history = sessionService.getSessionHistory(limit);
+
+  return res.json({
+    success: true,
+    count: history.length,
+    sessions: history,
+  });
 });
 
 // ==========================================

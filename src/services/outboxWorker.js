@@ -63,11 +63,25 @@ async function processGoogleSyncOutbox(filterUserId = null) {
   const params = [];
 
   if (isHomologationMode) {
-    const authTenantId = process.env.GOOGLE_SYNC_AUTHORIZED_TENANT_ID ? Number(process.env.GOOGLE_SYNC_AUTHORIZED_TENANT_ID) : null;
-    const authAptId = process.env.GOOGLE_SYNC_AUTHORIZED_APPOINTMENT_ID ? Number(process.env.GOOGLE_SYNC_AUTHORIZED_APPOINTMENT_ID) : null;
+    let authTenantId = null;
+    let authAptId = null;
+
+    try {
+      const sessionService = require('./googleCalendarSessionService');
+      const activeSession = sessionService.getActiveSession();
+      if (activeSession) {
+        authTenantId = Number(activeSession.user_id);
+        authAptId = Number(activeSession.appointment_id);
+      }
+    } catch (_) {}
 
     if (!authTenantId || !authAptId) {
-      // Fail-closed: modo de homologação restrita ativo mas sem parâmetros válidos: suspende sem tocar na fila
+      authTenantId = process.env.GOOGLE_SYNC_AUTHORIZED_TENANT_ID ? Number(process.env.GOOGLE_SYNC_AUTHORIZED_TENANT_ID) : null;
+      authAptId = process.env.GOOGLE_SYNC_AUTHORIZED_APPOINTMENT_ID ? Number(process.env.GOOGLE_SYNC_AUTHORIZED_APPOINTMENT_ID) : null;
+    }
+
+    if (!authTenantId || !authAptId) {
+      // Fail-closed: modo de homologação restrita ativo mas sem sessão ativa ou parâmetros válidos: suspende sem tocar na fila
       return 0;
     }
 
@@ -277,6 +291,7 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         appointmentId: item.appointment_id,
         accountEmail: tokenRow.account_email,
         isDemo: userRow && Boolean(userRow.is_demo),
+        action: item.action,
       });
 
       if (!gatekeeperResult.allowed) {
@@ -417,6 +432,14 @@ async function processGoogleSyncOutbox(filterUserId = null) {
         SET google_sync_status = ?, google_sync_error = NULL, updated_at = CURRENT_TIMESTAMP
         WHERE id = ?
       `).run(finalSyncStatus, item.appointment_id);
+
+      // Gravação do consumo da sessão controlada se executado em rede real
+      if (!isSimulated && gatekeeperResult && gatekeeperResult.sessionId) {
+        try {
+          const sessionService = require('./googleCalendarSessionService');
+          sessionService.recordSessionExecution(gatekeeperResult.sessionId);
+        } catch (_) {}
+      }
 
       processedCount++;
     } catch (err) {

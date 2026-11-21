@@ -41,8 +41,18 @@ function isLiveGoogleSyncAllowed(accountEmail = null) {
     return false;
   }
 
-  // 3. Em modo de homologação restrita, exige allowlist institucional
+  // 3. Em modo de homologação restrita, checar sessão ativa antes da allowlist estática
   if (process.env.GOOGLE_SYNC_HOMOLOGATION_MODE === 'true') {
+    try {
+      const sessionService = require('./googleCalendarSessionService');
+      const activeSession = sessionService.getActiveSession();
+      if (activeSession && activeSession.account_email) {
+        if (activeSession.account_email.trim().toLowerCase() === emailTrimmed) {
+          return true;
+        }
+      }
+    } catch (_) {}
+
     const allowedList = (process.env.GOOGLE_SYNC_ALLOWED_EMAILS || process.env.GOOGLE_SYNC_AUTHORIZED_EMAIL || '')
       .split(',')
       .map(e => e.trim().toLowerCase())
