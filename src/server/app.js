@@ -672,7 +672,7 @@ function authMiddleware(req, res, next) {
         '/api/admin/products',
         '/api/admin/plans',
         '/api/admin/segments',
-        '/api/admin/google-sync/test-session',
+        '/api/admin/google-sync',
       ];
       if (prohibitedPrefixesForApiKey.some(p => req.path.startsWith(p))) {
         try {
@@ -3703,6 +3703,82 @@ app.get('/api/admin/google-sync/test-session/history', requireInteractiveAdmin, 
     count: history.length,
     sessions: history,
   });
+});
+
+/**
+ * Retorna contexto seguro e em modo somente leitura do tenant para testes do Google Calendar.
+ * Exclusivo para administradores interativos autenticados com MFA.
+ */
+app.get('/api/admin/google-sync/tenant-context/:userId', requireInteractiveAdmin, (req, res) => {
+  const userId = Number(req.params.userId);
+  if (!userId || isNaN(userId) || userId <= 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'ID de tenant inválido.',
+      code: 'INVALID_TENANT_ID',
+    });
+  }
+
+  try {
+    const user = db.prepare('SELECT id, name, email, phone_number, is_demo, role FROM users WHERE id = ?').get(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: `Tenant #${userId} não encontrado.`,
+        code: 'TENANT_NOT_FOUND',
+      });
+    }
+
+    const tokenRow = db.prepare(`
+      SELECT user_id, is_connected, account_email, selected_calendar_id, sync_mode, connected_at
+      FROM google_calendar_tokens
+      WHERE user_id = ?
+    `).get(userId);
+
+    const appointments = db.prepare(`
+      SELECT id, user_id, title, client_name, start_datetime, end_datetime, status,
+             google_event_id, google_calendar_id, google_sync_status, google_sync_error, created_at
+      FROM appointments
+      WHERE user_id = ?
+      ORDER BY id DESC
+      LIMIT 10
+    `).all(userId);
+
+    const outboxItems = db.prepare(`
+      SELECT id, appointment_id, action, status, attempts, last_error, created_at, processed_at
+      FROM google_sync_outbox
+      WHERE user_id = ?
+      ORDER BY id DESC
+      LIMIT 10
+    `).all(userId);
+
+    return res.json({
+      success: true,
+      tenant: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phoneNumber: user.phone_number,
+        isDemo: Boolean(user.is_demo),
+      },
+      googleConnection: tokenRow ? {
+        isConnected: Boolean(tokenRow.is_connected),
+        accountEmail: tokenRow.account_email,
+        selectedCalendarId: tokenRow.selected_calendar_id,
+        syncMode: tokenRow.sync_mode,
+        connectedAt: tokenRow.connected_at,
+      } : null,
+      appointments,
+      outboxItems,
+    });
+  } catch (err) {
+    console.error('[TenantContext] Erro ao carregar contexto do tenant:', err);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro interno ao consultar contexto do tenant.',
+      code: 'INTERNAL_ERROR',
+    });
+  }
 });
 
 // ==========================================

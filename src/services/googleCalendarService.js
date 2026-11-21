@@ -41,27 +41,16 @@ function isLiveGoogleSyncAllowed(accountEmail = null) {
     return false;
   }
 
-  // 3. Em modo de homologação restrita, checar sessão ativa antes da allowlist estática
+  // 3. Em modo de homologação restrita, validação estrita pela sessão ativa (SEM fallback para variáveis estáticas)
   if (process.env.GOOGLE_SYNC_HOMOLOGATION_MODE === 'true') {
     try {
       const sessionService = require('./googleCalendarSessionService');
       const activeSession = sessionService.getActiveSession();
       if (activeSession && activeSession.account_email) {
-        if (activeSession.account_email.trim().toLowerCase() === emailTrimmed) {
-          return true;
-        }
+        return activeSession.account_email.trim().toLowerCase() === emailTrimmed;
       }
     } catch (_) {}
-
-    const allowedList = (process.env.GOOGLE_SYNC_ALLOWED_EMAILS || process.env.GOOGLE_SYNC_AUTHORIZED_EMAIL || '')
-      .split(',')
-      .map(e => e.trim().toLowerCase())
-      .filter(Boolean);
-
-    if (allowedList.length === 0) {
-      return false;
-    }
-    return allowedList.includes(emailTrimmed);
+    return false;
   }
 
   // 4. Em produção comercial, a allowlist global de homologação não impede clientes comerciais legítimos
@@ -784,6 +773,7 @@ async function createCalendarEvent(userId, appointment, targetCalendarId = null)
     calendarId: calId,
     appointmentId: appointment.id,
     accountEmail: status.accountEmail,
+    action: 'CREATE',
     isDemo,
   });
 
@@ -1004,6 +994,7 @@ async function updateCalendarEvent(userId, googleEventId, appointment, targetCal
     calendarId: calId,
     appointmentId: appointment.id,
     accountEmail: status.accountEmail,
+    action: 'UPDATE',
     isDemo,
   });
 
@@ -1161,11 +1152,12 @@ async function deleteCalendarEvent(userId, googleEventId, targetCalendarId = nul
     calendarId: calId,
     appointmentId: aptId,
     accountEmail: status.accountEmail,
+    action: 'DELETE',
     isDemo,
   });
 
   if (!gateCheck.allowed) {
-    if (gateCheck.isHomologation && gateCheck.reason !== 'LIVE_SYNC_DISABLED') {
+    if (gateCheck.isHomologation) {
       const err = new Error(`HOMOLOGACAO_BLOCKED: Chamada direta de exclusão rejeitada pelo Gatekeeper (${gateCheck.reason}): ${gateCheck.message}`);
       err.code = gateCheck.reason;
       throw err;
@@ -1197,6 +1189,11 @@ async function deleteCalendarEvent(userId, googleEventId, targetCalendarId = nul
 
   // Bloqueio fail-closed absoluto imediatamente antes de chamadas de rede à API do Google (COMANDO 059.1)
   if (process.env.GOOGLE_SYNC_LIVE_ENABLED !== 'true' || !isLiveGoogleSyncAllowed(status.accountEmail) || isDemo) {
+    if (process.env.GOOGLE_SYNC_HOMOLOGATION_MODE === 'true') {
+      const err = new Error('HOMOLOGACAO_BLOCKED: Live sync desabilitado ou não autorizado para exclusão em homologação.');
+      err.code = 'LIVE_SYNC_DISABLED';
+      throw err;
+    }
     db.prepare(`
       UPDATE appointments
       SET google_sync_status = 'CANCELLED',

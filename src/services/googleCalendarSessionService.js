@@ -58,6 +58,32 @@ function ensureSchema(dbInstance = null) {
 }
 
 /**
+ * Mascara o token de sessão para evitar exposição em respostas e histórico.
+ * @param {string} token
+ * @returns {string}
+ */
+function maskSessionToken(token) {
+  if (!token || typeof token !== 'string') return '';
+  if (token.length <= 8) return '****';
+  return `${token.substring(0, 4)}...${token.substring(token.length - 4)}`;
+}
+
+/**
+ * Sanitiza a sessão omitindo session_token e expondo session_token_masked.
+ * @param {Object} row
+ * @returns {Object|null}
+ */
+function sanitizeSession(row) {
+  if (!row) return null;
+  const copy = { ...row };
+  if (copy.session_token) {
+    copy.session_token_masked = maskSessionToken(copy.session_token);
+    delete copy.session_token;
+  }
+  return copy;
+}
+
+/**
  * Expira atômica e passivamente todas as sessões cujo TTL já venceu.
  * @param {Object} [dbInstance]
  * @returns {number} Quantidade de sessões expiradas
@@ -161,8 +187,8 @@ function createTestSession({
     throw err;
   }
 
-  // 5. Normalização de TTL e execuções
-  const safeDuration = Math.min(Math.max(Number(durationMinutes) || 15, 1), 60);
+  // 5. Normalização de TTL e execuções (máximo 30 minutos em homologação)
+  const safeDuration = Math.min(Math.max(Number(durationMinutes) || 15, 1), 30);
   const safeMaxExecutions = Math.min(Math.max(Number(maxExecutions) || 1, 1), 5);
 
   const sessionToken = crypto.randomBytes(32).toString('hex');
@@ -200,7 +226,8 @@ function createTestSession({
     expiresAt
   );
 
-  return db.prepare('SELECT * FROM google_sync_test_sessions WHERE id = ?').get(res.lastInsertRowid);
+  const inserted = db.prepare('SELECT * FROM google_sync_test_sessions WHERE id = ?').get(res.lastInsertRowid);
+  return sanitizeSession(inserted);
 }
 
 /**
@@ -245,10 +272,10 @@ function getActiveSession(dbInstance = null) {
     return null;
   }
 
-  return {
+  return sanitizeSession({
     ...row,
     ttl_seconds: ttlSeconds,
-  };
+  });
 }
 
 /**
@@ -332,7 +359,7 @@ function revokeTestSession(
 function getSessionHistory(limit = 20, dbInstance = null) {
   const db = getDb(dbInstance);
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
-  return db.prepare(`
+  const rows = db.prepare(`
     SELECT id, session_token, user_id, appointment_id, calendar_id,
            account_email, allowed_action, max_executions, executions_count,
            created_by, status, reason, revoked_by, revocation_reason,
@@ -341,6 +368,7 @@ function getSessionHistory(limit = 20, dbInstance = null) {
     ORDER BY id DESC
     LIMIT ?
   `).all(safeLimit);
+  return rows.map(sanitizeSession);
 }
 
 module.exports = {
@@ -351,4 +379,6 @@ module.exports = {
   revokeTestSession,
   getSessionHistory,
   cleanupExpiredSessions,
+  maskSessionToken,
+  sanitizeSession,
 };

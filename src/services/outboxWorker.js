@@ -65,6 +65,7 @@ async function processGoogleSyncOutbox(filterUserId = null) {
   if (isHomologationMode) {
     let authTenantId = null;
     let authAptId = null;
+    let authAction = null;
 
     try {
       const sessionService = require('./googleCalendarSessionService');
@@ -72,16 +73,14 @@ async function processGoogleSyncOutbox(filterUserId = null) {
       if (activeSession) {
         authTenantId = Number(activeSession.user_id);
         authAptId = Number(activeSession.appointment_id);
+        if (activeSession.allowed_action && activeSession.allowed_action !== 'ANY') {
+          authAction = activeSession.allowed_action;
+        }
       }
     } catch (_) {}
 
     if (!authTenantId || !authAptId) {
-      authTenantId = process.env.GOOGLE_SYNC_AUTHORIZED_TENANT_ID ? Number(process.env.GOOGLE_SYNC_AUTHORIZED_TENANT_ID) : null;
-      authAptId = process.env.GOOGLE_SYNC_AUTHORIZED_APPOINTMENT_ID ? Number(process.env.GOOGLE_SYNC_AUTHORIZED_APPOINTMENT_ID) : null;
-    }
-
-    if (!authTenantId || !authAptId) {
-      // Fail-closed: modo de homologação restrita ativo mas sem sessão ativa ou parâmetros válidos: suspende sem tocar na fila
+      // Fail-closed: modo de homologação restrita ativo mas sem sessão ativa: suspende sem tocar na fila (SEM fallback estático)
       return 0;
     }
 
@@ -92,6 +91,10 @@ async function processGoogleSyncOutbox(filterUserId = null) {
 
     sql += ' AND user_id = ? AND appointment_id = ?';
     params.push(authTenantId, authAptId);
+    if (authAction) {
+      sql += ' AND action = ?';
+      params.push(authAction);
+    }
   } else if (filterUserId) {
     sql += ' AND user_id = ?';
     params.push(filterUserId);
@@ -295,16 +298,18 @@ async function processGoogleSyncOutbox(filterUserId = null) {
       });
 
       if (!gatekeeperResult.allowed) {
-        // Se estiver em modo de homologação restrita e o item NÃO for o autorizado:
-        // PRESERVAÇÃO INTEGRAL DA FILA: NUNCA converter para SIMULATED/CANCELLED/SENT!
+        // Se estiver em modo de homologação restrita e o item NÃO for o autorizado,
+        // ou for ação DELETE bloqueada: NUNCA converter para SIMULATED/CANCELLED/SENT!
         // Reverte o lock imediatamente para PENDING e continua, mantendo a fila e o agendamento intactos.
-        if (gatekeeperResult.isHomologation && !gatekeeperResult.isAuthorizedHomologation) {
-          db.prepare(`
-            UPDATE google_sync_outbox
-            SET status = 'PENDING', locked_at = NULL
-            WHERE id = ?
-          `).run(item.id);
-          continue;
+        if (gatekeeperResult.isHomologation) {
+          if (!gatekeeperResult.isAuthorizedHomologation || item.action === 'DELETE') {
+            db.prepare(`
+              UPDATE google_sync_outbox
+              SET status = 'PENDING', locked_at = NULL
+              WHERE id = ?
+            `).run(item.id);
+            continue;
+          }
         }
 
         // Para itens autorizados com LIVE_SYNC_DISABLED ou fallback de produção:

@@ -359,6 +359,10 @@
         <i data-lucide="line-chart" class="w-4 h-4 text-emerald-400"></i>
         <span>📊 Marketing & Analytics</span>
       </button>
+      <button onclick="switchAdminTab('googleSync')" id="tabBtnGoogleSync" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
+        <i data-lucide="calendar" class="w-4 h-4 text-blue-400"></i>
+        <span>📅 Homologação Google Calendar</span>
+      </button>
     </div>
 
     <!-- ============================================================ -->
@@ -1947,6 +1951,184 @@
 
     </div>
 
+    <!-- ============================================================ -->
+    <!-- SECTION 9: HOMOLOGAÇÃO GOOGLE CALENDAR (EPHEMERAL GATEKEEPER) -->
+    <!-- ============================================================ -->
+    <div id="sectionGoogleSync" class="hidden space-y-6">
+
+      <!-- Header & Warning Banner -->
+      <div class="p-6 rounded-3xl bg-gradient-to-r from-blue-950/70 via-indigo-950/60 to-zinc-900 border border-blue-500/30 shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div class="space-y-1">
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-blue-500 text-white font-black uppercase tracking-wider">Gatekeeper Efêmero</span>
+            <span class="text-xs text-blue-300 font-bold">OWASP ASVS 5.0 • Matriz RAIA-27</span>
+          </div>
+          <h2 class="text-xl font-black text-white flex items-center gap-2">
+            <i data-lucide="shield-alert" class="w-5 h-5 text-blue-400"></i>
+            Homologação Controlada Google Calendar
+          </h2>
+          <p class="text-xs text-zinc-400 max-w-2xl">
+            Permite autorizar sessões temporárias, delimitadas e revogáveis de sincronização real com o Google Calendar.
+            Proteções ativas: <strong class="text-zinc-200">Anti-Primary Shield</strong> (bloqueia agenda principal), <strong class="text-zinc-200">Demo Shield</strong>, <strong class="text-zinc-200">Action Pinning</strong> e <strong class="text-zinc-200">TTL Máximo de 30 minutos</strong>.
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <button onclick="refreshGoogleSyncStatus()" class="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-bold flex items-center gap-1.5 transition">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            Atualizar
+          </button>
+        </div>
+      </div>
+
+      <!-- Card: Status em Tempo Real da Sessão Ativa -->
+      <div id="gSessionActiveCard" class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 shadow-xl space-y-4">
+        <div class="flex items-center justify-center py-6 text-zinc-500 text-xs">
+          <i data-lucide="loader" class="w-4 h-4 animate-spin mr-2"></i> Verificando sessão ativa de homologação...
+        </div>
+      </div>
+
+      <!-- Grid com Formulário de Sessão e Carregador de Contexto do Tenant -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Col 1: Carregador Automático de Contexto (Tenant Selector) -->
+        <div class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 shadow-xl space-y-4">
+          <div class="flex items-center gap-2 pb-2 border-b border-zinc-800">
+            <i data-lucide="user-check" class="w-4 h-4 text-emerald-400"></i>
+            <h3 class="text-sm font-black text-white">1. Consultar Contexto do Tenant</h3>
+          </div>
+          <p class="text-[11px] text-zinc-400 leading-relaxed">
+            Consulte diretamente o banco em modo somente leitura para carregar o e-mail conectado, calendário secundário real e agendamentos.
+          </p>
+
+          <div class="space-y-3">
+            <div>
+              <label class="text-[11px] font-bold text-zinc-400">Identificador do Tenant (User ID)</label>
+              <div class="flex gap-2 mt-1">
+                <input type="number" id="gTenantSearchInput" value="3" placeholder="Ex: 3" class="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white font-mono text-xs focus:border-blue-500 outline-none">
+                <button onclick="loadTenantContextForHomologation()" id="btnLoadTenantContext" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-black transition shrink-0">
+                  Carregar
+                </button>
+              </div>
+            </div>
+
+            <!-- Dados carregados do Tenant -->
+            <div id="gTenantContextResult" class="p-3 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 space-y-2 text-[11px] text-zinc-400">
+              <span class="text-zinc-500 italic">Clique em "Carregar" para consultar o Tenant 3.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Col 2 & 3: Formulário de Abertura de Sessão Temporária -->
+        <div class="lg:col-span-2 p-6 rounded-3xl bg-[#11131a] border border-zinc-800 shadow-xl space-y-4">
+          <div class="flex items-center gap-2 pb-2 border-b border-zinc-800">
+            <i data-lucide="key-round" class="w-4 h-4 text-blue-400"></i>
+            <h3 class="text-sm font-black text-white">2. Abrir Nova Sessão Efêmera</h3>
+          </div>
+
+          <form id="gSessionForm" onsubmit="handleCreateGCalTestSession(event)" class="space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="text-[11px] font-bold text-zinc-400">Tenant ID (users.id) *</label>
+                <input type="number" id="gFormUserId" required placeholder="3" class="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white font-mono text-xs focus:border-blue-500 outline-none">
+              </div>
+
+              <div>
+                <label class="text-[11px] font-bold text-zinc-400">Agendamento ID (appointments.id) *</label>
+                <input type="number" id="gFormAppointmentId" required placeholder="17" class="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white font-mono text-xs focus:border-blue-500 outline-none">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="text-[11px] font-bold text-zinc-400">
+                  ID do Calendário Secundário * 
+                  <span class="text-red-400 font-normal">(Anti-Primary Shield ativo)</span>
+                </label>
+                <input type="text" id="gFormCalendarId" required placeholder="c_...@group.calendar.google.com" class="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white font-mono text-xs focus:border-blue-500 outline-none">
+              </div>
+
+              <div>
+                <label class="text-[11px] font-bold text-zinc-400">E-mail da Conta Google *</label>
+                <input type="email" id="gFormAccountEmail" required placeholder="relinautomacoes@gmail.com" class="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs focus:border-blue-500 outline-none">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label class="text-[11px] font-bold text-zinc-400">Ação Permitida (Action Pinning) *</label>
+                <select id="gFormAllowedAction" required class="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs focus:border-blue-500 outline-none font-bold">
+                  <option value="DELETE" selected>DELETE (Remover Evento Real)</option>
+                  <option value="UPDATE">UPDATE (Remarcar)</option>
+                  <option value="CREATE">CREATE (Criar Novo Evento)</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-[11px] font-bold text-zinc-400">Duração TTL (minutos, máx 30) *</label>
+                <input type="number" id="gFormDurationMinutes" min="1" max="30" value="15" required class="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs focus:border-blue-500 outline-none font-mono">
+              </div>
+
+              <div>
+                <label class="text-[11px] font-bold text-zinc-400">Máx. Execuções (máx 5) *</label>
+                <input type="number" id="gFormMaxExecutions" min="1" max="5" value="1" required class="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs focus:border-blue-500 outline-none font-mono">
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[11px] font-bold text-zinc-400">Justificativa Operacional do Teste</label>
+              <input type="text" id="gFormReason" maxlength="250" value="Homologação controlada de exclusão do agendamento 17 (COMANDO 063.2.1)" class="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs focus:border-blue-500 outline-none">
+            </div>
+
+            <div class="pt-2 flex items-center justify-end">
+              <button type="submit" id="btnSubmitGSession" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs shadow-lg flex items-center gap-2 transition cursor-pointer">
+                <i data-lucide="shield-check" class="w-4 h-4"></i>
+                Autorizar Sessão Temporária
+              </button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+
+      <!-- Card: Histórico Forense de Sessões com Tokens Mascarados -->
+      <div class="p-6 rounded-3xl bg-[#11131a] border border-zinc-800 shadow-xl space-y-4">
+        <div class="flex items-center justify-between pb-2 border-b border-zinc-800">
+          <div class="flex items-center gap-2">
+            <i data-lucide="file-text" class="w-4 h-4 text-violet-400"></i>
+            <h3 class="text-sm font-black text-white">Histórico Forense de Sessões de Teste</h3>
+            <span class="text-[10px] text-zinc-500">(Tokens Mascarados em Conformidade com ASVS 5.0)</span>
+          </div>
+          <button onclick="loadGoogleSyncHistory()" class="text-xs text-blue-400 hover:text-blue-300 font-bold flex items-center gap-1">
+            <i data-lucide="refresh-cw" class="w-3 h-3"></i> Atualizar
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="border-b border-zinc-800 text-[11px] font-extrabold text-zinc-400 uppercase tracking-wider">
+                <th class="py-2.5 px-3">ID</th>
+                <th class="py-2.5 px-3">Status</th>
+                <th class="py-2.5 px-3">Tenant</th>
+                <th class="py-2.5 px-3">Agendamento</th>
+                <th class="py-2.5 px-3">Ação</th>
+                <th class="py-2.5 px-3">Execuções</th>
+                <th class="py-2.5 px-3">Token Mascarado</th>
+                <th class="py-2.5 px-3">Expiração</th>
+                <th class="py-2.5 px-3">Justificativa</th>
+              </tr>
+            </thead>
+            <tbody id="gHistoryTableBody" class="divide-y divide-zinc-800/60 text-xs text-zinc-300">
+              <tr>
+                <td colspan="9" class="py-4 text-center text-zinc-500">Nenhuma sessão registrada.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
   </div>
 
   <!-- Include Modals (Expense, Income, Bill, Appointment) -->
@@ -2613,6 +2795,7 @@
         system: document.getElementById('sectionSystem'),
         analyzer: document.getElementById('sectionAnalyzer'),
         marketing: document.getElementById('sectionMarketing'),
+        googleSync: document.getElementById('sectionGoogleSync'),
       };
       const buttons = {
         studio: document.getElementById('tabBtnStudio'),
@@ -2623,6 +2806,7 @@
         system: document.getElementById('tabBtnSystem'),
         analyzer: document.getElementById('tabBtnAnalyzer'),
         marketing: document.getElementById('tabBtnMarketing'),
+        googleSync: document.getElementById('tabBtnGoogleSync'),
       };
 
       Object.keys(sections).forEach(k => {
@@ -2644,6 +2828,8 @@
         loadProductsDashboard();
       } else if (tab === 'analyzer') {
         loadBusinessAnalyses();
+      } else if (tab === 'googleSync') {
+        initGoogleSyncHomologationTab();
       }
       lucide.createIcons();
     }
@@ -4735,6 +4921,343 @@
         lucide.createIcons();
       } catch (err) {
         console.error('Erro ao carregar dados de marketing:', err);
+      }
+    }
+
+    // -------------------------------------------------------------
+    // HOMOLOGAÇÃO GOOGLE CALENDAR (EPHEMERAL GATEKEEPER)
+    // -------------------------------------------------------------
+    let _gCountdownTimer = null;
+    let _gActiveSessionExpiresAt = null;
+
+    async function initGoogleSyncHomologationTab() {
+      await Promise.all([
+        refreshGoogleSyncStatus(),
+        loadGoogleSyncHistory(),
+      ]);
+      const calInput = document.getElementById('gFormCalendarId');
+      if (calInput && !calInput.value) {
+        loadTenantContextForHomologation(3);
+      }
+    }
+
+    async function refreshGoogleSyncStatus() {
+      const card = document.getElementById('gSessionActiveCard');
+      if (!card) return;
+
+      try {
+        const res = await authFetch('/api/admin/google-sync/test-session/active');
+        const data = await res.json();
+
+        if (data.active && data.session) {
+          const s = data.session;
+          _gActiveSessionExpiresAt = new Date(s.expires_at).getTime();
+
+          card.innerHTML = `
+            <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/40">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-500 text-black">
+                    ● SESSÃO ATIVA (#${s.id})
+                  </span>
+                  <span class="text-xs text-emerald-300 font-bold uppercase tracking-wider">
+                    Ação: ${escapeHtml(s.allowed_action)}
+                  </span>
+                </div>
+                <div class="text-xs text-zinc-300 space-y-0.5 pt-1">
+                  <div><strong>Tenant:</strong> #${s.user_id} &nbsp;|&nbsp; <strong>Agendamento:</strong> #${s.appointment_id}</div>
+                  <div><strong>Calendário:</strong> <code class="text-emerald-400 font-mono text-[11px]">${escapeHtml(s.calendar_id)}</code></div>
+                  <div><strong>Conta:</strong> ${escapeHtml(s.account_email)}</div>
+                  <div><strong>Execuções Realizadas:</strong> <span class="font-bold text-white">${s.executions_count} / ${s.max_executions}</span></div>
+                  <div><strong>Token Mascarado:</strong> <code class="text-zinc-400 font-mono">${escapeHtml(s.session_token_masked || '****')}</code></div>
+                </div>
+              </div>
+
+              <div class="flex flex-col items-end gap-3 shrink-0">
+                <div class="text-right">
+                  <div class="text-[10px] text-zinc-400 uppercase font-bold">Tempo Restante (TTL)</div>
+                  <div id="gTtlCountdownDisplay" class="text-2xl font-black font-mono text-emerald-400">
+                    --:--
+                  </div>
+                </div>
+                <button onclick="handlePanicRevocation(${s.id})" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs shadow-lg flex items-center gap-1.5 transition cursor-pointer">
+                  <i data-lucide="octagon-alert" class="w-4 h-4"></i>
+                  Revogar Sessão (Kill-Switch)
+                </button>
+              </div>
+            </div>
+          `;
+          startGCalCountdown();
+        } else {
+          stopGCalCountdown();
+          card.innerHTML = `
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-zinc-800 flex items-center justify-center text-zinc-400 shrink-0">
+                  <i data-lucide="shield-check" class="w-5 h-5 text-emerald-400"></i>
+                </div>
+                <div>
+                  <div class="text-xs font-black text-white flex items-center gap-2">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-zinc-800 text-zinc-400">
+                      INATIVO
+                    </span>
+                    Nenhuma Sessão Ativa de Homologação
+                  </div>
+                  <p class="text-[11px] text-zinc-400 mt-0.5">
+                    Fail-closed ativo: todas as operações de escrita no Google Calendar estão estritamente bloqueadas.
+                  </p>
+                </div>
+              </div>
+              <button onclick="document.getElementById('gFormUserId').focus()" class="px-3.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 text-xs font-bold transition">
+                Configurar Sessão
+              </button>
+            </div>
+          `;
+        }
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Erro ao verificar status da sessão Google Calendar:', err);
+      }
+    }
+
+    function startGCalCountdown() {
+      stopGCalCountdown();
+      const update = () => {
+        const el = document.getElementById('gTtlCountdownDisplay');
+        if (!el || !_gActiveSessionExpiresAt) return;
+        const diffMs = _gActiveSessionExpiresAt - Date.now();
+        if (diffMs <= 0) {
+          el.innerText = '00:00 (EXPIRADO)';
+          stopGCalCountdown();
+          setTimeout(refreshGoogleSyncStatus, 1500);
+          return;
+        }
+        const totalSec = Math.floor(diffMs / 1000);
+        const mins = Math.floor(totalSec / 60);
+        const secs = totalSec % 60;
+        el.innerText = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      };
+      update();
+      _gCountdownTimer = setInterval(update, 1000);
+    }
+
+    function stopGCalCountdown() {
+      if (_gCountdownTimer) {
+        clearInterval(_gCountdownTimer);
+        _gCountdownTimer = null;
+      }
+    }
+
+    const handleRevokeGCalTestSession = handlePanicRevocation;
+    async function handlePanicRevocation(sessionId) {
+      if (!confirm('ATENÇÃO: Deseja acionar o Kill-Switch e revogar IMEDIATAMENTE a sessão ativa de homologação?')) {
+        return;
+      }
+      try {
+        const res = await authFetch('/api/admin/google-sync/test-session/revoke', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: sessionId || null,
+            reason: 'Botão de pânico acionado manualmente pelo administrador no painel web',
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('Sessão revogada com sucesso! O Gatekeeper bloqueou imediatamente novas sincronizações.');
+          await refreshGoogleSyncStatus();
+          await loadGoogleSyncHistory();
+        } else {
+          alert('Erro ao revogar sessão: ' + (data.error || 'Falha desconhecida.'));
+        }
+      } catch (err) {
+        alert('Erro de conexão ao revogar sessão: ' + err.message);
+      }
+    }
+
+    async function loadTenantContextForHomologation(specificId) {
+      const input = document.getElementById('gTenantSearchInput');
+      const tenantId = specificId || (input ? input.value : 3);
+      const resContainer = document.getElementById('gTenantContextResult');
+
+      if (!tenantId) return;
+
+      if (resContainer) {
+        resContainer.innerHTML = '<span class="text-zinc-500 italic"><i class="w-3 h-3 animate-spin inline mr-1"></i> Carregando contexto do tenant #' + escapeHtml(tenantId) + '...</span>';
+      }
+
+      try {
+        const res = await authFetch(`/api/admin/google-sync/tenant-context/${tenantId}`);
+        const data = await res.json();
+
+        if (!data.success) {
+          if (resContainer) {
+            resContainer.innerHTML = `<span class="text-red-400 font-bold">${escapeHtml(data.error || 'Tenant não encontrado.')}</span>`;
+          }
+          return;
+        }
+
+        const t = data.tenant;
+        const g = data.googleConnection;
+        const apts = data.appointments || [];
+
+        // Auto-preenche o formulário
+        const formUserId = document.getElementById('gFormUserId');
+        if (formUserId) formUserId.value = t.id;
+
+        const formEmail = document.getElementById('gFormAccountEmail');
+        if (formEmail && g && g.accountEmail) {
+          formEmail.value = g.accountEmail;
+        }
+
+        const formCal = document.getElementById('gFormCalendarId');
+        if (formCal && g && g.selectedCalendarId) {
+          formCal.value = g.selectedCalendarId;
+        }
+
+        let aptHtml = '';
+        if (apts.length > 0) {
+          const apt17 = apts.find(a => a.id === 17) || apts[0];
+          const formApt = document.getElementById('gFormAppointmentId');
+          if (formApt) formApt.value = apt17.id;
+
+          aptHtml = `
+            <div class="mt-2 pt-2 border-t border-zinc-800 space-y-1">
+              <span class="text-[10px] font-bold text-zinc-400 uppercase">Agendamentos Recentes:</span>
+              <div class="space-y-1 max-h-32 overflow-y-auto pr-1">
+                ${apts.map(a => `
+                  <div onclick="selectAppointmentForHomologation(${a.id}, '${escapeHtml(a.google_calendar_id || g?.selectedCalendarId || '')}')" class="p-1.5 rounded-lg bg-zinc-800/60 hover:bg-zinc-800 cursor-pointer flex items-center justify-between text-[10px] text-zinc-300">
+                    <div>
+                      <strong>#${a.id}</strong> — ${escapeHtml(a.client_name || a.title || 'Agendamento')}
+                      <span class="text-zinc-500 font-mono">(${escapeHtml(a.start_datetime)})</span>
+                    </div>
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-bold ${a.google_sync_status === 'SYNCED' ? 'bg-emerald-950 text-emerald-400' : 'bg-zinc-700 text-zinc-300'}">
+                      ${escapeHtml(a.google_sync_status || 'NOT_SYNCED')}
+                    </span>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }
+
+        if (resContainer) {
+          resContainer.innerHTML = `
+            <div><strong>Nome:</strong> ${escapeHtml(t.name)} ${t.isDemo ? '<span class="text-red-400 font-bold">(DEMO)</span>' : ''}</div>
+            <div><strong>Conta Google:</strong> ${g?.isConnected ? `<span class="text-emerald-400 font-bold">${escapeHtml(g.accountEmail)}</span>` : '<span class="text-amber-400 font-bold">Desconectado</span>'}</div>
+            <div><strong>Calendário Secundário:</strong> <code class="text-blue-400 font-mono text-[10px] break-all">${escapeHtml(g?.selectedCalendarId || 'Não selecionado')}</code></div>
+            ${aptHtml}
+          `;
+        }
+      } catch (err) {
+        if (resContainer) {
+          resContainer.innerHTML = `<span class="text-red-400">Erro: ${escapeHtml(err.message)}</span>`;
+        }
+      }
+    }
+
+    function selectAppointmentForHomologation(aptId, calId) {
+      const formApt = document.getElementById('gFormAppointmentId');
+      if (formApt) formApt.value = aptId;
+      const formCal = document.getElementById('gFormCalendarId');
+      if (formCal && calId && calId !== 'primary') {
+        formCal.value = calId;
+      }
+    }
+
+    async function handleCreateGCalTestSession(e) {
+      e.preventDefault();
+      const btn = document.getElementById('btnSubmitGSession');
+      const originalText = btn ? btn.innerHTML : '';
+
+      const payload = {
+        userId: Number(document.getElementById('gFormUserId').value),
+        appointmentId: Number(document.getElementById('gFormAppointmentId').value),
+        calendarId: document.getElementById('gFormCalendarId').value.trim(),
+        accountEmail: document.getElementById('gFormAccountEmail').value.trim().toLowerCase(),
+        allowedAction: document.getElementById('gFormAllowedAction').value,
+        durationMinutes: Number(document.getElementById('gFormDurationMinutes').value),
+        maxExecutions: Number(document.getElementById('gFormMaxExecutions').value),
+        reason: document.getElementById('gFormReason').value.trim(),
+      };
+
+      if (!confirm(`Confirmar criação de sessão de teste efêmera para ${payload.allowedAction} no agendamento #${payload.appointmentId}?`)) {
+        return;
+      }
+
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="w-4 h-4 animate-spin inline mr-1"></i> Autorizando...';
+      }
+
+      try {
+        const res = await authFetch('/api/admin/google-sync/test-session/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          alert(`Sessão #${data.session.id} criada com sucesso!\nValidade: ${data.session.expires_at}\nAção: ${data.session.allowed_action}`);
+          await refreshGoogleSyncStatus();
+          await loadGoogleSyncHistory();
+        } else {
+          alert('Erro ao criar sessão: ' + (data.error || 'Falha na requisição.'));
+        }
+      } catch (err) {
+        alert('Erro de conexão ao criar sessão: ' + err.message);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalText;
+        }
+        lucide.createIcons();
+      }
+    }
+
+    async function loadGoogleSyncHistory() {
+      const tbody = document.getElementById('gHistoryTableBody');
+      if (!tbody) return;
+
+      try {
+        const res = await authFetch('/api/admin/google-sync/test-session/history?limit=15');
+        const data = await res.json();
+
+        if (!data.success || !data.sessions || data.sessions.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="9" class="py-4 text-center text-zinc-500">Nenhuma sessão de teste registrada.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = data.sessions.map(s => {
+          let badgeColor = 'bg-zinc-800 text-zinc-400';
+          if (s.status === 'ACTIVE') badgeColor = 'bg-emerald-950 text-emerald-400 border border-emerald-800/50';
+          if (s.status === 'COMPLETED') badgeColor = 'bg-blue-950 text-blue-400';
+          if (s.status === 'REVOKED') badgeColor = 'bg-red-950 text-red-400';
+          if (s.status === 'EXPIRED') badgeColor = 'bg-zinc-800 text-zinc-400';
+
+          return `
+            <tr class="hover:bg-zinc-900/40 font-mono text-[11px]">
+              <td class="py-2.5 px-3 font-bold text-white">#${s.id}</td>
+              <td class="py-2.5 px-3">
+                <span class="px-2 py-0.5 rounded text-[10px] font-black ${badgeColor}">
+                  ${escapeHtml(s.status)}
+                </span>
+              </td>
+              <td class="py-2.5 px-3 text-zinc-300">#${s.user_id}</td>
+              <td class="py-2.5 px-3 text-zinc-300">#${s.appointment_id}</td>
+              <td class="py-2.5 px-3 font-bold text-amber-400">${escapeHtml(s.allowed_action)}</td>
+              <td class="py-2.5 px-3 text-zinc-300">${s.executions_count} / ${s.max_executions}</td>
+              <td class="py-2.5 px-3 text-zinc-400 font-mono text-[10px]">${escapeHtml(s.session_token_masked || '****')}</td>
+              <td class="py-2.5 px-3 text-zinc-400 font-sans text-[10px]">${escapeHtml(s.expires_at ? s.expires_at.replace('T', ' ').slice(0, 19) : '')}</td>
+              <td class="py-2.5 px-3 text-zinc-400 font-sans text-[11px] max-w-xs truncate" title="${escapeHtml(s.reason || '')}">
+                ${escapeHtml(s.reason || '-')}
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error('Erro ao carregar histórico Google Calendar:', err);
       }
     }
 

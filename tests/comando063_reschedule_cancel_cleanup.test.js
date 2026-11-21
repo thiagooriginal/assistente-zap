@@ -182,11 +182,19 @@ test('Suíte Hermética COMANDO 063: Remarcação, Cancelamento e Limpeza Segura
     googleCalendarService.resetMockHandler();
     process.env.GOOGLE_SYNC_HOMOLOGATION_MODE = 'true';
     process.env.GOOGLE_SYNC_LIVE_ENABLED = 'true';
-    process.env.GOOGLE_SYNC_AUTHORIZED_TENANT_ID = '3';
-    process.env.GOOGLE_SYNC_AUTHORIZED_APPOINTMENT_ID = '17';
-    process.env.GOOGLE_SYNC_AUTHORIZED_CALENDAR_ID = 'salon_calendar_sec_123@group.calendar.google.com';
-    process.env.GOOGLE_SYNC_AUTHORIZED_EMAIL = 'dona.salao@gmail.com';
-    process.env.GOOGLE_SYNC_ALLOWED_EMAILS = 'dona.salao@gmail.com';
+
+    const sessionService = require('../src/services/googleCalendarSessionService');
+    sessionService.ensureSchema(db);
+    sessionService.createTestSession({
+      userId: 3,
+      appointmentId: 17,
+      calendarId: 'salon_calendar_sec_123@group.calendar.google.com',
+      accountEmail: 'dona.salao@gmail.com',
+      allowedAction: 'ANY',
+      durationMinutes: 30,
+      maxExecutions: 5,
+      createdBy: 1,
+    }, db);
   });
 
   t.afterEach(() => {
