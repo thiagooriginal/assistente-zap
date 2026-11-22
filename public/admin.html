@@ -306,6 +306,17 @@
 
       <!-- Action Buttons -->
       <div class="flex items-center gap-2 sm:gap-3">
+        <!-- Homologação Google Calendar Permanente Header Badge -->
+        <button onclick="switchAdminTab('googleSync')" id="tabBtnGoogleSyncHeader" title="Acesso Imediato à Homologação Google Calendar" class="px-3 py-1.5 text-xs font-extrabold bg-cyan-950/70 hover:bg-cyan-900/80 text-cyan-300 hover:text-white rounded-full border border-cyan-500/40 transition flex items-center gap-1.5 shadow-sm shadow-cyan-950/60 active:scale-95 cursor-pointer">
+          <span class="relative flex h-2 w-2 shrink-0">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+          </span>
+          <i data-lucide="shield-check" class="w-3.5 h-3.5 text-cyan-400 shrink-0"></i>
+          <span class="hidden sm:inline">Homologação</span>
+          <span class="text-[9px] px-1 py-0.2 bg-cyan-500/20 text-cyan-300 rounded font-mono font-bold border border-cyan-500/30">GCal</span>
+        </button>
+
         <!-- Ver Vitrine Pública -->
         <a href="/" target="_blank" class="px-3.5 py-1.5 text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white rounded-full border border-zinc-700/80 transition flex items-center gap-1.5 shadow-sm">
           <i data-lucide="globe" class="w-3.5 h-3.5 text-[#00F59B]"></i>
@@ -325,44 +336,199 @@
       </div>
     </header>
 
-    <!-- ADMIN NAVIGATION TABS -->
-    <div class="flex items-center gap-2 overflow-x-auto hide-scrollbar pb-1">
-      <button onclick="switchAdminTab('studio')" id="tabBtnStudio" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-violet-600 text-white flex items-center gap-2 shadow-lg transition shrink-0 cursor-pointer">
+    <!-- ============================================================ -->
+    <!-- REESTRUTURAÇÃO RESPONSIVA DO MENU ADMIN (COMANDO 063.2.2)    -->
+    <!-- ============================================================ -->
+
+    <!-- NAVEGAÇÃO DESKTOP (>= 1024px) -->
+    <nav class="hidden lg:flex items-center justify-between gap-1.5 p-2 rounded-2xl bg-zinc-950/80 border border-zinc-800/80 shadow-xl backdrop-blur-md relative z-30" aria-label="Navegação Principal Administrador">
+      
+      <!-- 1. Visão Geral / Estúdio IA -->
+      <button onclick="switchAdminTab('studio')" id="tabBtnStudio" data-admin-tab="studio" class="px-3.5 py-2 rounded-xl text-xs font-black bg-violet-600 text-white flex items-center gap-2 shadow-lg transition cursor-pointer shrink-0">
         <i data-lucide="clapperboard" class="w-4 h-4"></i>
-        <span>Estúdio de Vídeos & Vozes IA</span>
+        <span>Estúdio IA</span>
       </button>
-      <button onclick="switchAdminTab('asaas')" id="tabBtnAsaas" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
-        <i data-lucide="credit-card" class="w-4 h-4 text-[#00F59B]"></i>
-        <span>💳 Clientes & Pagamentos Asaas</span>
-      </button>
-      <button onclick="switchAdminTab('products')" id="tabBtnProducts" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
+
+      <!-- 2. Dropdown: Clientes & Acessos -->
+      <div class="relative" id="groupWrapperClients">
+        <button type="button" id="groupBtnClients" onclick="toggleAdminDropdown('dropdownMenuClients')" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800/80 flex items-center gap-2 transition cursor-pointer shrink-0">
+          <i data-lucide="users" class="w-4 h-4 text-[#00F59B]"></i>
+          <span>Clientes & Acessos</span>
+          <i data-lucide="chevron-down" id="groupChevronClients" class="w-3.5 h-3.5 text-zinc-400 transition-transform"></i>
+        </button>
+
+        <div id="dropdownMenuClients" class="hidden absolute left-0 top-full mt-2 w-64 p-2 rounded-2xl bg-[#0d121c] border border-zinc-800 shadow-2xl z-50 backdrop-blur-xl space-y-1">
+          <button onclick="switchAdminTab('asaas')" id="tabBtnAsaas" data-admin-tab="asaas" class="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2.5 transition cursor-pointer">
+            <i data-lucide="credit-card" class="w-4 h-4 text-[#00F59B] shrink-0"></i>
+            <div>
+              <div class="font-extrabold text-white">Clientes & Pagamentos</div>
+              <div class="text-[10px] text-zinc-400 font-normal">Assinaturas Asaas & Hotmart</div>
+            </div>
+          </button>
+          <button onclick="switchAdminTab('users')" id="tabBtnUsers" data-admin-tab="users" class="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2.5 transition cursor-pointer">
+            <i data-lucide="key" class="w-4 h-4 text-violet-400 shrink-0"></i>
+            <div>
+              <div class="font-extrabold text-white">Convites ZAP</div>
+              <div class="text-[10px] text-zinc-400 font-normal">Códigos de Ativação</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. Central de Produtos -->
+      <button onclick="switchAdminTab('products')" id="tabBtnProducts" data-admin-tab="products" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition cursor-pointer shrink-0">
         <i data-lucide="boxes" class="w-4 h-4 text-amber-400"></i>
-        <span>📦 Central de Produtos & Planos</span>
+        <span>Produtos & Planos</span>
       </button>
-      <button onclick="switchAdminTab('users')" id="tabBtnUsers" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
-        <i data-lucide="users" class="w-4 h-4"></i>
-        <span>Convites ZAP</span>
-      </button>
-      <button onclick="switchAdminTab('finance')" id="tabBtnFinance" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
-        <i data-lucide="badge-dollar-sign" class="w-4 h-4"></i>
+
+      <!-- 4. Finanças -->
+      <button onclick="switchAdminTab('finance')" id="tabBtnFinance" data-admin-tab="finance" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition cursor-pointer shrink-0">
+        <i data-lucide="badge-dollar-sign" class="w-4 h-4 text-emerald-400"></i>
         <span>Controle de Custos</span>
       </button>
-      <button onclick="switchAdminTab('system')" id="tabBtnSystem" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
-        <i data-lucide="cpu" class="w-4 h-4"></i>
-        <span>Status da IA & Conexões</span>
+
+      <!-- 5. Dropdown: Marketing & IA -->
+      <div class="relative" id="groupWrapperMarketing">
+        <button type="button" id="groupBtnMarketingIA" onclick="toggleAdminDropdown('dropdownMenuMarketing')" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800/80 flex items-center gap-2 transition cursor-pointer shrink-0">
+          <i data-lucide="brain-circuit" class="w-4 h-4 text-cyan-400"></i>
+          <span>Marketing & IA</span>
+          <i data-lucide="chevron-down" id="groupChevronMarketing" class="w-3.5 h-3.5 text-zinc-400 transition-transform"></i>
+        </button>
+
+        <div id="dropdownMenuMarketing" class="hidden absolute left-0 top-full mt-2 w-64 p-2 rounded-2xl bg-[#0d121c] border border-zinc-800 shadow-2xl z-50 backdrop-blur-xl space-y-1">
+          <button onclick="switchAdminTab('analyzer')" id="tabBtnAnalyzer" data-admin-tab="analyzer" class="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2.5 transition cursor-pointer">
+            <i data-lucide="brain-circuit" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+            <div>
+              <div class="font-extrabold text-white">Análise de Oferta & IA</div>
+              <div class="text-[10px] text-zinc-400 font-normal">Diagnóstico e ICP do Negócio</div>
+            </div>
+          </button>
+          <button onclick="switchAdminTab('marketing')" id="tabBtnMarketing" data-admin-tab="marketing" class="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2.5 transition cursor-pointer">
+            <i data-lucide="line-chart" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+            <div>
+              <div class="font-extrabold text-white">Marketing & Analytics</div>
+              <div class="text-[10px] text-zinc-400 font-normal">UTMs, Pixels e Conversões</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- 6. Status do Sistema -->
+      <button onclick="switchAdminTab('system')" id="tabBtnSystem" data-admin-tab="system" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition cursor-pointer shrink-0">
+        <i data-lucide="cpu" class="w-4 h-4 text-violet-400"></i>
+        <span>Status da IA</span>
       </button>
-      <button onclick="switchAdminTab('analyzer')" id="tabBtnAnalyzer" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
-        <i data-lucide="brain-circuit" class="w-4 h-4 text-cyan-400"></i>
-        <span>🧠 Análise de Oferta & IA</span>
+
+      <!-- 7. Homologação Google Calendar (Permanentemente em destaque azul ciano) -->
+      <button onclick="switchAdminTab('googleSync')" id="tabBtnGoogleSync" data-admin-tab="googleSync" class="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-cyan-950/50 hover:bg-cyan-900/60 text-cyan-300 hover:text-cyan-100 border border-cyan-500/40 flex items-center gap-2 transition cursor-pointer shrink-0 shadow-sm shadow-cyan-950/50">
+        <i data-lucide="calendar" class="w-4 h-4 text-cyan-400"></i>
+        <span>Homologação</span>
+        <span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">GCal</span>
       </button>
-      <button onclick="switchAdminTab('marketing')" id="tabBtnMarketing" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
-        <i data-lucide="line-chart" class="w-4 h-4 text-emerald-400"></i>
-        <span>📊 Marketing & Analytics</span>
-      </button>
-      <button onclick="switchAdminTab('googleSync')" id="tabBtnGoogleSync" class="px-4 py-2 rounded-2xl text-xs font-extrabold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition shrink-0 cursor-pointer">
-        <i data-lucide="calendar" class="w-4 h-4 text-blue-400"></i>
-        <span>📅 Homologação Google Calendar</span>
-      </button>
+    </nav>
+
+    <!-- NAVEGAÇÃO MOBILE / TABLET (< 1024px) -->
+    <div class="lg:hidden flex flex-col gap-2 relative z-30" id="adminMobileNavWrapper">
+      <!-- Barra Compacta -->
+      <div class="flex items-center justify-between p-2.5 rounded-2xl bg-zinc-950/90 border border-zinc-800/90 shadow-lg backdrop-blur-md">
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Aba Ativa:</span>
+          <span id="currentMobileTabLabel" class="text-xs font-black text-cyan-400 bg-zinc-900 px-2.5 py-1 rounded-xl border border-zinc-800 flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+            Estúdio IA
+          </span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Atalho Direto Homologação -->
+          <button onclick="switchAdminTab('googleSync')" id="tabBtnGoogleSyncMobileQuick" class="px-3 py-2 rounded-xl bg-cyan-950/80 text-cyan-300 border border-cyan-500/40 text-xs font-extrabold flex items-center gap-1.5 active:scale-95 transition cursor-pointer shadow-sm shadow-cyan-950/50 min-h-[44px]">
+            <i data-lucide="calendar" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span>Homologação</span>
+          </button>
+
+          <!-- Botão Hambúrguer / Fechar -->
+          <button type="button" onclick="toggleAdminMobileMenu()" id="adminMobileMenuToggle" aria-label="Abrir Menu de Navegação" class="w-11 h-11 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-white flex items-center justify-center active:scale-95 transition cursor-pointer shrink-0">
+            <i data-lucide="menu" id="adminMobileMenuToggleIcon" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Gaveta Expansível (Drawer) -->
+      <div id="adminMobileDrawer" class="hidden rounded-3xl bg-[#0d121c]/95 border border-zinc-800 p-4 space-y-4 shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-top-2 duration-150">
+        
+        <!-- Categoria 1: Criação & IA -->
+        <div class="space-y-1.5">
+          <div class="text-[10px] font-black uppercase tracking-wider text-zinc-400 px-1">🎬 Produção & Criação IA</div>
+          <button onclick="switchAdminTab('studio')" data-admin-tab="studio" class="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-3 transition cursor-pointer">
+            <i data-lucide="clapperboard" class="w-4 h-4 text-violet-400 shrink-0"></i>
+            <span>Estúdio de Vídeos & Vozes IA</span>
+          </button>
+        </div>
+
+        <!-- Categoria 2: Clientes & Pagamentos -->
+        <div class="space-y-1.5">
+          <div class="text-[10px] font-black uppercase tracking-wider text-zinc-400 px-1">👥 Clientes & Acessos</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button onclick="switchAdminTab('asaas')" data-admin-tab="asaas" class="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-3 transition cursor-pointer">
+              <i data-lucide="credit-card" class="w-4 h-4 text-[#00F59B] shrink-0"></i>
+              <span>Clientes & Pagamentos Asaas</span>
+            </button>
+            <button onclick="switchAdminTab('users')" data-admin-tab="users" class="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-3 transition cursor-pointer">
+              <i data-lucide="users" class="w-4 h-4 text-violet-400 shrink-0"></i>
+              <span>Convites ZAP & Clientes</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Categoria 3: Catálogo & Finanças -->
+        <div class="space-y-1.5">
+          <div class="text-[10px] font-black uppercase tracking-wider text-zinc-400 px-1">📦 Produtos & Gestão Financeira</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button onclick="switchAdminTab('products')" data-admin-tab="products" class="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-3 transition cursor-pointer">
+              <i data-lucide="boxes" class="w-4 h-4 text-amber-400 shrink-0"></i>
+              <span>Central de Produtos & Planos</span>
+            </button>
+            <button onclick="switchAdminTab('finance')" data-admin-tab="finance" class="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-3 transition cursor-pointer">
+              <i data-lucide="badge-dollar-sign" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+              <span>Controle de Custos & Finanças</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Categoria 4: Marketing & Inteligência -->
+        <div class="space-y-1.5">
+          <div class="text-[10px] font-black uppercase tracking-wider text-zinc-400 px-1">📊 Marketing & Inteligência de Negócio</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button onclick="switchAdminTab('analyzer')" data-admin-tab="analyzer" class="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-3 transition cursor-pointer">
+              <i data-lucide="brain-circuit" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+              <span>Análise de Oferta & IA</span>
+            </button>
+            <button onclick="switchAdminTab('marketing')" data-admin-tab="marketing" class="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-3 transition cursor-pointer">
+              <i data-lucide="line-chart" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+              <span>Marketing & Analytics</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Categoria 5: Plataforma & Homologação -->
+        <div class="space-y-1.5 pt-1 border-t border-zinc-800">
+          <div class="text-[10px] font-black uppercase tracking-wider text-zinc-400 px-1">⚙️ Sistema & Segurança</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button onclick="switchAdminTab('system')" data-admin-tab="system" class="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-3 transition cursor-pointer">
+              <i data-lucide="cpu" class="w-4 h-4 text-violet-400 shrink-0"></i>
+              <span>Status da IA & Conexões</span>
+            </button>
+            <button onclick="switchAdminTab('googleSync')" data-admin-tab="googleSync" class="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-black text-left bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 hover:text-white border border-cyan-500/40 flex items-center justify-between transition cursor-pointer">
+              <div class="flex items-center gap-3">
+                <i data-lucide="calendar" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+                <span>Homologação Google Calendar</span>
+              </div>
+              <span class="px-1.5 py-0.5 rounded text-[9px] font-black bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Gatekeeper</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
     </div>
 
     <!-- ============================================================ -->
@@ -1973,10 +2139,13 @@
           </p>
         </div>
         <div class="flex items-center gap-2 shrink-0">
-          <button onclick="refreshGoogleSyncStatus()" class="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-xs font-bold flex items-center gap-1.5 transition">
-            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-            Atualizar
+          <div class="flex items-center gap-3 shrink-0 flex-wrap">
+          <span id="gSyncLastUpdatedText" class="text-[11px] font-mono text-cyan-300/80 bg-zinc-900/80 px-2.5 py-1 rounded-lg border border-zinc-800"></span>
+          <button id="btnRefreshGSession" onclick="handleManualGoogleSyncRefresh()" class="px-3.5 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 hover:text-white border border-blue-500/30 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer">
+            <i data-lucide="refresh-cw" id="btnRefreshGSessionIcon" class="w-3.5 h-3.5"></i>
+            <span id="btnRefreshGSessionText">Atualizar</span>
           </button>
+        </div>
         </div>
       </div>
 
@@ -2783,8 +2952,76 @@
     }
 
     // -------------------------------------------------------------
-    // NAVIGATION TABS
+    // NAVIGATION TABS & RESPONSIVE CONTROLS (COMANDO 063.2.2)
     // -------------------------------------------------------------
+    function toggleAdminDropdown(menuId) {
+      const targetMenu = document.getElementById(menuId);
+      const isCurrentlyOpen = targetMenu && !targetMenu.classList.contains('hidden');
+      closeAllAdminDropdowns();
+
+      if (!isCurrentlyOpen && targetMenu) {
+        targetMenu.classList.remove('hidden');
+        if (menuId === 'dropdownMenuClients') {
+          document.getElementById('groupChevronClients')?.classList.add('rotate-180');
+        } else if (menuId === 'dropdownMenuMarketing') {
+          document.getElementById('groupChevronMarketing')?.classList.add('rotate-180');
+        }
+      }
+      lucide.createIcons();
+    }
+
+    function closeAllAdminDropdowns() {
+      const menuClients = document.getElementById('dropdownMenuClients');
+      const menuMkt = document.getElementById('dropdownMenuMarketing');
+      if (menuClients) menuClients.classList.add('hidden');
+      if (menuMkt) menuMkt.classList.add('hidden');
+      document.getElementById('groupChevronClients')?.classList.remove('rotate-180');
+      document.getElementById('groupChevronMarketing')?.classList.remove('rotate-180');
+    }
+
+    function toggleAdminMobileMenu() {
+      const drawer = document.getElementById('adminMobileDrawer');
+      const icon = document.getElementById('adminMobileMenuToggleIcon');
+      if (!drawer) return;
+
+      const isClosed = drawer.classList.contains('hidden');
+      if (isClosed) {
+        drawer.classList.remove('hidden');
+        if (icon) icon.setAttribute('data-lucide', 'x');
+      } else {
+        drawer.classList.add('hidden');
+        if (icon) icon.setAttribute('data-lucide', 'menu');
+      }
+      lucide.createIcons();
+    }
+
+    function closeAdminMobileMenu() {
+      const drawer = document.getElementById('adminMobileDrawer');
+      const icon = document.getElementById('adminMobileMenuToggleIcon');
+      if (drawer && !drawer.classList.contains('hidden')) {
+        drawer.classList.add('hidden');
+        if (icon) icon.setAttribute('data-lucide', 'menu');
+        lucide.createIcons();
+      }
+    }
+
+    // Fechamento automático de dropdowns ao clicar fora
+    document.addEventListener('click', (e) => {
+      const wrapClients = document.getElementById('groupWrapperClients');
+      const wrapMkt = document.getElementById('groupWrapperMarketing');
+      const menuClients = document.getElementById('dropdownMenuClients');
+      const menuMkt = document.getElementById('dropdownMenuMarketing');
+
+      if (wrapClients && !wrapClients.contains(e.target) && menuClients && !menuClients.classList.contains('hidden')) {
+        menuClients.classList.add('hidden');
+        document.getElementById('groupChevronClients')?.classList.remove('rotate-180');
+      }
+      if (wrapMkt && !wrapMkt.contains(e.target) && menuMkt && !menuMkt.classList.contains('hidden')) {
+        menuMkt.classList.add('hidden');
+        document.getElementById('groupChevronMarketing')?.classList.remove('rotate-180');
+      }
+    });
+
     function switchAdminTab(tab) {
       const sections = {
         studio: document.getElementById('sectionStudio'),
@@ -2809,18 +3046,105 @@
         googleSync: document.getElementById('tabBtnGoogleSync'),
       };
 
+      // 1. Alterna seções principais
       Object.keys(sections).forEach(k => {
         if (k === tab) {
           sections[k]?.classList.remove('hidden');
-          buttons[k]?.classList.remove('bg-zinc-900', 'text-zinc-400');
-          buttons[k]?.classList.add('bg-violet-600', 'text-white');
         } else {
           sections[k]?.classList.add('hidden');
-          buttons[k]?.classList.remove('bg-violet-600', 'text-white');
-          buttons[k]?.classList.add('bg-zinc-900', 'text-zinc-400');
         }
       });
 
+      // 2. Atualiza botões desktop (preservando IDs)
+      Object.keys(buttons).forEach(k => {
+        const btn = buttons[k];
+        if (!btn) return;
+
+        if (k === 'googleSync') {
+          // Homologação possui destaque de segurança permanente ciano
+          if (k === tab) {
+            btn.className = 'px-3.5 py-2 rounded-xl text-xs font-black bg-cyan-600 text-white border border-cyan-400 flex items-center gap-2 transition cursor-pointer shrink-0 shadow-lg shadow-cyan-600/30';
+          } else {
+            btn.className = 'px-3.5 py-2 rounded-xl text-xs font-extrabold bg-cyan-950/50 hover:bg-cyan-900/60 text-cyan-300 hover:text-cyan-100 border border-cyan-500/40 flex items-center gap-2 transition cursor-pointer shrink-0 shadow-sm shadow-cyan-950/50';
+          }
+        } else {
+          if (k === tab) {
+            btn.classList.remove('bg-zinc-900', 'text-zinc-400', 'text-zinc-300');
+            btn.classList.add('bg-violet-600', 'text-white', 'shadow-lg');
+          } else {
+            btn.classList.remove('bg-violet-600', 'text-white', 'shadow-lg');
+            btn.classList.add('bg-zinc-900', 'text-zinc-400');
+          }
+        }
+      });
+
+      // 3. Atualiza botões da gaveta móvel (via data-admin-tab)
+      document.querySelectorAll('#adminMobileDrawer [data-admin-tab]').forEach(el => {
+        const target = el.getAttribute('data-admin-tab');
+        if (target === 'googleSync') {
+          if (target === tab) {
+            el.className = 'w-full min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-black text-left bg-cyan-600 text-white border border-cyan-400 flex items-center justify-between transition cursor-pointer shadow-md';
+          } else {
+            el.className = 'w-full min-h-[44px] px-3.5 py-2.5 rounded-xl text-xs font-black text-left bg-cyan-950/60 hover:bg-cyan-900/60 text-cyan-300 hover:text-white border border-cyan-500/40 flex items-center justify-between transition cursor-pointer';
+          }
+        } else {
+          if (target === tab) {
+            el.classList.remove('bg-zinc-900', 'text-zinc-300');
+            el.classList.add('bg-violet-600', 'text-white', 'font-black');
+          } else {
+            el.classList.remove('bg-violet-600', 'text-white', 'font-black');
+            el.classList.add('bg-zinc-900', 'text-zinc-300');
+          }
+        }
+      });
+
+      // 4. Indicador ativo nos botões agrupadores Desktop (Clientes e Marketing)
+      const groupClients = document.getElementById('groupBtnClients');
+      if (groupClients) {
+        if (tab === 'asaas' || tab === 'users') {
+          groupClients.classList.add('border-cyan-500/60', 'bg-zinc-800', 'text-cyan-300');
+          groupClients.classList.remove('text-zinc-300', 'border-zinc-800/80');
+        } else {
+          groupClients.classList.remove('border-cyan-500/60', 'bg-zinc-800', 'text-cyan-300');
+          groupClients.classList.add('text-zinc-300', 'border-zinc-800/80');
+        }
+      }
+
+      const groupMkt = document.getElementById('groupBtnMarketingIA');
+      if (groupMkt) {
+        if (tab === 'analyzer' || tab === 'marketing') {
+          groupMkt.classList.add('border-cyan-500/60', 'bg-zinc-800', 'text-cyan-300');
+          groupMkt.classList.remove('text-zinc-300', 'border-zinc-800/80');
+        } else {
+          groupMkt.classList.remove('border-cyan-500/60', 'bg-zinc-800', 'text-cyan-300');
+          groupMkt.classList.add('text-zinc-300', 'border-zinc-800/80');
+        }
+      }
+
+      // 5. Atualiza o label da barra móvel compacta
+      const mobileLabel = document.getElementById('currentMobileTabLabel');
+      if (mobileLabel) {
+        const labelsMap = {
+          studio: 'Estúdio IA',
+          asaas: 'Clientes & Asaas',
+          products: 'Produtos & Planos',
+          users: 'Convites ZAP',
+          finance: 'Controle de Custos',
+          system: 'Status & Conexões',
+          analyzer: 'Análise de Oferta',
+          marketing: 'Marketing & Tráfego',
+          googleSync: 'Homologação GCal',
+        };
+        const activeName = labelsMap[tab] || tab;
+        const dotColor = tab === 'googleSync' ? 'bg-cyan-400 animate-pulse' : 'bg-emerald-400';
+        mobileLabel.innerHTML = `<span class="w-2 h-2 rounded-full ${dotColor}"></span> ${activeName}`;
+      }
+
+      // 6. Fecha menus flutuantes e gaveta mobile automaticamente
+      closeAllAdminDropdowns();
+      closeAdminMobileMenu();
+
+      // 7. Dispara inicializadores da aba selecionada
       if (tab === 'asaas') {
         loadAsaasDashboard();
         updateAsaasSubPricePreview();
@@ -4941,6 +5265,39 @@
       }
     }
 
+    async function handleManualGoogleSyncRefresh() {
+      const btn = document.getElementById('btnRefreshGSession');
+      const btnText = document.getElementById('btnRefreshGSessionText');
+      const btnIcon = document.getElementById('btnRefreshGSessionIcon');
+      const timeText = document.getElementById('gSyncLastUpdatedText');
+
+      if (btn) btn.disabled = true;
+      if (btnText) btnText.innerText = 'Atualizando...';
+      if (btnIcon) btnIcon.classList.add('animate-spin');
+
+      try {
+        await Promise.all([
+          refreshGoogleSyncStatus(),
+          loadGoogleSyncHistory()
+        ]);
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('pt-BR', { hour12: false });
+        if (timeText) {
+          timeText.innerText = `Atualizado às ${timeStr}`;
+        }
+      } catch (err) {
+        console.error('Erro na atualização manual de homologação:', err);
+        if (timeText) {
+          timeText.innerText = 'Erro ao atualizar';
+        }
+      } finally {
+        if (btn) btn.disabled = false;
+        if (btnText) btnText.innerText = 'Atualizar';
+        if (btnIcon) btnIcon.classList.remove('animate-spin');
+        lucide.createIcons();
+      }
+    }
+
     async function refreshGoogleSyncStatus() {
       const card = document.getElementById('gSessionActiveCard');
       if (!card) return;
@@ -4952,6 +5309,10 @@
         if (data.active && data.session) {
           const s = data.session;
           _gActiveSessionExpiresAt = new Date(s.expires_at).getTime();
+          const autoTimeText = document.getElementById('gSyncLastUpdatedText');
+          if (autoTimeText && !autoTimeText.innerText) {
+            autoTimeText.innerText = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR', { hour12: false });
+          }
 
           card.innerHTML = `
             <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/40">
