@@ -1172,40 +1172,48 @@ function markBillAsPaid(userId, billId) {
     throw new Error('Identificadores de usuário e conta são obrigatórios.');
   }
 
+  const cleanUserId = Number(userId);
+  const cleanBillId = Number(billId);
+
   db.exec('BEGIN IMMEDIATE');
   try {
-    const bill = db.prepare('SELECT * FROM scheduled_payments WHERE id = ? AND user_id = ?').get(billId, userId);
+    const bill = db.prepare('SELECT * FROM scheduled_payments WHERE id = ? AND user_id = ?').get(cleanBillId, cleanUserId);
     if (!bill) {
       throw new Error('Conta agendada não encontrada ou não pertence a este usuário.');
     }
 
+    // 1. Verificação de idempotência estrita por scheduled_payment_id
+    const existingExpense = db.prepare(`
+      SELECT id, amount, category, description, date, scheduled_payment_id FROM expenses
+      WHERE user_id = ? AND scheduled_payment_id = ?
+      LIMIT 1
+    `).get(cleanUserId, cleanBillId);
+
     if (bill.status === 'PAID') {
       db.exec('ROLLBACK');
-      return { bill, message: 'Esta conta já foi marcada como quitada anteriormente.' };
+      return {
+        bill,
+        expense: existingExpense || null,
+        message: 'Esta conta já foi marcada como quitada anteriormente.',
+      };
     }
 
     const nowIso = new Date().toISOString();
-    db.prepare(`UPDATE scheduled_payments SET status = 'PAID', paid_at = ? WHERE id = ? AND user_id = ?`).run(nowIso, billId, userId);
-
-    // Prevent duplicate expense entries if one already exists for this exact bill
-    const existingExpense = db.prepare(`
-      SELECT id, amount, category, description, date FROM expenses
-      WHERE user_id = ? AND source_type = 'dashboard_bill' AND description = ?
-      LIMIT 1
-    `).get(userId, `Pagamento de Conta: ${bill.title}`);
+    db.prepare(`UPDATE scheduled_payments SET status = 'PAID', paid_at = ? WHERE id = ? AND user_id = ?`).run(nowIso, cleanBillId, cleanUserId);
 
     let expense = null;
     if (existingExpense) {
       expense = existingExpense;
     } else {
       expense = financeService.addExpense({
-        userId,
+        userId: cleanUserId,
         amount: bill.amount,
         category: bill.category || 'Contas',
         description: `Pagamento de Conta: ${bill.title}`,
         paymentMethod: 'Boleto / Transferência',
         date: nowIso,
         sourceType: 'dashboard_bill',
+        scheduledPaymentId: cleanBillId,
       });
     }
 

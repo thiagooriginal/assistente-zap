@@ -2350,7 +2350,8 @@ router.patch('/pro/bills/:id/pay', clientAuthMiddleware, requireProductAccess('J
     }
 
     const result = salonDashboardService.markBillAsPaid(req.clientUser.id, req.params.id);
-    return res.json({ success: true, ...result, message: 'Conta marcada como paga e despesa registrada no caixa!' });
+    const message = result.message || 'Conta marcada como paga e despesa registrada no caixa!';
+    return res.json({ success: true, ...result, message });
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message || 'Erro ao atualizar conta.' });
   }

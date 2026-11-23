@@ -227,27 +227,60 @@ function getBillsDueTomorrow(userId = 1) {
  * Mark a bill as PAID and automatically create an expense
  */
 function markAsPaid(billId, userId = null) {
-  const bill = db.prepare('SELECT * FROM scheduled_payments WHERE id = ?').get(billId);
-  if (!bill) {
-    throw new Error('Pagamento agendado não encontrado.');
+  const cleanBillId = Number(billId);
+  db.exec('BEGIN IMMEDIATE');
+  try {
+    const bill = db.prepare('SELECT * FROM scheduled_payments WHERE id = ?').get(cleanBillId);
+    if (!bill) {
+      throw new Error('Pagamento agendado não encontrado.');
+    }
+
+    const targetUserId = userId || bill.user_id || 1;
+    if (userId && Number(bill.user_id) !== Number(userId)) {
+      throw new Error('Permissão negada para liquidar conta de outro usuário.');
+    }
+
+    // Check existing expense by scheduled_payment_id
+    const existingExpense = db.prepare(`
+      SELECT id, amount, category, description, date, scheduled_payment_id FROM expenses
+      WHERE user_id = ? AND scheduled_payment_id = ?
+      LIMIT 1
+    `).get(targetUserId, cleanBillId);
+
+    if (bill.status === 'PAID') {
+      db.exec('ROLLBACK');
+      return {
+        bill,
+        expense: existingExpense || null,
+        message: 'Esta conta já foi marcada como quitada anteriormente.',
+      };
+    }
+
+    const nowIso = new Date().toISOString();
+    db.prepare(`UPDATE scheduled_payments SET status = 'PAID', paid_at = ? WHERE id = ?`).run(nowIso, cleanBillId);
+
+    let expense = null;
+    if (existingExpense) {
+      expense = existingExpense;
+    } else {
+      expense = financeService.addExpense({
+        userId: targetUserId,
+        amount: bill.amount,
+        category: bill.category || 'Contas',
+        description: `Pagamento: ${bill.title}`,
+        paymentMethod: 'Boleto / Transferência',
+        date: nowIso,
+        sourceType: bill.source_type || 'scheduled',
+        scheduledPaymentId: cleanBillId,
+      });
+    }
+
+    db.exec('COMMIT');
+    return { bill: { ...bill, status: 'PAID', paid_at: nowIso }, expense };
+  } catch (err) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    throw err;
   }
-
-  // Update status to PAID
-  db.prepare(`UPDATE scheduled_payments SET status = 'PAID' WHERE id = ?`).run(billId);
-
-  // Automatically register in expenses table with bill's user_id
-  const targetUserId = userId || bill.user_id || 1;
-  const expense = financeService.addExpense({
-    userId: targetUserId,
-    amount: bill.amount,
-    category: bill.category || 'Contas',
-    description: `Pagamento: ${bill.title}`,
-    paymentMethod: 'Boleto / Transferência',
-    date: new Date().toISOString(),
-    sourceType: bill.source_type || 'scheduled',
-  });
-
-  return { bill, expense };
 }
 
 /**

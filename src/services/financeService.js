@@ -94,13 +94,14 @@ function normalizeIncomeCategory(category) {
 /**
  * Add a new expense
  */
-function addExpense({ userId = 1, amount, category, description, paymentMethod, date, sourceType = 'text' }) {
+function addExpense({ userId = 1, amount, category, description, paymentMethod, date, sourceType = 'text', scheduledPaymentId = null }) {
   const normCategory = normalizeCategory(category);
   const expenseDate = date || new Date().toISOString();
+  const cleanScheduledPaymentId = (scheduledPaymentId !== null && scheduledPaymentId !== undefined) ? Number(scheduledPaymentId) : null;
   
   const stmt = db.prepare(`
-    INSERT INTO expenses (user_id, amount, category, description, payment_method, date, source_type)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO expenses (user_id, amount, category, description, payment_method, date, source_type, scheduled_payment_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
   
   const result = stmt.run(
@@ -110,7 +111,8 @@ function addExpense({ userId = 1, amount, category, description, paymentMethod, 
     description || normCategory,
     paymentMethod || 'Não informado',
     expenseDate,
-    sourceType
+    sourceType,
+    cleanScheduledPaymentId
   );
   
   return {
@@ -122,6 +124,7 @@ function addExpense({ userId = 1, amount, category, description, paymentMethod, 
     paymentMethod: paymentMethod || 'Não informado',
     date: expenseDate,
     sourceType,
+    scheduledPaymentId: cleanScheduledPaymentId,
   };
 }
 

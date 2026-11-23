@@ -40,11 +40,14 @@ db.exec(`
     payment_method TEXT,
     date TEXT NOT NULL,
     source_type TEXT NOT NULL DEFAULT 'text',
+    scheduled_payment_id INTEGER,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
 
   CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
   CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
+  CREATE INDEX IF NOT EXISTS idx_expenses_scheduled_payment ON expenses(scheduled_payment_id);
+  CREATE INDEX IF NOT EXISTS idx_expenses_user_scheduled ON expenses(user_id, scheduled_payment_id);
 
   CREATE TABLE IF NOT EXISTS incomes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1003,6 +1006,14 @@ runVersionedMigration('20261122_01_google_sync_dynamic_late_binding', 'Add late-
   db.exec('CREATE INDEX IF NOT EXISTS idx_gtest_late_binding ON google_sync_test_sessions(user_id, status, session_type, appointment_id);');
 });
 
+// Versioned migration: Idempotência de despesas vinculadas a scheduled_payments (COMANDO 071.1)
+runVersionedMigration('20261123_01_expenses_scheduled_payment_id', 'Add scheduled_payment_id column and indices to expenses for idempotent bill liquidation', () => {
+  ensureColumnExists('expenses', 'scheduled_payment_id', 'INTEGER');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_expenses_scheduled_payment ON expenses(scheduled_payment_id);');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_expenses_user_scheduled ON expenses(user_id, scheduled_payment_id);');
+});
+
+ensureColumnExists('expenses', 'scheduled_payment_id', 'INTEGER');
 ensureColumnExists('client_service_staff', 'confirmed', 'INTEGER NOT NULL DEFAULT 1 CHECK(confirmed IN (0, 1))');
 db.exec('CREATE INDEX IF NOT EXISTS idx_css_tenant_confirmed ON client_service_staff(user_id, confirmed);');
 
