@@ -1860,6 +1860,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
         const displayDate = formatDisplayDate(session.selectedSlot.date);
         const staffName = session.selectedStaff ? session.selectedStaff.name : (booked?.staff_name || 'Equipe do Salão');
         const priceFormatted = formatPrice(session.selectedService.price);
+        const confirmedTime = session.selectedSlot.time;
 
         // Cálculo da diferença em horas até o atendimento (COMANDO 058)
         let diffHours = 48;
@@ -1892,7 +1893,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
             `• *Serviço:* ${validService.name}\n` +
             `• *Profissional:* ${staffName}\n` +
             `• *Data:* ${displayDate}\n` +
-            `• *Horário:* ${session.selectedSlot.time}\n` +
+            `• *Horário:* ${confirmedTime}\n` +
             `• *Valor:* R$ ${priceFormatted}\n\n` +
             `🔔 *Lembrete 24h por WhatsApp (Opcional):*\n` +
             `Você gostaria de receber um lembrete automático por aqui 24 horas antes do seu horário?\n` +
@@ -1910,7 +1911,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
             `• *Serviço:* ${validService.name}\n` +
             `• *Profissional:* ${staffName}\n` +
             `• *Data:* ${displayDate}\n` +
-            `• *Horário:* ${session.selectedSlot.time}\n` +
+            `• *Horário:* ${confirmedTime}\n` +
             `• *Valor:* R$ ${priceFormatted}\n\n` +
             `Como seu atendimento já é nas próximas horas, nos vemos em breve no *${salonName}*! 💖`;
         }
