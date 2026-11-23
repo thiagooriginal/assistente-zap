@@ -2284,8 +2284,24 @@ router.get('/pro/bills', clientAuthMiddleware, requireProductAccess('JESSICA'), 
 
 router.post('/pro/bills', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   try {
+    if (req.isDemo || req.clientUser?.is_demo) {
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.UNAUTHORIZED_ACCESS || 'DEMO_WRITE_BLOCKED',
+        userId: req.clientUser?.id,
+        req,
+        status: 'BLOCKED',
+        details: { endpoint: req.originalUrl, method: req.method },
+      });
+      return res.status(403).json({
+        success: false,
+        isDemoBlocked: true,
+        code: 'DEMO_MODE_RESTRICTED',
+        error: 'Operação não permitida em conta de demonstração (Demo Shield ativo).',
+      });
+    }
+
     const tier = salonDashboardService.getEffectiveJessicaTier(req.clientUser.id, req.clientUser);
-    const isPro = tier === 'JESSICA_PRO' || req.isDemo;
+    const isPro = tier === 'JESSICA_PRO';
 
     if (!isPro) {
       return res.status(403).json({
@@ -2305,8 +2321,24 @@ router.post('/pro/bills', clientAuthMiddleware, requireProductAccess('JESSICA'),
 
 router.patch('/pro/bills/:id/pay', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   try {
+    if (req.isDemo || req.clientUser?.is_demo) {
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.UNAUTHORIZED_ACCESS || 'DEMO_WRITE_BLOCKED',
+        userId: req.clientUser?.id,
+        req,
+        status: 'BLOCKED',
+        details: { endpoint: req.originalUrl, method: req.method },
+      });
+      return res.status(403).json({
+        success: false,
+        isDemoBlocked: true,
+        code: 'DEMO_MODE_RESTRICTED',
+        error: 'Operação não permitida em conta de demonstração (Demo Shield ativo).',
+      });
+    }
+
     const tier = salonDashboardService.getEffectiveJessicaTier(req.clientUser.id, req.clientUser);
-    const isPro = tier === 'JESSICA_PRO' || req.isDemo;
+    const isPro = tier === 'JESSICA_PRO';
 
     if (!isPro) {
       return res.status(403).json({
@@ -2326,8 +2358,24 @@ router.patch('/pro/bills/:id/pay', clientAuthMiddleware, requireProductAccess('J
 
 router.delete('/pro/bills/:id', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   try {
+    if (req.isDemo || req.clientUser?.is_demo) {
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.UNAUTHORIZED_ACCESS || 'DEMO_WRITE_BLOCKED',
+        userId: req.clientUser?.id,
+        req,
+        status: 'BLOCKED',
+        details: { endpoint: req.originalUrl, method: req.method },
+      });
+      return res.status(403).json({
+        success: false,
+        isDemoBlocked: true,
+        code: 'DEMO_MODE_RESTRICTED',
+        error: 'Operação não permitida em conta de demonstração (Demo Shield ativo).',
+      });
+    }
+
     const tier = salonDashboardService.getEffectiveJessicaTier(req.clientUser.id, req.clientUser);
-    const isPro = tier === 'JESSICA_PRO' || req.isDemo;
+    const isPro = tier === 'JESSICA_PRO';
 
     if (!isPro) {
       return res.status(403).json({
@@ -2348,8 +2396,24 @@ router.delete('/pro/bills/:id', clientAuthMiddleware, requireProductAccess('JESS
 // Manual transaction registration (Income or Expense)
 router.post('/pro/transactions', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
   try {
+    if (req.isDemo || req.clientUser?.is_demo) {
+      logSecurityEvent({
+        eventType: AUDIT_EVENTS.UNAUTHORIZED_ACCESS || 'DEMO_WRITE_BLOCKED',
+        userId: req.clientUser?.id,
+        req,
+        status: 'BLOCKED',
+        details: { endpoint: req.originalUrl, method: req.method },
+      });
+      return res.status(403).json({
+        success: false,
+        isDemoBlocked: true,
+        code: 'DEMO_MODE_RESTRICTED',
+        error: 'Operação não permitida em conta de demonstração (Demo Shield ativo).',
+      });
+    }
+
     const tier = salonDashboardService.getEffectiveJessicaTier(req.clientUser.id, req.clientUser);
-    const canAccess = ['JESSICA_INTERMEDIATE', 'JESSICA_PRO'].includes(tier) || req.isDemo;
+    const canAccess = ['JESSICA_INTERMEDIATE', 'JESSICA_PRO'].includes(tier);
 
     if (!canAccess) {
       return res.status(403).json({
