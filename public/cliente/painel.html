@@ -3173,9 +3173,9 @@
                 <p class="text-xs text-slate-400 mt-0.5">Indicadores financeiros consolidados de entradas, saídas e resultado líquido.</p>
               </div>
               <div class="flex items-center gap-2">
-                <span class="text-[11px] font-semibold text-slate-400 bg-white/5 px-3 py-1 rounded-full border border-white/5 flex items-center gap-1.5">
+                <span id="badgeMathConsistency" class="text-[11px] font-semibold text-slate-400 bg-white/5 px-3 py-1 rounded-full border border-white/5 flex items-center gap-1.5">
                   <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
-                  <span>Consistência Matemática 100%</span>
+                  <span>Consistência Matemática 100% Auditada</span>
                 </span>
               </div>
             </div>
@@ -3318,7 +3318,7 @@
                   <i data-lucide="scissors" class="w-4 h-4 text-violet-400"></i>
                   <span>Serviços Mais Procurados</span>
                 </h4>
-                <span class="text-[11px] text-slate-500">Por volume e receita</span>
+                <span class="text-[11px] text-slate-500">Por volume e receita (preço de tabela)</span>
               </div>
               <div id="topServicesList" class="space-y-2.5">
                 <div class="text-xs text-slate-500 py-4 text-center">Nenhum serviço registrado no período.</div>
@@ -3370,6 +3370,14 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+
+            <div class="pt-2 border-t border-white/5 flex items-center justify-between text-[11px] text-slate-400">
+              <div class="flex items-center gap-1.5">
+                <i data-lucide="info" class="w-3.5 h-3.5 text-slate-500 shrink-0"></i>
+                <span>O Ticket Médio individual é calculado rigorosamente pela receita atribuída dividida pelos atendimentos do profissional no período.</span>
+              </div>
+              <span class="text-[10px] text-slate-500 italic">Base: Atendimentos registrados</span>
             </div>
           </div>
 
@@ -10885,6 +10893,40 @@
       renderVariationBadge('summaryVarRealized', variations.realizedRevenue);
       renderVariationBadge('summaryVarExpenses', variations.expensesTotal);
 
+      // Validação de Consistência Matemática 100% Auditada em Tempo de Execução
+      const badgeEl = document.getElementById('badgeMathConsistency');
+      if (badgeEl) {
+        let isConsistent = false;
+        const realized = Math.round((Number(metrics.realizedRevenue) || 0) * 100) / 100;
+        const expenses = Math.round((Number(metrics.expensesTotal) || 0) * 100) / 100;
+        const result = Math.round((Number(metrics.financialResult) || 0) * 100) / 100;
+        const expectedResult = Math.round((realized - expenses) * 100) / 100;
+        const resultValid = Math.abs(result - expectedResult) < 0.02;
+
+        if (Array.isArray(weeklyBreakdown) && weeklyBreakdown.length > 0) {
+          const sumWeeksRec = Math.round(weeklyBreakdown.reduce((acc, w) => acc + (Number(w.receitas) || 0), 0) * 100) / 100;
+          const sumWeeksDesp = Math.round(weeklyBreakdown.reduce((acc, w) => acc + (Number(w.despesas) || 0), 0) * 100) / 100;
+          const sumWeeksRes = Math.round(weeklyBreakdown.reduce((acc, w) => acc + (Number(w.resultado) || 0), 0) * 100) / 100;
+
+          const recValid = Math.abs(sumWeeksRec - realized) < 0.02;
+          const despValid = Math.abs(sumWeeksDesp - expenses) < 0.02;
+          const resValid = Math.abs(sumWeeksRes - result) < 0.02;
+
+          isConsistent = recValid && despValid && resValid && resultValid;
+        } else {
+          isConsistent = resultValid;
+        }
+
+        if (isConsistent) {
+          badgeEl.classList.remove('hidden');
+          badgeEl.classList.add('flex');
+          badgeEl.innerHTML = '<i data-lucide="shield-check" class="w-3.5 h-3.5 text-[#16A34A]"></i><span>Consistência Matemática 100% Auditada</span>';
+        } else {
+          badgeEl.classList.add('hidden');
+          badgeEl.classList.remove('flex');
+        }
+      }
+
       if (!container) return;
       if (!weeklyBreakdown || weeklyBreakdown.length === 0) {
         container.innerHTML = '<div class="text-xs text-slate-500 py-4 text-center">Nenhum dado semanal disponível para o período selecionado.</div>';
@@ -11274,7 +11316,7 @@
             </div>
             <div class="text-right">
               <span class="font-bold text-[#00F59B] block">${formatBRL(s.revenue)}</span>
-              <span class="text-[10px] text-slate-500">preço médio: ${formatBRL(s.price)}</span>
+              <span class="text-[10px] text-slate-500">Preço de tabela: ${formatBRL(s.price)}</span>
             </div>
           </div>
         `;
@@ -11323,13 +11365,16 @@
 
       let html = '';
       staff.forEach(st => {
+        const appts = Number(st.appointments) || 0;
+        const rev = Number(st.revenue) || 0;
+        const avgTicket = appts > 0 ? Math.round((rev / appts) * 100) / 100 : 0;
         html += `
           <tr class="hover:bg-white/[0.02] transition-colors">
             <td class="py-3 px-3 font-bold text-white">${escapeHtml(st.name)}</td>
             <td class="py-3 px-3 text-slate-400">${escapeHtml(st.specialty || 'Profissional')}</td>
-            <td class="py-3 px-3 text-center font-bold text-slate-200">${st.appointments}</td>
-            <td class="py-3 px-3 text-right font-bold text-[#00F59B]">${formatBRL(st.revenue)}</td>
-            <td class="py-3 px-3 text-right text-slate-300">${formatBRL(st.avgTicket)}</td>
+            <td class="py-3 px-3 text-center font-bold text-slate-200">${appts}</td>
+            <td class="py-3 px-3 text-right font-bold text-[#00F59B]">${formatBRL(rev)}</td>
+            <td class="py-3 px-3 text-right text-slate-300 font-semibold">${formatBRL(avgTicket)}</td>
             <td class="py-3 px-3 text-right">
               <span class="px-2 py-0.5 rounded-full bg-white/5 text-slate-300 font-bold text-[10px]">${(st.sharePercent || 0).toFixed(1).replace('.', ',')}%</span>
             </td>
@@ -11353,26 +11398,50 @@
       if (banner) banner.classList.add('hidden');
       if (content) content.classList.remove('hidden');
 
-      // KPIs
-      document.getElementById('billsPendingTotal').innerText = formatBRL(bills.pendingTotal || 0);
-      document.getElementById('billsPendingCount').innerText = `${bills.pendingCount || 0} pendente${bills.pendingCount === 1 ? '' : 's'}`;
-      document.getElementById('billsOverdueCount').innerText = bills.overdueCount || 0;
-      document.getElementById('billsUpcomingCount').innerText = (bills.upcomingBills || []).length;
-      document.getElementById('billsPaidTotal').innerText = formatBRL(bills.paidTotal || 0);
-      document.getElementById('billsPaidCount').innerText = `${bills.paidCount || 0} quitada${bills.paidCount === 1 ? '' : 's'}`;
+      const billMap = new Map();
+      [...(bills.overdueBills || []), ...(bills.upcomingBills || []), ...(bills.paidBills || []), ...(bills.allBills || [])].forEach(b => {
+        if (b && b.id) billMap.set(Number(b.id), b);
+      });
+      const allBills = Array.from(billMap.values());
+
+      const now = new Date();
+      const spY = now.getFullYear();
+      const spM = String(now.getMonth() + 1).padStart(2, '0');
+      const spD = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${spY}-${spM}-${spD}`;
+
+      const overdueBills = allBills.filter(b => b.status === 'PENDING' && b.due_date < todayStr);
+      const upcomingBills = allBills.filter(b => b.status === 'PENDING' && b.due_date >= todayStr);
+      const paidBills = allBills.filter(b => b.status === 'PAID');
+
+      overdueBills.sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)));
+      upcomingBills.sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)));
+      paidBills.sort((a, b) => String(b.due_date).localeCompare(String(a.due_date)));
+
+      const pendingCount = overdueBills.length + upcomingBills.length;
+      const pendingTotal = Math.round([...overdueBills, ...upcomingBills].reduce((acc, b) => acc + (Number(b.amount) || 0), 0) * 100) / 100;
+      const paidCount = paidBills.length;
+      const paidTotal = Math.round(paidBills.reduce((acc, b) => acc + (Number(b.amount) || 0), 0) * 100) / 100;
+
+      document.getElementById('billsPendingTotal').innerText = formatBRL(pendingTotal);
+      document.getElementById('billsPendingCount').innerText = `${pendingCount} pendente${pendingCount === 1 ? '' : 's'}`;
+      document.getElementById('billsOverdueCount').innerText = overdueBills.length;
+      document.getElementById('billsUpcomingCount').innerText = upcomingBills.length;
+      document.getElementById('billsPaidTotal').innerText = formatBRL(paidTotal);
+      document.getElementById('billsPaidCount').innerText = `${paidCount} quitada${paidCount === 1 ? '' : 's'}`;
 
       const tbody = document.getElementById('billsTableBody');
-      const allBills = [...(bills.overdueBills || []), ...(bills.upcomingBills || []), ...(bills.paidBills || [])];
+      const orderedBills = [...overdueBills, ...upcomingBills, ...paidBills];
 
-      if (allBills.length === 0) {
+      if (orderedBills.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-slate-500">Nenhuma conta agendada cadastrada.</td></tr>';
         return;
       }
 
       let html = '';
-      allBills.forEach(b => {
+      orderedBills.forEach(b => {
         const isPaid = b.status === 'PAID';
-        const isOverdue = !isPaid && b.due_date < new Date().toISOString().slice(0, 10);
+        const isOverdue = !isPaid && b.due_date < todayStr;
 
         const statusBadge = isPaid
           ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">QUITADA</span>'
@@ -11408,6 +11477,9 @@
         `;
       });
       tbody.innerHTML = html;
+      if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
+      }
     }
 
     // Render Movimentações Financeiras

@@ -17,6 +17,15 @@ function getSaoPauloDate(d = new Date()) {
 }
 
 /**
+ * Helper to add or subtract calendar days from a YYYY-MM-DD string
+ */
+function addDays(dateStr, days) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + days);
+  return getSaoPauloDate(dt);
+}
+
+/**
  * Compute start and end dates based on period filter
  */
 function getPeriodDates(period = 'this_month', customStart = null, customEnd = null) {
@@ -328,6 +337,7 @@ function buildWeeklyBreakdown(timeline = [], period = 'this_month') {
  */
 function getDemoDashboardData(periodInfo, isPro = true) {
   const { period, startDate, endDate, periodLabel } = periodInfo;
+  const todayStr = getSaoPauloDate();
 
   const dateArr = getDateRangeArray(startDate, endDate);
   const daysCount = Math.max(1, dateArr.length);
@@ -336,11 +346,22 @@ function getDemoDashboardData(periodInfo, isPro = true) {
   const baseDailyEstimated = 114.00;
   const baseDailyExpenses = 159.33;
 
-  // Timeline com valores diários consistentes
+  let futureEstimatedSum = 0;
+
+  // Timeline com separação estrita de receitas realizadas (passado/hoje) vs previstas (futuro)
   const timeline = dateArr.map((d, idx) => {
+    const isFuture = d > todayStr;
     const dayFactor = 0.7 + (((idx * 7) % 11) / 15);
-    const dayRealized = Math.round(baseDailyRealized * dayFactor * 100) / 100;
-    const dayExpense = (idx % 3 === 0) ? Math.round(baseDailyExpenses * 2.2 * 100) / 100 : 0;
+
+    // Dias futuros não possuem receita nem despesa realizada em caixa
+    const dayRealized = isFuture ? 0 : Math.round(baseDailyRealized * dayFactor * 100) / 100;
+    const dayExpense = (!isFuture && idx % 3 === 0) ? Math.round(baseDailyExpenses * 2.2 * 100) / 100 : 0;
+
+    if (isFuture) {
+      // Valor previsto para dias futuros alimenta o faturamento estimado
+      futureEstimatedSum += Math.round(baseDailyRealized * dayFactor * 100) / 100;
+    }
+
     const [y, m, day] = d.split('-');
     return {
       date: d,
@@ -355,12 +376,22 @@ function getDemoDashboardData(periodInfo, isPro = true) {
   const realizedRevenue = Math.round(timeline.reduce((acc, t) => acc + t.receitas, 0) * 100) / 100;
   const expensesTotal = Math.round(timeline.reduce((acc, t) => acc + t.despesas, 0) * 100) / 100;
   const financialResult = Math.round((realizedRevenue - expensesTotal) * 100) / 100;
-  const estimatedRevenue = Math.round(baseDailyEstimated * daysCount * 100) / 100;
+
+  const pastDays = dateArr.filter(d => d <= todayStr).length;
+  const futureDays = dateArr.filter(d => d > todayStr).length;
+
+  // Se houver dias futuros, estimatedRevenue é o faturamento projetado futuro + pendentes
+  const estimatedRevenue = futureDays > 0
+    ? Math.round((futureEstimatedSum + (baseDailyEstimated * Math.min(pastDays, 2))) * 100) / 100
+    : Math.round(baseDailyEstimated * daysCount * 100) / 100;
+
   const weeklyBreakdown = buildWeeklyBreakdown(timeline, period);
 
-  const totalAppointments = Math.max(daysCount * 5, 6);
-  const completedAppointments = Math.max(daysCount * 4, 5);
-  const cancelledAppointments = Math.max(Math.round(daysCount * 0.3), 1);
+  const completedAppointments = Math.max(pastDays * 4, pastDays > 0 ? 5 : 0);
+  const scheduledPendingAppointments = futureDays > 0 ? Math.max(futureDays * 4, 3) : 2;
+  const cancelledAppointments = Math.max(Math.round(pastDays * 0.3), 1);
+  const totalAppointments = completedAppointments + scheduledPendingAppointments + cancelledAppointments;
+
   const averageTicket = completedAppointments > 0
     ? Math.round((realizedRevenue / completedAppointments) * 100) / 100
     : 85.00;
@@ -374,36 +405,36 @@ function getDemoDashboardData(periodInfo, isPro = true) {
     { name: 'Manicure & Spa dos Pés', count: Math.round(completedAppointments * 0.10), revenue: Math.round(realizedRevenue * 0.06), price: 65.00 },
   ];
 
-  // Staff
+  // Staff: avgTicket calculado estritamente como revenue / appointments
   const staff = [
     {
       id: 1,
       name: 'Jéssica Ramos',
       specialty: 'Master Hairstylist & Colorista',
-      appointments: Math.round(completedAppointments * 0.52),
-      revenue: Math.round(realizedRevenue * 0.55),
-      avgTicket: 91.50,
+      appointments: Math.max(1, Math.round(completedAppointments * 0.52)),
+      revenue: Math.round(realizedRevenue * 0.55 * 100) / 100,
       sharePercent: 55.0,
     },
     {
       id: 2,
       name: 'Camila Santos',
       specialty: 'Especialista em Mechas & Tratamento',
-      appointments: Math.round(completedAppointments * 0.28),
-      revenue: Math.round(realizedRevenue * 0.30),
-      avgTicket: 93.20,
+      appointments: Math.max(1, Math.round(completedAppointments * 0.28)),
+      revenue: Math.round(realizedRevenue * 0.30 * 100) / 100,
       sharePercent: 30.0,
     },
     {
       id: 3,
       name: 'Rafael Costa',
       specialty: 'Cortes & Terapia Capilar',
-      appointments: Math.round(completedAppointments * 0.20),
-      revenue: Math.round(realizedRevenue * 0.15),
-      avgTicket: 65.25,
+      appointments: Math.max(1, Math.round(completedAppointments * 0.20)),
+      revenue: Math.round(realizedRevenue * 0.15 * 100) / 100,
       sharePercent: 15.0,
     },
-  ];
+  ].map(st => ({
+    ...st,
+    avgTicket: st.appointments > 0 ? Math.round((st.revenue / st.appointments) * 100) / 100 : 0,
+  }));
 
   // Peak Hours
   const peakHours = [
@@ -416,34 +447,111 @@ function getDemoDashboardData(periodInfo, isPro = true) {
     { hour: '17:00', count: Math.round(totalAppointments * 0.11) },
   ];
 
-  // Demo Bills to Pay (Gated by isPro)
+  // Demo Bills to Pay (Gated by isPro) — 100% dinâmico e consistente com todayStr
   let bills = null;
   if (isPro) {
+    const overdueBills = [
+      {
+        id: 901,
+        title: "Distribuidora L'Oréal & Wella",
+        amount: 1450.00,
+        due_date: addDays(todayStr, -3),
+        category: 'Produtos',
+        status: 'PENDING',
+      },
+      {
+        id: 902,
+        title: 'Enel Energia Elétrica',
+        amount: 680.00,
+        due_date: addDays(todayStr, -1),
+        category: 'Contas Básicas',
+        status: 'PENDING',
+      },
+    ];
+
+    const upcomingBills = [
+      {
+        id: 903,
+        title: 'Software & Internet Fibra',
+        amount: 620.00,
+        due_date: addDays(todayStr, 2),
+        category: 'Tecnologia',
+        status: 'PENDING',
+      },
+      {
+        id: 904,
+        title: 'Reposição Descartáveis & Toalhas',
+        amount: 380.00,
+        due_date: addDays(todayStr, 6),
+        category: 'Insumos',
+        status: 'PENDING',
+      },
+    ];
+
+    const paidBills = [
+      {
+        id: 900,
+        title: 'Aluguel do Salão Comercial',
+        amount: 2100.00,
+        due_date: addDays(todayStr, -18),
+        category: 'Imóvel',
+        status: 'PAID',
+        paid_at: `${addDays(todayStr, -18)}T10:00:00`,
+      },
+      {
+        id: 899,
+        title: 'Sistema de Automação & WhatsApp',
+        amount: 450.00,
+        due_date: addDays(todayStr, -13),
+        category: 'Tecnologia',
+        status: 'PAID',
+        paid_at: `${addDays(todayStr, -13)}T14:30:00`,
+      },
+      {
+        id: 898,
+        title: 'Taxa e Seguro Comercial',
+        amount: 350.00,
+        due_date: addDays(todayStr, -11),
+        category: 'Taxas',
+        status: 'PAID',
+        paid_at: `${addDays(todayStr, -11)}T09:15:00`,
+      },
+      {
+        id: 897,
+        title: 'Manutenção de Lavatórios & Secadores',
+        amount: 500.00,
+        due_date: addDays(todayStr, -7),
+        category: 'Manutenção',
+        status: 'PAID',
+        paid_at: `${addDays(todayStr, -7)}T16:00:00`,
+      },
+    ];
+
+    const pendingBills = [...overdueBills, ...upcomingBills];
+    const pendingTotal = Math.round(pendingBills.reduce((acc, b) => acc + b.amount, 0) * 100) / 100;
+    const paidTotal = Math.round(paidBills.reduce((acc, b) => acc + b.amount, 0) * 100) / 100;
+
     bills = {
-      pendingTotal: 2750.00,
-      pendingCount: 3,
-      paidTotal: 3400.00,
-      paidCount: 4,
-      overdueCount: 0,
-      upcomingBills: [
-        { id: 901, title: 'Distribuidora L\'Oréal & Wella', amount: 1450.00, due_date: `${startDate.slice(0, 7)}-20`, category: 'Produtos', status: 'PENDING' },
-        { id: 902, title: 'Enel Energia Elétrica', amount: 680.00, due_date: `${startDate.slice(0, 7)}-22`, category: 'Contas Básicas', status: 'PENDING' },
-        { id: 903, title: 'Software & Internet Fibra', amount: 620.00, due_date: `${startDate.slice(0, 7)}-25`, category: 'Tecnologia', status: 'PENDING' },
-      ],
-      overdueBills: [],
-      paidBills: [
-        { id: 900, title: 'Aluguel do Salão Comercial', amount: 3400.00, due_date: `${startDate.slice(0, 7)}-05`, category: 'Imóvel', status: 'PAID' },
-      ],
+      pendingTotal,
+      pendingCount: pendingBills.length,
+      overdueCount: overdueBills.length,
+      overdueBills,
+      upcomingBills,
+      paidBills,
+      paidTotal,
+      paidCount: paidBills.length,
     };
   }
 
-  // Demo Transactions
+  // Demo Transactions — Alinhadas para nunca ultrapassar a data atual
+  const latestPastDate = endDate > todayStr ? todayStr : endDate;
+  const transStartDate = startDate > todayStr ? todayStr : startDate;
   const transactions = [
-    { id: 101, type: 'INCOME', date: `${endDate} 16:30`, description: 'Mechas Criativas + Tratamento (Mariana S.)', category: 'Coloração', amount: 380.00, paymentMethod: 'Pix', origin: 'Agendamento Jéssica' },
-    { id: 102, type: 'INCOME', date: `${endDate} 14:15`, description: 'Corte Feminino & Escova (Paula M.)', category: 'Cortes', amount: 140.00, paymentMethod: 'Cartão de Crédito', origin: 'Agendamento Camila' },
-    { id: 103, type: 'EXPENSE', date: `${endDate} 11:20`, description: 'Café Premium & Insumos Recepção', category: 'Insumos', amount: -85.50, paymentMethod: 'Pix', origin: 'Despesa Salão' },
-    { id: 104, type: 'INCOME', date: `${startDate} 10:00`, description: 'Cronograma Capilar (Fernanda R.)', category: 'Tratamentos', amount: 160.00, paymentMethod: 'Pix', origin: 'Agendamento Jéssica' },
-    { id: 105, type: 'EXPENSE', date: `${startDate} 09:10`, description: 'Produtos de Limpeza & Higiene', category: 'Operacional', amount: -120.00, paymentMethod: 'Débito', origin: 'Despesa Salão' },
+    { id: 101, type: 'INCOME', date: `${latestPastDate} 16:30`, description: 'Mechas Criativas + Tratamento (Mariana S.)', category: 'Coloração', amount: 380.00, paymentMethod: 'Pix', origin: 'Agendamento Jéssica' },
+    { id: 102, type: 'INCOME', date: `${latestPastDate} 14:15`, description: 'Corte Feminino & Escova (Paula M.)', category: 'Cortes', amount: 140.00, paymentMethod: 'Cartão de Crédito', origin: 'Agendamento Camila' },
+    { id: 103, type: 'EXPENSE', date: `${latestPastDate} 11:20`, description: 'Café Premium & Insumos Recepção', category: 'Insumos', amount: -85.50, paymentMethod: 'Pix', origin: 'Despesa Salão' },
+    { id: 104, type: 'INCOME', date: `${transStartDate} 10:00`, description: 'Cronograma Capilar (Fernanda R.)', category: 'Tratamentos', amount: 160.00, paymentMethod: 'Pix', origin: 'Agendamento Jéssica' },
+    { id: 105, type: 'EXPENSE', date: `${transStartDate} 09:10`, description: 'Produtos de Limpeza & Higiene', category: 'Operacional', amount: -120.00, paymentMethod: 'Débito', origin: 'Despesa Salão' },
   ];
 
   return {
@@ -798,13 +906,13 @@ function getRealDashboardData(userId, periodInfo, isPro = true) {
 
     const pendingTotal = Math.round(pendingRows.reduce((acc, b) => acc + (b.amount || 0), 0) * 100) / 100;
     const overdueBills = pendingRows.filter(b => b.due_date < todayStr);
-    const upcomingBills = pendingRows.filter(b => b.due_date >= todayStr).slice(0, 10);
+    const upcomingBills = pendingRows.filter(b => b.due_date >= todayStr);
 
     const paidRows = db.prepare(`
       SELECT id, title, amount, due_date, category, status, paid_at
       FROM scheduled_payments
       WHERE user_id = ? AND status = 'PAID'
-      ORDER BY due_date DESC LIMIT 10
+      ORDER BY due_date DESC, id DESC
     `).all(userId);
     const paidTotal = Math.round(paidRows.reduce((acc, b) => acc + (b.amount || 0), 0) * 100) / 100;
 
