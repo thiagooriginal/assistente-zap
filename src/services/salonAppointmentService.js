@@ -1055,6 +1055,19 @@ function bookAppointmentSync(userId, {
       VALUES (?, ?, NULL, ?, ?, 'Novo agendamento criado')
     `).run(appointmentId, userId, finalStatus, origin.toUpperCase());
 
+    // Dynamic Late-Binding Automático de Homologação Google Calendar (COMANDO 064.1)
+    if (process.env.GOOGLE_SYNC_HOMOLOGATION_MODE === 'true') {
+      try {
+        const sessionService = require('./googleCalendarSessionService');
+        sessionService.bindAppointmentToActiveSession(userId, appointmentId, {
+          origin,
+          clientPhone,
+        });
+      } catch (bindErr) {
+        console.warn(`[salonAppointmentService] Dynamic Late-Binding aviso (#${userId}):`, bindErr.message);
+      }
+    }
+
     // Enfileirar sincronização com Google Calendar no Outbox durável
     db.prepare(`
       INSERT INTO google_sync_outbox (user_id, appointment_id, action, status, payload_json)

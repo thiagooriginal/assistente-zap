@@ -39,6 +39,10 @@ function ensureSchema(dbInstance = null) {
       appointment_id INTEGER NOT NULL,
       calendar_id TEXT NOT NULL,
       account_email TEXT NOT NULL,
+      session_type TEXT NOT NULL DEFAULT 'EXISTING_APPOINTMENT',
+      authorized_client_phone TEXT,
+      target_channel TEXT DEFAULT 'WHATSAPP_BOT',
+      allow_new_appointments INTEGER NOT NULL DEFAULT 0,
       allowed_action TEXT NOT NULL DEFAULT 'CREATE' CHECK(allowed_action IN ('CREATE', 'UPDATE', 'DELETE', 'ANY')),
       max_executions INTEGER NOT NULL DEFAULT 1,
       executions_count INTEGER NOT NULL DEFAULT 0,
@@ -54,7 +58,26 @@ function ensureSchema(dbInstance = null) {
     CREATE INDEX IF NOT EXISTS idx_gtest_status_expires ON google_sync_test_sessions(status, expires_at);
     CREATE INDEX IF NOT EXISTS idx_gtest_user_apt ON google_sync_test_sessions(user_id, appointment_id);
     CREATE INDEX IF NOT EXISTS idx_gtest_created_at ON google_sync_test_sessions(created_at);
+    CREATE INDEX IF NOT EXISTS idx_gtest_late_binding ON google_sync_test_sessions(user_id, status, session_type, appointment_id);
   `);
+
+  // Migrações suaves idempotentes para instâncias preexistentes
+  const migrations = [
+    { name: 'session_type', def: "TEXT NOT NULL DEFAULT 'EXISTING_APPOINTMENT'" },
+    { name: 'authorized_client_phone', def: 'TEXT' },
+    { name: 'target_channel', def: "TEXT DEFAULT 'WHATSAPP_BOT'" },
+    { name: 'allow_new_appointments', def: 'INTEGER NOT NULL DEFAULT 0' },
+  ];
+
+  for (const col of migrations) {
+    try {
+      const cols = db.prepare('PRAGMA table_info(google_sync_test_sessions)').all();
+      const hasCol = cols.some((c) => c.name.toLowerCase() === col.name.toLowerCase());
+      if (!hasCol) {
+        db.exec(`ALTER TABLE google_sync_test_sessions ADD COLUMN ${col.name} ${col.def}`);
+      }
+    } catch (_) {}
+  }
 }
 
 /**
@@ -105,7 +128,7 @@ function cleanupExpiredSessions(dbInstance = null) {
  *
  * @param {Object} params
  * @param {number|string} params.userId - Identificador do tenant
- * @param {number|string} params.appointmentId - Identificador do agendamento
+ * @param {number|string} [params.appointmentId] - Identificador do agendamento (obrigatório se sessionType != 'WHATSAPP_NEW')
  * @param {string} params.calendarId - ID do calendário secundário
  * @param {string} params.accountEmail - E-mail institucional do salão
  * @param {string} [params.allowedAction='CREATE'] - Ação permitida ('CREATE', 'UPDATE', 'DELETE', 'ANY')
@@ -113,6 +136,9 @@ function cleanupExpiredSessions(dbInstance = null) {
  * @param {number} [params.maxExecutions=1] - Limite de execuções reais (1 a 5)
  * @param {number|string} params.createdBy - ID do administrador responsável
  * @param {string} [params.reason] - Motivo do teste
+ * @param {string} [params.sessionType='EXISTING_APPOINTMENT'] - Tipo ('EXISTING_APPOINTMENT' ou 'WHATSAPP_NEW')
+ * @param {string|null} [params.authorizedClientPhone=null] - Telefone autorizado (opcional, restrito à whitelist)
+ * @param {string} [params.targetChannel='WHATSAPP_BOT'] - Canal autorizado
  * @param {Object} [dbInstance] - Instância de banco para injeção em testes
  * @returns {Object} Sessão criada
  */
@@ -126,11 +152,15 @@ function createTestSession({
   maxExecutions = 1,
   createdBy,
   reason = 'Homologação real controlada Google Calendar',
+  sessionType = 'EXISTING_APPOINTMENT',
+  authorizedClientPhone = null,
+  targetChannel = 'WHATSAPP_BOT',
 }, dbInstance = null) {
   const db = getDb(dbInstance);
 
   const uId = Number(userId);
-  const aptId = Number(appointmentId);
+  const isWhatsAppNew = String(sessionType || '').toUpperCase() === 'WHATSAPP_NEW';
+  const aptId = isWhatsAppNew ? (Number(appointmentId) || 0) : Number(appointmentId);
   const adminId = Number(createdBy);
 
   if (!uId || isNaN(uId) || uId <= 0) {
@@ -138,7 +168,12 @@ function createTestSession({
     err.code = 'INVALID_USER_ID';
     throw err;
   }
-  if (!aptId || isNaN(aptId) || aptId <= 0) {
+  if (isWhatsAppNew && uId !== 3) {
+    const err = new Error('TENANT_RESTRICTED_TO_TEST_SALON: O modo WHATSAPP_NEW está disponível exclusivamente para o salão de testes oficial (Tenant 3).');
+    err.code = 'TENANT_RESTRICTED_TO_TEST_SALON';
+    throw err;
+  }
+  if (!isWhatsAppNew && (!aptId || isNaN(aptId) || aptId <= 0)) {
     const err = new Error('INVALID_APPOINTMENT_ID: Identificador do agendamento inválido.');
     err.code = 'INVALID_APPOINTMENT_ID';
     throw err;
@@ -177,8 +212,8 @@ function createTestSession({
     throw err;
   }
 
-  // 4. Normalização da ação permitida
-  let actionUpper = String(allowedAction || 'CREATE').trim().toUpperCase();
+  // 4. Normalização da ação permitida (No modo WHATSAPP_NEW, força estritamente CREATE)
+  let actionUpper = isWhatsAppNew ? 'CREATE' : String(allowedAction || 'CREATE').trim().toUpperCase();
   if (actionUpper === 'INSERT') actionUpper = 'CREATE';
   const VALID_ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'ANY'];
   if (!VALID_ACTIONS.includes(actionUpper)) {
@@ -187,9 +222,16 @@ function createTestSession({
     throw err;
   }
 
-  // 5. Normalização de TTL e execuções (máximo 30 minutos em homologação)
+  // 5. Normalização de TTL e execuções (máximo 30 minutos em homologação, exatamente 1 para WHATSAPP_NEW)
   const safeDuration = Math.min(Math.max(Number(durationMinutes) || 15, 1), 30);
-  const safeMaxExecutions = Math.min(Math.max(Number(maxExecutions) || 1, 1), 5);
+  const safeMaxExecutions = isWhatsAppNew ? 1 : Math.min(Math.max(Number(maxExecutions) || 1, 1), 5);
+  const allowNewAppointments = isWhatsAppNew ? 1 : 0;
+
+  // Sanitização de telefone autorizado se fornecido
+  let cleanAuthorizedPhone = null;
+  if (authorizedClientPhone) {
+    cleanAuthorizedPhone = String(authorizedClientPhone).replace(/\D/g, '') || null;
+  }
 
   const sessionToken = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + safeDuration * 60 * 1000).toISOString();
@@ -208,9 +250,10 @@ function createTestSession({
   const stmt = db.prepare(`
     INSERT INTO google_sync_test_sessions (
       session_token, user_id, appointment_id, calendar_id, account_email,
+      session_type, authorized_client_phone, target_channel, allow_new_appointments,
       allowed_action, max_executions, executions_count, created_by,
       status, reason, expires_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 'ACTIVE', ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 'ACTIVE', ?, ?)
   `);
 
   const res = stmt.run(
@@ -219,6 +262,10 @@ function createTestSession({
     aptId,
     calendarId.trim(),
     emailTrimmed,
+    isWhatsAppNew ? 'WHATSAPP_NEW' : 'EXISTING_APPOINTMENT',
+    cleanAuthorizedPhone,
+    targetChannel || 'WHATSAPP_BOT',
+    allowNewAppointments,
     actionUpper,
     safeMaxExecutions,
     adminId,
@@ -232,23 +279,38 @@ function createTestSession({
 
 /**
  * Retorna a sessão ativa de homologação com lazy-expiration atômica.
+ * Suporta chamada getActiveSession(userId) ou getActiveSession(dbInstance).
  *
+ * @param {number|Object} [userIdOrDb]
  * @param {Object} [dbInstance]
  * @returns {Object|null}
  */
-function getActiveSession(dbInstance = null) {
-  const db = getDb(dbInstance);
+function getActiveSession(userIdOrDb = null, dbInstance = null) {
+  let userId = null;
+  let dbRef = dbInstance;
+  if (typeof userIdOrDb === 'number' || (typeof userIdOrDb === 'string' && /^\d+$/.test(userIdOrDb))) {
+    userId = Number(userIdOrDb);
+  } else if (userIdOrDb && typeof userIdOrDb === 'object') {
+    dbRef = userIdOrDb;
+  }
+  const db = getDb(dbRef);
 
   // Lazy-expire atômico pré-consulta
-  cleanupExpiredSessions(dbInstance);
+  cleanupExpiredSessions(dbRef);
 
-  const row = db.prepare(`
+  let query = `
     SELECT * FROM google_sync_test_sessions
     WHERE status = 'ACTIVE'
       AND datetime(expires_at) > datetime('now')
-    ORDER BY id DESC
-    LIMIT 1
-  `).get();
+  `;
+  const params = [];
+  if (userId) {
+    query += ' AND user_id = ?';
+    params.push(userId);
+  }
+  query += ' ORDER BY id DESC LIMIT 1';
+
+  const row = db.prepare(query).get(...params);
 
   if (!row) return null;
 
@@ -305,22 +367,34 @@ function recordSessionExecution(sessionId, dbInstance = null) {
 /**
  * Revoga uma sessão ativa (kill-switch / botão de pânico).
  * Se sessionId não for especificado, revoga a sessão atualmente ativa no sistema.
+ * Suporta chamada revokeTestSession(id, options, db) ou revokeTestSession(id, adminId, reason).
  *
  * @param {number|string|null} [sessionId=null]
- * @param {Object} [options]
- * @param {number|string} [options.revokedBy=null]
- * @param {string} [options.revocationReason='Manual admin revocation']
- * @param {Object} [dbInstance]
+ * @param {Object|number} [options]
+ * @param {Object|string} [dbInstance]
  * @returns {{ revoked: boolean, changes: number }}
  */
 function revokeTestSession(
   sessionId = null,
-  { revokedBy = null, revocationReason = 'Manual admin revocation' } = {},
+  options = {},
   dbInstance = null
 ) {
-  const db = getDb(dbInstance);
-  const adminId = revokedBy ? Number(revokedBy) : null;
-  const reasonText = (revocationReason || 'Manual admin revocation').slice(0, 500);
+  let adminId = null;
+  let reasonText = 'Manual admin revocation';
+  let dbRef = dbInstance;
+
+  if (typeof options === 'number') {
+    adminId = options;
+    if (typeof dbInstance === 'string') {
+      reasonText = dbInstance;
+      dbRef = null;
+    }
+  } else if (options && typeof options === 'object') {
+    adminId = options.revokedBy ? Number(options.revokedBy) : null;
+    reasonText = (options.revocationReason || 'Manual admin revocation').slice(0, 500);
+  }
+
+  const db = getDb(dbRef);
 
   let result;
   if (sessionId) {
@@ -363,7 +437,8 @@ function getSessionHistory(limit = 20, dbInstance = null) {
     SELECT id, session_token, user_id, appointment_id, calendar_id,
            account_email, allowed_action, max_executions, executions_count,
            created_by, status, reason, revoked_by, revocation_reason,
-           expires_at, created_at, updated_at
+           expires_at, session_type, authorized_client_phone, target_channel,
+           allow_new_appointments, created_at, updated_at
     FROM google_sync_test_sessions
     ORDER BY id DESC
     LIMIT ?
@@ -371,12 +446,96 @@ function getSessionHistory(limit = 20, dbInstance = null) {
   return rows.map(sanitizeSession);
 }
 
+/**
+ * Realiza o Dynamic Late-Binding atômico de um agendamento recém-criado via WhatsApp
+ * à sessão ativa de homologação controlada do Google Calendar (COMANDO 064.1).
+ *
+ * @param {number|string} userId - Identificador do tenant do salão
+ * @param {number|string} appointmentId - Identificador do agendamento recém-gerado
+ * @param {Object} [context={}] - Metadados de segurança (origin, clientPhone)
+ * @param {Object} [dbInstance=null] - Instância de banco injetável
+ * @returns {Object|null} Sessão atualizada e sanitizada, ou null se não houver vinculação
+ */
+function bindAppointmentToActiveSession(userId, appointmentId, context = {}, dbInstance = null) {
+  const db = getDb(dbInstance);
+  const uId = Number(userId);
+  const aptId = Number(appointmentId);
+
+  if (!uId || !aptId || aptId <= 0) return null;
+
+  // 1. Canal estrito: somente agendamentos originados pelo bot do WhatsApp
+  const origin = String(context.origin || '').trim().toUpperCase();
+  if (origin !== 'WHATSAPP_BOT') {
+    return null;
+  }
+
+  // 2. Telefone do cliente
+  const phoneUtils = require('../utils/phoneUtils');
+  const clientPhoneDigits = context.clientPhone ? phoneUtils.cleanDigits(context.clientPhone) : null;
+
+  // Em homologação, validação contra SALON_TEST_ALLOWED_PHONES
+  const isHomologation = process.env.GOOGLE_SYNC_HOMOLOGATION_MODE === 'true';
+  if (isHomologation && process.env.SALON_TEST_ALLOWED_PHONES) {
+    const rawAllowed = process.env.SALON_TEST_ALLOWED_PHONES || '';
+    const allowedList = rawAllowed.split(',').map((p) => phoneUtils.cleanDigits(p)).filter(Boolean);
+    if (allowedList.length > 0 && clientPhoneDigits && !allowedList.includes(clientPhoneDigits)) {
+      return null;
+    }
+  }
+
+  // 3. Busca a sessão ativa elegível para Late-Binding
+  cleanupExpiredSessions(dbInstance);
+
+  const activeSession = db.prepare(`
+    SELECT * FROM google_sync_test_sessions
+    WHERE user_id = ?
+      AND status = 'ACTIVE'
+      AND (session_type = 'WHATSAPP_NEW' OR allow_new_appointments = 1 OR appointment_id = 0)
+      AND allowed_action IN ('CREATE', 'ANY')
+      AND datetime(expires_at) > datetime('now')
+      AND executions_count < max_executions
+    ORDER BY id DESC
+    LIMIT 1
+  `).get(uId);
+
+  if (!activeSession) return null;
+
+  // Se a sessão amarra um telefone específico, exige correspondência exata
+  if (activeSession.authorized_client_phone) {
+    const authPhoneDigits = phoneUtils.cleanDigits(activeSession.authorized_client_phone);
+    if (authPhoneDigits && clientPhoneDigits && authPhoneDigits !== clientPhoneDigits) {
+      return null;
+    }
+  }
+
+  // 4. Update atômico com predicate lock
+  const updateStmt = db.prepare(`
+    UPDATE google_sync_test_sessions
+    SET appointment_id = ?,
+        allow_new_appointments = 0,
+        session_type = 'EXISTING_APPOINTMENT',
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+      AND status = 'ACTIVE'
+      AND (session_type = 'WHATSAPP_NEW' OR allow_new_appointments = 1 OR appointment_id = 0)
+  `);
+
+  const result = updateStmt.run(aptId, activeSession.id);
+  if (result.changes === 0) return null;
+
+  const updatedSession = db.prepare('SELECT * FROM google_sync_test_sessions WHERE id = ?').get(activeSession.id);
+  return sanitizeSession(updatedSession);
+}
+
 module.exports = {
   ensureSchema,
   createTestSession,
   getActiveSession,
+  getActiveTestSession: getActiveSession,
+  bindAppointmentToActiveSession,
   recordSessionExecution,
   revokeTestSession,
+  revokeSession: revokeTestSession,
   getSessionHistory,
   cleanupExpiredSessions,
   maskSessionToken,

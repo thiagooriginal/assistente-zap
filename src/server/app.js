@@ -3549,16 +3549,31 @@ app.post(['/api/admin/google-sync/test-session/start', '/api/admin/google-sync/t
     durationMinutes = 15,
     maxExecutions = 1,
     reason,
+    sessionType = 'EXISTING_APPOINTMENT',
+    mode,
+    authorizedClientPhone,
   } = req.body || {};
+
+  const isWhatsAppNew = String(sessionType || mode || '').toUpperCase() === 'WHATSAPP_NEW';
 
   // Validação dos campos obrigatórios
   const uId = Number(userId);
-  const aptId = Number(appointmentId);
-  if (!uId || !aptId || !calendarId || !accountEmail) {
+  const aptId = isWhatsAppNew ? 0 : Number(appointmentId);
+
+  if (!uId || (!isWhatsAppNew && !aptId) || !calendarId || !accountEmail) {
     return res.status(400).json({
       success: false,
-      error: 'Parâmetros obrigatórios ausentes: userId, appointmentId, calendarId e accountEmail são mandatórios.',
+      error: 'Parâmetros obrigatórios ausentes: userId, appointmentId (para agendamento existente), calendarId e accountEmail são mandatórios.',
       code: 'MISSING_REQUIRED_FIELDS',
+    });
+  }
+
+  // Restrição estrita de tenant para modo WHATSAPP_NEW: exclusivamente tenant 3 (Salão Teste RAIA)
+  if (isWhatsAppNew && uId !== 3) {
+    return res.status(403).json({
+      success: false,
+      error: 'Apenas o Salão Teste RAIA (tenant #3) está autorizado para sessões de teste no modo WhatsApp New.',
+      code: 'TENANT_RESTRICTED_TO_TEST_SALON',
     });
   }
 
@@ -3589,14 +3604,32 @@ app.post(['/api/admin/google-sync/test-session/start', '/api/admin/google-sync/t
     });
   }
 
-  // Validação do agendamento pertencente ao tenant
-  const aptRow = db.prepare('SELECT id, user_id, status FROM appointments WHERE id = ? AND user_id = ?').get(aptId, uId);
-  if (!aptRow) {
-    return res.status(404).json({
-      success: false,
-      error: `Agendamento #${aptId} não pertence ao tenant #${uId} ou não existe.`,
-      code: 'APPOINTMENT_NOT_FOUND',
-    });
+  // Validação do agendamento existente caso não seja modo WHATSAPP_NEW
+  if (!isWhatsAppNew) {
+    const aptRow = db.prepare('SELECT id, user_id, status FROM appointments WHERE id = ? AND user_id = ?').get(aptId, uId);
+    if (!aptRow) {
+      return res.status(404).json({
+        success: false,
+        error: `Agendamento #${aptId} não pertence ao tenant #${uId} ou não existe.`,
+        code: 'APPOINTMENT_NOT_FOUND',
+      });
+    }
+  }
+
+  // Validação do telefone autorizado se informado no modo WHATSAPP_NEW
+  let cleanAuthPhone = null;
+  if (isWhatsAppNew && authorizedClientPhone) {
+    const phoneUtils = require('../utils/phoneUtils');
+    cleanAuthPhone = phoneUtils.cleanDigits(authorizedClientPhone);
+    const rawAllowed = process.env.SALON_TEST_ALLOWED_PHONES || '';
+    const allowedList = rawAllowed.split(',').map((p) => phoneUtils.cleanDigits(p)).filter(Boolean);
+    if (allowedList.length > 0 && cleanAuthPhone && !allowedList.includes(cleanAuthPhone)) {
+      return res.status(403).json({
+        success: false,
+        error: `Telefone ${cleanAuthPhone} não consta na lista de telefones autorizados para homologação (SALON_TEST_ALLOWED_PHONES).`,
+        code: 'PHONE_NOT_IN_TEST_ALLOWLIST',
+      });
+    }
   }
 
   try {
@@ -3606,11 +3639,14 @@ app.post(['/api/admin/google-sync/test-session/start', '/api/admin/google-sync/t
       appointmentId: aptId,
       calendarId: String(calendarId).trim(),
       accountEmail: String(accountEmail).trim().toLowerCase(),
-      allowedAction,
+      allowedAction: isWhatsAppNew ? 'CREATE' : allowedAction,
       durationMinutes,
-      maxExecutions,
+      maxExecutions: isWhatsAppNew ? 1 : maxExecutions,
       createdBy: req.user.id,
-      reason,
+      reason: reason || (isWhatsAppNew ? 'Autorização para próximo agendamento via WhatsApp (COMANDO 064.1)' : 'Homologação real controlada Google Calendar'),
+      sessionType: isWhatsAppNew ? 'WHATSAPP_NEW' : 'EXISTING_APPOINTMENT',
+      authorizedClientPhone: cleanAuthPhone,
+      targetChannel: 'WHATSAPP_BOT',
     });
 
     logSecurityEvent({
@@ -3621,17 +3657,21 @@ app.post(['/api/admin/google-sync/test-session/start', '/api/admin/google-sync/t
       details: {
         sessionId: session.id,
         targetUserId: uId,
-        appointmentId: aptId,
+        appointmentId: session.appointment_id,
+        sessionType: session.session_type,
         calendarId: session.calendar_id,
         accountEmail: session.account_email,
         expiresAt: session.expires_at,
         maxExecutions: session.max_executions,
+        authorizedClientPhone: session.authorized_client_phone,
       },
     });
 
     return res.status(201).json({
       success: true,
-      message: 'Sessão temporária de teste criada com sucesso.',
+      message: isWhatsAppNew
+        ? 'Sessão para próximo agendamento via WhatsApp autorizada com sucesso. O agendamento será vinculado dinamicamente pelo bot.'
+        : 'Sessão temporária de teste criada com sucesso.',
       session,
     });
   } catch (err) {

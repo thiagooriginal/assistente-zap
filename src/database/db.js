@@ -993,6 +993,15 @@ runVersionedMigration('20261121_01_google_sync_test_sessions', 'Create google_sy
   `);
 });
 
+// Versioned migration: Dynamic Late-Binding do Google Calendar para WhatsApp (COMANDO 064.1)
+runVersionedMigration('20261122_01_google_sync_dynamic_late_binding', 'Add late-binding columns and index for WhatsApp Google Calendar test sessions', () => {
+  ensureColumnExists('google_sync_test_sessions', 'session_type', "TEXT NOT NULL DEFAULT 'EXISTING_APPOINTMENT'");
+  ensureColumnExists('google_sync_test_sessions', 'authorized_client_phone', 'TEXT');
+  ensureColumnExists('google_sync_test_sessions', 'target_channel', "TEXT DEFAULT 'WHATSAPP_BOT'");
+  ensureColumnExists('google_sync_test_sessions', 'allow_new_appointments', 'INTEGER NOT NULL DEFAULT 0');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_gtest_late_binding ON google_sync_test_sessions(user_id, status, session_type, appointment_id);');
+});
+
 ensureColumnExists('client_service_staff', 'confirmed', 'INTEGER NOT NULL DEFAULT 1 CHECK(confirmed IN (0, 1))');
 db.exec('CREATE INDEX IF NOT EXISTS idx_css_tenant_confirmed ON client_service_staff(user_id, confirmed);');
 

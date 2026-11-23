@@ -2195,16 +2195,53 @@
           </div>
 
           <form id="gSessionForm" onsubmit="handleCreateGCalTestSession(event)" class="space-y-4">
+            <!-- Modo de Homologação: Agendamento Existente vs Próximo via WhatsApp -->
+            <div class="p-3 bg-zinc-900/80 border border-zinc-800 rounded-2xl space-y-2">
+              <label class="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
+                <i data-lucide="layers" class="w-3.5 h-3.5 text-blue-400"></i>
+                Modo de Autorização
+              </label>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                <label class="flex items-center gap-2.5 p-2 rounded-xl border border-zinc-800 bg-zinc-950/60 cursor-pointer hover:border-zinc-700 transition" id="lblModeExisting">
+                  <input type="radio" name="gSessionMode" value="EXISTING_APPOINTMENT" checked onchange="toggleGCalSessionMode(this.value)" class="text-blue-600 focus:ring-0">
+                  <div>
+                    <div class="font-bold text-white text-[12px]">Agendamento Existente</div>
+                    <div class="text-[10px] text-zinc-400">ID fixo para CREATE / UPDATE / DELETE</div>
+                  </div>
+                </label>
+                <label class="flex items-center gap-2.5 p-2 rounded-xl border border-blue-500/30 bg-blue-950/20 cursor-pointer hover:border-blue-500/50 transition" id="lblModeWhatsApp">
+                  <input type="radio" name="gSessionMode" value="WHATSAPP_NEW" onchange="toggleGCalSessionMode(this.value)" class="text-blue-600 focus:ring-0">
+                  <div>
+                    <div class="font-bold text-blue-300 text-[12px] flex items-center gap-1">
+                      <span>⚡ Próximo via WhatsApp</span>
+                      <span class="px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-400 text-[9px] font-black uppercase">Demo Bot</span>
+                    </div>
+                    <div class="text-[10px] text-zinc-400">Late-Binding automático no 1º agendamento</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label class="text-[11px] font-bold text-zinc-400">Tenant ID (users.id) *</label>
                 <input type="number" id="gFormUserId" required placeholder="3" class="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white font-mono text-xs focus:border-blue-500 outline-none">
               </div>
 
-              <div>
+              <div id="gFormAppointmentIdContainer">
                 <label class="text-[11px] font-bold text-zinc-400">Agendamento ID (appointments.id) *</label>
                 <input type="number" id="gFormAppointmentId" required placeholder="17" class="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white font-mono text-xs focus:border-blue-500 outline-none">
+                <p id="gFormAppointmentIdNotice" class="hidden text-[10px] text-amber-400 mt-1 font-mono">⚡ Vinculação dinâmica: O ID será vinculado dinamicamente pelo bot no primeiro agendamento via WhatsApp.</p>
               </div>
+            </div>
+
+            <!-- Campo opcional para telefone do cliente autorizado no modo WhatsApp -->
+            <div id="gFormWhatsAppPhoneContainer" class="hidden">
+              <label class="text-[11px] font-bold text-zinc-400">
+                Telefone do Cliente Autorizado no WhatsApp
+                <span class="text-zinc-500 font-normal">(opcional — deixe vazio para aceitar qualquer testador da whitelist)</span>
+              </label>
+              <input type="text" id="gFormAuthorizedClientPhone" placeholder="Ex: 5511999999999" class="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white font-mono text-xs focus:border-blue-500 outline-none">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -5326,7 +5363,12 @@
                   </span>
                 </div>
                 <div class="text-xs text-zinc-300 space-y-0.5 pt-1">
-                  <div><strong>Tenant:</strong> #${s.user_id} &nbsp;|&nbsp; <strong>Agendamento:</strong> #${s.appointment_id}</div>
+                  <div>
+                    <strong>Tenant:</strong> #${s.user_id} &nbsp;|&nbsp; 
+                    <strong>Agendamento:</strong> ${Number(s.appointment_id) === 0 ? '<span class="text-amber-400 font-bold bg-amber-950/60 border border-amber-500/30 px-2 py-0.5 rounded-lg text-[10px]">⚡ AGUARDANDO NOVO AGENDAMENTO VIA WHATSAPP (TENANT #' + s.user_id + ')</span>' : '#' + s.appointment_id}
+                  </div>
+                  ${s.session_type === 'WHATSAPP_NEW' ? '<div class="text-blue-300 font-bold text-[11px]">Modo: ⚡ Vinculação Dinâmica WhatsApp (1 agendamento permitido)</div>' : ''}
+                  ${s.authorized_client_phone ? '<div class="text-zinc-400 text-[11px]">Telefone Autorizado: <code class="text-zinc-200 font-mono">' + escapeHtml(s.authorized_client_phone) + '</code></div>' : ''}
                   <div><strong>Calendário:</strong> <code class="text-emerald-400 font-mono text-[11px]">${escapeHtml(s.calendar_id)}</code></div>
                   <div><strong>Conta:</strong> ${escapeHtml(s.account_email)}</div>
                   <div><strong>Execuções Realizadas:</strong> <span class="font-bold text-white">${s.executions_count} / ${s.max_executions}</span></div>
@@ -5517,7 +5559,69 @@
       }
     }
 
+    function toggleGCalSessionMode(mode) {
+      const aptInput = document.getElementById('gFormAppointmentId');
+      const aptNotice = document.getElementById('gFormAppointmentIdNotice');
+      const phoneContainer = document.getElementById('gFormWhatsAppPhoneContainer');
+      const actionSelect = document.getElementById('gFormAllowedAction');
+      const maxExecInput = document.getElementById('gFormMaxExecutions');
+      const tenantInput = document.getElementById('gFormUserId');
+      const reasonInput = document.getElementById('gFormReason');
+
+      if (mode === 'WHATSAPP_NEW') {
+        if (aptInput) {
+          aptInput.value = '0';
+          aptInput.readOnly = true;
+          aptInput.classList.add('opacity-50', 'bg-zinc-800');
+        }
+        if (aptNotice) aptNotice.classList.remove('hidden');
+        if (phoneContainer) phoneContainer.classList.remove('hidden');
+        if (actionSelect) {
+          actionSelect.value = 'CREATE';
+          actionSelect.disabled = true;
+        }
+        if (maxExecInput) {
+          maxExecInput.value = '1';
+          maxExecInput.readOnly = true;
+          maxExecInput.classList.add('opacity-50', 'bg-zinc-800');
+        }
+        if (tenantInput) {
+          tenantInput.value = '3';
+          tenantInput.readOnly = true;
+        }
+        if (reasonInput) {
+          reasonInput.value = 'Demonstração Comercial WhatsApp da Jéssica (Dynamic Late-Binding)';
+        }
+      } else {
+        if (aptInput) {
+          if (aptInput.value === '0') aptInput.value = '';
+          aptInput.readOnly = false;
+          aptInput.classList.remove('opacity-50', 'bg-zinc-800');
+        }
+        if (aptNotice) aptNotice.classList.add('hidden');
+        if (phoneContainer) phoneContainer.classList.add('hidden');
+        if (actionSelect) {
+          actionSelect.disabled = false;
+        }
+        if (maxExecInput) {
+          maxExecInput.readOnly = false;
+          maxExecInput.classList.remove('opacity-50', 'bg-zinc-800');
+        }
+        if (tenantInput) {
+          tenantInput.readOnly = false;
+        }
+        if (reasonInput) {
+          reasonInput.value = 'Homologação controlada do agendamento';
+        }
+      }
+    }
+
     function selectAppointmentForHomologation(aptId, calId) {
+      const modeExisting = document.querySelector('input[name="gSessionMode"][value="EXISTING_APPOINTMENT"]');
+      if (modeExisting) {
+        modeExisting.checked = true;
+        toggleGCalSessionMode('EXISTING_APPOINTMENT');
+      }
       const formApt = document.getElementById('gFormAppointmentId');
       if (formApt) formApt.value = aptId;
       const formCal = document.getElementById('gFormCalendarId');
@@ -5531,18 +5635,33 @@
       const btn = document.getElementById('btnSubmitGSession');
       const originalText = btn ? btn.innerHTML : '';
 
+      const modeRadio = document.querySelector('input[name="gSessionMode"]:checked');
+      const isWhatsAppNew = modeRadio && modeRadio.value === 'WHATSAPP_NEW';
+
       const payload = {
+        sessionType: isWhatsAppNew ? 'WHATSAPP_NEW' : 'EXISTING_APPOINTMENT',
         userId: Number(document.getElementById('gFormUserId').value),
-        appointmentId: Number(document.getElementById('gFormAppointmentId').value),
+        appointmentId: isWhatsAppNew ? 0 : Number(document.getElementById('gFormAppointmentId').value),
         calendarId: document.getElementById('gFormCalendarId').value.trim(),
         accountEmail: document.getElementById('gFormAccountEmail').value.trim().toLowerCase(),
-        allowedAction: document.getElementById('gFormAllowedAction').value,
+        allowedAction: isWhatsAppNew ? 'CREATE' : document.getElementById('gFormAllowedAction').value,
         durationMinutes: Number(document.getElementById('gFormDurationMinutes').value),
-        maxExecutions: Number(document.getElementById('gFormMaxExecutions').value),
+        maxExecutions: isWhatsAppNew ? 1 : Number(document.getElementById('gFormMaxExecutions').value),
         reason: document.getElementById('gFormReason').value.trim(),
       };
 
-      if (!confirm(`Confirmar criação de sessão de teste efêmera para ${payload.allowedAction} no agendamento #${payload.appointmentId}?`)) {
+      if (isWhatsAppNew) {
+        const clientPhone = document.getElementById('gFormAuthorizedClientPhone')?.value.trim();
+        if (clientPhone) {
+          payload.authorizedClientPhone = clientPhone;
+        }
+      }
+
+      const confirmMsg = isWhatsAppNew
+        ? 'Confirmar criação de sessão efêmera para vincular dinamicamente o PRÓXIMO agendamento via WhatsApp (Tenant #3)?'
+        : `Confirmar criação de sessão de teste efêmera para ${payload.allowedAction} no agendamento #${payload.appointmentId}?`;
+
+      if (!confirm(confirmMsg)) {
         return;
       }
 
@@ -5606,7 +5725,7 @@
                 </span>
               </td>
               <td class="py-2.5 px-3 text-zinc-300">#${s.user_id}</td>
-              <td class="py-2.5 px-3 text-zinc-300">#${s.appointment_id}</td>
+              <td class="py-2.5 px-3 text-zinc-300">${Number(s.appointment_id) === 0 ? '<span class="text-amber-400 font-bold">#0 (WhatsApp)</span>' : '#' + s.appointment_id}</td>
               <td class="py-2.5 px-3 font-bold text-amber-400">${escapeHtml(s.allowed_action)}</td>
               <td class="py-2.5 px-3 text-zinc-300">${s.executions_count} / ${s.max_executions}</td>
               <td class="py-2.5 px-3 text-zinc-400 font-mono text-[10px]">${escapeHtml(s.session_token_masked || '****')}</td>
