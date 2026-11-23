@@ -472,6 +472,166 @@ function findMatchingService(services, text) {
 }
 
 /**
+ * Detecta de forma determinística solicitações comerciais de catálogo, valores ou preços.
+ * Rejeita com rigor falsos positivos (afirmações isoladas, numerais e comandos de cancelamento).
+ * Identifica se a solicitação é de catálogo geral ou de procedimento específico.
+ *
+ * @param {string} normText Texto normalizado (sem acentos, minúsculo)
+ * @returns {{ isCommercial: boolean, isFullCatalog: boolean, queryTerm: string }}
+ */
+function parseCommercialInquiry(normText) {
+  if (!normText || typeof normText !== 'string') {
+    return { isCommercial: false, isFullCatalog: false, queryTerm: '' };
+  }
+
+  const clean = normalizeText(normText);
+  if (!clean) {
+    return { isCommercial: false, isFullCatalog: false, queryTerm: '' };
+  }
+
+  // 1. Rejeição de falsos positivos: termos afirmativos, numerais isolados e cancelamentos
+  const isAffirmativeOrCommand = /^(sim|s|1|2|3|ok|claro|pode|pode\s+ser|pode\s+sim|confirmo|confirma|positivo|com\s+certeza|isso|isso\s+mesmo|exato|cancela|cancelar|sair|parar|desisto|deixa\s+pra\s+la|parar\s+lembretes?)$/i.test(clean);
+  if (isAffirmativeOrCommand) {
+    return { isCommercial: false, isFullCatalog: false, queryTerm: '' };
+  }
+
+  // 2. Termos fortes e inequívocos de catálogo geral
+  const fullCatalogRegex = /\b(catalogo|tabela(\s+de\s+pre[cç]os?)?|cardapio|menu|lista\s+de\s+servi[cç]os|rela[cç][aã]o\s+de\s+servi[cç]os|quais\s+(s[aã]o\s+os\s+|os\s+)?servi[cç]os|quais\s+procedimentos|o\s+que\s+voc[eê]s\s+(fazem|oferecem|atendem)|servi[cç]os\s+que\s+voc[eê]s\s+(fazem|oferecem|t[eê]m)|todos\s+os\s+(pre[cç]os|valores|servi[cç]os)|valores\s+de\s+tudo)\b/i;
+
+  // 3. Termos de consulta comercial de preço / valor / orçamento
+  const priceInquiryRegex = /\b(quanto\s+(custa|fica|sai|[eé]|t[aá])|qual\s+(o\s+|os\s+)?(pre[cç]o|valor)|quais\s+(os\s+)?(pre[cç]os|valores)|pre[cç]os?|valores?|or[cç]amentos?|tabela)\b/i;
+
+  // 4. Termos genéricos de questionamento de serviços oferecidos
+  const serviceInquiryRegex = /\b(servi[cç]os?|procedimentos?)\b/i;
+
+  const matchesFull = fullCatalogRegex.test(clean);
+  const matchesPrice = priceInquiryRegex.test(clean);
+  const matchesServiceInquiry = serviceInquiryRegex.test(clean) && /\b(quais|quaisquer|ver|mostrar|mandar|enviar|tem|t[eê]m|passar|saber)\b/i.test(clean);
+
+  if (!matchesFull && !matchesPrice && !matchesServiceInquiry) {
+    return { isCommercial: false, isFullCatalog: false, queryTerm: '' };
+  }
+
+  // Verifica menção explícita a famílias de serviços
+  let hasSpecificService = false;
+  for (const fam of SERVICE_FAMILIES) {
+    if (fam.triggers.some((trig) => clean.includes(trig))) {
+      hasSpecificService = true;
+      break;
+    }
+  }
+
+  // Se tem gatilho explícito de catálogo geral OU se perguntou preço/valores sem citar serviço específico
+  const isFull = matchesFull || (matchesPrice && !hasSpecificService) || (matchesServiceInquiry && !hasSpecificService);
+
+  // Extrai queryTerm higienizado (removendo termos de pergunta)
+  let queryTerm = clean
+    .replace(/\b(quanto\s+(custa|fica|sai|[eé]|t[aá])|qual\s+(o\s+|os\s+)?(pre[cç]o|valor)|quais\s+(os\s+)?(pre[cç]os|valores)|gostaria\s+de\s+saber|saber|por\s+favor|me\s+fala|me\s+informa|tem\s+como\s+me\s+passar|pra\s+fazer|para\s+fazer|de|do|da|o|a|os|as)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return {
+    isCommercial: true,
+    isFullCatalog: isFull,
+    queryTerm,
+  };
+}
+
+/**
+ * Formata mensagem de catálogo comercial completo com preços reais e duração.
+ * Agrupa por categoria caso haja mais de 6 serviços e categorias preenchidas.
+ * Se o catálogo estiver vazio, emite mensagem acolhedora sem inventar valores.
+ *
+ * @param {Array<object>} services Catálogo ativo de serviços do tenant
+ * @param {string} salonName Nome do salão
+ * @returns {string} Mensagem pronta para o cliente
+ */
+function formatCommercialCatalogMessage(services, salonName) {
+  const safeSalonName = salonName || 'Nosso Espaço de Beleza';
+
+  if (!Array.isArray(services) || services.length === 0) {
+    return `Seja muito bem-vinda ao *${safeSalonName}*! ✨\n\n` +
+      `No momento, nosso catálogo de procedimentos e valores está sendo atualizado em nosso sistema. Para consultar nossos serviços e agendar seu horário com todo carinho, por favor fale diretamente com a nossa recepção! 🥰`;
+  }
+
+  // Agrupamento por categoria caso haja > 6 serviços e pelo menos 2 categorias distintas válidas
+  const hasCategories = services.some((s) => s.category && typeof s.category === 'string' && s.category.trim() !== '' && s.category.trim().toLowerCase() !== 'geral');
+  const distinctCategories = new Set(services.map((s) => (s.category || '').trim()).filter(Boolean));
+
+  const shouldGroup = services.length > 6 && hasCategories && distinctCategories.size > 1;
+
+  if (shouldGroup) {
+    const grouped = new Map();
+    for (const s of services) {
+      const cat = (s.category && s.category.trim()) ? s.category.trim() : 'Outros Serviços';
+      if (!grouped.has(cat)) {
+        grouped.set(cat, []);
+      }
+      grouped.get(cat).push(s);
+    }
+
+    const sections = [];
+    for (const [category, items] of grouped.entries()) {
+      const catHeader = `📂 *${category.toUpperCase()}*`;
+      const catLines = items.map((s) => {
+        const dur = s.duration_min ? ` (${s.duration_min} min)` : '';
+        return `• *${s.name}* — R$ ${formatPrice(s.price)}${dur}`;
+      });
+      sections.push(`${catHeader}\n${catLines.join('\n')}`);
+    }
+
+    return `Aqui está o nosso catálogo completo de serviços e valores no *${safeSalonName}*: ✨\n\n` +
+      sections.join('\n\n') +
+      `\n\nGostaria de agendar algum desses procedimentos? É só me falar qual você prefere ou o dia que tem em mente! 🥰`;
+  }
+
+  // Catálogo linear (<= 6 serviços ou sem categorias)
+  const itemsList = services.map((s) => {
+    const dur = s.duration_min ? ` (${s.duration_min} min)` : '';
+    return `• *${s.name}* — R$ ${formatPrice(s.price)}${dur}`;
+  }).join('\n');
+
+  return `Aqui está o nosso catálogo de serviços e valores no *${safeSalonName}*: ✨\n\n` +
+    `${itemsList}\n\n` +
+    `Gostaria de agendar algum desses procedimentos? É só me falar qual você prefere ou o dia que tem em mente! 🥰`;
+}
+
+/**
+ * Constrói resposta de preço preservando o contexto e o estado do agendamento ativo.
+ * Evita perda de contexto quando o cliente tira dúvidas de preço durante o funil.
+ *
+ * @param {string} priceText Texto explicativo do preço ou catálogo
+ * @param {object} session Sessão conversacional do cliente
+ * @returns {string} Resposta contextual combinada
+ */
+function buildActiveStatePriceResponse(priceText, session) {
+  if (!session) return priceText;
+
+  const currentService = session.selectedService?.name;
+
+  switch (session.state) {
+    case 'AWAITING_STAFF':
+      return `${priceText}\n\n(Seu agendamento para *${currentService || 'seu procedimento'}* continua em andamento! ✨ Com qual profissional você prefere realizar, ou pode ser quem tiver o primeiro horário livre?)`;
+
+    case 'AWAITING_SLOT':
+      return `${priceText}\n\n(Seu agendamento para *${currentService || 'seu procedimento'}* continua em andamento! ✨ Qual dos horários informados fica melhor para você? Se quiser trocar de serviço ou data, é só me falar!)`;
+
+    case 'AWAITING_NAME': {
+      const timeInfo = session.selectedSlot?.time ? ` às *${session.selectedSlot.time}*` : '';
+      return `${priceText}\n\n(Seu horário para *${currentService || 'seu procedimento'}*${timeInfo} continua reservadinho! ✨ Para concluirmos, pode me informar seu nome completo, por favor? 😊)`;
+    }
+
+    case 'AWAITING_CONFIRMATION': {
+      const timeInfo = session.selectedSlot?.time ? ` às *${session.selectedSlot.time}*` : '';
+      return `${priceText}\n\n(Seu agendamento para *${currentService || 'seu procedimento'}*${timeInfo} continua reservadinho! ✨ Posso confirmar seu horário? 🥰)`;
+    }
+
+    default:
+      return priceText;
+  }
+}
+
+/**
  * Converte preferência de data em lista de dias alvo
  * @param {string|null} datePreference "hoje", "amanha", "segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo", ou "YYYY-MM-DD"
  * @param {Date} [baseDate=new Date()]
@@ -1043,9 +1203,13 @@ async function handleConversationalV2({
   if (!nluResult || !nluResult.intent) return null;
   const intent = nluResult.intent;
 
-  // Sessão aguardando nome deve ser conduzida com precisão determinística (ETAPA 3 - COMANDO 066)
+  // Sessão aguardando nome deve ser conduzida com precisão determinística (ETAPA 3 - COMANDO 066),
+  // exceto se a mensagem for dúvida comercial/preço, que deve ser esclarecida sem resetar o agendamento.
   if (session.state === 'AWAITING_NAME') {
-    return null;
+    const commercial = parseCommercialInquiry(normText);
+    if (!commercial.isCommercial && intent !== 'PRICE_INQUIRY' && intent !== 'PRICE_SERVICE_INQUIRY' && intent !== 'SERVICE_INQUIRY') {
+      return null;
+    }
   }
 
   // 1. Opt-in ou Opt-out de Lembretes 24h (LGPD - Prioridade Absoluta sobre Cancelamento Genérico)
@@ -1120,8 +1284,8 @@ async function handleConversationalV2({
         const s = resMatch.match;
         return `O procedimento *${s.name}* no *${salonName}* custa *R$ ${formatPrice(s.price)}* (duração estimada de ${s.duration_min} minutos).\n\n(Seu agendamento anterior continua confirmadíssimo! ✨ Se quiser marcar mais um horário para esse ou outro procedimento, é só me falar!)`;
       }
-      const serviceList = services.slice(0, 5).map((s) => `• *${s.name}* — R$ ${formatPrice(s.price)}`).join('\n');
-      return `Com certeza! Aqui estão nossos principais procedimentos e valores no *${salonName}*:\n\n${serviceList}\n\n(Seu agendamento já está confirmado normalmente! ✨ Se quiser marcar outro atendimento, é só me avisar!)`;
+      const catalog = formatCommercialCatalogMessage(services, salonName);
+      return `${catalog}\n\n(Seu agendamento já está confirmado normalmente! ✨ Se quiser marcar outro atendimento, é só me avisar!)`;
     }
 
     // Se for conversa geral / dúvidas
@@ -1276,20 +1440,48 @@ async function handleConversationalV2({
       `Como seu atendimento já é nas próximas horas, nos vemos em breve no *${salonName}*! 💖`;
   }
 
-  // 4. Consulta de Preço / Valores (sem perder o serviço em andamento se já estiver selecionado)
-  if (intent === 'PRICE_INQUIRY' || intent === 'PRICE_SERVICE_INQUIRY' || intent === 'SERVICE_INQUIRY') {
-    const queryTerm = nluResult.serviceName || text;
-    const resMatch = resolveServiceMatch(services, queryTerm);
-    if (resMatch.status === 'EXACT') {
-      const s = resMatch.match;
-      let extra = '';
-      if (session.selectedService && session.selectedService.id !== s.id) {
-        extra = `\n\n(Seu agendamento para *${session.selectedService.name}* continua em andamento! Deseja trocar para este serviço ou continuar?)`;
+  // 4. Consulta Comercial: Preço / Valores / Catálogo Inteligente (COMANDO 067)
+  const commercialInfo = parseCommercialInquiry(normText);
+  const isCommercialIntent =
+    intent === 'PRICE_INQUIRY' ||
+    intent === 'PRICE_SERVICE_INQUIRY' ||
+    intent === 'SERVICE_INQUIRY' ||
+    commercialInfo.isCommercial;
+
+  if (isCommercialIntent) {
+    const isBookingActive = ['AWAITING_STAFF', 'AWAITING_SLOT', 'AWAITING_NAME', 'AWAITING_CONFIRMATION'].includes(session.state);
+
+    let priceResponseText = '';
+
+    if (commercialInfo.isFullCatalog) {
+      priceResponseText = formatCommercialCatalogMessage(services, salonName);
+    } else {
+      const queryTerm = commercialInfo.queryTerm || nluResult.serviceName || text;
+      const resMatch = resolveServiceMatch(services, queryTerm);
+
+      if (resMatch.status === 'EXACT') {
+        const s = resMatch.match;
+        const dur = s.duration_min ? ` (duração estimada de ${s.duration_min} minutos)` : '';
+        if (session.selectedService && session.selectedService.id !== s.id) {
+          priceResponseText = `O procedimento *${s.name}* no *${salonName}* custa *R$ ${formatPrice(s.price)}*${dur}.\n\n(Seu agendamento para *${session.selectedService.name}* continua em andamento! Deseja trocar para este serviço ou continuar?)`;
+        } else {
+          priceResponseText = `O procedimento *${s.name}* no *${salonName}* custa *R$ ${formatPrice(s.price)}*${dur}.\n\nGostaria de verificar os horários livres para agendar? É só me falar o dia de sua preferência! ✨`;
+        }
+      } else if (resMatch.status === 'AMBIGUOUS') {
+        const candidateList = resMatch.candidates
+          .map((s, i) => `${i + 1}. *${s.name}* — R$ ${formatPrice(s.price)} (${s.duration_min} min)`)
+          .join('\n');
+        priceResponseText = `Temos mais de uma opção para esse serviço no *${salonName}*:\n\n${candidateList}\n\nQual dessas opções você prefere? Me conta para eu já checar os horários! ✨`;
       } else {
-        extra = `\n\nGostaria de verificar os horários livres para agendar? É só me falar o dia de sua preferência! ✨`;
+        priceResponseText = formatCommercialCatalogMessage(services, salonName);
       }
-      return `O procedimento *${s.name}* no *${salonName}* custa *R$ ${formatPrice(s.price)}* (duração estimada de ${s.duration_min} minutos).${extra}`;
     }
+
+    if (isBookingActive) {
+      return buildActiveStatePriceResponse(priceResponseText, session);
+    }
+
+    return priceResponseText;
   }
 
   // 5. Seleção de Horário/Slot
@@ -1728,6 +1920,32 @@ async function dispatchMessage(salonUserId, sock, msg) {
     }
   }
 
+  // 5.3 Consulta Comercial durante agendamento em andamento (Determinístico Fallback)
+  const isBookingFlowActiveWithoutService = ['AWAITING_STAFF', 'AWAITING_SLOT', 'AWAITING_NAME', 'AWAITING_CONFIRMATION'].includes(session.state);
+  const activeCommercialCheck = parseCommercialInquiry(normText);
+  if (!replyText && isBookingFlowActiveWithoutService && activeCommercialCheck.isCommercial) {
+    let priceInfo = '';
+    if (activeCommercialCheck.isFullCatalog) {
+      priceInfo = formatCommercialCatalogMessage(services, salonName);
+    } else {
+      const qTerm = activeCommercialCheck.queryTerm || text;
+      const resMatch = resolveServiceMatch(services, qTerm);
+      if (resMatch.status === 'EXACT') {
+        const s = resMatch.match;
+        const dur = s.duration_min ? ` (duração estimada de ${s.duration_min} minutos)` : '';
+        priceInfo = `O procedimento *${s.name}* no *${salonName}* custa *R$ ${formatPrice(s.price)}*${dur}.`;
+      } else if (resMatch.status === 'AMBIGUOUS') {
+        const candidateList = resMatch.candidates
+          .map((s, i) => `${i + 1}. *${s.name}* — R$ ${formatPrice(s.price)} (${s.duration_min} min)`)
+          .join('\n');
+        priceInfo = `Temos mais de uma opção para esse serviço no *${salonName}*:\n\n${candidateList}`;
+      } else {
+        priceInfo = formatCommercialCatalogMessage(services, salonName);
+      }
+    }
+    replyText = buildActiveStatePriceResponse(priceInfo, session);
+  }
+
   // 6. Máquina de Estados Conversacionais da Jéssica
   if (!replyText) {
   switch (session.state) {
@@ -1756,6 +1974,12 @@ async function dispatchMessage(salonUserId, sock, msg) {
     }
 
     case 'AWAITING_SERVICE': {
+      const comm = parseCommercialInquiry(normText);
+      if (comm.isCommercial && comm.isFullCatalog) {
+        replyText = formatCommercialCatalogMessage(services, salonName);
+        break;
+      }
+
       const serviceResolution = resolveServiceMatch(services, text, session.candidateServices);
 
       if (serviceResolution.status === 'AMBIGUOUS') {
@@ -2167,13 +2391,39 @@ async function dispatchMessage(salonUserId, sock, msg) {
 
     case 'IDLE':
     default: {
+      const commercial = parseCommercialInquiry(normText);
       const isGreeting = /^(oi|ola|bom dia|boa tarde|boa noite|tudo bem|como vai|opa|oie)\b/i.test(normText);
-      const isServiceInquiry = /(servico|servicos|valor|valores|preco|precos|quanto custa|tabela|cardapio|menu|catalogo)/i.test(normText);
       const isRescheduleDirect = /\b(remarcar|remarca[çc][aã]o|mudar\s+(o\s+)?(hor[aá]rio|dia|data)|trocar\s+(o\s+)?(hor[aá]rio|dia|data))\b/i.test(normText);
       if (isRescheduleDirect) {
         replyText = await dispatchRescheduleHandoff(uid, cleanPhone, session, salon);
         break;
       }
+
+      // Precedência Absoluta Comercial (COMANDO 067): Catálogo e preços reais respondidos antes de agendamento
+      if (commercial.isCommercial) {
+        if (commercial.isFullCatalog) {
+          replyText = formatCommercialCatalogMessage(services, salonName);
+        } else {
+          const queryTerm = commercial.queryTerm || text;
+          const resMatch = resolveServiceMatch(services, queryTerm);
+          if (resMatch.status === 'EXACT') {
+            const s = resMatch.match;
+            const dur = s.duration_min ? ` (duração estimada de ${s.duration_min} minutos)` : '';
+            replyText = `O procedimento *${s.name}* no *${salonName}* custa *R$ ${formatPrice(s.price)}*${dur}.\n\nGostaria de verificar os horários disponíveis para agendar? É só me falar o dia de sua preferência! ✨`;
+          } else if (resMatch.status === 'AMBIGUOUS') {
+            session.candidateServices = resMatch.candidates;
+            session.state = 'AWAITING_SERVICE';
+            const candidateList = resMatch.candidates
+              .map((s, i) => `${i + 1}. *${s.name}* — R$ ${formatPrice(s.price)} (${s.duration_min} min)`)
+              .join('\n');
+            replyText = `Temos mais de uma opção para esse serviço no *${salonName}*:\n\n${candidateList}\n\nQual dessas opções você prefere? Me conta para eu já checar os horários! ✨`;
+          } else {
+            replyText = formatCommercialCatalogMessage(services, salonName);
+          }
+        }
+        break;
+      }
+
       const isScheduleInquiry = isSchedulingOrCareIntent(normText);
       const temporal = extractDeterministicTemporal(normText);
 
@@ -2247,13 +2497,6 @@ async function dispatchMessage(salonUserId, sock, msg) {
             replyText = `Oii! Tudo bem? 😊 Claro, posso verificar para você! Qual procedimento você está pensando em fazer?`;
           }
         }
-      } else if (isServiceInquiry) {
-        if (services && services.length > 0) {
-          const itemsList = services.map((s, i) => `${i + 1}. *${s.name}*: R$ ${formatPrice(s.price)} (${s.duration_min} min)`).join('\n');
-          replyText = `Aqui estão os procedimentos disponíveis no *${salonName}*:\n\n${itemsList}\n\nGostaria de agendar algum? É só me falar qual você tem em mente! ✨`;
-        } else {
-          replyText = `Seja bem-vinda ao *${salonName}*! Estamos atualizando nosso catálogo de procedimentos. Pode me informar qual serviço deseja realizar para eu verificar com a nossa equipe?`;
-        }
       } else if (isGreeting && session.messageCount === 1) {
         replyText = `Olá! Tudo bem? Seja muito bem-vinda ao *${salonName}*! ✨\n\nEu sou a Jéssica. Como posso te ajudar hoje? Se você quiser agendar um horário ou saber mais sobre nossos serviços, é só me falar!`;
       } else {
@@ -2308,6 +2551,9 @@ module.exports = {
   consumeDispatcherBookingProof,
   isValidCustomerName,
   extractCleanCustomerName,
+  parseCommercialInquiry,
+  formatCommercialCatalogMessage,
+  buildActiveStatePriceResponse,
   _resetForTesting,
   _getCustomerSessionForTesting,
 };
