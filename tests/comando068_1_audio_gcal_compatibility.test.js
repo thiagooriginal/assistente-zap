@@ -529,10 +529,17 @@ test.describe('P1 — Limites de Download e Robustez de Metadados de Áudio', ()
 // P1 — MODELOS GEMINI E SANITIZAÇÃO DE ERROS
 // =========================================================================
 test.describe('P1 — Configuração de Modelos Gemini e Sanitização de Erros', () => {
-  test('GEMINI_MODELS contém gemini-1.5-flash e gemini-1.5-flash-8b', () => {
+  test('GEMINI_MODELS contém gemini-3.5-flash-lite e gemini-3.8-flash (Modelos Vigentes)', () => {
     const audioServiceSource = fs.readFileSync(path.resolve(__dirname, '../src/services/jessicaAudioService.js'), 'utf8');
-    assert.ok(audioServiceSource.includes('gemini-1.5-flash'), 'Deve conter gemini-1.5-flash');
-    assert.ok(audioServiceSource.includes('gemini-1.5-flash-8b'), 'Deve conter gemini-1.5-flash-8b');
+    assert.ok(audioServiceSource.includes('gemini-3.5-flash-lite'), 'Deve conter gemini-3.5-flash-lite como modelo primário');
+    assert.ok(audioServiceSource.includes('gemini-3.8-flash'), 'Deve conter gemini-3.8-flash como modelo de fallback');
+    assert.ok(!audioServiceSource.includes('gemini-1.5-flash-8b'), 'NÃO deve conter modelos descontinuados');
+    assert.deepEqual(jessicaAudioService.GEMINI_MODELS, ['gemini-3.5-flash-lite', 'gemini-3.8-flash']);
+  });
+
+  test('generationConfig omite temperature para modelos flash-lite evitando erro de parâmetro', () => {
+    const audioServiceSource = fs.readFileSync(path.resolve(__dirname, '../src/services/jessicaAudioService.js'), 'utf8');
+    assert.ok(audioServiceSource.includes("includes('flash-lite')"), 'Deve checar condicional para omitir temperature em flash-lite');
   });
 
   test('sanitizeAiError mascara chaves AIza..., query params key=... e headers x-goog-api-key', () => {
@@ -560,5 +567,81 @@ test.describe('P1 — Configuração de Modelos Gemini e Sanitização de Erros'
 
     assert.equal(result.success, false);
     assert.ok(result.error.includes('AUDIO_TIMEOUT'));
+  });
+});
+
+// =========================================================================
+// P2 — IN-FLIGHT STREAM GUARD E CORTE ATIVO DURANTE STREAMING
+// =========================================================================
+test.describe('P2 — In-Flight Stream Guard (Tier 2 de Defesa da RAM)', () => {
+  const { Readable } = require('node:stream');
+
+  test('readAudioStreamWithGuard aborta stream via destroy() e lança AUDIO_STREAM_EXCEEDED ao exceder 5MB', async () => {
+    let destroyedWith = null;
+    const stream = new Readable({
+      read() {
+        // Envia chunks de 2MB cada
+        this.push(Buffer.alloc(2 * 1024 * 1024));
+      },
+      destroy(err, cb) {
+        destroyedWith = err;
+        cb(err);
+      },
+    });
+
+    await assert.rejects(
+      async () => {
+        await salonIncomingDispatcher.readAudioStreamWithGuard(stream, 5 * 1024 * 1024);
+      },
+      (err) => {
+        assert.equal(err.code, 'AUDIO_STREAM_EXCEEDED');
+        return true;
+      }
+    );
+
+    assert.ok(destroyedWith !== null, 'stream.destroy() deve ter sido chamado');
+    assert.equal(destroyedWith.message, 'AUDIO_STREAM_EXCEEDED');
+  });
+
+  test('dispatchMessage intercepta áudio stream acima de 5MB, envia mensagem cordial e descarta RAM', async () => {
+    salonIncomingDispatcher._resetForTesting();
+    const sentReplies = [];
+
+    salonIncomingDispatcher.setMockDownloadMediaHandler(async () => {
+      // Simula Readable stream que envia mais de 5MB
+      let sentCount = 0;
+      return new Readable({
+        read() {
+          sentCount++;
+          if (sentCount <= 4) {
+            this.push(Buffer.alloc(2 * 1024 * 1024)); // 4 * 2MB = 8MB
+          } else {
+            this.push(null);
+          }
+        },
+      });
+    });
+
+    const trackingSock = {
+      sendMessage: async (jid, payload) => {
+        sentReplies.push(payload.text);
+        return { key: { id: 'stream_rep_1' } };
+      },
+    };
+
+    const msg = {
+      key: { id: 'stream_large_msg', remoteJid: `${TEST_CLIENT_PHONE}@s.whatsapp.net`, fromMe: false },
+      message: {
+        audioMessage: {
+          mimetype: 'audio/ogg',
+          seconds: 30,
+          fileLength: 6000000,
+        },
+      },
+    };
+
+    const res = await salonIncomingDispatcher.dispatchMessage(TEST_TENANT_ID, trackingSock, msg);
+    assert.equal(res, true);
+    assert.ok(sentReplies.some((t) => t.includes('máximo de 5MB')), 'Deve notificar cordialmente sobre o limite de 5MB');
   });
 });

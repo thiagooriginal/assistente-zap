@@ -80,6 +80,59 @@ function consumeDispatcherBookingProof(token, userId, clientPhone) {
   return true;
 }
 
+/**
+ * Lê com segurança um stream ou buffer de áudio com interrupção ativa in-flight (Tier 2 Guard).
+ * Se os dados acumulados excederem maxBytes durante o streaming, destrói o stream imediatamente
+ * e lança erro AUDIO_STREAM_EXCEEDED, evitando saturação de RAM (OOM).
+ *
+ * @param {import('node:stream').Readable|Buffer} mediaSource
+ * @param {number} [maxBytes=5242880]
+ * @returns {Promise<Buffer>}
+ */
+async function readAudioStreamWithGuard(mediaSource, maxBytes = jessicaAudioService.MAX_AUDIO_BYTES) {
+  if (!mediaSource) return null;
+
+  if (Buffer.isBuffer(mediaSource)) {
+    if (mediaSource.length > maxBytes) {
+      const err = new Error('AUDIO_STREAM_EXCEEDED: Tamanho do áudio excedeu o limite máximo in-flight.');
+      err.code = 'AUDIO_STREAM_EXCEEDED';
+      throw err;
+    }
+    return mediaSource;
+  }
+
+  // Verifica se é iterável assincronamente ou Readable Stream
+  if (typeof mediaSource[Symbol.asyncIterator] === 'function' || typeof mediaSource.on === 'function') {
+    const chunks = [];
+    let totalBytes = 0;
+    try {
+      for await (const chunk of mediaSource) {
+        const chunkBuf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        totalBytes += chunkBuf.length;
+        if (totalBytes > maxBytes) {
+          if (typeof mediaSource.destroy === 'function') {
+            try {
+              mediaSource.destroy(new Error('AUDIO_STREAM_EXCEEDED'));
+            } catch (_) {}
+          }
+          const err = new Error('AUDIO_STREAM_EXCEEDED: Tamanho do áudio excedeu o limite máximo in-flight.');
+          err.code = 'AUDIO_STREAM_EXCEEDED';
+          throw err;
+        }
+        chunks.push(chunkBuf);
+      }
+      return Buffer.concat(chunks);
+    } catch (streamErr) {
+      if (typeof mediaSource.destroy === 'function' && !mediaSource.destroyed) {
+        try { mediaSource.destroy(); } catch (_) {}
+      }
+      throw streamErr;
+    }
+  }
+
+  return null;
+}
+
 const WEEKDAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 const WEEKDAY_NAME_TO_INDEX = {
   domingo: 0,
@@ -1881,25 +1934,43 @@ async function dispatchMessage(salonUserId, sock, msg) {
       } catch (_) {}
     }
 
-    // 2.4 Download do buffer de áudio em memória via Baileys downloadMediaMessage
+    // 2.4 Download com In-Flight Stream Guard (Tier 2 de Defesa da RAM)
     let audioBuffer = null;
+    let streamExceeded = false;
     try {
       if (typeof _mockDownloadMediaHandler === 'function') {
-        audioBuffer = await _mockDownloadMediaHandler(msg);
+        const mockSource = await _mockDownloadMediaHandler(msg);
+        audioBuffer = await readAudioStreamWithGuard(mockSource, jessicaAudioService.MAX_AUDIO_BYTES);
       } else {
         const dlFn = baileysModule?.downloadMediaMessage;
         if (typeof dlFn !== 'function') {
           throw new Error('downloadMediaMessage helper não está disponível.');
         }
-        audioBuffer = await dlFn(msg, 'buffer', {});
+
+        // Tenta download via Stream para corte ativo in-flight se suportado
+        try {
+          const mediaStream = await dlFn(msg, 'stream', {});
+          audioBuffer = await readAudioStreamWithGuard(mediaStream, jessicaAudioService.MAX_AUDIO_BYTES);
+        } catch (streamErr) {
+          if (streamErr?.code === 'AUDIO_STREAM_EXCEEDED' || streamErr?.message?.includes('AUDIO_STREAM_EXCEEDED')) {
+            throw streamErr;
+          }
+          // Fallback seguro para buffer se a versão do Baileys não suportar stream
+          const directBuf = await dlFn(msg, 'buffer', {});
+          audioBuffer = await readAudioStreamWithGuard(directBuf, jessicaAudioService.MAX_AUDIO_BYTES);
+        }
       }
     } catch (dlErr) {
-      console.error(`[salonIncomingDispatcher] Falha no download do áudio (#${uid}):`, dlErr.message);
+      if (dlErr?.code === 'AUDIO_STREAM_EXCEEDED' || dlErr?.message?.includes('AUDIO_STREAM_EXCEEDED')) {
+        streamExceeded = true;
+      } else {
+        console.error(`[salonIncomingDispatcher] Falha no download do áudio (#${uid}):`, dlErr.message);
+      }
     }
 
-    // Post-Download / In-Flight Buffer Guard (Tier 2 de Defesa da RAM)
-    if (audioBuffer && audioBuffer.length > jessicaAudioService.MAX_AUDIO_BYTES) {
-      console.warn(`[salonIncomingDispatcher] Áudio baixado excedeu tamanho máximo de 5MB (${audioBuffer.length} bytes > ${jessicaAudioService.MAX_AUDIO_BYTES}). Descartando da RAM.`);
+    // In-Flight Stream Guard / Buffer Guard (Tier 2 de Defesa da RAM)
+    if (streamExceeded || (audioBuffer && audioBuffer.length > jessicaAudioService.MAX_AUDIO_BYTES)) {
+      console.warn(`[salonIncomingDispatcher] Áudio excedeu tamanho máximo in-flight de 5MB. Descartando da RAM.`);
       audioBuffer = null;
       if (sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
         await sock.sendMessage(senderJid, {
@@ -2734,6 +2805,7 @@ function _getCustomerSessionForTesting(key) {
 module.exports = {
   dispatchMessage,
   extractAudioNode,
+  readAudioStreamWithGuard,
   setMockDownloadMediaHandler,
   resetMockDownloadMediaHandler,
   resolveServiceMatch,

@@ -22,8 +22,8 @@ const MAX_AUDIO_TIMEOUT_MS = 30000;
 const GEMINI_MODELS = process.env.GEMINI_AUDIO_MODEL
   ? [process.env.GEMINI_AUDIO_MODEL.trim()]
   : (process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL.trim()] : [
-      'gemini-1.5-flash',
-      'gemini-1.5-flash-8b',
+      'gemini-3.5-flash-lite',
+      'gemini-3.8-flash',
     ]);
 
 let genAIClient = null;
@@ -155,12 +155,17 @@ async function executeGeminiAudioCall({ audioBuffer, mimeType, abortSignal }) {
     }
 
     try {
+      const isLite = modelName.toLowerCase().includes('flash-lite');
+      const generationConfig = {
+        maxOutputTokens: 1000,
+      };
+      if (!isLite) {
+        generationConfig.temperature = 0.1;
+      }
+
       const model = client.getGenerativeModel({
         model: modelName,
-        generationConfig: {
-          temperature: 0.1,
-          maxOutputTokens: 1000,
-        },
+        generationConfig,
       }, { signal: abortSignal });
 
       const response = await model.generateContent({
@@ -356,4 +361,5 @@ module.exports = {
   MAX_AUDIO_BYTES,
   MAX_AUDIO_SECONDS,
   DEFAULT_AUDIO_TIMEOUT_MS,
+  GEMINI_MODELS,
 };
