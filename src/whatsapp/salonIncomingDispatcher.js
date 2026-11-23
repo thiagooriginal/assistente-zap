@@ -15,6 +15,20 @@ const phoneUtils = require('../utils/phoneUtils');
 const salonAppointmentService = require('../services/salonAppointmentService');
 const salonNotificationService = require('../services/salonNotificationService');
 const jessicaNluService = require('../services/jessicaNluService');
+const jessicaAudioService = require('../services/jessicaAudioService');
+
+let baileysModule = null;
+try {
+  baileysModule = require('@whiskeysockets/baileys');
+} catch (_) {}
+
+let _mockDownloadMediaHandler = null;
+function setMockDownloadMediaHandler(fn) {
+  _mockDownloadMediaHandler = fn;
+}
+function resetMockDownloadMediaHandler() {
+  _mockDownloadMediaHandler = null;
+}
 
 /**
  * Acesso preguiçoso (lazy) ao salonSessionManager para eliminar advertência de dependência circular
@@ -169,6 +183,30 @@ function getQualifiedStaffForService(uid, serviceId) {
 }
 
 /**
+ * Extrai o nó de áudio da mensagem desenvelopando wrappers comuns do WhatsApp
+ * @private
+ * @param {object} messageContent
+ * @returns {object|null}
+ */
+function extractAudioNode(messageContent) {
+  if (!messageContent) return null;
+  let current = messageContent;
+  while (
+    current?.ephemeralMessage?.message ||
+    current?.viewOnceMessage?.message ||
+    current?.viewOnceMessageV2?.message ||
+    current?.documentWithCaptionMessage?.message
+  ) {
+    current =
+      current.ephemeralMessage?.message ||
+      current.viewOnceMessage?.message ||
+      current.viewOnceMessageV2?.message ||
+      current.documentWithCaptionMessage?.message;
+  }
+  return current?.audioMessage || null;
+}
+
+/**
  * Extrai o texto limpo da mensagem recebida
  * @private
  * @param {object} messageContent
@@ -176,11 +214,24 @@ function getQualifiedStaffForService(uid, serviceId) {
  */
 function extractMessageText(messageContent) {
   if (!messageContent) return '';
+  let current = messageContent;
+  while (
+    current?.ephemeralMessage?.message ||
+    current?.viewOnceMessage?.message ||
+    current?.viewOnceMessageV2?.message ||
+    current?.documentWithCaptionMessage?.message
+  ) {
+    current =
+      current.ephemeralMessage?.message ||
+      current.viewOnceMessage?.message ||
+      current.viewOnceMessageV2?.message ||
+      current.documentWithCaptionMessage?.message;
+  }
   return (
-    messageContent.conversation ||
-    messageContent.extendedTextMessage?.text ||
-    messageContent.imageMessage?.caption ||
-    messageContent.videoMessage?.caption ||
+    current?.conversation ||
+    current?.extendedTextMessage?.text ||
+    current?.imageMessage?.caption ||
+    current?.videoMessage?.caption ||
     ''
   ).trim();
 }
@@ -1375,7 +1426,7 @@ async function handleConversationalV2({
       date: session.selectedSlot.date,
       time: session.selectedSlot.time,
       durationMin: validService.duration_min,
-      origin: 'WHATSAPP_BOT',
+      origin: (session.lastOrigin === 'whatsapp_audio') ? 'whatsapp_audio' : 'WHATSAPP_BOT',
       dispatcherProof,
       reminderConsent: 0,
       reminderConsentOrigin: null,
@@ -1767,21 +1818,128 @@ async function dispatchMessage(salonUserId, sock, msg) {
     return false;
   }
 
-  const text = extractMessageText(msg.message);
-  if (!text) {
+  const audioNode = extractAudioNode(msg.message);
+  let text = extractMessageText(msg.message);
+
+  // 1. Defesa primária: se não há texto nem nó de áudio, descartar silenciosamente
+  if (!text && !audioNode) {
     return false;
   }
 
-  // 2. Deduplicação persistente via processed_messages
-  const msgId = msg.key?.id;
-  if (msgId) {
-    try {
-      const existing = db.prepare('SELECT id FROM processed_messages WHERE id = ?').get(msgId);
-      if (existing) {
-        return false;
+  let isAudioMessage = false;
+
+  // 2. Tratamento especializado para mensagem de áudio (COMANDO 068)
+  if (audioNode) {
+    // 2.1 Feature Flag: process.env.JESSICA_AUDIO_ENABLED === 'true'
+    if (process.env.JESSICA_AUDIO_ENABLED !== 'true') {
+      console.info(`[salonIncomingDispatcher] Áudio recebido mas JESSICA_AUDIO_ENABLED não está ativo. Ignorando silenciosamente (#${uid}).`);
+      return false;
+    }
+
+    // 2.2 Metadados defensivos ANTES de qualquer download em memória:
+    const fileLength = Number(audioNode.fileLength || 0);
+    if (fileLength > jessicaAudioService.MAX_AUDIO_BYTES) {
+      if (sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
+        await sock.sendMessage(senderJid, {
+          text: 'Opa! 😊 Este áudio é um pouco grande demais para eu ouvir por aqui (máximo de 5MB). Você poderia enviar um áudio mais curtinho ou me mandar por mensagem escrita o que precisa? Vou adorar te atender!',
+        });
       }
-      db.prepare('INSERT OR IGNORE INTO processed_messages (id, sender_jid) VALUES (?, ?)').run(msgId, senderJid);
-    } catch (_) {}
+      return true;
+    }
+
+    const durationSeconds = Number(audioNode.seconds || 0);
+    if (durationSeconds > jessicaAudioService.MAX_AUDIO_SECONDS) {
+      if (sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
+        await sock.sendMessage(senderJid, {
+          text: 'Opa! 😊 Este áudio é um pouco longo para eu ouvir por aqui (máximo de 2 minutos). Você poderia enviar um áudio mais curtinho ou me escrever o que você precisa? Vou adorar te atender!',
+        });
+      }
+      return true;
+    }
+
+    const rawMime = String(audioNode.mimetype || '').trim().toLowerCase();
+    if (!rawMime.startsWith('audio/')) {
+      if (sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
+        await sock.sendMessage(senderJid, {
+          text: 'Desculpa! 😊 Não consegui reconhecer o formato desse arquivo de áudio. Você poderia me enviar uma mensagem de voz comum ou me escrever o que precisa?',
+        });
+      }
+      return true;
+    }
+
+    // 2.3 Deduplicação persistente via processed_messages antes do download
+    const msgId = msg.key?.id;
+    if (msgId) {
+      try {
+        const existing = db.prepare('SELECT id FROM processed_messages WHERE id = ?').get(msgId);
+        if (existing) {
+          return false;
+        }
+        db.prepare('INSERT OR IGNORE INTO processed_messages (id, sender_jid) VALUES (?, ?)').run(msgId, senderJid);
+      } catch (_) {}
+    }
+
+    // 2.4 Download do buffer de áudio em memória via Baileys downloadMediaMessage
+    let audioBuffer = null;
+    try {
+      if (typeof _mockDownloadMediaHandler === 'function') {
+        audioBuffer = await _mockDownloadMediaHandler(msg);
+      } else {
+        const dlFn = baileysModule?.downloadMediaMessage;
+        if (typeof dlFn !== 'function') {
+          throw new Error('downloadMediaMessage helper não está disponível.');
+        }
+        audioBuffer = await dlFn(msg, 'buffer', {});
+      }
+    } catch (dlErr) {
+      console.error(`[salonIncomingDispatcher] Falha no download do áudio (#${uid}):`, dlErr.message);
+    }
+
+    if (!audioBuffer || !Buffer.isBuffer(audioBuffer) || audioBuffer.length === 0) {
+      if (sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
+        await sock.sendMessage(senderJid, {
+          text: 'Desculpa! 😊 Não consegui entender seu áudio desta vez. Você pode tentar enviar novamente ou me escrever o que precisa? Estou aqui para ajudar!',
+        });
+      }
+      return true;
+    }
+
+    // 2.5 Transcrição multimodal inteligente com JessicaAudioService
+    let transResult = null;
+    try {
+      transResult = await jessicaAudioService.transcribeAudio({
+        audioBuffer,
+        mimeType: audioNode.mimetype,
+        seconds: durationSeconds,
+      });
+    } catch (txErr) {
+      console.error(`[salonIncomingDispatcher] Erro inesperado na transcrição de áudio (#${uid}):`, txErr.message);
+    }
+
+    const transcribedText = (transResult?.text || '').trim();
+    if (!transResult?.success || !transcribedText || transcribedText === '[ININTELIGIVEL]') {
+      if (sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
+        await sock.sendMessage(senderJid, {
+          text: 'Desculpa! 😊 Não consegui entender seu áudio desta vez. Você pode tentar enviar novamente ou me escrever o que precisa? Estou aqui para ajudar!',
+        });
+      }
+      return true;
+    }
+
+    text = transcribedText;
+    isAudioMessage = true;
+  } else {
+    // Deduplicação para mensagens de texto padrão
+    const msgId = msg.key?.id;
+    if (msgId) {
+      try {
+        const existing = db.prepare('SELECT id FROM processed_messages WHERE id = ?').get(msgId);
+        if (existing) {
+          return false;
+        }
+        db.prepare('INSERT OR IGNORE INTO processed_messages (id, sender_jid) VALUES (?, ?)').run(msgId, senderJid);
+      } catch (_) {}
+    }
   }
 
   const sessionKey = `${uid}:${cleanPhone}`;
@@ -1828,6 +1986,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
       availableStaffList: [],
       candidateSlots: [],
       selectedSlot: null,
+      lastOrigin: isAudioMessage ? 'whatsapp_audio' : 'whatsapp_text',
     };
     customerSessions.set(sessionKey, session);
   } else {
@@ -1839,6 +1998,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
     }
   }
   session.lastActivity = now;
+  session.lastOrigin = isAudioMessage ? 'whatsapp_audio' : 'whatsapp_text';
   session.messageCount++;
 
   // 4. Normalização do texto
@@ -2238,7 +2398,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
           date: session.selectedSlot.date,
           time: session.selectedSlot.time,
           durationMin: validService.duration_min,
-          origin: 'WHATSAPP_BOT',
+          origin: (session.lastOrigin === 'whatsapp_audio') ? 'whatsapp_audio' : 'WHATSAPP_BOT',
           dispatcherProof,
           reminderConsent: 0,
           reminderConsentOrigin: null,
@@ -2527,6 +2687,8 @@ async function dispatchMessage(salonUserId, sock, msg) {
 function _resetForTesting() {
   customerSessions.clear();
   dispatcherProofs.clear();
+  _mockDownloadMediaHandler = null;
+  jessicaAudioService._resetForTesting();
 }
 
 /**
@@ -2538,6 +2700,9 @@ function _getCustomerSessionForTesting(key) {
 
 module.exports = {
   dispatchMessage,
+  extractAudioNode,
+  setMockDownloadMediaHandler,
+  resetMockDownloadMediaHandler,
   resolveServiceMatch,
   extractDeterministicTemporal,
   formatTemporalTarget,
