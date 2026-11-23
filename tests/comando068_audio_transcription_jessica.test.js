@@ -329,7 +329,8 @@ test('4. Áudio confirmando uma reserva -> Jéssica transcreve, confirma reserva
   `).get();
 
   assert.ok(apt, 'Agendamento deve ter sido gravado no SQLite');
-  assert.strictEqual(apt.origin, 'whatsapp_audio', 'Origin deve ser gravado como whatsapp_audio');
+  assert.strictEqual(apt.origin, 'WHATSAPP_BOT', 'Origin deve ser canonicamente WHATSAPP_BOT');
+  assert.strictEqual(apt.input_modality, 'audio', 'Modalidade de entrada deve ser gravada como audio');
 });
 
 test('5. Áudio com conteúdo incompreensível -> Transcrição retorna [ININTELIGIVEL] -> Fallback cordial', async () => {

@@ -1426,7 +1426,8 @@ async function handleConversationalV2({
       date: session.selectedSlot.date,
       time: session.selectedSlot.time,
       durationMin: validService.duration_min,
-      origin: (session.lastOrigin === 'whatsapp_audio') ? 'whatsapp_audio' : 'WHATSAPP_BOT',
+      origin: 'WHATSAPP_BOT',
+      inputModality: (session.lastOrigin === 'whatsapp_audio') ? 'audio' : 'text',
       dispatcherProof,
       reminderConsent: 0,
       reminderConsentOrigin: null,
@@ -1837,8 +1838,8 @@ async function dispatchMessage(salonUserId, sock, msg) {
     }
 
     // 2.2 Metadados defensivos ANTES de qualquer download em memória:
-    const fileLength = Number(audioNode.fileLength || 0);
-    if (fileLength > jessicaAudioService.MAX_AUDIO_BYTES) {
+    const rawFileLength = (audioNode.fileLength !== undefined && audioNode.fileLength !== null) ? Number(audioNode.fileLength) : null;
+    if (Number.isFinite(rawFileLength) && rawFileLength > jessicaAudioService.MAX_AUDIO_BYTES) {
       if (sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
         await sock.sendMessage(senderJid, {
           text: 'Opa! 😊 Este áudio é um pouco grande demais para eu ouvir por aqui (máximo de 5MB). Você poderia enviar um áudio mais curtinho ou me mandar por mensagem escrita o que precisa? Vou adorar te atender!',
@@ -1847,8 +1848,9 @@ async function dispatchMessage(salonUserId, sock, msg) {
       return true;
     }
 
-    const durationSeconds = Number(audioNode.seconds || 0);
-    if (durationSeconds > jessicaAudioService.MAX_AUDIO_SECONDS) {
+    const rawSeconds = (audioNode.seconds !== undefined && audioNode.seconds !== null) ? Number(audioNode.seconds) : null;
+    const durationSeconds = (Number.isFinite(rawSeconds) && rawSeconds > 0) ? rawSeconds : 0;
+    if (Number.isFinite(rawSeconds) && rawSeconds > jessicaAudioService.MAX_AUDIO_SECONDS) {
       if (sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
         await sock.sendMessage(senderJid, {
           text: 'Opa! 😊 Este áudio é um pouco longo para eu ouvir por aqui (máximo de 2 minutos). Você poderia enviar um áudio mais curtinho ou me escrever o que você precisa? Vou adorar te atender!',
@@ -1895,6 +1897,18 @@ async function dispatchMessage(salonUserId, sock, msg) {
       console.error(`[salonIncomingDispatcher] Falha no download do áudio (#${uid}):`, dlErr.message);
     }
 
+    // Post-Download / In-Flight Buffer Guard (Tier 2 de Defesa da RAM)
+    if (audioBuffer && audioBuffer.length > jessicaAudioService.MAX_AUDIO_BYTES) {
+      console.warn(`[salonIncomingDispatcher] Áudio baixado excedeu tamanho máximo de 5MB (${audioBuffer.length} bytes > ${jessicaAudioService.MAX_AUDIO_BYTES}). Descartando da RAM.`);
+      audioBuffer = null;
+      if (sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
+        await sock.sendMessage(senderJid, {
+          text: 'Opa! 😊 Este áudio é um pouco grande demais para eu ouvir por aqui (máximo de 5MB). Você poderia enviar um áudio mais curtinho ou me mandar por mensagem escrita o que precisa? Vou adorar te atender!',
+        });
+      }
+      return true;
+    }
+
     if (!audioBuffer || !Buffer.isBuffer(audioBuffer) || audioBuffer.length === 0) {
       if (sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
         await sock.sendMessage(senderJid, {
@@ -1914,6 +1928,24 @@ async function dispatchMessage(salonUserId, sock, msg) {
       });
     } catch (txErr) {
       console.error(`[salonIncomingDispatcher] Erro inesperado na transcrição de áudio (#${uid}):`, txErr.message);
+    }
+
+    if (transResult?.error === 'AUDIO_FILE_TOO_LARGE') {
+      if (sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
+        await sock.sendMessage(senderJid, {
+          text: 'Opa! 😊 Este áudio é um pouco grande demais para eu ouvir por aqui (máximo de 5MB). Você poderia enviar um áudio mais curtinho ou me mandar por mensagem escrita o que precisa? Vou adorar te atender!',
+        });
+      }
+      return true;
+    }
+
+    if (transResult?.error === 'AUDIO_DURATION_EXCEEDED') {
+      if (sessionMgr.isSalonRealWhatsAppAllowed(uid, cleanPhone)) {
+        await sock.sendMessage(senderJid, {
+          text: 'Opa! 😊 Este áudio é um pouco longo para eu ouvir por aqui (máximo de 2 minutos). Você poderia enviar um áudio mais curtinho ou me escrever o que você precisa? Vou adorar te atender!',
+        });
+      }
+      return true;
     }
 
     const transcribedText = (transResult?.text || '').trim();
@@ -2398,7 +2430,8 @@ async function dispatchMessage(salonUserId, sock, msg) {
           date: session.selectedSlot.date,
           time: session.selectedSlot.time,
           durationMin: validService.duration_min,
-          origin: (session.lastOrigin === 'whatsapp_audio') ? 'whatsapp_audio' : 'WHATSAPP_BOT',
+          origin: 'WHATSAPP_BOT',
+      inputModality: (session.lastOrigin === 'whatsapp_audio') ? 'audio' : 'text',
           dispatcherProof,
           reminderConsent: 0,
           reminderConsentOrigin: null,

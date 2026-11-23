@@ -109,6 +109,7 @@ db.exec(`
     notified_3h INTEGER DEFAULT 0,
     notified_1h INTEGER DEFAULT 0,
     source_type TEXT NOT NULL DEFAULT 'whatsapp',
+    input_modality TEXT DEFAULT 'text',
     created_at TEXT DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -1124,6 +1125,7 @@ ensureColumnExists('appointments', 'reminder_24h_status', "TEXT DEFAULT 'PENDING
 ensureColumnExists('appointments', 'reminder_consent', 'INTEGER DEFAULT 0');
 ensureColumnExists('appointments', 'reminder_consent_at', 'TEXT');
 ensureColumnExists('appointments', 'reminder_consent_origin', 'TEXT');
+ensureColumnExists('appointments', 'input_modality', "TEXT DEFAULT 'text'");
 ensureColumnExists('appointments', 'updated_at', 'TEXT');
 
 ensureColumnExists('client_staff', 'google_calendar_id', 'TEXT');

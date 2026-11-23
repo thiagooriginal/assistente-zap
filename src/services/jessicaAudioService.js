@@ -22,8 +22,8 @@ const MAX_AUDIO_TIMEOUT_MS = 30000;
 const GEMINI_MODELS = process.env.GEMINI_AUDIO_MODEL
   ? [process.env.GEMINI_AUDIO_MODEL.trim()]
   : (process.env.GEMINI_MODEL ? [process.env.GEMINI_MODEL.trim()] : [
-      'gemini-3.5-flash-lite',
-      'gemini-3.8-flash',
+      'gemini-1.5-flash',
+      'gemini-1.5-flash-8b',
     ]);
 
 let genAIClient = null;
@@ -39,6 +39,7 @@ function sanitizeAiError(err) {
   let msg = typeof err === 'string' ? err : (err.message || String(err));
   msg = msg.replace(/AIza[0-9A-Za-z\-_]{35}/g, '[REDACTED_GEMINI_KEY]');
   msg = msg.replace(/([?&]key=)[^&]+/gi, '$1[REDACTED_GEMINI_KEY]');
+  msg = msg.replace(/(x-goog-api-key[:=\s"']+)[^&\s"',;]+/gi, '$1[REDACTED_GEMINI_KEY]');
   return msg.substring(0, 255);
 }
 

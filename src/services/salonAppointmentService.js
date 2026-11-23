@@ -916,6 +916,7 @@ function bookAppointmentSync(userId, {
   reminderConsent = 0,
   reminderConsentOrigin = null,
   dispatcherProof = null,
+  inputModality = 'text',
 }) {
   if (!clientName || !clientName.trim()) {
     throw new Error('O nome do cliente é obrigatório.');
@@ -1017,15 +1018,17 @@ function bookAppointmentSync(userId, {
     const finalConsentAt = isConsentGiven ? new Date().toISOString() : null;
     const finalConsentOrigin = isConsentGiven ? (reminderConsentOrigin || origin || 'painel') : null;
     const initialReminder24hStatus = isConsentGiven ? 'PENDING' : 'DISABLED';
+    const finalInputModality = (String(inputModality || '').toLowerCase().trim() === 'audio') ? 'audio' : 'text';
 
     const stmt = db.prepare(`
       INSERT INTO appointments (
         user_id, title, description, start_datetime, end_datetime,
         service_id, staff_id, price, client_name, client_phone,
         duration_min, origin, status, google_sync_status, whatsapp_notified,
-        reminder_24h_status, reminder_consent, reminder_consent_at, reminder_consent_origin
+        reminder_24h_status, reminder_consent, reminder_consent_at, reminder_consent_origin,
+        input_modality
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', 0, ?, ?, ?, ?, ?)
     `);
 
     const info = stmt.run(
@@ -1045,7 +1048,8 @@ function bookAppointmentSync(userId, {
       initialReminder24hStatus,
       finalConsent,
       finalConsentAt,
-      finalConsentOrigin
+      finalConsentOrigin,
+      finalInputModality
     );
 
     const appointmentId = info.lastInsertRowid;
@@ -1108,6 +1112,7 @@ function bookAppointmentSync(userId, {
       duration_minutes: finalDurationMin,
       origin,
       status: finalStatus,
+      input_modality: finalInputModality,
       has_conflict: 0,
       google_sync_status: 'PENDING',
       reminder_consent: finalConsent,
@@ -1223,6 +1228,7 @@ async function bookAppointment(userId, params) {
   try {
     const createdAppointment = bookAppointmentSync(userId, {
       ...params,
+      inputModality: params.inputModality || params.input_modality || 'text',
       date: cleanDate,
       staffId: resolvedStaffId,
     });
