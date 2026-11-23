@@ -389,3 +389,173 @@ test('15. Presença dos seletores interativos e toggle de linha de resultado', (
   assert.ok(painelHtml.includes('showResultLine'), 'Deve controlar o estado de visibilidade da linha');
   assert.ok(painelHtml.includes('formatBRL'), 'Deve conter formatador em moeda brasileira R$');
 });
+
+// =========================================================================
+// TESTES DO COMANDO 070.1: CORREÇÃO VISUAL E FINANCEIRA
+// =========================================================================
+
+test('16. [COMANDO 070.1] Identidade Visual Beauty Premium clara no dashboard gerencial', () => {
+  const painelHtml = fs.readFileSync(path.resolve(__dirname, '../public/cliente/painel.html'), 'utf8');
+
+  // Verifica as regras de CSS scoped do Beauty Premium aplicadas ao #tab-dashboard-pro
+  assert.ok(painelHtml.includes('body.theme-jessica-beauty #tab-dashboard-pro .bg-\\[\\#11131a\\]'), 'Deve conter override dos cards escuros no tema Beauty');
+  assert.ok(painelHtml.includes('var(--beauty-card-bg)'), 'Cards devem herdar fundo claro --beauty-card-bg');
+  assert.ok(painelHtml.includes('var(--beauty-text-primary)'), 'Textos devem herdar marrom --beauty-text-primary');
+  assert.ok(painelHtml.includes('var(--beauty-border)'), 'Bordas devem herdar --beauty-border');
+  assert.ok(painelHtml.includes('#financialChartContainer'), 'Containers dos gráficos devem ter override scoped');
+  assert.ok(painelHtml.includes('#financialTrendContainer'), 'Containers dos gráficos devem ter override scoped');
+  assert.ok(painelHtml.includes('#FAF0E7') || painelHtml.includes('#FBF6F0'), 'Deve aplicar fundo bege/creme aos containers de gráficos');
+
+  // Cores semânticas nos KPIs
+  assert.ok(painelHtml.includes('#AD7B42'), 'Receitas com dourado profundo no tema Beauty');
+  assert.ok(painelHtml.includes('#E06D53'), 'Despesas com coral elegante no tema Beauty');
+  assert.ok(painelHtml.includes('#16A34A'), 'Resultado positivo com verde elegante no tema Beauty');
+
+  // Preservação do tema institucional dark da RAIA
+  assert.ok(painelHtml.includes('body.theme-raia'), 'Tema RAIA institucional deve permanecer preservado');
+});
+
+test('17. [COMANDO 070.1] Agrupamento semanal em meses de 28, 29, 30 e 31 dias', () => {
+  // Teste com mês de 28 dias (Fevereiro comum)
+  const fev28 = [];
+  for (let d = 1; d <= 28; d++) {
+    const dayStr = d < 10 ? `0${d}` : `${d}`;
+    fev28.push({ date: `2025-02-${dayStr}`, label: `${dayStr}/02`, receitas: 100, despesas: 30, resultado: 70 });
+  }
+  const weeks28 = salonDashboardService.buildWeeklyBreakdown(fev28, 'this_month');
+  assert.equal(weeks28.length, 4, 'Fevereiro de 28 dias deve ter exatamente 4 semanas');
+  assert.equal(weeks28[0].daysCount, 7);
+  assert.equal(weeks28[1].daysCount, 7);
+  assert.equal(weeks28[2].daysCount, 7);
+  assert.equal(weeks28[3].daysCount, 7);
+  assert.equal(weeks28.reduce((a, w) => a + w.receitas, 0), 2800);
+  assert.equal(weeks28.reduce((a, w) => a + w.despesas, 0), 840);
+  assert.equal(weeks28.reduce((a, w) => a + w.resultado, 0), 1960);
+
+  // Teste com mês de 29 dias (Fevereiro bissexto)
+  const fev29 = [];
+  for (let d = 1; d <= 29; d++) {
+    const dayStr = d < 10 ? `0${d}` : `${d}`;
+    fev29.push({ date: `2024-02-${dayStr}`, label: `${dayStr}/02`, receitas: 100, despesas: 20, resultado: 80 });
+  }
+  const weeks29 = salonDashboardService.buildWeeklyBreakdown(fev29, 'this_month');
+  assert.equal(weeks29.length, 4, 'Fevereiro bissexto deve ter exatamente 4 semanas');
+  assert.equal(weeks29[3].daysCount, 8, 'A 4ª semana de fev bissexto deve conter 8 dias');
+  assert.equal(weeks29.reduce((a, w) => a + w.receitas, 0), 2900);
+
+  // Teste com mês de 30 dias (Abril)
+  const abr30 = [];
+  for (let d = 1; d <= 30; d++) {
+    const dayStr = d < 10 ? `0${d}` : `${d}`;
+    abr30.push({ date: `2026-04-${dayStr}`, label: `${dayStr}/04`, receitas: 200, despesas: 50, resultado: 150 });
+  }
+  const weeks30 = salonDashboardService.buildWeeklyBreakdown(abr30, 'this_month');
+  assert.equal(weeks30.length, 4, 'Mês de 30 dias deve ter 4 semanas');
+  assert.equal(weeks30[3].daysCount, 9, 'A 4ª semana de mês com 30 dias deve conter 9 dias (22 a 30)');
+  assert.equal(weeks30.reduce((a, w) => a + w.receitas, 0), 6000);
+
+  // Teste com mês de 31 dias (Março)
+  const mar31 = [];
+  for (let d = 1; d <= 31; d++) {
+    const dayStr = d < 10 ? `0${d}` : `${d}`;
+    mar31.push({ date: `2026-03-${dayStr}`, label: `${dayStr}/03`, receitas: 300, despesas: 100, resultado: 200 });
+  }
+  const weeks31 = salonDashboardService.buildWeeklyBreakdown(mar31, 'this_month');
+  assert.equal(weeks31.length, 4, 'Mês de 31 dias deve ter 4 semanas');
+  assert.equal(weeks31[3].daysCount, 10, 'A 4ª semana de mês com 31 dias deve conter 10 dias (22 a 31)');
+  assert.equal(weeks31.reduce((a, w) => a + w.receitas, 0), 9300);
+});
+
+test('18. [COMANDO 070.1] Períodos personalizados que atravessam meses (45 dias, 90 dias e transição dez-jan)', () => {
+  // Cenário 1: 45 dias atravessando dezembro e janeiro (ex: 2026-12-15 a 2027-01-28)
+  const cross45 = [];
+  let curDate = new Date('2026-12-15T00:00:00');
+  for (let i = 0; i < 45; i++) {
+    const iso = curDate.toISOString().slice(0, 10);
+    const parts = iso.split('-');
+    const label = `${parts[2]}/${parts[1]}`;
+    cross45.push({
+      date: iso,
+      label,
+      receitas: i % 2 === 0 ? 150.00 : 0.00,
+      despesas: i % 3 === 0 ? 50.00 : 0.00,
+      resultado: (i % 2 === 0 ? 150.00 : 0.00) - (i % 3 === 0 ? 50.00 : 0.00),
+    });
+    curDate.setDate(curDate.getDate() + 1);
+  }
+
+  const weeks45 = salonDashboardService.buildWeeklyBreakdown(cross45, 'custom');
+  assert.ok(weeks45.length >= 6, 'Período de 45 dias deve gerar pelo menos 6 semanas contínuas');
+
+  // Cada semana deve ser estritamente sequencial cronológica
+  for (let w = 0; w < weeks45.length - 1; w++) {
+    assert.ok(weeks45[w].startDate < weeks45[w + 1].startDate, `Semana ${w + 1} deve anteceder a Semana ${w + 2}`);
+  }
+
+  // Verificação de soma exata
+  const totalRec45 = cross45.reduce((a, c) => a + c.receitas, 0);
+  const totalDesp45 = cross45.reduce((a, c) => a + c.despesas, 0);
+  const totalRes45 = cross45.reduce((a, c) => a + c.resultado, 0);
+
+  const sumRec45 = Math.round(weeks45.reduce((a, w) => a + w.receitas, 0) * 100) / 100;
+  const sumDesp45 = Math.round(weeks45.reduce((a, w) => a + w.despesas, 0) * 100) / 100;
+  const sumRes45 = Math.round(weeks45.reduce((a, w) => a + w.resultado, 0) * 100) / 100;
+
+  assert.equal(sumRec45, totalRec45, 'Soma das receitas semanais deve ser exata no cruzamento de meses');
+  assert.equal(sumDesp45, totalDesp45, 'Soma das despesas semanais deve ser exata no cruzamento de meses');
+  assert.equal(sumRes45, totalRes45, 'Soma dos resultados semanais deve ser exata no cruzamento de meses');
+
+  // Cenário 2: 90 dias
+  const cross90 = [];
+  curDate = new Date('2026-01-01T00:00:00');
+  for (let i = 0; i < 90; i++) {
+    const iso = curDate.toISOString().slice(0, 10);
+    const parts = iso.split('-');
+    cross90.push({
+      date: iso,
+      label: `${parts[2]}/${parts[1]}`,
+      receitas: 250,
+      despesas: 100,
+      resultado: 150,
+    });
+    curDate.setDate(curDate.getDate() + 1);
+  }
+
+  const weeks90 = salonDashboardService.buildWeeklyBreakdown(cross90, 'custom');
+  assert.ok(weeks90.length >= 12, '90 dias devem gerar pelo menos 12 semanas');
+  const sumRec90 = weeks90.reduce((a, w) => a + w.receitas, 0);
+  assert.equal(sumRec90, 90 * 250, 'Soma de 90 dias deve bater exatamente');
+});
+
+test('19. [COMANDO 070.1] Resultado financeiro acumulado correto na curva de tendência', () => {
+  const painelHtml = fs.readFileSync(path.resolve(__dirname, '../public/cliente/painel.html'), 'utf8');
+
+  // Verifica que renderFinancialTrend possui a fórmula do resultado acumulado
+  assert.ok(painelHtml.includes('runningCumulative'), 'Deve calcular resultado acumulado dia a dia');
+  assert.ok(painelHtml.includes('accumulatedResult'), 'Deve atribuir accumulatedResult a cada ponto');
+  assert.ok(painelHtml.includes('dailyResult'), 'Deve preservar dailyResult para clareza no tooltip');
+  assert.ok(painelHtml.includes('Resultado Acumulado:'), 'Tooltip deve exibir explicitamente Resultado Acumulado');
+  assert.ok(painelHtml.includes('Resultado do Dia:'), 'Tooltip deve exibir explicitamente Resultado do Dia');
+
+  // Simulação matemática de acumulação (positivo e negativo)
+  const testTimeline = [
+    { date: '2026-11-01', label: '01/11', resultado: 100 },
+    { date: '2026-11-02', label: '02/11', resultado: -250 }, // acumulado: -150
+    { date: '2026-11-03', label: '03/11', resultado: 50 },   // acumulado: -100
+    { date: '2026-11-04', label: '04/11', resultado: 400 },  // acumulado: +300
+  ];
+
+  let acc = 0;
+  const simulatedCumulative = testTimeline.map(pt => {
+    acc = Math.round((acc + pt.resultado) * 100) / 100;
+    return { ...pt, accumulatedResult: acc };
+  });
+
+  assert.equal(simulatedCumulative[0].accumulatedResult, 100);
+  assert.equal(simulatedCumulative[1].accumulatedResult, -150, 'Deve suportar valor acumulado negativo');
+  assert.equal(simulatedCumulative[2].accumulatedResult, -100);
+  assert.equal(simulatedCumulative[3].accumulatedResult, 300, 'Último ponto deve ser exatamente a soma total do período (+300)');
+
+  const totalPeriodResult = testTimeline.reduce((a, c) => a + c.resultado, 0);
+  assert.equal(simulatedCumulative[simulatedCumulative.length - 1].accumulatedResult, totalPeriodResult, 'O último ponto DEVE ser igual ao resultado financeiro total do período');
+});

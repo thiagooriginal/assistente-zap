@@ -621,6 +621,114 @@
       border-color: rgba(200, 155, 109, 0.35) !important;
     }
 
+    /* ========================================================================= */
+    /* 👑 JÉSSICA BEAUTY DASHBOARD GERENCIAL & FINANCEIRO PREMIUM (CLARO)        */
+    /* ========================================================================= */
+    body.theme-jessica-beauty #tab-dashboard-pro .bg-\[\#11131a\] {
+      background-color: var(--beauty-card-bg) !important;
+      border-color: var(--beauty-border) !important;
+      color: var(--beauty-text-primary) !important;
+      box-shadow: 0 4px 20px -2px rgba(78, 59, 49, 0.05), 0 2px 6px -1px rgba(200, 155, 109, 0.08) !important;
+    }
+
+    body.theme-jessica-beauty #tab-dashboard-pro .bg-\[\#07080c\],
+    body.theme-jessica-beauty #tab-dashboard-pro .bg-\[\#07080c\]\/60 {
+      background-color: #FAF0E7 !important;
+      border-color: var(--beauty-border) !important;
+    }
+
+    body.theme-jessica-beauty #tab-dashboard-pro #financialChartContainer,
+    body.theme-jessica-beauty #tab-dashboard-pro #financialTrendContainer {
+      background-color: #FBF6F0 !important;
+      border: 1px solid var(--beauty-border) !important;
+    }
+
+    body.theme-jessica-beauty #tab-dashboard-pro .border-white\/5,
+    body.theme-jessica-beauty #tab-dashboard-pro .border-white\/10 {
+      border-color: var(--beauty-border) !important;
+    }
+
+    body.theme-jessica-beauty #tab-dashboard-pro .text-white {
+      color: var(--beauty-text-primary) !important;
+    }
+
+    body.theme-jessica-beauty #tab-dashboard-pro .text-slate-200,
+    body.theme-jessica-beauty #tab-dashboard-pro .text-slate-300,
+    body.theme-jessica-beauty #tab-dashboard-pro .text-slate-400,
+    body.theme-jessica-beauty #tab-dashboard-pro .text-slate-500 {
+      color: var(--beauty-text-secondary) !important;
+    }
+
+    /* Cores Semânticas Beauty nos KPIs e Resumo */
+    body.theme-jessica-beauty #tab-dashboard-pro #kpiRealizedRevenue,
+    body.theme-jessica-beauty #tab-dashboard-pro #summaryRealizedRevenue {
+      color: #AD7B42 !important;
+    }
+    body.theme-jessica-beauty #tab-dashboard-pro #kpiExpensesTotal,
+    body.theme-jessica-beauty #tab-dashboard-pro #summaryExpensesTotal {
+      color: #E06D53 !important;
+    }
+    body.theme-jessica-beauty #tab-dashboard-pro #kpiEstimatedRevenue {
+      color: #8C6A58 !important;
+    }
+
+    /* Botões de Filtro de Período no Tema Beauty */
+    body.theme-jessica-beauty #proPeriodBtnGroup .period-filter-btn {
+      background-color: #FAF0E7 !important;
+      color: var(--beauty-text-secondary) !important;
+      border: 1px solid var(--beauty-border) !important;
+    }
+    body.theme-jessica-beauty #proPeriodBtnGroup .period-filter-btn:hover {
+      background-color: #F3E6DB !important;
+      color: var(--beauty-text-primary) !important;
+    }
+    body.theme-jessica-beauty #proPeriodBtnGroup .period-filter-btn.active {
+      background-color: #F6EDE6 !important;
+      color: #AD7B42 !important;
+      font-weight: 700 !important;
+      border-color: #AD7B42 !important;
+      box-shadow: 0 2px 8px rgba(78, 59, 49, 0.05) !important;
+    }
+
+    /* Botão + Movimentação */
+    body.theme-jessica-beauty #btnOpenNewTxModal {
+      background: linear-gradient(135deg, #C89B6D 0%, #AD7B42 100%) !important;
+      color: #FFFFFF !important;
+      border: none !important;
+      box-shadow: 0 4px 14px rgba(173, 123, 66, 0.28) !important;
+    }
+    body.theme-jessica-beauty #btnOpenNewTxModal:hover {
+      background: linear-gradient(135deg, #AD7B42 0%, #8C5E28 100%) !important;
+    }
+    body.theme-jessica-beauty #btnOpenNewTxModal i {
+      color: #FFFFFF !important;
+    }
+
+    /* Botão Alternar Linha de Resultado */
+    body.theme-jessica-beauty #btnToggleResultLine {
+      background-color: #FAF0E7 !important;
+      border: 1px solid var(--beauty-border) !important;
+      color: var(--beauty-text-secondary) !important;
+    }
+    body.theme-jessica-beauty #btnToggleResultLine:hover {
+      background-color: #F3E6DB !important;
+      color: var(--beauty-text-primary) !important;
+    }
+
+    /* Linhas das Tabelas no Dashboard */
+    body.theme-jessica-beauty #tab-dashboard-pro table thead tr {
+      border-bottom-color: var(--beauty-border) !important;
+    }
+    body.theme-jessica-beauty #tab-dashboard-pro table thead th {
+      color: var(--beauty-text-secondary) !important;
+    }
+    body.theme-jessica-beauty #tab-dashboard-pro table tbody tr {
+      border-bottom-color: rgba(230, 214, 202, 0.5) !important;
+    }
+    body.theme-jessica-beauty #tab-dashboard-pro table tbody tr:hover {
+      background-color: rgba(250, 240, 231, 0.6) !important;
+    }
+
     /* ======================================================== */
     /* RAIA & JÉSSICA MODAL PORTAL & BACKDROP SPECIFICATION     */
     /* ======================================================== */
@@ -10744,13 +10852,22 @@
       if (recEl) recEl.innerText = formatBRL(metrics.realizedRevenue);
       if (despEl) despEl.innerText = formatBRL(metrics.expensesTotal);
 
+      const isBeautyTheme = document.body.classList.contains('theme-jessica-beauty');
       const resVal = metrics.financialResult || 0;
       if (resEl) {
         resEl.innerText = formatBRL(resVal);
-        resEl.className = resVal < 0 ? 'text-xl sm:text-2xl font-black text-rose-400 mt-2' : 'text-xl sm:text-2xl font-black text-emerald-400 mt-2';
+        if (isBeautyTheme) {
+          resEl.className = resVal < 0 ? 'text-xl sm:text-2xl font-black text-[#E06D53] mt-2' : 'text-xl sm:text-2xl font-black text-[#16A34A] mt-2';
+        } else {
+          resEl.className = resVal < 0 ? 'text-xl sm:text-2xl font-black text-rose-400 mt-2' : 'text-xl sm:text-2xl font-black text-emerald-400 mt-2';
+        }
       }
       if (dotEl) {
-        dotEl.className = resVal < 0 ? 'w-2.5 h-2.5 rounded-full bg-rose-500' : 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+        if (isBeautyTheme) {
+          dotEl.className = resVal < 0 ? 'w-2.5 h-2.5 rounded-full bg-[#E06D53]' : 'w-2.5 h-2.5 rounded-full bg-[#16A34A]';
+        } else {
+          dotEl.className = resVal < 0 ? 'w-2.5 h-2.5 rounded-full bg-rose-500' : 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+        }
       }
 
       const margin = (metrics.realizedRevenue && metrics.realizedRevenue > 0)
@@ -10758,7 +10875,11 @@
         : '0,0%';
       if (marginEl) {
         marginEl.innerText = margin;
-        marginEl.className = resVal < 0 ? 'font-bold text-rose-400' : 'font-bold text-emerald-400';
+        if (isBeautyTheme) {
+          marginEl.className = resVal < 0 ? 'font-bold text-[#E06D53]' : 'font-bold text-[#16A34A]';
+        } else {
+          marginEl.className = resVal < 0 ? 'font-bold text-rose-400' : 'font-bold text-emerald-400';
+        }
       }
 
       renderVariationBadge('summaryVarRealized', variations.realizedRevenue);
@@ -10777,7 +10898,12 @@
         const recPct = Math.min(100, Math.max(2, Math.round(((w.receitas || 0) / maxVal) * 100)));
         const despPct = Math.min(100, Math.max(2, Math.round(((w.despesas || 0) / maxVal) * 100)));
         const isPositive = (w.resultado || 0) >= 0;
-        const badgeColor = isPositive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+        let badgeColor = '';
+        if (isBeautyTheme) {
+          badgeColor = isPositive ? 'bg-emerald-500/10 text-[#16A34A] border-emerald-500/30' : 'bg-rose-500/10 text-[#E06D53] border-rose-500/30';
+        } else {
+          badgeColor = isPositive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+        }
         const sign = isPositive ? '+' : '';
 
         html += `
@@ -10799,7 +10925,7 @@
                   <span class="w-2 h-2 rounded-full bg-[#C89B6D]"></span>
                   <span>Receitas</span>
                 </span>
-                <span class="font-bold text-[#C89B6D] font-mono">${formatBRL(w.receitas)}</span>
+                <span class="font-bold text-[#AD7B42] font-mono">${formatBRL(w.receitas)}</span>
               </div>
               <div class="w-full h-2.5 rounded-full bg-white/5 overflow-hidden">
                 <div class="h-full rounded-full bg-gradient-to-r from-[#AD7B42] to-[#C89B6D] transition-all duration-500" style="width: ${recPct}%;"></div>
@@ -10837,6 +10963,13 @@
         container.innerHTML = '<div class="text-xs text-slate-500">Sem dados financeiros suficientes para o período.</div>';
         return;
       }
+
+      const isBeautyTheme = document.body.classList.contains('theme-jessica-beauty');
+      const gridStroke = isBeautyTheme ? '#EAD9CD' : 'rgba(255,255,255,0.06)';
+      const textColor = isBeautyTheme ? '#7A6255' : '#94a3b8';
+      const zeroStroke = isBeautyTheme ? '#D9B8AE' : 'rgba(255,255,255,0.25)';
+      const resultLineColor = isBeautyTheme ? '#16A34A' : '#00F59B';
+      const dotStrokeColor = isBeautyTheme ? '#FFFDFB' : '#07080c';
 
       // Determina os 6 a 8 agrupamentos máximos
       let groups = [];
@@ -10915,8 +11048,8 @@
         const val = minVal + (valRange / gridSteps) * i;
         const y = getY(val);
         gridLinesSvg += `
-          <line x1="${padLeft}" y1="${y}" x2="${padLeft + chartW}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3,3" />
-          <text x="${padLeft - 10}" y="${y + 4}" fill="#94a3b8" font-size="10" font-family="monospace" text-anchor="end">${formatBRL(Math.round(val))}</text>
+          <line x1="${padLeft}" y1="${y}" x2="${padLeft + chartW}" y2="${y}" stroke="${gridStroke}" stroke-dasharray="3,3" />
+          <text x="${padLeft - 10}" y="${y + 4}" fill="${textColor}" font-size="10" font-family="monospace" text-anchor="end">${formatBRL(Math.round(val))}</text>
         `;
       }
 
@@ -10948,14 +11081,14 @@
           <g class="chart-bar-group cursor-pointer" data-group-index="${idx}">
             <title>${escapeHtml(g.fullLabel)}&#10;Receitas: ${formatBRL(g.receitas)}&#10;Despesas: ${formatBRL(g.despesas)}&#10;Resultado: ${formatBRL(g.resultado)}</title>
             <!-- Barra Receita Dourada -->
-            <rect x="${xRec}" y="${yRec}" width="${barWidth}" height="${hRec}" rx="3" fill="url(#beautyGoldBarGrad)" class="transition-all hover:brightness-125" />
+            <rect x="${xRec}" y="${yRec}" width="${barWidth}" height="${hRec}" rx="3" fill="url(#beautyGoldBarGrad)" class="transition-all hover:brightness-110" />
             <!-- Barra Despesa Rosé/Coral -->
-            <rect x="${xDesp}" y="${yDesp}" width="${barWidth}" height="${hDesp}" rx="3" fill="url(#beautyRoseBarGrad)" class="transition-all hover:brightness-125" />
+            <rect x="${xDesp}" y="${yDesp}" width="${barWidth}" height="${hDesp}" rx="3" fill="url(#beautyRoseBarGrad)" class="transition-all hover:brightness-110" />
           </g>
         `;
 
         xLabelsSvg += `
-          <text x="${centerX}" y="${padTop + chartH + 20}" fill="#94a3b8" font-size="10" text-anchor="middle" font-semibold>${escapeHtml(g.label)}</text>
+          <text x="${centerX}" y="${padTop + chartH + 20}" fill="${textColor}" font-size="10" text-anchor="middle" font-semibold>${escapeHtml(g.label)}</text>
         `;
       });
 
@@ -10967,12 +11100,12 @@
         groups.forEach((g, idx) => {
           const centerX = padLeft + idx * groupWidth + groupWidth / 2;
           const yRes = getY(g.resultado);
-          const dotColor = g.resultado >= 0 ? '#00F59B' : '#EF4444';
-          dotsSvg += `<circle cx="${centerX}" cy="${yRes}" r="4" fill="${dotColor}" stroke="#07080c" stroke-width="2" />`;
+          const dotColor = g.resultado >= 0 ? resultLineColor : '#E06D53';
+          dotsSvg += `<circle cx="${centerX}" cy="${yRes}" r="4" fill="${dotColor}" stroke="${dotStrokeColor}" stroke-width="2" />`;
         });
 
         resultLineSvg = `
-          <path d="${pathD}" fill="none" stroke="#00F59B" stroke-width="2.5" stroke-dasharray="4,4" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="${pathD}" fill="none" stroke="${resultLineColor}" stroke-width="2.5" stroke-dasharray="4,4" stroke-linecap="round" stroke-linejoin="round" />
           ${dotsSvg}
         `;
       }
@@ -10991,7 +11124,7 @@
               <stop offset="100%" stop-color="#B91C1C" />
             </linearGradient>
           </defs>
-          ${minVal < 0 ? `<line x1="${padLeft}" y1="${zeroY}" x2="${padLeft + chartW}" y2="${zeroY}" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" />` : ''}
+          ${minVal < 0 ? `<line x1="${padLeft}" y1="${zeroY}" x2="${padLeft + chartW}" y2="${zeroY}" stroke="${zeroStroke}" stroke-width="1.5" />` : ''}
           ${gridLinesSvg}
           ${xLabelsSvg}
           ${barsSvg}
@@ -11001,7 +11134,7 @@
     }
 
     // ========================================================
-    // 3. SEÇÃO 3: TENDÊNCIA DO RESULTADO (LINHA & ÁREA)
+    // 3. SEÇÃO 3: TENDÊNCIA DO RESULTADO ACUMULADO (LINHA & ÁREA)
     // ========================================================
     function renderFinancialTrend(timeline = []) {
       const container = document.getElementById('financialTrendContainer');
@@ -11011,6 +11144,25 @@
         container.innerHTML = '<div class="text-xs text-slate-500">Sem dados para a curva de resultado.</div>';
         return;
       }
+
+      // Calcula o resultado acumulado cronológico desde o início do período até cada dia n:
+      // resultadoAcumulado[n] = soma(resultado diário de 0 até n)
+      let runningCumulative = 0;
+      const cumulativeTimeline = timeline.map(pt => {
+        runningCumulative = Math.round((runningCumulative + (Number(pt.resultado) || 0)) * 100) / 100;
+        return {
+          ...pt,
+          dailyResult: Number(pt.resultado) || 0,
+          accumulatedResult: runningCumulative,
+        };
+      });
+
+      const isBeautyTheme = document.body.classList.contains('theme-jessica-beauty');
+      const gridStroke = isBeautyTheme ? '#EAD9CD' : 'rgba(255,255,255,0.06)';
+      const textColor = isBeautyTheme ? '#7A6255' : '#94a3b8';
+      const zeroStroke = isBeautyTheme ? '#D9B8AE' : 'rgba(255,255,255,0.25)';
+      const trendColor = isBeautyTheme ? '#16A34A' : '#00F59B';
+      const dotStrokeColor = isBeautyTheme ? '#FFFDFB' : '#07080c';
 
       const w = 800;
       const h = 240;
@@ -11023,9 +11175,9 @@
 
       let maxVal = 50;
       let minVal = 0;
-      timeline.forEach(pt => {
-        if (pt.resultado > maxVal) maxVal = pt.resultado;
-        if (pt.resultado < minVal) minVal = pt.resultado;
+      cumulativeTimeline.forEach(pt => {
+        if (pt.accumulatedResult > maxVal) maxVal = pt.accumulatedResult;
+        if (pt.accumulatedResult < minVal) minVal = pt.accumulatedResult;
       });
       maxVal = Math.ceil(maxVal * 1.15);
       if (minVal < 0) minVal = Math.floor(minVal * 1.15);
@@ -11034,28 +11186,29 @@
       const getY = (val) => padTop + chartH - ((val - minVal) / valRange) * chartH;
       const zeroY = getY(0);
 
-      const stepX = timeline.length > 1 ? chartW / (timeline.length - 1) : chartW / 2;
-      const getX = (idx) => padLeft + (timeline.length > 1 ? idx * stepX : chartW / 2);
+      const stepX = cumulativeTimeline.length > 1 ? chartW / (cumulativeTimeline.length - 1) : chartW / 2;
+      const getX = (idx) => padLeft + (cumulativeTimeline.length > 1 ? idx * stepX : chartW / 2);
 
       let points = [];
       let dotsSvg = '';
-      timeline.forEach((pt, idx) => {
+      cumulativeTimeline.forEach((pt, idx) => {
         const x = getX(idx);
-        const y = getY(pt.resultado);
+        const y = getY(pt.accumulatedResult);
         points.push(`${x},${y}`);
-        const isPos = pt.resultado >= 0;
-        const dotColor = isPos ? '#00F59B' : '#EF4444';
+        const isPos = pt.accumulatedResult >= 0;
+        const dotColor = isPos ? trendColor : '#E06D53';
+        const sign = pt.dailyResult >= 0 ? '+' : '';
         dotsSvg += `
           <g class="cursor-pointer">
-            <title>${escapeHtml(pt.label)}: Saldo Líquido ${formatBRL(pt.resultado)}</title>
-            <circle cx="${x}" cy="${y}" r="3.5" fill="${dotColor}" stroke="#07080c" stroke-width="2" />
+            <title>${escapeHtml(pt.label)}&#10;Resultado Acumulado: ${formatBRL(pt.accumulatedResult)}&#10;Resultado do Dia: ${sign}${formatBRL(pt.dailyResult)}</title>
+            <circle cx="${x}" cy="${y}" r="3.5" fill="${dotColor}" stroke="${dotStrokeColor}" stroke-width="2" />
           </g>
         `;
       });
 
       const linePathD = `M ` + points.join(' L ');
       const firstX = getX(0);
-      const lastX = getX(timeline.length - 1);
+      const lastX = getX(cumulativeTimeline.length - 1);
       const areaPathD = `${linePathD} L ${lastX},${zeroY} L ${firstX},${zeroY} Z`;
 
       let gridLinesSvg = '';
@@ -11064,18 +11217,18 @@
         const val = minVal + (valRange / gridSteps) * i;
         const y = getY(val);
         gridLinesSvg += `
-          <line x1="${padLeft}" y1="${y}" x2="${padLeft + chartW}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3,3" />
-          <text x="${padLeft - 10}" y="${y + 4}" fill="#94a3b8" font-size="10" font-family="monospace" text-anchor="end">${formatBRL(Math.round(val))}</text>
+          <line x1="${padLeft}" y1="${y}" x2="${padLeft + chartW}" y2="${y}" stroke="${gridStroke}" stroke-dasharray="3,3" />
+          <text x="${padLeft - 10}" y="${y + 4}" fill="${textColor}" font-size="10" font-family="monospace" text-anchor="end">${formatBRL(Math.round(val))}</text>
         `;
       }
 
-      const labelInterval = timeline.length > 16 ? Math.ceil(timeline.length / 8) : (timeline.length > 8 ? 2 : 1);
+      const labelInterval = cumulativeTimeline.length > 16 ? Math.ceil(cumulativeTimeline.length / 8) : (cumulativeTimeline.length > 8 ? 2 : 1);
       let xLabelsSvg = '';
-      timeline.forEach((pt, idx) => {
-        if (idx % labelInterval === 0 || idx === timeline.length - 1) {
+      cumulativeTimeline.forEach((pt, idx) => {
+        if (idx % labelInterval === 0 || idx === cumulativeTimeline.length - 1) {
           const x = getX(idx);
           xLabelsSvg += `
-            <text x="${x}" y="${padTop + chartH + 20}" fill="#94a3b8" font-size="10" text-anchor="middle">${escapeHtml(pt.label)}</text>
+            <text x="${x}" y="${padTop + chartH + 20}" fill="${textColor}" font-size="10" text-anchor="middle">${escapeHtml(pt.label)}</text>
           `;
         }
       });
@@ -11084,15 +11237,15 @@
         <svg viewBox="0 0 ${w} ${h}" class="w-full h-full overflow-visible" preserveAspectRatio="none">
           <defs>
             <linearGradient id="emeraldAreaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="#00F59B" stop-opacity="0.3" />
-              <stop offset="100%" stop-color="#00F59B" stop-opacity="0.0" />
+              <stop offset="0%" stop-color="${trendColor}" stop-opacity="${isBeautyTheme ? '0.22' : '0.30'}" />
+              <stop offset="100%" stop-color="${trendColor}" stop-opacity="0.0" />
             </linearGradient>
           </defs>
-          <line x1="${padLeft}" y1="${zeroY}" x2="${padLeft + chartW}" y2="${zeroY}" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-dasharray="4,4" />
+          <line x1="${padLeft}" y1="${zeroY}" x2="${padLeft + chartW}" y2="${zeroY}" stroke="${zeroStroke}" stroke-width="1.5" stroke-dasharray="4,4" />
           ${gridLinesSvg}
           ${xLabelsSvg}
           <path d="${areaPathD}" fill="url(#emeraldAreaGrad)" />
-          <path d="${linePathD}" fill="none" stroke="#00F59B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="${linePathD}" fill="none" stroke="${trendColor}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
           ${dotsSvg}
         </svg>
       `;

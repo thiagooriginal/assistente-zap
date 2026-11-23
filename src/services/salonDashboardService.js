@@ -190,49 +190,38 @@ function getDateRangeArray(startStr, endStr) {
 }
 
 /**
- * Build weekly breakdown with 100% mathematical consistency
- * @param {Array} timeline Array of daily timeline objects
- * @param {string} period Filter period ('this_month', 'last_month', '7d', etc.)
+ * Build weekly breakdown with 100% mathematical consistency and strict chronological order
+ * @param {Array} timeline Array of daily timeline objects ({ date: 'YYYY-MM-DD', label: 'DD/MM', receitas, despesas, resultado })
+ * @param {string} period Filter period ('this_month', 'last_month', '7d', 'today', 'custom', etc.)
  * @returns {Array} Array of aggregated weekly bucket objects
  */
 function buildWeeklyBreakdown(timeline = [], period = 'this_month') {
-  if (!timeline || timeline.length === 0) return [];
+  if (!timeline || !Array.isArray(timeline) || timeline.length === 0) return [];
 
-  const totalDays = timeline.length;
+  // Garante ordenação estritamente cronológica por data ISO (YYYY-MM-DD)
+  const sorted = [...timeline].sort((a, b) => {
+    if (!a?.date) return -1;
+    if (!b?.date) return 1;
+    return String(a.date).localeCompare(String(b.date));
+  });
+
+  const totalDays = sorted.length;
   let buckets = [];
 
-  if (totalDays >= 28 && (period === 'this_month' || period === 'last_month' || totalDays >= 28)) {
-    // 4 standard calendar weeks: 01-07, 08-14, 15-21, 22-end
-    const w1 = [];
-    const w2 = [];
-    const w3 = [];
-    const w4 = [];
+  const getRangeLabel = (arr) => {
+    if (!arr || arr.length === 0) return '';
+    const first = arr[0].label;
+    const last = arr[arr.length - 1].label;
+    return first === last ? first : `${first} a ${last}`;
+  };
 
-    timeline.forEach(pt => {
-      const dayNum = parseInt(pt.date.split('-')[2], 10);
-      if (dayNum <= 7) w1.push(pt);
-      else if (dayNum <= 14) w2.push(pt);
-      else if (dayNum <= 21) w3.push(pt);
-      else w4.push(pt);
-    });
-
-    const getRangeLabel = (arr) => {
-      if (!arr || arr.length === 0) return '';
-      return `${arr[0].label} a ${arr[arr.length - 1].label}`;
-    };
-
-    buckets = [
-      { week: 1, label: 'Semana 1', dateRange: getRangeLabel(w1), items: w1 },
-      { week: 2, label: 'Semana 2', dateRange: getRangeLabel(w2), items: w2 },
-      { week: 3, label: 'Semana 3', dateRange: getRangeLabel(w3), items: w3 },
-      { week: 4, label: 'Semana 4', dateRange: getRangeLabel(w4), items: w4 },
-    ];
-  } else if (totalDays <= 7) {
+  // CASO 1: Período Curto (<= 7 dias, ex: 'today', '7d' ou intervalo personalizado curto)
+  if (totalDays <= 7) {
     const chunkSize = Math.max(1, Math.ceil(totalDays / 4));
     for (let i = 0; i < totalDays; i += chunkSize) {
-      const slice = timeline.slice(i, i + chunkSize);
+      const slice = sorted.slice(i, i + chunkSize);
       const wNum = Math.floor(i / chunkSize) + 1;
-      const dateRange = slice[0].label === slice[slice.length - 1].label ? slice[0].label : `${slice[0].label} a ${slice[slice.length - 1].label}`;
+      const dateRange = getRangeLabel(slice);
       buckets.push({
         week: wNum,
         label: totalDays <= 4 ? `Dia ${slice[0].label}` : `Semana ${wNum}`,
@@ -241,23 +230,84 @@ function buildWeeklyBreakdown(timeline = [], period = 'this_month') {
       });
     }
   } else {
-    const chunkSize = Math.ceil(totalDays / 4);
-    for (let i = 0; i < 4; i++) {
-      const slice = timeline.slice(i * chunkSize, (i + 1) * chunkSize);
-      if (slice.length > 0) {
-        buckets.push({
-          week: i + 1,
-          label: `Semana ${i + 1}`,
-          dateRange: `${slice[0].label} a ${slice[slice.length - 1].label}`,
-          items: slice,
-        });
+    // Verifica se todas as datas pertencem ao mesmo mês de calendário (YYYY-MM)
+    const firstMonth = sorted[0].date.slice(0, 7);
+    const allSameMonth = sorted.every(pt => pt.date && pt.date.slice(0, 7) === firstMonth);
+
+    // Mês de calendário fechado: 'this_month', 'last_month' ou quando todas as datas são do mesmo mês e começam no dia 01 com >= 28 dias
+    const isCalendarMonth =
+      period === 'this_month' ||
+      period === 'last_month' ||
+      (allSameMonth && (totalDays >= 28 || sorted[0].date.endsWith('-01')));
+
+    if (isCalendarMonth) {
+      // CASO 2: Mês de calendário fechado (4 semanas padrão do mês)
+      // Semana 1: dias 01 a 07
+      // Semana 2: dias 08 a 14
+      // Semana 3: dias 15 a 21
+      // Semana 4: dia 22 até o último dia do mês (28, 29, 30 ou 31)
+      const w1 = [];
+      const w2 = [];
+      const w3 = [];
+      const w4 = [];
+
+      sorted.forEach(pt => {
+        const dayNum = parseInt(pt.date.split('-')[2], 10);
+        if (dayNum <= 7) {
+          w1.push(pt);
+        } else if (dayNum <= 14) {
+          w2.push(pt);
+        } else if (dayNum <= 21) {
+          w3.push(pt);
+        } else {
+          w4.push(pt);
+        }
+      });
+
+      buckets = [
+        { week: 1, label: 'Semana 1', dateRange: getRangeLabel(w1), items: w1 },
+        { week: 2, label: 'Semana 2', dateRange: getRangeLabel(w2), items: w2 },
+        { week: 3, label: 'Semana 3', dateRange: getRangeLabel(w3), items: w3 },
+        { week: 4, label: 'Semana 4', dateRange: getRangeLabel(w4), items: w4 },
+      ];
+    } else {
+      // CASO 3: Períodos personalizados ou múltiplos meses (ex: 28, 45, 60, 90 dias, transição 15/12 a 28/01)
+      // Agrupamento sequencial contínuo de 7 em 7 dias a partir da data inicial cronológica.
+      // A última semana absorve os dias restantes para manter a integridade visual sem criar falsos vales de faturamento.
+      const numWeeks = Math.max(1, Math.floor(totalDays / 7));
+      const remainder = totalDays % 7;
+
+      if (numWeeks === 1 && remainder > 0) {
+        // Intervalos de 8 a 13 dias: Semana 1 (7 dias) e Semana 2 (restante)
+        const slice1 = sorted.slice(0, 7);
+        const slice2 = sorted.slice(7);
+        buckets.push(
+          { week: 1, label: 'Semana 1', dateRange: getRangeLabel(slice1), items: slice1 },
+          { week: 2, label: 'Semana 2', dateRange: getRangeLabel(slice2), items: slice2 }
+        );
+      } else {
+        // Intervalos >= 14 dias: Semanas 1 a numWeeks-1 (7 dias cada) e Semana numWeeks (7 + remainder dias)
+        for (let w = 0; w < numWeeks; w++) {
+          const startIdx = w * 7;
+          const isLastWeek = (w === numWeeks - 1);
+          const endIdx = (isLastWeek && remainder > 0) ? totalDays : (w + 1) * 7;
+          const slice = sorted.slice(startIdx, endIdx);
+          const weekNum = w + 1;
+
+          buckets.push({
+            week: weekNum,
+            label: `Semana ${weekNum}`,
+            dateRange: getRangeLabel(slice),
+            items: slice,
+          });
+        }
       }
     }
   }
 
   return buckets.map(b => {
-    const rec = Math.round(b.items.reduce((acc, cur) => acc + (cur.receitas || 0), 0) * 100) / 100;
-    const desp = Math.round(b.items.reduce((acc, cur) => acc + (cur.despesas || 0), 0) * 100) / 100;
+    const rec = Math.round(b.items.reduce((acc, cur) => acc + (Number(cur?.receitas) || 0), 0) * 100) / 100;
+    const desp = Math.round(b.items.reduce((acc, cur) => acc + (Number(cur?.despesas) || 0), 0) * 100) / 100;
     const res = Math.round((rec - desp) * 100) / 100;
     return {
       week: b.week,
