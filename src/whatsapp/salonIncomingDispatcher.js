@@ -9,6 +9,7 @@
  * @module whatsapp/salonIncomingDispatcher
  */
 
+const crypto = require('crypto');
 const db = require('../database/db');
 const phoneUtils = require('../utils/phoneUtils');
 const salonAppointmentService = require('../services/salonAppointmentService');
@@ -25,6 +26,45 @@ function getSessionManager() {
 // Memória volátil de conversação: `${salonUserId}:${customerPhone}` => State
 const customerSessions = new Map();
 const SESSION_TTL_MS = 30 * 60 * 1000; // 30 minutos
+
+// Mapa de provas de despacho seguras para blindagem contra spoofing de origem (COMANDO 064.1.1)
+const dispatcherProofs = new Map();
+
+/**
+ * Gera prova criptograficamente segura de despacho WhatsApp para vinculação de agendamento.
+ * @param {number|string} userId
+ * @param {string} clientPhone
+ * @returns {string} Token de prova com TTL curto
+ */
+function generateDispatcherBookingProof(userId, clientPhone) {
+  const token = crypto.randomBytes(24).toString('hex');
+  const cleanPhone = phoneUtils.cleanDigits(clientPhone);
+  dispatcherProofs.set(token, {
+    userId: Number(userId),
+    clientPhone: cleanPhone,
+    expiresAt: Date.now() + 60000, // 60 segundos
+  });
+  return token;
+}
+
+/**
+ * Valida e consome atomicamente (single-use) a prova de despacho WhatsApp.
+ * @param {string} token
+ * @param {number|string} userId
+ * @param {string} clientPhone
+ * @returns {boolean}
+ */
+function consumeDispatcherBookingProof(token, userId, clientPhone) {
+  if (!token || typeof token !== 'string') return false;
+  const entry = dispatcherProofs.get(token);
+  if (!entry) return false;
+  dispatcherProofs.delete(token); // Single-use consumption
+  if (entry.expiresAt < Date.now()) return false;
+  if (entry.userId !== Number(userId)) return false;
+  const cleanPhone = phoneUtils.cleanDigits(clientPhone);
+  if (entry.clientPhone !== cleanPhone) return false;
+  return true;
+}
 
 const WEEKDAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
 const WEEKDAY_NAME_TO_INDEX = {
@@ -1096,6 +1136,7 @@ async function handleConversationalV2({
       session.selectedStaff = { id: eff.staffId, name: eff.staffName };
     }
 
+    const dispatcherProof = generateDispatcherBookingProof(uid, cleanPhone);
     const booked = await salonAppointmentService.bookAppointment(uid, {
       clientName: session.customerName || 'Cliente WhatsApp',
       clientPhone: cleanPhone,
@@ -1105,6 +1146,7 @@ async function handleConversationalV2({
       time: session.selectedSlot.time,
       durationMin: validService.duration_min,
       origin: 'WHATSAPP_BOT',
+      dispatcherProof,
       reminderConsent: 0,
       reminderConsentOrigin: null,
     });
@@ -1844,6 +1886,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
           }
         }
 
+        const dispatcherProof = generateDispatcherBookingProof(uid, cleanPhone);
         const booked = await salonAppointmentService.bookAppointment(uid, {
           clientName: session.customerName || 'Cliente WhatsApp',
           clientPhone: cleanPhone,
@@ -1853,6 +1896,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
           time: session.selectedSlot.time,
           durationMin: validService.duration_min,
           origin: 'WHATSAPP_BOT',
+          dispatcherProof,
           reminderConsent: 0,
           reminderConsentOrigin: null,
         });
@@ -2120,6 +2164,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
  */
 function _resetForTesting() {
   customerSessions.clear();
+  dispatcherProofs.clear();
 }
 
 /**
@@ -2140,6 +2185,8 @@ module.exports = {
   filterSlotsByPreference,
   formatCandidateSlotsMessage,
   dispatchRescheduleHandoff,
+  generateDispatcherBookingProof,
+  consumeDispatcherBookingProof,
   _resetForTesting,
   _getCustomerSessionForTesting,
 };

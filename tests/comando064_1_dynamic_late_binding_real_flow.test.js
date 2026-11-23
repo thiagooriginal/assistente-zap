@@ -56,6 +56,7 @@ process.env.WA_SESSIONS_DISABLED = 'true';
 
 const db = require('../src/database/db');
 const salonAppointmentService = require('../src/services/salonAppointmentService');
+const salonIncomingDispatcher = require('../src/whatsapp/salonIncomingDispatcher');
 const googleCalendarSessionService = require('../src/services/googleCalendarSessionService');
 const googleCalendarGatekeeper = require('../src/services/googleCalendarGatekeeper');
 const outboxWorker = require('../src/services/outboxWorker');
@@ -196,6 +197,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
       durationMinutes: 30,
       createdBy: 1,
       reason: 'Demonstração Comercial WhatsApp da Jéssica (Dynamic Late-Binding)',
+      authorizedClientPhone: '5511999990001',
     });
 
     assert.ok(session, 'Sessão temporária deve ser criada');
@@ -231,6 +233,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
       time: '14:00',
       durationMin: 45,
       origin: 'WHATSAPP_BOT',
+      dispatcherProof: salonIncomingDispatcher.generateDispatcherBookingProof(3, '5511999990001'),
     });
 
     assert.ok(newAppointment, 'Agendamento deve ser criado com sucesso');
@@ -361,6 +364,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
       durationMinutes: 15,
       createdBy: 1,
       reason: 'Teste Origin Shield',
+      authorizedClientPhone: '5511999990001',
     });
     assert.equal(session.appointment_id, 0);
 
@@ -425,6 +429,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
       durationMinutes: 15,
       createdBy: 1,
       reason: 'Teste Tenant Shield',
+      authorizedClientPhone: '5511999990001',
     });
 
     // Tenant 4 cria agendamento via WhatsApp
@@ -438,6 +443,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
       time: '16:00',
       durationMin: 30,
       origin: 'WHATSAPP_BOT',
+      dispatcherProof: salonIncomingDispatcher.generateDispatcherBookingProof(4, '5511999990001'),
     });
 
     // Sessão do Tenant 3 NÃO deve ter sido tocada
@@ -474,6 +480,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
       time: '16:30',
       durationMin: 45,
       origin: 'WHATSAPP_BOT',
+      dispatcherProof: salonIncomingDispatcher.generateDispatcherBookingProof(3, '5511999990002'),
     });
 
     const activeSession = googleCalendarSessionService.getActiveTestSession(3);
@@ -494,6 +501,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
       time: '17:30',
       durationMin: 45,
       origin: 'WHATSAPP_BOT',
+      dispatcherProof: salonIncomingDispatcher.generateDispatcherBookingProof(3, '5511999990001'),
     });
 
     const boundSession = googleCalendarSessionService.getActiveTestSession(3);
@@ -519,6 +527,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
       durationMinutes: 15,
       createdBy: 1,
       reason: 'Teste Anti-Reuso',
+      authorizedClientPhone: '5511999990001',
     });
 
     // 2. Primeira reserva vincula
@@ -532,6 +541,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
       time: '09:00',
       durationMin: 45,
       origin: 'WHATSAPP_BOT',
+      dispatcherProof: salonIncomingDispatcher.generateDispatcherBookingProof(3, '5511999990001'),
     });
 
     const afterFirst = googleCalendarSessionService.getActiveTestSession(3);
@@ -549,6 +559,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
       time: '10:00',
       durationMin: 45,
       origin: 'WHATSAPP_BOT',
+      dispatcherProof: salonIncomingDispatcher.generateDispatcherBookingProof(3, '5511999990001'),
     });
 
     // 4. A sessão PRESERVA o primeiro agendamento e NÃO foi roubada pelo segundo
@@ -575,6 +586,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
       durationMinutes: 1,
       createdBy: 1,
       reason: 'Teste TTL',
+      authorizedClientPhone: '5511999990001',
     });
 
     // Força data de expiração no passado via DB
@@ -591,6 +603,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
       time: '11:00',
       durationMin: 45,
       origin: 'WHATSAPP_BOT',
+      dispatcherProof: salonIncomingDispatcher.generateDispatcherBookingProof(3, '5511999990001'),
     });
 
     // A sessão continua com appointment_id = 0 e status expira
@@ -628,6 +641,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
           maxExecutions: 1,
           durationMinutes: 15,
           createdBy: 1,
+          authorizedClientPhone: '5511999990001',
         });
       },
       (err) => {
@@ -651,6 +665,7 @@ test.describe('COMANDO 064.1 — Dynamic Late-Binding e Fluxo Real Integrado do 
           maxExecutions: 1,
           durationMinutes: 15,
           createdBy: 1,
+          authorizedClientPhone: '5511999990001',
         });
       },
       (err) => {

@@ -227,10 +227,34 @@ function createTestSession({
   const safeMaxExecutions = isWhatsAppNew ? 1 : Math.min(Math.max(Number(maxExecutions) || 1, 1), 5);
   const allowNewAppointments = isWhatsAppNew ? 1 : 0;
 
-  // Sanitização de telefone autorizado se fornecido
+  // Sanitização e validação estrita de telefone autorizado para sessões WHATSAPP_NEW (COMANDO 064.1.1)
+  const phoneUtils = require('../utils/phoneUtils');
   let cleanAuthorizedPhone = null;
-  if (authorizedClientPhone) {
-    cleanAuthorizedPhone = String(authorizedClientPhone).replace(/\D/g, '') || null;
+  if (isWhatsAppNew) {
+    cleanAuthorizedPhone = authorizedClientPhone ? phoneUtils.cleanDigits(authorizedClientPhone) : null;
+    if (!cleanAuthorizedPhone || cleanAuthorizedPhone.length < 10) {
+      const err = new Error('PHONE_REQUIRED_FOR_WHATSAPP_DEMO: Telefone autorizado válido é obrigatório para sessões de demonstração no WhatsApp.');
+      err.code = 'PHONE_REQUIRED_FOR_WHATSAPP_DEMO';
+      throw err;
+    }
+
+    const isStaging = process.env.GOOGLE_SYNC_HOMOLOGATION_MODE === 'true' || process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging' || process.env.NODE_ENV === 'test';
+    if (isStaging) {
+      const rawAllowed = (process.env.SALON_TEST_ALLOWED_PHONES || '').trim();
+      if (!rawAllowed) {
+        const err = new Error('WHITELIST_NOT_CONFIGURED: SALON_TEST_ALLOWED_PHONES não configurada no ambiente de homologação.');
+        err.code = 'WHITELIST_NOT_CONFIGURED';
+        throw err;
+      }
+      const allowedList = rawAllowed.split(',').map((p) => phoneUtils.cleanDigits(p)).filter(Boolean);
+      if (allowedList.length === 0 || !allowedList.includes(cleanAuthorizedPhone)) {
+        const err = new Error(`PHONE_NOT_IN_TEST_ALLOWLIST: O telefone ${cleanAuthorizedPhone} não consta na lista de telefones autorizados para homologação (SALON_TEST_ALLOWED_PHONES).`);
+        err.code = 'PHONE_NOT_IN_TEST_ALLOWLIST';
+        throw err;
+      }
+    }
+  } else if (authorizedClientPhone) {
+    cleanAuthorizedPhone = phoneUtils.cleanDigits(authorizedClientPhone) || null;
   }
 
   const sessionToken = crypto.randomBytes(32).toString('hex');
@@ -446,13 +470,23 @@ function getSessionHistory(limit = 20, dbInstance = null) {
   return rows.map(sanitizeSession);
 }
 
+let lastBindingError = null;
+
+/**
+ * Retorna o último erro ocorrido na tentativa de Late-Binding para fins de auditoria e testes.
+ * @returns {Object|null}
+ */
+function getLastBindingError() {
+  return lastBindingError;
+}
+
 /**
  * Realiza o Dynamic Late-Binding atômico de um agendamento recém-criado via WhatsApp
- * à sessão ativa de homologação controlada do Google Calendar (COMANDO 064.1).
+ * à sessão ativa de homologação controlada do Google Calendar (COMANDO 064.1 & COMANDO 064.1.1).
  *
  * @param {number|string} userId - Identificador do tenant do salão
  * @param {number|string} appointmentId - Identificador do agendamento recém-gerado
- * @param {Object} [context={}] - Metadados de segurança (origin, clientPhone)
+ * @param {Object} [context={}] - Metadados de segurança (origin, clientPhone, dispatcherProof)
  * @param {Object} [dbInstance=null] - Instância de banco injetável
  * @returns {Object|null} Sessão atualizada e sanitizada, ou null se não houver vinculação
  */
@@ -461,29 +495,64 @@ function bindAppointmentToActiveSession(userId, appointmentId, context = {}, dbI
   const uId = Number(userId);
   const aptId = Number(appointmentId);
 
-  if (!uId || !aptId || aptId <= 0) return null;
+  if (!uId || !aptId || aptId <= 0) {
+    lastBindingError = { code: 'INVALID_PARAMETERS', reason: 'Identificadores inválidos.' };
+    return null;
+  }
 
   // 1. Canal estrito: somente agendamentos originados pelo bot do WhatsApp
   const origin = String(context.origin || '').trim().toUpperCase();
   if (origin !== 'WHATSAPP_BOT') {
+    lastBindingError = { code: 'INVALID_ORIGIN', reason: `Origem '${origin}' não autorizada para Late-Binding.` };
     return null;
   }
 
-  // 2. Telefone do cliente
+  // 2. Validação estrita do telefone do cliente (bloqueia se nulo, vazio ou inválido)
   const phoneUtils = require('../utils/phoneUtils');
   const clientPhoneDigits = context.clientPhone ? phoneUtils.cleanDigits(context.clientPhone) : null;
+  if (!clientPhoneDigits || clientPhoneDigits.length < 10) {
+    lastBindingError = { code: 'INVALID_CLIENT_PHONE', reason: 'Telefone do cliente ausente, vazio ou inválido.' };
+    console.warn(`[LateBindingGatekeeper] REJEITADO [${lastBindingError.code}]: ${lastBindingError.reason}`);
+    return null;
+  }
 
-  // Em homologação, validação contra SALON_TEST_ALLOWED_PHONES
-  const isHomologation = process.env.GOOGLE_SYNC_HOMOLOGATION_MODE === 'true';
-  if (isHomologation && process.env.SALON_TEST_ALLOWED_PHONES) {
-    const rawAllowed = process.env.SALON_TEST_ALLOWED_PHONES || '';
+  // 3. Validação de origem autêntica do despachante WhatsApp (Anti-Spoofing / Dispatcher Proof)
+  let isProofValid = false;
+  try {
+    const salonIncomingDispatcher = require('../whatsapp/salonIncomingDispatcher');
+    if (typeof salonIncomingDispatcher.consumeDispatcherBookingProof === 'function') {
+      isProofValid = salonIncomingDispatcher.consumeDispatcherBookingProof(
+        context.dispatcherProof,
+        uId,
+        clientPhoneDigits
+      );
+    }
+  } catch (_) {}
+
+  if (!isProofValid) {
+    lastBindingError = { code: 'UNTRUSTED_DISPATCHER_ORIGIN', reason: 'Origem WHATSAPP_BOT sem comprovação autêntica do despachante WhatsApp.' };
+    console.warn(`[LateBindingGatekeeper] REJEITADO [${lastBindingError.code}]: ${lastBindingError.reason}`);
+    return null;
+  }
+
+  // 4. Em homologação/staging, validação estrita contra SALON_TEST_ALLOWED_PHONES (Fail-Closed)
+  const isStaging = process.env.GOOGLE_SYNC_HOMOLOGATION_MODE === 'true' || process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging' || process.env.NODE_ENV === 'test';
+  if (isStaging) {
+    const rawAllowed = (process.env.SALON_TEST_ALLOWED_PHONES || '').trim();
+    if (!rawAllowed) {
+      lastBindingError = { code: 'WHITELIST_NOT_CONFIGURED', reason: 'SALON_TEST_ALLOWED_PHONES não configurada no ambiente de homologação.' };
+      console.warn(`[LateBindingGatekeeper] REJEITADO [${lastBindingError.code}]: ${lastBindingError.reason}`);
+      return null;
+    }
     const allowedList = rawAllowed.split(',').map((p) => phoneUtils.cleanDigits(p)).filter(Boolean);
-    if (allowedList.length > 0 && clientPhoneDigits && !allowedList.includes(clientPhoneDigits)) {
+    if (allowedList.length === 0 || !allowedList.includes(clientPhoneDigits)) {
+      lastBindingError = { code: 'PHONE_NOT_IN_TEST_ALLOWLIST', reason: `Telefone ${clientPhoneDigits} não autorizado na whitelist de homologação.` };
+      console.warn(`[LateBindingGatekeeper] REJEITADO [${lastBindingError.code}]: ${lastBindingError.reason}`);
       return null;
     }
   }
 
-  // 3. Busca a sessão ativa elegível para Late-Binding
+  // 5. Busca a sessão ativa elegível para Late-Binding
   cleanupExpiredSessions(dbInstance);
 
   const activeSession = db.prepare(`
@@ -498,17 +567,26 @@ function bindAppointmentToActiveSession(userId, appointmentId, context = {}, dbI
     LIMIT 1
   `).get(uId);
 
-  if (!activeSession) return null;
-
-  // Se a sessão amarra um telefone específico, exige correspondência exata
-  if (activeSession.authorized_client_phone) {
-    const authPhoneDigits = phoneUtils.cleanDigits(activeSession.authorized_client_phone);
-    if (authPhoneDigits && clientPhoneDigits && authPhoneDigits !== clientPhoneDigits) {
-      return null;
-    }
+  if (!activeSession) {
+    lastBindingError = { code: 'NO_ACTIVE_SESSION', reason: 'Nenhuma sessão ativa aguardando novo agendamento.' };
+    return null;
   }
 
-  // 4. Update atômico com predicate lock
+  // 6. Exigência mandatória de telefone autorizado na sessão e correspondência exata
+  if (!activeSession.authorized_client_phone) {
+    lastBindingError = { code: 'SESSION_PHONE_UNCONFIGURED', reason: 'Sessão de teste sem telefone autorizado configurado.' };
+    console.warn(`[LateBindingGatekeeper] REJEITADO [${lastBindingError.code}]: ${lastBindingError.reason}`);
+    return null;
+  }
+
+  const authPhoneDigits = phoneUtils.cleanDigits(activeSession.authorized_client_phone);
+  if (!authPhoneDigits || authPhoneDigits !== clientPhoneDigits) {
+    lastBindingError = { code: 'PHONE_MISMATCH_WITH_SESSION', reason: `Telefone do cliente (${clientPhoneDigits}) diverge do autorizado na sessão (${authPhoneDigits}).` };
+    console.warn(`[LateBindingGatekeeper] REJEITADO [${lastBindingError.code}]: ${lastBindingError.reason}`);
+    return null;
+  }
+
+  // 7. Update atômico com predicate lock
   const updateStmt = db.prepare(`
     UPDATE google_sync_test_sessions
     SET appointment_id = ?,
@@ -521,8 +599,12 @@ function bindAppointmentToActiveSession(userId, appointmentId, context = {}, dbI
   `);
 
   const result = updateStmt.run(aptId, activeSession.id);
-  if (result.changes === 0) return null;
+  if (result.changes === 0) {
+    lastBindingError = { code: 'LATE_BINDING_CONFLICT', reason: 'Conflito concorrente na vinculação da sessão.' };
+    return null;
+  }
 
+  lastBindingError = null;
   const updatedSession = db.prepare('SELECT * FROM google_sync_test_sessions WHERE id = ?').get(activeSession.id);
   return sanitizeSession(updatedSession);
 }
@@ -533,6 +615,7 @@ module.exports = {
   getActiveSession,
   getActiveTestSession: getActiveSession,
   bindAppointmentToActiveSession,
+  getLastBindingError,
   recordSessionExecution,
   revokeTestSession,
   revokeSession: revokeTestSession,

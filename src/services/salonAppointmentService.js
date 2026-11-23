@@ -915,6 +915,7 @@ function bookAppointmentSync(userId, {
   status = 'AGENDADO',
   reminderConsent = 0,
   reminderConsentOrigin = null,
+  dispatcherProof = null,
 }) {
   if (!clientName || !clientName.trim()) {
     throw new Error('O nome do cliente é obrigatório.');
@@ -1055,13 +1056,14 @@ function bookAppointmentSync(userId, {
       VALUES (?, ?, NULL, ?, ?, 'Novo agendamento criado')
     `).run(appointmentId, userId, finalStatus, origin.toUpperCase());
 
-    // Dynamic Late-Binding Automático de Homologação Google Calendar (COMANDO 064.1)
+    // Dynamic Late-Binding Automático de Homologação Google Calendar (COMANDO 064.1 & 064.1.1)
     if (process.env.GOOGLE_SYNC_HOMOLOGATION_MODE === 'true') {
       try {
         const sessionService = require('./googleCalendarSessionService');
         sessionService.bindAppointmentToActiveSession(userId, appointmentId, {
           origin,
           clientPhone,
+          dispatcherProof,
         });
       } catch (bindErr) {
         console.warn(`[salonAppointmentService] Dynamic Late-Binding aviso (#${userId}):`, bindErr.message);

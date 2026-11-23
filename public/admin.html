@@ -2235,13 +2235,13 @@
               </div>
             </div>
 
-            <!-- Campo opcional para telefone do cliente autorizado no modo WhatsApp -->
+            <!-- Telefone do cliente autorizado no modo WhatsApp (obrigatório) -->
             <div id="gFormWhatsAppPhoneContainer" class="hidden">
               <label class="text-[11px] font-bold text-zinc-400">
-                Telefone do Cliente Autorizado no WhatsApp
-                <span class="text-zinc-500 font-normal">(opcional — deixe vazio para aceitar qualquer testador da whitelist)</span>
+                Telefone do Cliente Autorizado no WhatsApp *
+                <span class="text-amber-400 font-normal">(obrigatório — deve constar em SALON_TEST_ALLOWED_PHONES)</span>
               </label>
-              <input type="text" id="gFormAuthorizedClientPhone" placeholder="Ex: 5511999999999" class="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white font-mono text-xs focus:border-blue-500 outline-none">
+              <input type="text" id="gFormAuthorizedClientPhone" placeholder="Ex: 5511999990001" class="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white font-mono text-xs focus:border-blue-500 outline-none">
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -5568,6 +5568,7 @@
       const tenantInput = document.getElementById('gFormUserId');
       const reasonInput = document.getElementById('gFormReason');
 
+      const phoneInput = document.getElementById('gFormAuthorizedClientPhone');
       if (mode === 'WHATSAPP_NEW') {
         if (aptInput) {
           aptInput.value = '0';
@@ -5576,6 +5577,7 @@
         }
         if (aptNotice) aptNotice.classList.remove('hidden');
         if (phoneContainer) phoneContainer.classList.remove('hidden');
+        if (phoneInput) phoneInput.required = true;
         if (actionSelect) {
           actionSelect.value = 'CREATE';
           actionSelect.disabled = true;
@@ -5600,6 +5602,9 @@
         }
         if (aptNotice) aptNotice.classList.add('hidden');
         if (phoneContainer) phoneContainer.classList.add('hidden');
+        if (phoneInput) {
+          phoneInput.required = false;
+        }
         if (actionSelect) {
           actionSelect.disabled = false;
         }
@@ -5652,9 +5657,11 @@
 
       if (isWhatsAppNew) {
         const clientPhone = document.getElementById('gFormAuthorizedClientPhone')?.value.trim();
-        if (clientPhone) {
-          payload.authorizedClientPhone = clientPhone;
+        if (!clientPhone) {
+          alert('ATENÇÃO: Informe o telefone do cliente autorizado para a demonstração (Phone Shield obrigatório).');
+          return;
         }
+        payload.authorizedClientPhone = clientPhone;
       }
 
       const confirmMsg = isWhatsAppNew

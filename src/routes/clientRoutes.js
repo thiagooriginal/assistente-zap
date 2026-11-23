@@ -1725,7 +1725,9 @@ router.post('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA
       date: req.body?.date,
       time: req.body?.time,
       durationMin: rawDuration,
-      origin: req.body?.origin || 'painel',
+      // Hardening contra spoofing de origem (COMANDO 064.1.1):
+      // Requisições HTTP ao painel do cliente NUNCA podem declarar origem WHATSAPP_BOT
+      origin: (String(req.body?.origin || '').trim().toUpperCase() === 'WHATSAPP_BOT') ? 'PAINEL_CLIENTE' : (req.body?.origin || 'painel'),
       status: req.body?.status || 'AGENDADO',
       reminderConsent: req.body?.reminderConsent ?? req.body?.reminder_consent,
       reminderConsentOrigin: req.body?.reminderConsentOrigin || req.body?.reminder_consent_origin || req.body?.origin || 'painel',

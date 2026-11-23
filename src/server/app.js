@@ -3616,19 +3616,38 @@ app.post(['/api/admin/google-sync/test-session/start', '/api/admin/google-sync/t
     }
   }
 
-  // Validação do telefone autorizado se informado no modo WHATSAPP_NEW
+  // Validação estrita do telefone autorizado para sessões WHATSAPP_NEW (COMANDO 064.1.1)
   let cleanAuthPhone = null;
-  if (isWhatsAppNew && authorizedClientPhone) {
+  if (isWhatsAppNew) {
     const phoneUtils = require('../utils/phoneUtils');
-    cleanAuthPhone = phoneUtils.cleanDigits(authorizedClientPhone);
-    const rawAllowed = process.env.SALON_TEST_ALLOWED_PHONES || '';
-    const allowedList = rawAllowed.split(',').map((p) => phoneUtils.cleanDigits(p)).filter(Boolean);
-    if (allowedList.length > 0 && cleanAuthPhone && !allowedList.includes(cleanAuthPhone)) {
-      return res.status(403).json({
+    cleanAuthPhone = authorizedClientPhone ? phoneUtils.cleanDigits(authorizedClientPhone) : null;
+
+    if (!cleanAuthPhone || cleanAuthPhone.length < 10) {
+      return res.status(400).json({
         success: false,
-        error: `Telefone ${cleanAuthPhone} não consta na lista de telefones autorizados para homologação (SALON_TEST_ALLOWED_PHONES).`,
-        code: 'PHONE_NOT_IN_TEST_ALLOWLIST',
+        error: 'PHONE_REQUIRED_FOR_WHATSAPP_DEMO: Telefone autorizado do cliente é obrigatório para sessões de demonstração no WhatsApp.',
+        code: 'PHONE_REQUIRED_FOR_WHATSAPP_DEMO',
       });
+    }
+
+    const isStaging = process.env.HOMOLOGACAO === 'true' || process.env.APP_MODE === 'staging' || process.env.NODE_ENV === 'test';
+    if (isStaging) {
+      const rawAllowed = (process.env.SALON_TEST_ALLOWED_PHONES || '').trim();
+      if (!rawAllowed) {
+        return res.status(403).json({
+          success: false,
+          error: 'WHITELIST_NOT_CONFIGURED: SALON_TEST_ALLOWED_PHONES não configurada no ambiente de homologação.',
+          code: 'WHITELIST_NOT_CONFIGURED',
+        });
+      }
+      const allowedList = rawAllowed.split(',').map((p) => phoneUtils.cleanDigits(p)).filter(Boolean);
+      if (allowedList.length === 0 || !allowedList.includes(cleanAuthPhone)) {
+        return res.status(403).json({
+          success: false,
+          error: `PHONE_NOT_IN_TEST_ALLOWLIST: Telefone ${cleanAuthPhone} não consta na lista de telefones autorizados para homologação (SALON_TEST_ALLOWED_PHONES).`,
+          code: 'PHONE_NOT_IN_TEST_ALLOWLIST',
+        });
+      }
     }
   }
 
