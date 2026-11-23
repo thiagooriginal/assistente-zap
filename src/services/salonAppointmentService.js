@@ -1078,11 +1078,14 @@ function bookAppointmentSync(userId, {
 
     // Enfileirar notificação WhatsApp no Outbox durável dentro da transação
     salonNotificationService.enqueueNotificationTx(userId, appointmentId, 'NEW_APPOINTMENT', {
+      appointmentId,
       clientName: clientName.trim(),
+      clientPhone: clientPhone ? clientPhone.trim() : null,
       serviceName: finalServiceName,
       staffName: resolvedStaffName,
       startDt,
       endDt,
+      price: finalPrice,
     });
 
     db.exec('COMMIT');

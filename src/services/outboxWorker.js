@@ -116,9 +116,10 @@ async function processGoogleSyncOutbox(filterUserId = null) {
     if (lock.changes === 0) continue;
 
     let initialConnectedAt = null;
+    let apt = null;
 
     try {
-      const apt = db.prepare('SELECT * FROM appointments WHERE id = ?').get(item.appointment_id);
+      apt = db.prepare('SELECT * FROM appointments WHERE id = ?').get(item.appointment_id);
       if (!apt) {
         // Appointment was deleted or invalid
         db.prepare(`
@@ -483,6 +484,24 @@ async function processGoogleSyncOutbox(filterUserId = null) {
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `).run(errMsg, item.appointment_id);
+
+        try {
+          const salonNotificationService = require('./salonNotificationService');
+          const svcRow = apt.service_id ? db.prepare('SELECT name FROM client_services WHERE id = ?').get(apt.service_id) : null;
+          const stfRow = apt.staff_id ? db.prepare('SELECT name FROM client_staff WHERE id = ?').get(apt.staff_id) : null;
+
+          salonNotificationService.enqueueNotificationTx(item.user_id, item.appointment_id, 'SYNC_FAILURE', {
+            appointmentId: item.appointment_id,
+            clientName: apt.client_name,
+            clientPhone: apt.client_phone,
+            serviceName: svcRow?.name || apt.title,
+            staffName: stfRow?.name || 'Equipe',
+            startDt: apt.start_datetime,
+            error: errMsg,
+          });
+        } catch (notifyErr) {
+          console.warn(`[outboxWorker] Erro ao enfileirar notificação de falha de sync (#${item.id}):`, notifyErr.message);
+        }
       } else {
         const newAttempts = (item.attempts || 0) + 1;
         const maxAttempts = item.max_attempts || 5;
@@ -501,6 +520,26 @@ async function processGoogleSyncOutbox(filterUserId = null) {
           SET google_sync_status = 'FAILED', google_sync_error = ?, updated_at = CURRENT_TIMESTAMP
           WHERE id = ?
         `).run(errMsg, item.appointment_id);
+
+        if (isFinal) {
+          try {
+            const salonNotificationService = require('./salonNotificationService');
+            const svcRow = apt.service_id ? db.prepare('SELECT name FROM client_services WHERE id = ?').get(apt.service_id) : null;
+            const stfRow = apt.staff_id ? db.prepare('SELECT name FROM client_staff WHERE id = ?').get(apt.staff_id) : null;
+
+            salonNotificationService.enqueueNotificationTx(item.user_id, item.appointment_id, 'SYNC_FAILURE', {
+              appointmentId: item.appointment_id,
+              clientName: apt.client_name,
+              clientPhone: apt.client_phone,
+              serviceName: svcRow?.name || apt.title,
+              staffName: stfRow?.name || 'Equipe',
+              startDt: apt.start_datetime,
+              error: errMsg,
+            });
+          } catch (notifyErr) {
+            console.warn(`[outboxWorker] Erro ao enfileirar notificação de falha de sync (#${item.id}):`, notifyErr.message);
+          }
+        }
       }
     }
   }

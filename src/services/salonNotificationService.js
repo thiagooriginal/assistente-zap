@@ -135,40 +135,61 @@ function formatDateTimeStrings(startDt, endDt) {
 }
 
 /**
- * Generates message for new confirmed appointment
+ * Generates message for new confirmed appointment (Management Alert)
  */
-function buildNewAppointmentMessage({ clientName, serviceName, staffName, startDt, endDt }) {
+function buildNewAppointmentMessage({ appointmentId, id, clientName, serviceName, staffName, startDt, endDt, price, isSelfChat }) {
   const { dateStr, startTimeStr, endTimeStr } = formatDateTimeStrings(startDt, endDt);
+  const aptId = appointmentId || id;
+  const aptIdStr = aptId ? ` #${aptId}` : '';
 
-  return `✂️ Novo agendamento confirmado!\n\n` +
+  let priceStr = '';
+  if (price !== undefined && price !== null && Number(price) > 0) {
+    const formatted = Number(price).toFixed(2).replace('.', ',');
+    priceStr = `\nValor: R$ ${formatted}`;
+  }
+
+  const selfChatNote = isSelfChat
+    ? `\n\n*(Mensagem enviada a você por ser o WhatsApp de gestão cadastrado deste salão)*`
+    : '';
+
+  return `📢 AVISO DE GESTÃO — JÉSSICA\n` +
+         `✂️ Novo agendamento confirmado${aptIdStr}!\n\n` +
          `Cliente: ${clientName || 'Cliente'}\n` +
          `Serviço: ${serviceName || 'Atendimento'}\n` +
          `Data: ${dateStr}\n` +
          `Horário: ${startTimeStr} às ${endTimeStr}\n` +
-         `Profissional: ${staffName || 'Equipe'}\n\n` +
-         `✅ Agendamento registrado pela Jéssica.`;
+         `Profissional: ${staffName || 'Equipe'}${priceStr}\n\n` +
+         `✅ Agendamento registrado pela Jéssica.${selfChatNote}`;
 }
 
 /**
- * Generates message for cancellation
+ * Generates message for cancellation (Management Alert)
  */
-function buildCancellationMessage({ clientName, serviceName, staffName, startDt, endDt, reason }) {
+function buildCancellationMessage({ appointmentId, id, clientName, serviceName, staffName, startDt, endDt, reason, isSelfChat }) {
   const { dateStr, startTimeStr, endTimeStr } = formatDateTimeStrings(startDt, endDt);
+  const aptId = appointmentId || id;
+  const aptIdStr = aptId ? ` #${aptId}` : '';
+  const selfChatNote = isSelfChat
+    ? `\n\n*(Mensagem enviada a você por ser o WhatsApp de gestão cadastrado deste salão)*`
+    : '';
 
-  return `⚠️ Agendamento cancelado!\n\n` +
+  return `📢 AVISO DE GESTÃO — JÉSSICA\n` +
+         `⚠️ Agendamento cancelado${aptIdStr}!\n\n` +
          `Cliente: ${clientName || 'Cliente'}\n` +
          `Serviço: ${serviceName || 'Atendimento'}\n` +
          `Data: ${dateStr}\n` +
          `Horário: ${startTimeStr} às ${endTimeStr}\n` +
          `Profissional: ${staffName || 'Equipe'}\n` +
          `${reason ? `Motivo: ${reason}\n` : ''}\n` +
-         `ℹ️ O horário foi liberado na sua agenda.`;
+         `ℹ️ O horário foi liberado na sua agenda.${selfChatNote}`;
 }
 
 /**
- * Generates message for rescheduling
+ * Generates message for rescheduling (Management Alert)
  */
 function buildRescheduleMessage({
+  appointmentId,
+  id,
   clientName,
   serviceName,
   staffName,
@@ -176,53 +197,75 @@ function buildRescheduleMessage({
   newEndDt,
   oldStartDt,
   oldEndDt,
+  isSelfChat,
 }) {
   const nw = formatDateTimeStrings(newStartDt, newEndDt);
   const old = formatDateTimeStrings(oldStartDt, oldEndDt);
+  const aptId = appointmentId || id;
+  const aptIdStr = aptId ? ` #${aptId}` : '';
+  const selfChatNote = isSelfChat
+    ? `\n\n*(Mensagem enviada a você por ser o WhatsApp de gestão cadastrado deste salão)*`
+    : '';
 
-  return `🔄 Agendamento remarcado!\n\n` +
+  return `📢 AVISO DE GESTÃO — JÉSSICA\n` +
+         `🔄 Agendamento remarcado${aptIdStr}!\n\n` +
          `Cliente: ${clientName || 'Cliente'}\n` +
          `Serviço: ${serviceName || 'Atendimento'}\n` +
          `Novo Horário: ${nw.dateStr} de ${nw.startTimeStr} às ${nw.endTimeStr}\n` +
          `Horário Anterior: ${old.dateStr} de ${old.startTimeStr} às ${old.endTimeStr}\n` +
          `Profissional: ${staffName || 'Equipe'}\n\n` +
-         `✅ Agenda atualizada com sucesso.`;
+         `✅ Agenda atualizada com sucesso.${selfChatNote}`;
 }
 
 /**
- * Generates message for client reschedule request (human handoff)
+ * Generates message for client reschedule request (human handoff - Management Alert)
  */
 function buildRescheduleRequestMessage({
+  appointmentId,
+  id,
   clientName,
   clientPhone,
   serviceName,
   staffName,
   startDt,
   endDt,
+  isSelfChat,
 }) {
   const { dateStr, startTimeStr } = formatDateTimeStrings(startDt, endDt);
+  const aptId = appointmentId || id;
+  const aptIdStr = aptId ? ` #${aptId}` : '';
+  const selfChatNote = isSelfChat
+    ? `\n\n*(Mensagem enviada a você por ser o WhatsApp de gestão cadastrado deste salão)*`
+    : '';
 
-  return `🔄 Solicitação de remarcação recebida!\n\n` +
+  return `📢 AVISO DE GESTÃO — JÉSSICA\n` +
+         `🔄 Solicitação de remarcação recebida${aptIdStr}!\n\n` +
          `Cliente: ${clientName || 'Cliente'}\n` +
          `WhatsApp: ${clientPhone || 'Não informado'}\n` +
          `Serviço: ${serviceName || 'Atendimento'}\n` +
          `Profissional: ${staffName || 'Equipe'}\n` +
          `Horário Atual: ${dateStr} às ${startTimeStr}\n\n` +
-         `ℹ️ A cliente solicitou a remarcação pelo WhatsApp. O agendamento original permanece confirmado na sua agenda até que você combine o novo horário com ela.`;
+         `ℹ️ A cliente solicitou a remarcação pelo WhatsApp. O agendamento original permanece confirmado na sua agenda até que você combine o novo horário com ela.${selfChatNote}`;
 }
 
 /**
- * Generates message for Google sync failure alert
+ * Generates message for Google sync failure alert (Management Alert)
  */
-function buildSyncFailureMessage({ clientName, serviceName, staffName, startDt, error }) {
+function buildSyncFailureMessage({ appointmentId, id, clientName, serviceName, staffName, startDt, error, isSelfChat }) {
   const { dateStr, startTimeStr } = formatDateTimeStrings(startDt);
+  const aptId = appointmentId || id;
+  const aptIdStr = aptId ? ` #${aptId}` : '';
+  const selfChatNote = isSelfChat
+    ? `\n\n*(Mensagem enviada a você por ser o WhatsApp de gestão cadastrado deste salão)*`
+    : '';
 
-  return `⚠️ Atenção: Falha na sincronização com o Google Calendar\n\n` +
+  return `📢 AVISO DE GESTÃO — JÉSSICA\n` +
+         `⚠️ Falha na sincronização com o Google Calendar${aptIdStr}\n\n` +
          `Agendamento: ${clientName || 'Cliente'} — ${serviceName || 'Atendimento'}\n` +
          `Horário: ${dateStr} às ${startTimeStr}\n` +
          `Profissional: ${staffName || 'Equipe'}\n` +
          `Motivo: ${error || 'Token expirado ou serviço temporariamente indisponível'}\n\n` +
-         `ℹ️ O agendamento está salvo com segurança na sua agenda RAIA. Acesse o painel para reconectar sua conta Google.`;
+         `ℹ️ O agendamento está salvo com segurança na sua agenda RAIA. Acesse o painel para reconectar sua conta Google.${selfChatNote}`;
 }
 
 /**
@@ -246,25 +289,36 @@ function enqueueNotificationTx(userId, appointmentId, eventType, data = {}) {
   if ((eventType === 'RESCHEDULE' || eventType === 'RESCHEDULE_REQUEST') && !settings.notifyReschedule) return { success: false, reason: 'TOGGLE_DISABLED' };
   if (eventType === 'SYNC_FAILURE' && !settings.notifySyncFailure) return { success: false, reason: 'TOGGLE_DISABLED' };
 
+  const aptId = data.appointmentId || appointmentId;
+  const clientPhoneClean = String(data.clientPhone || '').replace(/\D/g, '');
+  const notifPhoneClean = String(settings.notificationPhone || '').replace(/\D/g, '');
+  const isSelfChat = Boolean(clientPhoneClean && notifPhoneClean && clientPhoneClean === notifPhoneClean);
+
+  const enrichedData = {
+    ...data,
+    appointmentId: aptId,
+    isSelfChat,
+  };
+
   let messageText = '';
   switch (eventType) {
     case 'NEW_APPOINTMENT':
-      messageText = buildNewAppointmentMessage(data);
+      messageText = buildNewAppointmentMessage(enrichedData);
       break;
     case 'CANCELLATION':
-      messageText = buildCancellationMessage(data);
+      messageText = buildCancellationMessage(enrichedData);
       break;
     case 'RESCHEDULE':
-      messageText = buildRescheduleMessage(data);
+      messageText = buildRescheduleMessage(enrichedData);
       break;
     case 'RESCHEDULE_REQUEST':
-      messageText = buildRescheduleRequestMessage(data);
+      messageText = buildRescheduleRequestMessage(enrichedData);
       break;
     case 'SYNC_FAILURE':
-      messageText = buildSyncFailureMessage(data);
+      messageText = buildSyncFailureMessage(enrichedData);
       break;
     default:
-      messageText = data.text || 'Notificação RAIA Agentes';
+      messageText = enrichedData.text || 'Notificação RAIA Agentes';
   }
 
   // Prevenção de duplicação consciente de conteúdo: não enfileirar notificação idêntica para o mesmo compromisso e evento nos últimos 5 minutos

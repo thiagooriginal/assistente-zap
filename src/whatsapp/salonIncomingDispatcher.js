@@ -80,6 +80,67 @@ const WEEKDAY_NAME_TO_INDEX = {
 };
 
 /**
+ * Validação segura e inteligente de nome de cliente (COMANDO 066 - ETAPA 3)
+ * Rejeita nulo, vazio, apenas emojis, símbolos, caracteres genéricos ou menos de 2 letras.
+ * @param {string} name
+ * @returns {boolean}
+ */
+function isValidCustomerName(name) {
+  if (!name || typeof name !== 'string') return false;
+  const trimmed = name.trim();
+  if (trimmed.length < 2) return false;
+
+  // Rejeitar termos afirmativos, negativos ou comandos isolados comuns que não são nomes
+  const nonNameWords = /^(sim|não|nao|ok|claro|pode|confirmo|confirma|agendar|positivo|negativo|cancela|cancelar|sair|ajuda|menu|ola|olá|oi|bom dia|boa tarde|boa noite|1|2|3|isso|com certeza)$/i;
+  if (nonNameWords.test(trimmed)) return false;
+
+  // Rejeitar placeholders genéricos conhecidos
+  const genericPlaceholders = [
+    /^cliente\s*whatsapp$/i,
+    /^cliente$/i,
+    /^unknown$/i,
+    /^anonimo$/i,
+    /^anônimo$/i,
+    /^user$/i,
+    /^usuario$/i,
+    /^usuário$/i,
+    /^contato$/i,
+    /^numero\s*desconhecido$/i,
+    /^sem\s*nome$/i,
+  ];
+  if (genericPlaceholders.some((rgx) => rgx.test(trimmed))) return false;
+
+  // Requer ao menos 2 caracteres alfabéticos (Unicode/acentos latinos)
+  const letters = trimmed.match(/[\p{L}]/gu) || [];
+  if (letters.length < 2) return false;
+
+  // Rejeita strings que consistem apenas de pontuações, números ou caracteres repetidos não-nominais
+  if (/^[0-9\s._\-+=!@#$%¨&*()~^`'"]+$/.test(trimmed)) return false;
+
+  return true;
+}
+
+/**
+ * Extrai e higieniza o nome pessoal a partir de expressões coloquiais
+ * (ex: "Meu nome é Juliana", "Me chamo Ana Paula", "Sou a Mariana", "Juliana")
+ *
+ * @param {string} text
+ * @returns {string}
+ */
+function extractCleanCustomerName(text) {
+  if (!text || typeof text !== 'string') return '';
+  let cleaned = text.trim();
+  // Remove afirmação inicial opcional (ex: "Sim, meu nome é Juliana" ou "Sim, Juliana")
+  cleaned = cleaned.replace(/^(?:sim|claro|ok|pode\s+ser)[,.]?\s+/i, '').trim();
+  // Remove prefixos comuns de apresentação
+  const prefixRegex = /^(?:meu\s+nome\s+[eé]|me\s+chamo|sou\s+(?:o|a)?|aqui\s+[eé]\s+(?:o|a)?|pode\s+colocar|chamo-me)\s+/i;
+  cleaned = cleaned.replace(prefixRegex, '').trim();
+  // Remove pontuações finais
+  cleaned = cleaned.replace(/[.!?,;]+$/g, '').trim();
+  return cleaned;
+}
+
+/**
  * Limpa periodicamente sessões conversacionais inativas da memória
  */
 function cleanupExpiredSessions() {
@@ -982,6 +1043,11 @@ async function handleConversationalV2({
   if (!nluResult || !nluResult.intent) return null;
   const intent = nluResult.intent;
 
+  // Sessão aguardando nome deve ser conduzida com precisão determinística (ETAPA 3 - COMANDO 066)
+  if (session.state === 'AWAITING_NAME') {
+    return null;
+  }
+
   // 1. Opt-in ou Opt-out de Lembretes 24h (LGPD - Prioridade Absoluta sobre Cancelamento Genérico)
   if (session.state === 'AWAITING_REMINDER_OPTIN' || intent === 'REMINDER_OPTIN') {
     // Zero-Trust: jamais conceder consentimento por mera inferência de IA
@@ -1251,7 +1317,6 @@ async function handleConversationalV2({
 
       if (pickedSlot) {
         session.selectedSlot = { date: pickedSlot.date, time: pickedSlot.time };
-        session.state = 'AWAITING_CONFIRMATION';
 
         if (!session.selectedStaff) {
           try {
@@ -1270,6 +1335,20 @@ async function handleConversationalV2({
         const staffName = session.selectedStaff ? session.selectedStaff.name : 'Equipe do Salão';
         const priceFormatted = formatPrice(session.selectedService.price);
 
+        const hasValidName = isValidCustomerName(session.customerName);
+        if (hasValidName) {
+          session.state = 'AWAITING_CONFIRMATION';
+          return `Perfeito! Encontrei esse horário para você! ✨\n\n` +
+            `📍 *Espaço:* ${salonName}\n` +
+            `💇‍♀️ *Serviço:* ${session.selectedService.name}\n` +
+            `👤 *Profissional:* ${staffName}\n` +
+            `📅 *Data:* ${displayDate} (${pickedSlot.dayLabel.split(' ')[0]})\n` +
+            `⏰ *Horário:* ${pickedSlot.time}\n` +
+            `💰 *Valor:* R$ ${priceFormatted}\n\n` +
+            `Posso confirmar o seu agendamento? 🥰`;
+        }
+
+        session.state = 'AWAITING_NAME';
         return `Perfeito! Encontrei esse horário para você! ✨\n\n` +
           `📍 *Espaço:* ${salonName}\n` +
           `💇‍♀️ *Serviço:* ${session.selectedService.name}\n` +
@@ -1277,7 +1356,7 @@ async function handleConversationalV2({
           `📅 *Data:* ${displayDate} (${pickedSlot.dayLabel.split(' ')[0]})\n` +
           `⏰ *Horário:* ${pickedSlot.time}\n` +
           `💰 *Valor:* R$ ${priceFormatted}\n\n` +
-          `Posso confirmar o seu agendamento? 🥰`;
+          `Perfeito! Antes de confirmar, pode me informar seu nome, por favor? 😊`;
       }
     }
   }
@@ -1542,10 +1621,11 @@ async function dispatchMessage(salonUserId, sock, msg) {
   const now = Date.now();
   let session = customerSessions.get(sessionKey);
   if (!session) {
+    const rawPushName = (msg.pushName || '').trim();
     session = {
       salonUserId: uid,
       customerPhone: cleanPhone,
-      customerName: (msg.pushName || '').trim() || 'Cliente WhatsApp',
+      customerName: isValidCustomerName(rawPushName) ? rawPushName : 'Cliente WhatsApp',
       state: 'IDLE',
       startedAt: now,
       lastActivity: now,
@@ -1559,8 +1639,11 @@ async function dispatchMessage(salonUserId, sock, msg) {
     };
     customerSessions.set(sessionKey, session);
   } else {
-    if (msg.pushName && (!session.customerName || session.customerName === 'Cliente WhatsApp')) {
-      session.customerName = msg.pushName.trim();
+    if (msg.pushName && (!session.customerName || session.customerName === 'Cliente WhatsApp' || !isValidCustomerName(session.customerName))) {
+      const candidateName = msg.pushName.trim();
+      if (isValidCustomerName(candidateName)) {
+        session.customerName = candidateName;
+      }
     }
   }
   session.lastActivity = now;
@@ -1589,7 +1672,7 @@ async function dispatchMessage(salonUserId, sock, msg) {
   }
 
   // 5.1 Verificação de Cancelamento/Desistência durante o fluxo de agendamento em andamento
-  const isBookingFlowActive = ['AWAITING_SERVICE', 'AWAITING_STAFF', 'AWAITING_SLOT', 'AWAITING_CONFIRMATION'].includes(session.state);
+  const isBookingFlowActive = ['AWAITING_SERVICE', 'AWAITING_STAFF', 'AWAITING_SLOT', 'AWAITING_NAME', 'AWAITING_CONFIRMATION'].includes(session.state);
   const isCancellation = /^(cancelar|cancela|cancelamento|desisto|sair|parar|deixa pra la|deixa para la)\b/i.test(normText);
   if (isBookingFlowActive && isCancellation) {
     session.state = 'IDLE';
@@ -1793,7 +1876,6 @@ async function dispatchMessage(salonUserId, sock, msg) {
       }
 
       session.selectedSlot = { date: pickedSlot.date, time: pickedSlot.time };
-      session.state = 'AWAITING_CONFIRMATION';
 
       // Se o cliente escolheu "Qualquer profissional disponível", resolver atomicamente agora
       if (!session.selectedStaff) {
@@ -1813,6 +1895,21 @@ async function dispatchMessage(salonUserId, sock, msg) {
       const staffName = session.selectedStaff ? session.selectedStaff.name : 'Equipe do Salão';
       const priceFormatted = formatPrice(session.selectedService.price);
 
+      const hasValidName = isValidCustomerName(session.customerName);
+      if (hasValidName) {
+        session.state = 'AWAITING_CONFIRMATION';
+        replyText = `Perfeito! Encontrei esse horário para você! ✨\n\n` +
+          `📍 *Espaço:* ${salonName}\n` +
+          `💇‍♀️ *Serviço:* ${session.selectedService.name}\n` +
+          `👤 *Profissional:* ${staffName}\n` +
+          `📅 *Data:* ${displayDate} (${pickedSlot.dayLabel.split(' ')[0]})\n` +
+          `⏰ *Horário:* ${pickedSlot.time}\n` +
+          `💰 *Valor:* R$ ${priceFormatted}\n\n` +
+          `Posso confirmar o seu agendamento? 🥰`;
+        break;
+      }
+
+      session.state = 'AWAITING_NAME';
       replyText = `Perfeito! Encontrei esse horário para você! ✨\n\n` +
         `📍 *Espaço:* ${salonName}\n` +
         `💇‍♀️ *Serviço:* ${session.selectedService.name}\n` +
@@ -1820,7 +1917,29 @@ async function dispatchMessage(salonUserId, sock, msg) {
         `📅 *Data:* ${displayDate} (${pickedSlot.dayLabel.split(' ')[0]})\n` +
         `⏰ *Horário:* ${pickedSlot.time}\n` +
         `💰 *Valor:* R$ ${priceFormatted}\n\n` +
-        `Posso confirmar o seu agendamento? 🥰`;
+        `Perfeito! Antes de confirmar, pode me informar seu nome, por favor? 😊`;
+      break;
+    }
+
+    case 'AWAITING_NAME': {
+      const isAffirmationWithoutName = /^(sim|confirmo|pode agendar|pode sim|pode confirmar|pode|agendar|ok|confirma|com certeza|positivo|pode ser|1|claro|isso)\b/i.test(normText);
+      const cleanedName = extractCleanCustomerName(text);
+
+      if (isAffirmationWithoutName && !isValidCustomerName(cleanedName)) {
+        replyText = `Para eu deixar reservadinho na sua ficha, qual é o seu nome completo, por favor? 😊`;
+        break;
+      }
+
+      if (isValidCustomerName(cleanedName)) {
+        session.customerName = cleanedName;
+        session.state = 'AWAITING_CONFIRMATION';
+        const displayDate = formatDisplayDate(session.selectedSlot?.date);
+        replyText = `Obrigada, ${session.customerName}! 🥰 Agora sim, posso confirmar o seu agendamento para ${displayDate} às ${session.selectedSlot?.time}? ✨`;
+        break;
+      }
+
+      // Se enviar caracteres inválidos, símbolos ou ruídos sem nome válido
+      replyText = `Para eu deixar reservadinho na sua ficha, qual é o seu nome completo, por favor? 😊`;
       break;
     }
 
@@ -2187,6 +2306,8 @@ module.exports = {
   dispatchRescheduleHandoff,
   generateDispatcherBookingProof,
   consumeDispatcherBookingProof,
+  isValidCustomerName,
+  extractCleanCustomerName,
   _resetForTesting,
   _getCustomerSessionForTesting,
 };
