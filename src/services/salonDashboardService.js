@@ -26,6 +26,63 @@ function addDays(dateStr, days) {
 }
 
 /**
+ * Distribui um total inteiro entre itens com base em seus pesos relativos,
+ * utilizando o algoritmo determinístico do Método dos Maiores Restos (Hamilton Method).
+ * Garante invariância estrita: SUM(result) === total para qualquer total >= 0.
+ *
+ * @param {number} total Total inteiro a distribuir (ex: completedAppointments)
+ * @param {number[]} weights Vetor de pesos/proporções nominais (ex: [0.52, 0.28, 0.20])
+ * @returns {number[]} Vetor de inteiros na mesma ordem original somando exatamente o total
+ */
+function distributeIntegerByWeights(total, weights) {
+  if (!Array.isArray(weights) || weights.length === 0) return [];
+  const safeTotal = Math.max(0, Math.round(Number(total) || 0));
+  if (safeTotal === 0) {
+    return weights.map(() => 0);
+  }
+
+  const normalizedWeights = weights.map(w => Math.max(0, Number(w) || 0));
+  const sumWeights = normalizedWeights.reduce((acc, w) => acc + w, 0);
+
+  if (sumWeights <= 0) {
+    const base = Math.floor(safeTotal / weights.length);
+    let rem = safeTotal % weights.length;
+    return weights.map(() => {
+      const val = base + (rem > 0 ? 1 : 0);
+      if (rem > 0) rem--;
+      return val;
+    });
+  }
+
+  // 1. Quotas teóricas e cotas inteiras (piso)
+  const items = normalizedWeights.map((w, index) => {
+    const rawQuota = (safeTotal * w) / sumWeights;
+    const integerPart = Math.floor(rawQuota);
+    const remainder = rawQuota - integerPart;
+    return { index, integerPart, remainder };
+  });
+
+  const allocated = items.reduce((acc, it) => acc + it.integerPart, 0);
+  const remainderToDistribute = safeTotal - allocated;
+
+  // 2. Ordenação estável por maior resto decrescente (desempate pelo índice original)
+  const sorted = [...items].sort((a, b) => {
+    if (Math.abs(b.remainder - a.remainder) > 1e-9) {
+      return b.remainder - a.remainder;
+    }
+    return a.index - b.index;
+  });
+
+  // 3. Alocação prioritária dos restos (+1 para os maiores restos)
+  for (let i = 0; i < remainderToDistribute; i++) {
+    sorted[i].integerPart += 1;
+  }
+
+  // 4. Retorno preservando a ordem original dos itens
+  return items.map(it => it.integerPart);
+}
+
+/**
  * Compute start and end dates based on period filter
  */
 function getPeriodDates(period = 'this_month', customStart = null, customEnd = null) {
@@ -396,22 +453,30 @@ function getDemoDashboardData(periodInfo, isPro = true) {
     ? Math.round((realizedRevenue / completedAppointments) * 100) / 100
     : 85.00;
 
-  // Services
+  // Services: distribuição determinística de atendimentos pelo Método dos Maiores Restos
+  const serviceWeights = [0.35, 0.18, 0.22, 0.15, 0.10];
+  const serviceCounts = distributeIntegerByWeights(completedAppointments, serviceWeights);
+
   const services = [
-    { name: 'Corte Feminino & Visagismo', count: Math.round(completedAppointments * 0.35), revenue: Math.round(realizedRevenue * 0.32), price: 110.00 },
-    { name: 'Mechas Criativas & Blond', count: Math.round(completedAppointments * 0.18), revenue: Math.round(realizedRevenue * 0.38), price: 350.00 },
-    { name: 'Cronograma Capilar & Nutrição', count: Math.round(completedAppointments * 0.22), revenue: Math.round(realizedRevenue * 0.15), price: 140.00 },
-    { name: 'Escova Modeladora & Tratamento', count: Math.round(completedAppointments * 0.15), revenue: Math.round(realizedRevenue * 0.09), price: 75.00 },
-    { name: 'Manicure & Spa dos Pés', count: Math.round(completedAppointments * 0.10), revenue: Math.round(realizedRevenue * 0.06), price: 65.00 },
+    { name: 'Corte Feminino & Visagismo', count: serviceCounts[0], revenue: Math.round(realizedRevenue * 0.32), price: 110.00 },
+    { name: 'Mechas Criativas & Blond', count: serviceCounts[1], revenue: Math.round(realizedRevenue * 0.38), price: 350.00 },
+    { name: 'Cronograma Capilar & Nutrição', count: serviceCounts[2], revenue: Math.round(realizedRevenue * 0.15), price: 140.00 },
+    { name: 'Escova Modeladora & Tratamento', count: serviceCounts[3], revenue: Math.round(realizedRevenue * 0.09), price: 75.00 },
+    { name: 'Manicure & Spa dos Pés', count: serviceCounts[4], revenue: Math.round(realizedRevenue * 0.06), price: 65.00 },
   ];
 
-  // Staff: avgTicket calculado estritamente como revenue / appointments
+  // Staff: distribuição determinística de atendimentos pelo Método dos Maiores Restos (Hamilton Method)
+  // Garante estritamente: SUM(staff.appointments) === completedAppointments
+  const staffWeights = [0.52, 0.28, 0.20];
+  const staffAppointments = distributeIntegerByWeights(completedAppointments, staffWeights);
+
+  // Staff: receita e participação percentual preservadas; avgTicket recalculado sobre os atendimentos distribuídos
   const staff = [
     {
       id: 1,
       name: 'Jéssica Ramos',
       specialty: 'Master Hairstylist & Colorista',
-      appointments: Math.max(1, Math.round(completedAppointments * 0.52)),
+      appointments: staffAppointments[0],
       revenue: Math.round(realizedRevenue * 0.55 * 100) / 100,
       sharePercent: 55.0,
     },
@@ -419,7 +484,7 @@ function getDemoDashboardData(periodInfo, isPro = true) {
       id: 2,
       name: 'Camila Santos',
       specialty: 'Especialista em Mechas & Tratamento',
-      appointments: Math.max(1, Math.round(completedAppointments * 0.28)),
+      appointments: staffAppointments[1],
       revenue: Math.round(realizedRevenue * 0.30 * 100) / 100,
       sharePercent: 30.0,
     },
@@ -427,7 +492,7 @@ function getDemoDashboardData(periodInfo, isPro = true) {
       id: 3,
       name: 'Rafael Costa',
       specialty: 'Cortes & Terapia Capilar',
-      appointments: Math.max(1, Math.round(completedAppointments * 0.20)),
+      appointments: staffAppointments[2],
       revenue: Math.round(realizedRevenue * 0.15 * 100) / 100,
       sharePercent: 15.0,
     },
@@ -1218,6 +1283,7 @@ module.exports = {
   getEffectiveJessicaTier,
   getSalonDashboard,
   buildWeeklyBreakdown,
+  distributeIntegerByWeights,
   createBill,
   markBillAsPaid,
   deleteBill,
