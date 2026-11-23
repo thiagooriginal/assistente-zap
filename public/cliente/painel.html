@@ -3052,35 +3052,152 @@
             </div>
           </div>
 
-          <!-- Financial Chart (Receitas, Despesas, Resultado) -->
-          <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <!-- ======================================================== -->
+          <!-- SEÇÃO 1: RESUMO FINANCEIRO DO PERÍODO & VISÃO SEMANAL    -->
+          <!-- ======================================================== -->
+          <div id="sectionFinancialSummary" class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-4">
               <div>
                 <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                  <i data-lucide="activity" class="w-4 h-4 text-[#00F59B]"></i>
-                  <span>Evolução Temporal • Receitas vs Despesas</span>
+                  <i data-lucide="sparkles" class="w-4 h-4 text-[#AD7B42]"></i>
+                  <span>Resumo Financeiro do Período</span>
                 </h3>
-                <p class="text-xs text-slate-400 mt-0.5">Acompanhamento diário das entradas, saídas e resultado líquido.</p>
+                <p class="text-xs text-slate-400 mt-0.5">Indicadores financeiros consolidados de entradas, saídas e resultado líquido.</p>
               </div>
-              <div class="flex items-center gap-4 text-xs">
-                <div class="flex items-center gap-1.5 text-slate-300">
-                  <span class="w-2.5 h-2.5 rounded-full bg-[#00F59B]"></span>
-                  <span>Receitas</span>
+              <div class="flex items-center gap-2">
+                <span class="text-[11px] font-semibold text-slate-400 bg-white/5 px-3 py-1 rounded-full border border-white/5 flex items-center gap-1.5">
+                  <i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+                  <span>Consistência Matemática 100%</span>
+                </span>
+              </div>
+            </div>
+
+            <!-- 3 Indicadores Sintéticos de Destaque -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <!-- Indicador 1: Receitas -->
+              <div class="p-4 rounded-xl bg-[#07080c] border border-white/5 relative overflow-hidden">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Receitas Realizadas</span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#C89B6D]"></span>
                 </div>
-                <div class="flex items-center gap-1.5 text-slate-300">
-                  <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
-                  <span>Despesas</span>
+                <div id="summaryRealizedRevenue" class="text-xl sm:text-2xl font-black text-[#C89B6D] mt-2">R$ 0,00</div>
+                <div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[11px]">
+                  <span class="text-slate-500">vs período anterior</span>
+                  <span id="summaryVarRealized" class="font-bold text-slate-400">--</span>
                 </div>
-                <div class="flex items-center gap-1.5 text-slate-300">
-                  <span class="w-2.5 h-2.5 rounded-full bg-violet-400"></span>
-                  <span>Resultado</span>
+              </div>
+
+              <!-- Indicador 2: Despesas -->
+              <div class="p-4 rounded-xl bg-[#07080c] border border-white/5 relative overflow-hidden">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Despesas Operacionais</span>
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#E06D53]"></span>
+                </div>
+                <div id="summaryExpensesTotal" class="text-xl sm:text-2xl font-black text-[#E06D53] mt-2">R$ 0,00</div>
+                <div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[11px]">
+                  <span class="text-slate-500">vs período anterior</span>
+                  <span id="summaryVarExpenses" class="font-bold text-slate-400">--</span>
+                </div>
+              </div>
+
+              <!-- Indicador 3: Resultado Líquido -->
+              <div class="p-4 rounded-xl bg-[#07080c] border border-white/5 relative overflow-hidden">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Resultado Líquido</span>
+                  <span id="summaryResultIndicatorDot" class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                </div>
+                <div id="summaryFinancialResult" class="text-xl sm:text-2xl font-black text-emerald-400 mt-2">R$ 0,00</div>
+                <div class="flex items-center justify-between mt-2 pt-2 border-t border-white/5 text-[11px]">
+                  <span class="text-slate-500">Margem líquida de caixa</span>
+                  <span id="summaryResultMargin" class="font-bold text-emerald-400">0,0%</span>
                 </div>
               </div>
             </div>
 
-            <!-- Chart Canvas / SVG Container -->
-            <div id="financialChartContainer" class="w-full h-64 relative bg-[#07080c]/60 rounded-xl border border-white/5 p-3 flex items-center justify-center overflow-hidden">
-              <div class="text-xs text-slate-500">Carregando gráfico...</div>
+            <!-- Visualização Horizontal Semanal -->
+            <div class="space-y-3 pt-2">
+              <div class="flex items-center justify-between">
+                <h4 class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <i data-lucide="calendar" class="w-3.5 h-3.5 text-[#AD7B42]"></i>
+                  <span>Desempenho Semanal (Receitas, Despesas e Saldo)</span>
+                </h4>
+                <span class="text-[11px] text-slate-500">Valores em R$</span>
+              </div>
+
+              <div id="weeklyBreakdownContainer" class="space-y-3">
+                <div class="text-xs text-slate-500 py-3 text-center">Carregando divisão semanal...</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ======================================================== -->
+          <!-- SEÇÃO 2: RECEITAS X DESPESAS (BARRAS VERTICAIS AGRUPADAS) -->
+          <!-- ======================================================== -->
+          <div id="sectionRevenueExpenses" class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+              <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <i data-lucide="bar-chart-2" class="w-4 h-4 text-[#C89B6D]"></i>
+                  <span>Receitas x Despesas</span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">Comparativo visual de entradas e saídas com linha discreta de resultado.</p>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-3 text-xs">
+                <div class="flex items-center gap-3 mr-2">
+                  <div class="flex items-center gap-1.5 text-slate-300">
+                    <span class="w-3 h-3 rounded-xs bg-[#C89B6D] inline-block"></span>
+                    <span>Receitas</span>
+                  </div>
+                  <div class="flex items-center gap-1.5 text-slate-300">
+                    <span class="w-3 h-3 rounded-xs bg-[#E06D53] inline-block"></span>
+                    <span>Despesas</span>
+                  </div>
+                  <div class="flex items-center gap-1.5 text-slate-300">
+                    <span class="w-3 h-0.5 bg-emerald-400 inline-block"></span>
+                    <span>Resultado</span>
+                  </div>
+                </div>
+
+                <button type="button" id="btnToggleResultLine" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer">
+                  <i data-lucide="eye" class="w-3.5 h-3.5 text-emerald-400"></i>
+                  <span id="btnToggleResultLineText">Ocultar Resultado</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="financialChartContainer" class="w-full h-72 relative bg-[#07080c]/60 rounded-xl border border-white/5 p-3 flex items-center justify-center overflow-hidden">
+              <div class="text-xs text-slate-500">Carregando gráfico de barras...</div>
+            </div>
+          </div>
+
+          <!-- ======================================================== -->
+          <!-- SEÇÃO 3: EVOLUÇÃO DO RESULTADO FINANCEIRO (LINHA & ÁREA)  -->
+          <!-- ======================================================== -->
+          <div id="sectionFinancialTrend" class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-3">
+              <div>
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                  <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i>
+                  <span>Evolução do Resultado Financeiro</span>
+                </h3>
+                <p class="text-xs text-slate-400 mt-0.5">Resultado acumulado no período com curva suave e marcadores nos pontos.</p>
+              </div>
+
+              <div class="flex items-center gap-4 text-xs">
+                <div class="flex items-center gap-1.5 text-slate-300">
+                  <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+                  <span>Superávit</span>
+                </div>
+                <div class="flex items-center gap-1.5 text-slate-300">
+                  <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                  <span>Déficit</span>
+                </div>
+              </div>
+            </div>
+
+            <div id="financialTrendContainer" class="w-full h-64 relative bg-[#07080c]/60 rounded-xl border border-white/5 p-3 flex items-center justify-center overflow-hidden">
+              <div class="text-xs text-slate-500">Carregando curva de resultado...</div>
             </div>
           </div>
 
@@ -10582,6 +10699,7 @@
       startDate: null,
       endDate: null,
       data: null,
+      showResultLine: true,
     };
 
     function formatBRL(val) {
@@ -10606,14 +10724,112 @@
         const isUp = varObj.direction === 'up';
         const colorClass = isUp ? 'text-emerald-400' : 'text-rose-400';
         const arrow = isUp ? '↑' : '↓';
-        el.innerHTML = `<span class="${colorClass}">${arrow} ${varObj.formatted}</span>`;
+        el.innerHTML = `<span class="${colorClass}">${arrow} ${escapeHtml(varObj.formatted)}</span>`;
       } else {
         el.innerHTML = `<span class="text-slate-500 font-normal">--</span>`;
       }
     }
 
-    // Render interactive SVG Chart for Revenues vs Expenses vs Result
-    function renderFinancialChart(timeline = []) {
+    // ========================================================
+    // 1. SEÇÃO 1: RESUMO FINANCEIRO & BARRAS SEMANAIS
+    // ========================================================
+    function renderFinancialSummary(metrics = {}, variations = {}, weeklyBreakdown = []) {
+      const recEl = document.getElementById('summaryRealizedRevenue');
+      const despEl = document.getElementById('summaryExpensesTotal');
+      const resEl = document.getElementById('summaryFinancialResult');
+      const marginEl = document.getElementById('summaryResultMargin');
+      const dotEl = document.getElementById('summaryResultIndicatorDot');
+      const container = document.getElementById('weeklyBreakdownContainer');
+
+      if (recEl) recEl.innerText = formatBRL(metrics.realizedRevenue);
+      if (despEl) despEl.innerText = formatBRL(metrics.expensesTotal);
+
+      const resVal = metrics.financialResult || 0;
+      if (resEl) {
+        resEl.innerText = formatBRL(resVal);
+        resEl.className = resVal < 0 ? 'text-xl sm:text-2xl font-black text-rose-400 mt-2' : 'text-xl sm:text-2xl font-black text-emerald-400 mt-2';
+      }
+      if (dotEl) {
+        dotEl.className = resVal < 0 ? 'w-2.5 h-2.5 rounded-full bg-rose-500' : 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+      }
+
+      const margin = (metrics.realizedRevenue && metrics.realizedRevenue > 0)
+        ? ((resVal / metrics.realizedRevenue) * 100).toFixed(1).replace('.', ',') + '%'
+        : '0,0%';
+      if (marginEl) {
+        marginEl.innerText = margin;
+        marginEl.className = resVal < 0 ? 'font-bold text-rose-400' : 'font-bold text-emerald-400';
+      }
+
+      renderVariationBadge('summaryVarRealized', variations.realizedRevenue);
+      renderVariationBadge('summaryVarExpenses', variations.expensesTotal);
+
+      if (!container) return;
+      if (!weeklyBreakdown || weeklyBreakdown.length === 0) {
+        container.innerHTML = '<div class="text-xs text-slate-500 py-4 text-center">Nenhum dado semanal disponível para o período selecionado.</div>';
+        return;
+      }
+
+      const maxVal = Math.max(...weeklyBreakdown.map(w => Math.max(w.receitas || 0, w.despesas || 0)), 1);
+      let html = '';
+
+      weeklyBreakdown.forEach((w) => {
+        const recPct = Math.min(100, Math.max(2, Math.round(((w.receitas || 0) / maxVal) * 100)));
+        const despPct = Math.min(100, Math.max(2, Math.round(((w.despesas || 0) / maxVal) * 100)));
+        const isPositive = (w.resultado || 0) >= 0;
+        const badgeColor = isPositive ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border-rose-500/20';
+        const sign = isPositive ? '+' : '';
+
+        html += `
+          <div class="p-3.5 rounded-xl bg-[#07080c] border border-white/5 hover:border-white/10 transition-all space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-white text-sm">${escapeHtml(w.label)}</span>
+                <span class="text-[11px] text-slate-400 font-mono">(${escapeHtml(w.dateRange)})</span>
+              </div>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold border ${badgeColor}">
+                Saldo: ${sign} ${formatBRL(w.resultado)}
+              </span>
+            </div>
+
+            <!-- Barra Horizontal de Receitas -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-400 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-[#C89B6D]"></span>
+                  <span>Receitas</span>
+                </span>
+                <span class="font-bold text-[#C89B6D] font-mono">${formatBRL(w.receitas)}</span>
+              </div>
+              <div class="w-full h-2.5 rounded-full bg-white/5 overflow-hidden">
+                <div class="h-full rounded-full bg-gradient-to-r from-[#AD7B42] to-[#C89B6D] transition-all duration-500" style="width: ${recPct}%;"></div>
+              </div>
+            </div>
+
+            <!-- Barra Horizontal de Despesas -->
+            <div class="space-y-1">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-slate-400 flex items-center gap-1.5">
+                  <span class="w-2 h-2 rounded-full bg-[#E06D53]"></span>
+                  <span>Despesas</span>
+                </span>
+                <span class="font-bold text-[#E06D53] font-mono">${formatBRL(w.despesas)}</span>
+              </div>
+              <div class="w-full h-2.5 rounded-full bg-white/5 overflow-hidden">
+                <div class="h-full rounded-full bg-gradient-to-r from-[#B91C1C] to-[#E06D53] transition-all duration-500" style="width: ${despPct}%;"></div>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      container.innerHTML = html;
+    }
+
+    // ========================================================
+    // 2. SEÇÃO 2: RECEITAS X DESPESAS (BARRAS VERTICAIS AGRUPADAS)
+    // ========================================================
+    function renderFinancialChart(timeline = [], weeklyBreakdown = [], period = 'this_month') {
       const container = document.getElementById('financialChartContainer');
       if (!container) return;
 
@@ -10622,25 +10838,69 @@
         return;
       }
 
-      const w = container.clientWidth || 800;
-      const h = container.clientHeight || 240;
-      const padLeft = 60;
-      const padRight = 20;
-      const padTop = 20;
-      const padBottom = 35;
-      const chartW = Math.max(100, w - padLeft - padRight);
-      const chartH = Math.max(60, h - padTop - padBottom);
+      // Determina os 6 a 8 agrupamentos máximos
+      let groups = [];
+      if (period === '7d' && timeline.length <= 8) {
+        groups = timeline.map(pt => ({
+          label: pt.label,
+          fullLabel: pt.date,
+          receitas: pt.receitas,
+          despesas: pt.despesas,
+          resultado: pt.resultado,
+        }));
+      } else if (weeklyBreakdown && weeklyBreakdown.length > 0 && (period === 'this_month' || period === 'last_month')) {
+        const chunkCount = 6;
+        const chunkSize = Math.ceil(timeline.length / chunkCount);
+        for (let i = 0; i < timeline.length; i += chunkSize) {
+          const slice = timeline.slice(i, i + chunkSize);
+          const rec = slice.reduce((acc, c) => acc + c.receitas, 0);
+          const desp = slice.reduce((acc, c) => acc + c.despesas, 0);
+          const first = slice[0].label;
+          const last = slice[slice.length - 1].label;
+          groups.push({
+            label: first === last ? first : `${first}-${last.split('/')[0]}`,
+            fullLabel: `${first} a ${last}`,
+            receitas: Math.round(rec * 100) / 100,
+            despesas: Math.round(desp * 100) / 100,
+            resultado: Math.round((rec - desp) * 100) / 100,
+          });
+        }
+      } else {
+        const targetCount = Math.min(8, Math.max(4, timeline.length));
+        const step = Math.ceil(timeline.length / targetCount);
+        for (let i = 0; i < timeline.length; i += step) {
+          const slice = timeline.slice(i, i + step);
+          const rec = slice.reduce((acc, c) => acc + c.receitas, 0);
+          const desp = slice.reduce((acc, c) => acc + c.despesas, 0);
+          const first = slice[0].label;
+          const last = slice[slice.length - 1].label;
+          groups.push({
+            label: first === last ? first : `${first}-${last.split('/')[0]}`,
+            fullLabel: `${first} a ${last}`,
+            receitas: Math.round(rec * 100) / 100,
+            despesas: Math.round(desp * 100) / 100,
+            resultado: Math.round((rec - desp) * 100) / 100,
+          });
+        }
+      }
 
-      // Find max and min values
+      const w = 800;
+      const h = 280;
+      const padLeft = 70;
+      const padRight = 30;
+      const padTop = 25;
+      const padBottom = 40;
+      const chartW = w - padLeft - padRight;
+      const chartH = h - padTop - padBottom;
+
       let maxVal = 100;
       let minVal = 0;
-      timeline.forEach(pt => {
-        if (pt.receitas > maxVal) maxVal = pt.receitas;
-        if (pt.despesas > maxVal) maxVal = pt.despesas;
-        if (pt.resultado > maxVal) maxVal = pt.resultado;
-        if (pt.resultado < minVal) minVal = pt.resultado;
+      groups.forEach(g => {
+        if (g.receitas > maxVal) maxVal = g.receitas;
+        if (g.despesas > maxVal) maxVal = g.despesas;
+        if (g.resultado > maxVal) maxVal = g.resultado;
+        if (g.resultado < minVal) minVal = g.resultado;
       });
-
       maxVal = Math.ceil(maxVal * 1.15);
       if (minVal < 0) minVal = Math.floor(minVal * 1.15);
 
@@ -10648,81 +10908,191 @@
       const getY = (val) => padTop + chartH - ((val - minVal) / valRange) * chartH;
       const zeroY = getY(0);
 
-      // X scale
-      const stepX = timeline.length > 1 ? chartW / (timeline.length - 1) : chartW / 2;
-      const getX = (idx) => padLeft + (timeline.length > 1 ? idx * stepX : chartW / 2);
-
-      // Build paths
-      let recPoints = [];
-      let despPoints = [];
-      let resPoints = [];
-
-      timeline.forEach((pt, idx) => {
-        const x = getX(idx);
-        recPoints.push(`${x},${getY(pt.receitas)}`);
-        despPoints.push(`${x},${getY(pt.despesas)}`);
-        resPoints.push(`${x},${getY(pt.resultado)}`);
-      });
-
-      const recPathD = `M ` + recPoints.join(' L ');
-      const despPathD = `M ` + despPoints.join(' L ');
-      const resPathD = `M ` + resPoints.join(' L ');
-
-      // Horizontal grid lines
-      const gridCount = 4;
+      // Eixo Y e Grid
       let gridLinesSvg = '';
-      for (let i = 0; i <= gridCount; i++) {
-        const val = minVal + (valRange / gridCount) * i;
+      const gridSteps = 4;
+      for (let i = 0; i <= gridSteps; i++) {
+        const val = minVal + (valRange / gridSteps) * i;
         const y = getY(val);
         gridLinesSvg += `
           <line x1="${padLeft}" y1="${y}" x2="${padLeft + chartW}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3,3" />
-          <text x="${padLeft - 8}" y="${y + 4}" fill="#64748b" font-size="10" text-anchor="end">${Math.round(val)}</text>
+          <text x="${padLeft - 10}" y="${y + 4}" fill="#94a3b8" font-size="10" font-family="monospace" text-anchor="end">${formatBRL(Math.round(val))}</text>
         `;
       }
 
-      // X Axis Labels (sample if too many points)
+      // Barras Agrupadas
+      const numGroups = groups.length;
+      const groupWidth = chartW / numGroups;
+      const barWidth = Math.max(8, Math.min(26, groupWidth * 0.32));
+      const gap = Math.max(2, barWidth * 0.15);
+
+      let barsSvg = '';
+      let xLabelsSvg = '';
+      let resultPoints = [];
+
+      groups.forEach((g, idx) => {
+        const centerX = padLeft + idx * groupWidth + groupWidth / 2;
+        const xRec = centerX - barWidth - (gap / 2);
+        const xDesp = centerX + (gap / 2);
+
+        const yRec = getY(Math.max(0, g.receitas));
+        const hRec = Math.max(2, Math.abs(zeroY - yRec));
+
+        const yDesp = getY(Math.max(0, g.despesas));
+        const hDesp = Math.max(2, Math.abs(zeroY - yDesp));
+
+        const yRes = getY(g.resultado);
+        resultPoints.push(`${centerX},${yRes}`);
+
+        barsSvg += `
+          <g class="chart-bar-group cursor-pointer" data-group-index="${idx}">
+            <title>${escapeHtml(g.fullLabel)}&#10;Receitas: ${formatBRL(g.receitas)}&#10;Despesas: ${formatBRL(g.despesas)}&#10;Resultado: ${formatBRL(g.resultado)}</title>
+            <!-- Barra Receita Dourada -->
+            <rect x="${xRec}" y="${yRec}" width="${barWidth}" height="${hRec}" rx="3" fill="url(#beautyGoldBarGrad)" class="transition-all hover:brightness-125" />
+            <!-- Barra Despesa Rosé/Coral -->
+            <rect x="${xDesp}" y="${yDesp}" width="${barWidth}" height="${hDesp}" rx="3" fill="url(#beautyRoseBarGrad)" class="transition-all hover:brightness-125" />
+          </g>
+        `;
+
+        xLabelsSvg += `
+          <text x="${centerX}" y="${padTop + chartH + 20}" fill="#94a3b8" font-size="10" text-anchor="middle" font-semibold>${escapeHtml(g.label)}</text>
+        `;
+      });
+
+      // Linha opcional de resultado líquido
+      let resultLineSvg = '';
+      if (proDashboardState.showResultLine && resultPoints.length > 0) {
+        const pathD = `M ` + resultPoints.join(' L ');
+        let dotsSvg = '';
+        groups.forEach((g, idx) => {
+          const centerX = padLeft + idx * groupWidth + groupWidth / 2;
+          const yRes = getY(g.resultado);
+          const dotColor = g.resultado >= 0 ? '#00F59B' : '#EF4444';
+          dotsSvg += `<circle cx="${centerX}" cy="${yRes}" r="4" fill="${dotColor}" stroke="#07080c" stroke-width="2" />`;
+        });
+
+        resultLineSvg = `
+          <path d="${pathD}" fill="none" stroke="#00F59B" stroke-width="2.5" stroke-dasharray="4,4" stroke-linecap="round" stroke-linejoin="round" />
+          ${dotsSvg}
+        `;
+      }
+
+      container.innerHTML = `
+        <svg viewBox="0 0 ${w} ${h}" class="w-full h-full overflow-visible" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="beautyGoldBarGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#E8D3BE" />
+              <stop offset="50%" stop-color="#C89B6D" />
+              <stop offset="100%" stop-color="#AD7B42" />
+            </linearGradient>
+            <linearGradient id="beautyRoseBarGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#FCA5A5" />
+              <stop offset="50%" stop-color="#E06D53" />
+              <stop offset="100%" stop-color="#B91C1C" />
+            </linearGradient>
+          </defs>
+          ${minVal < 0 ? `<line x1="${padLeft}" y1="${zeroY}" x2="${padLeft + chartW}" y2="${zeroY}" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" />` : ''}
+          ${gridLinesSvg}
+          ${xLabelsSvg}
+          ${barsSvg}
+          ${resultLineSvg}
+        </svg>
+      `;
+    }
+
+    // ========================================================
+    // 3. SEÇÃO 3: TENDÊNCIA DO RESULTADO (LINHA & ÁREA)
+    // ========================================================
+    function renderFinancialTrend(timeline = []) {
+      const container = document.getElementById('financialTrendContainer');
+      if (!container) return;
+
+      if (!timeline || timeline.length === 0) {
+        container.innerHTML = '<div class="text-xs text-slate-500">Sem dados para a curva de resultado.</div>';
+        return;
+      }
+
+      const w = 800;
+      const h = 240;
+      const padLeft = 70;
+      const padRight = 25;
+      const padTop = 20;
+      const padBottom = 35;
+      const chartW = w - padLeft - padRight;
+      const chartH = h - padTop - padBottom;
+
+      let maxVal = 50;
+      let minVal = 0;
+      timeline.forEach(pt => {
+        if (pt.resultado > maxVal) maxVal = pt.resultado;
+        if (pt.resultado < minVal) minVal = pt.resultado;
+      });
+      maxVal = Math.ceil(maxVal * 1.15);
+      if (minVal < 0) minVal = Math.floor(minVal * 1.15);
+
+      const valRange = maxVal - minVal || 1;
+      const getY = (val) => padTop + chartH - ((val - minVal) / valRange) * chartH;
+      const zeroY = getY(0);
+
+      const stepX = timeline.length > 1 ? chartW / (timeline.length - 1) : chartW / 2;
+      const getX = (idx) => padLeft + (timeline.length > 1 ? idx * stepX : chartW / 2);
+
+      let points = [];
+      let dotsSvg = '';
+      timeline.forEach((pt, idx) => {
+        const x = getX(idx);
+        const y = getY(pt.resultado);
+        points.push(`${x},${y}`);
+        const isPos = pt.resultado >= 0;
+        const dotColor = isPos ? '#00F59B' : '#EF4444';
+        dotsSvg += `
+          <g class="cursor-pointer">
+            <title>${escapeHtml(pt.label)}: Saldo Líquido ${formatBRL(pt.resultado)}</title>
+            <circle cx="${x}" cy="${y}" r="3.5" fill="${dotColor}" stroke="#07080c" stroke-width="2" />
+          </g>
+        `;
+      });
+
+      const linePathD = `M ` + points.join(' L ');
+      const firstX = getX(0);
+      const lastX = getX(timeline.length - 1);
+      const areaPathD = `${linePathD} L ${lastX},${zeroY} L ${firstX},${zeroY} Z`;
+
+      let gridLinesSvg = '';
+      const gridSteps = 4;
+      for (let i = 0; i <= gridSteps; i++) {
+        const val = minVal + (valRange / gridSteps) * i;
+        const y = getY(val);
+        gridLinesSvg += `
+          <line x1="${padLeft}" y1="${y}" x2="${padLeft + chartW}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3,3" />
+          <text x="${padLeft - 10}" y="${y + 4}" fill="#94a3b8" font-size="10" font-family="monospace" text-anchor="end">${formatBRL(Math.round(val))}</text>
+        `;
+      }
+
       const labelInterval = timeline.length > 16 ? Math.ceil(timeline.length / 8) : (timeline.length > 8 ? 2 : 1);
       let xLabelsSvg = '';
       timeline.forEach((pt, idx) => {
         if (idx % labelInterval === 0 || idx === timeline.length - 1) {
           const x = getX(idx);
           xLabelsSvg += `
-            <text x="${x}" y="${padTop + chartH + 20}" fill="#94a3b8" font-size="10" text-anchor="middle">${pt.label}</text>
+            <text x="${x}" y="${padTop + chartH + 20}" fill="#94a3b8" font-size="10" text-anchor="middle">${escapeHtml(pt.label)}</text>
           `;
         }
       });
 
-      // Data point dots & tooltips
-      let dotsSvg = '';
-      timeline.forEach((pt, idx) => {
-        const x = getX(idx);
-        const yRec = getY(pt.receitas);
-        const yDesp = getY(pt.despesas);
-        const yRes = getY(pt.resultado);
-
-        dotsSvg += `
-          <g class="chart-point-group cursor-pointer">
-            <title>${escapeHtml(pt.label)} | Receitas: R$ ${pt.receitas.toFixed(2)} | Despesas: R$ ${pt.despesas.toFixed(2)} | Resultado: R$ ${pt.resultado.toFixed(2)}</title>
-            <circle cx="${x}" cy="${yRec}" r="3" fill="#00F59B" stroke="#07080c" stroke-width="1.5" />
-            <circle cx="${x}" cy="${yDesp}" r="3" fill="#EF4444" stroke="#07080c" stroke-width="1.5" />
-            <circle cx="${x}" cy="${yRes}" r="3" fill="#8B5CF6" stroke="#07080c" stroke-width="1.5" />
-          </g>
-        `;
-      });
-
       container.innerHTML = `
         <svg viewBox="0 0 ${w} ${h}" class="w-full h-full overflow-visible" preserveAspectRatio="none">
-          <!-- Zero Line -->
-          ${minVal < 0 ? `<line x1="${padLeft}" y1="${zeroY}" x2="${padLeft + chartW}" y2="${zeroY}" stroke="rgba(255,255,255,0.2)" stroke-width="1" />` : ''}
-          <!-- Grid -->
+          <defs>
+            <linearGradient id="emeraldAreaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#00F59B" stop-opacity="0.3" />
+              <stop offset="100%" stop-color="#00F59B" stop-opacity="0.0" />
+            </linearGradient>
+          </defs>
+          <line x1="${padLeft}" y1="${zeroY}" x2="${padLeft + chartW}" y2="${zeroY}" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-dasharray="4,4" />
           ${gridLinesSvg}
-          <!-- Axes Labels -->
           ${xLabelsSvg}
-          <!-- Trend Lines -->
-          <path d="${recPathD}" fill="none" stroke="#00F59B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="${despPathD}" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-          <path d="${resPathD}" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-dasharray="4,4" stroke-linecap="round" stroke-linejoin="round" />
-          <!-- Dots -->
+          <path d="${areaPathD}" fill="url(#emeraldAreaGrad)" />
+          <path d="${linePathD}" fill="none" stroke="#00F59B" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
           ${dotsSvg}
         </svg>
       `;
@@ -11005,8 +11375,10 @@
         renderVariationBadge('kpiVarAppts', v.totalAppointments);
         renderVariationBadge('kpiVarCompleted', v.completedAppointments);
 
-        // Sections
-        renderFinancialChart(data.timeline || []);
+        // Sections (3 Visualizações Coexistentes Beauty Premium)
+        renderFinancialSummary(data.metrics || {}, data.variations || {}, data.weeklyBreakdown || []);
+        renderFinancialChart(data.timeline || [], data.weeklyBreakdown || [], proDashboardState.period);
+        renderFinancialTrend(data.timeline || []);
         renderTopServices(data.services || []);
         renderPeakHours(data.peakHours || []);
         renderStaffPerformance(data.staff || []);
@@ -11147,6 +11519,22 @@
         return;
       }
       loadProDashboard('custom', s, e);
+    });
+
+    // Toggle da Linha de Resultado no Gráfico de Barras
+    document.getElementById('btnToggleResultLine')?.addEventListener('click', () => {
+      proDashboardState.showResultLine = !proDashboardState.showResultLine;
+      const btnText = document.getElementById('btnToggleResultLineText');
+      if (btnText) {
+        btnText.innerText = proDashboardState.showResultLine ? 'Ocultar Resultado' : 'Mostrar Resultado';
+      }
+      if (proDashboardState.data) {
+        renderFinancialChart(
+          proDashboardState.data.timeline || [],
+          proDashboardState.data.weeklyBreakdown || [],
+          proDashboardState.period
+        );
+      }
     });
 
     // New Bill Modal

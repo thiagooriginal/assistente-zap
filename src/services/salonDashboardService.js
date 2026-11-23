@@ -190,6 +190,90 @@ function getDateRangeArray(startStr, endStr) {
 }
 
 /**
+ * Build weekly breakdown with 100% mathematical consistency
+ * @param {Array} timeline Array of daily timeline objects
+ * @param {string} period Filter period ('this_month', 'last_month', '7d', etc.)
+ * @returns {Array} Array of aggregated weekly bucket objects
+ */
+function buildWeeklyBreakdown(timeline = [], period = 'this_month') {
+  if (!timeline || timeline.length === 0) return [];
+
+  const totalDays = timeline.length;
+  let buckets = [];
+
+  if (totalDays >= 28 && (period === 'this_month' || period === 'last_month' || totalDays >= 28)) {
+    // 4 standard calendar weeks: 01-07, 08-14, 15-21, 22-end
+    const w1 = [];
+    const w2 = [];
+    const w3 = [];
+    const w4 = [];
+
+    timeline.forEach(pt => {
+      const dayNum = parseInt(pt.date.split('-')[2], 10);
+      if (dayNum <= 7) w1.push(pt);
+      else if (dayNum <= 14) w2.push(pt);
+      else if (dayNum <= 21) w3.push(pt);
+      else w4.push(pt);
+    });
+
+    const getRangeLabel = (arr) => {
+      if (!arr || arr.length === 0) return '';
+      return `${arr[0].label} a ${arr[arr.length - 1].label}`;
+    };
+
+    buckets = [
+      { week: 1, label: 'Semana 1', dateRange: getRangeLabel(w1), items: w1 },
+      { week: 2, label: 'Semana 2', dateRange: getRangeLabel(w2), items: w2 },
+      { week: 3, label: 'Semana 3', dateRange: getRangeLabel(w3), items: w3 },
+      { week: 4, label: 'Semana 4', dateRange: getRangeLabel(w4), items: w4 },
+    ];
+  } else if (totalDays <= 7) {
+    const chunkSize = Math.max(1, Math.ceil(totalDays / 4));
+    for (let i = 0; i < totalDays; i += chunkSize) {
+      const slice = timeline.slice(i, i + chunkSize);
+      const wNum = Math.floor(i / chunkSize) + 1;
+      const dateRange = slice[0].label === slice[slice.length - 1].label ? slice[0].label : `${slice[0].label} a ${slice[slice.length - 1].label}`;
+      buckets.push({
+        week: wNum,
+        label: totalDays <= 4 ? `Dia ${slice[0].label}` : `Semana ${wNum}`,
+        dateRange,
+        items: slice,
+      });
+    }
+  } else {
+    const chunkSize = Math.ceil(totalDays / 4);
+    for (let i = 0; i < 4; i++) {
+      const slice = timeline.slice(i * chunkSize, (i + 1) * chunkSize);
+      if (slice.length > 0) {
+        buckets.push({
+          week: i + 1,
+          label: `Semana ${i + 1}`,
+          dateRange: `${slice[0].label} a ${slice[slice.length - 1].label}`,
+          items: slice,
+        });
+      }
+    }
+  }
+
+  return buckets.map(b => {
+    const rec = Math.round(b.items.reduce((acc, cur) => acc + (cur.receitas || 0), 0) * 100) / 100;
+    const desp = Math.round(b.items.reduce((acc, cur) => acc + (cur.despesas || 0), 0) * 100) / 100;
+    const res = Math.round((rec - desp) * 100) / 100;
+    return {
+      week: b.week,
+      label: b.label,
+      dateRange: b.dateRange,
+      startDate: b.items[0]?.date || '',
+      endDate: b.items[b.items.length - 1]?.date || '',
+      daysCount: b.items.length,
+      receitas: rec,
+      despesas: desp,
+      resultado: res,
+    };
+  });
+}
+
+/**
  * Get dashboard metrics for demo account (Bella Vista Hair & Spa)
  */
 function getDemoDashboardData(periodInfo, isPro = true) {
@@ -202,19 +286,7 @@ function getDemoDashboardData(periodInfo, isPro = true) {
   const baseDailyEstimated = 114.00;
   const baseDailyExpenses = 159.33;
 
-  const realizedRevenue = Math.round(baseDailyRealized * daysCount * 100) / 100;
-  const estimatedRevenue = Math.round(baseDailyEstimated * daysCount * 100) / 100;
-  const expensesTotal = Math.round(baseDailyExpenses * daysCount * 100) / 100;
-  const financialResult = Math.round((realizedRevenue - expensesTotal) * 100) / 100;
-
-  const totalAppointments = Math.max(daysCount * 5, 6);
-  const completedAppointments = Math.max(daysCount * 4, 5);
-  const cancelledAppointments = Math.max(Math.round(daysCount * 0.3), 1);
-  const averageTicket = completedAppointments > 0
-    ? Math.round((realizedRevenue / completedAppointments) * 100) / 100
-    : 85.00;
-
-  // Timeline
+  // Timeline com valores diários consistentes
   const timeline = dateArr.map((d, idx) => {
     const dayFactor = 0.7 + (((idx * 7) % 11) / 15);
     const dayRealized = Math.round(baseDailyRealized * dayFactor * 100) / 100;
@@ -228,6 +300,20 @@ function getDemoDashboardData(periodInfo, isPro = true) {
       resultado: Math.round((dayRealized - dayExpense) * 100) / 100,
     };
   });
+
+  // Alinhamento exato de métricas com a soma dos pontos diários
+  const realizedRevenue = Math.round(timeline.reduce((acc, t) => acc + t.receitas, 0) * 100) / 100;
+  const expensesTotal = Math.round(timeline.reduce((acc, t) => acc + t.despesas, 0) * 100) / 100;
+  const financialResult = Math.round((realizedRevenue - expensesTotal) * 100) / 100;
+  const estimatedRevenue = Math.round(baseDailyEstimated * daysCount * 100) / 100;
+  const weeklyBreakdown = buildWeeklyBreakdown(timeline, period);
+
+  const totalAppointments = Math.max(daysCount * 5, 6);
+  const completedAppointments = Math.max(daysCount * 4, 5);
+  const cancelledAppointments = Math.max(Math.round(daysCount * 0.3), 1);
+  const averageTicket = completedAppointments > 0
+    ? Math.round((realizedRevenue / completedAppointments) * 100) / 100
+    : 85.00;
 
   // Services
   const services = [
@@ -348,6 +434,7 @@ function getDemoDashboardData(periodInfo, isPro = true) {
       completedAppointments: { percent: 9.5, formatted: '+9,5%', direction: 'up', hasHistory: true },
     },
     timeline,
+    weeklyBreakdown,
     services,
     staff,
     peakHours,
@@ -562,6 +649,8 @@ function getRealDashboardData(userId, periodInfo, isPro = true) {
     };
   });
 
+  const weeklyBreakdown = buildWeeklyBreakdown(timeline, period);
+
   // 9. Services Ranking
   const serviceStatsMap = {};
   userServices.forEach(s => {
@@ -753,6 +842,7 @@ function getRealDashboardData(userId, periodInfo, isPro = true) {
     },
     variations,
     timeline,
+    weeklyBreakdown,
     services,
     staff,
     peakHours,
@@ -768,7 +858,17 @@ async function getSalonDashboard(userId, options = {}) {
   const { period = 'this_month', startDate = null, endDate = null, isDemo = false, isPro = true } = options;
   const periodInfo = getPeriodDates(period, startDate, endDate);
 
-  if (isDemo) {
+  let effectiveIsDemo = Boolean(isDemo);
+  if (!effectiveIsDemo && userId) {
+    try {
+      const u = db.prepare('SELECT is_demo FROM users WHERE id = ?').get(userId);
+      if (u && Boolean(u.is_demo)) {
+        effectiveIsDemo = true;
+      }
+    } catch (_) {}
+  }
+
+  if (effectiveIsDemo) {
     return getDemoDashboardData(periodInfo, isPro);
   }
 
@@ -959,6 +1059,7 @@ module.exports = {
   getPeriodDates,
   getEffectiveJessicaTier,
   getSalonDashboard,
+  buildWeeklyBreakdown,
   createBill,
   markBillAsPaid,
   deleteBill,
