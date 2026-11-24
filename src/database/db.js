@@ -46,8 +46,6 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
   CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category);
-  CREATE INDEX IF NOT EXISTS idx_expenses_scheduled_payment ON expenses(scheduled_payment_id);
-  CREATE INDEX IF NOT EXISTS idx_expenses_user_scheduled ON expenses(user_id, scheduled_payment_id);
 
   CREATE TABLE IF NOT EXISTS incomes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1006,14 +1004,43 @@ runVersionedMigration('20261122_01_google_sync_dynamic_late_binding', 'Add late-
   db.exec('CREATE INDEX IF NOT EXISTS idx_gtest_late_binding ON google_sync_test_sessions(user_id, status, session_type, appointment_id);');
 });
 
-// Versioned migration: Idempotência de despesas vinculadas a scheduled_payments (COMANDO 071.1)
+// Versioned migration: Idempotência de despesas vinculadas a scheduled_payments (COMANDO 071.1 / 071.2)
 runVersionedMigration('20261123_01_expenses_scheduled_payment_id', 'Add scheduled_payment_id column and indices to expenses for idempotent bill liquidation', () => {
   ensureColumnExists('expenses', 'scheduled_payment_id', 'INTEGER');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_expenses_scheduled_payment ON expenses(scheduled_payment_id);');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_expenses_user_scheduled ON expenses(user_id, scheduled_payment_id);');
+
+  const columns = db.prepare('PRAGMA table_info(expenses)').all();
+  const hasColumn = columns.some((c) => c.name === 'scheduled_payment_id');
+  if (!hasColumn) {
+    throw new Error("[Database Migration] Falha crítica: coluna 'scheduled_payment_id' não foi confirmada na tabela 'expenses'.");
+  }
+
+  const duplicates = db.prepare(`
+    SELECT user_id, scheduled_payment_id, COUNT(*) as c
+    FROM expenses
+    WHERE scheduled_payment_id IS NOT NULL
+    GROUP BY user_id, scheduled_payment_id
+    HAVING c > 1
+  `).all();
+
+  if (duplicates.length > 0) {
+    const details = duplicates
+      .map(d => `user_id=${d.user_id}, scheduled_payment_id=${d.scheduled_payment_id} (${d.c} ocorrências)`)
+      .join('; ');
+    throw new Error(
+      `[Database Migration] Falha de integridade: detectadas despesas duplicadas para o mesmo scheduled_payment_id: ${details}. ` +
+      `A migração foi interrompida sem modificações para preservar os dados. Sanear duplicidades manualmente.`
+    );
+  }
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_expenses_scheduled_payment ON expenses(scheduled_payment_id);
+    CREATE INDEX IF NOT EXISTS idx_expenses_user_scheduled ON expenses(user_id, scheduled_payment_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_expenses_user_scheduled_payment_unique 
+      ON expenses(user_id, scheduled_payment_id) 
+      WHERE scheduled_payment_id IS NOT NULL;
+  `);
 });
 
-ensureColumnExists('expenses', 'scheduled_payment_id', 'INTEGER');
 ensureColumnExists('client_service_staff', 'confirmed', 'INTEGER NOT NULL DEFAULT 1 CHECK(confirmed IN (0, 1))');
 db.exec('CREATE INDEX IF NOT EXISTS idx_css_tenant_confirmed ON client_service_staff(user_id, confirmed);');
 
