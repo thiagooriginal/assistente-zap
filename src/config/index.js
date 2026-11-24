@@ -38,6 +38,13 @@ const config = {
 
   // Hotmart Integration
   hotmartWebhookSecret: (process.env.HOTMART_WEBHOOK_SECRET || process.env.HOTMART_HOTTOK || '').trim(),
+  hotmartProductId: (process.env.HOTMART_PRODUCT_ID || '8840376').trim(),
+  hotmartPlanStartId: (process.env.HOTMART_PLAN_START_ID || '').trim(),
+  hotmartPlanIntermediateId: (process.env.HOTMART_PLAN_INTERMEDIATE_ID || '').trim(),
+  hotmartPlanProId: (process.env.HOTMART_PLAN_PRO_ID || '').trim(),
+  hotmartOfferStartCode: (process.env.HOTMART_OFFER_START_CODE || 'gtt3rhpk').trim(),
+  hotmartOfferIntermediateCode: (process.env.HOTMART_OFFER_INTERMEDIATE_CODE || '1x8ik7i3').trim(),
+  hotmartOfferProCode: (process.env.HOTMART_OFFER_PRO_CODE || 'ytvdj943').trim(),
 
   // Dynamic Environment Helpers (Proteção 11 e 12)
   get isStaging() {
@@ -49,9 +56,6 @@ const config = {
     const nodeEnv = (process.env.NODE_ENV || '').toLowerCase();
     return (mode === 'production' || nodeEnv === 'production') && !this.isStaging;
   },
-  hotmartProductId: (process.env.HOTMART_PRODUCT_ID || '8840376').trim(),
-  hotmartPlanStartId: (process.env.HOTMART_PLAN_START_ID || '').trim(),
-  hotmartPlanProId: (process.env.HOTMART_PLAN_PRO_ID || '').trim(),
 
   // Isolated Demo Account for Hotmart Compliance
   demoAccountEmail: (process.env.DEMO_ACCOUNT_EMAIL || 'homologacao.hotmart@raiaagentes.com.br').trim().toLowerCase(),

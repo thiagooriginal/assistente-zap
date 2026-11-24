@@ -1081,7 +1081,7 @@ app.post('/api/webhooks/asaas', async (req, res) => {
 });
 
 // ==========================================
-// HOTMART WEBHOOK (PRODUCT 8840376 - JÉSSICA START & PRO)
+// HOTMART WEBHOOK (PRODUCT 8840376 - JÉSSICA START, INTERMEDIÁRIO & PRO)
 // ==========================================
 app.post('/api/webhooks/hotmart', async (req, res) => {
   try {
@@ -1103,6 +1103,19 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
     if (!isStagingHotmart && (result.action === 'USER_CREATED_PENDING' || result.action === 'USER_UPDATED')) {
       const buyer = payload.data?.buyer || {};
       const purchase = payload.data?.purchase || {};
+
+      const PLAN_OFFICIAL_PRICES = {
+        JESSICA_START: 89.0,
+        JESSICA_INTERMEDIATE: 109.0,
+        JESSICA_PRO: 139.0,
+      };
+
+      const PLAN_OFFICIAL_NAMES = {
+        JESSICA_START: 'Jéssica Start',
+        JESSICA_INTERMEDIATE: 'Jéssica Intermediário',
+        JESSICA_PRO: 'Jéssica Pro',
+      };
+
       metaCapiService.sendMetaCapiEvent({
         eventName: 'Purchase',
         eventId: payload.id || `purchase_${purchase.transaction}`,
@@ -1114,8 +1127,8 @@ app.post('/api/webhooks/hotmart', async (req, res) => {
         },
         customData: {
           currency: purchase.price?.currency_value || 'BRL',
-          value: purchase.price?.value || (result.planTier === 'JESSICA_PRO' ? 89.0 : 59.0),
-          contentName: result.planTier === 'JESSICA_PRO' ? 'Jéssica Pro' : 'Jéssica Start',
+          value: purchase.price?.value || PLAN_OFFICIAL_PRICES[result.planTier] || 89.0,
+          contentName: PLAN_OFFICIAL_NAMES[result.planTier] || result.planTier || 'Jéssica Beauty',
         },
       }).catch(() => {});
     }

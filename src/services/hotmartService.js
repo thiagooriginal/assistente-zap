@@ -40,8 +40,14 @@ function validateHotmartHeader(req, customSecret = null) {
 }
 
 /**
- * Identify plan tier from Hotmart 2.0 payload using official Plan IDs or Offer Codes
- * Strictly avoids relying on purchase price values or arbitrary guessing.
+ * Identify plan tier from Hotmart 2.0 payload using official Offer Codes (Priority 1),
+ * configured Plan IDs from .env (Priority 2), or plan name fallback (Priority 3).
+ * Strictly avoids relying on purchase price values.
+ *
+ * Official offer codes for product 8840376:
+ *   gtt3rhpk → JESSICA_START        (R$ 89,00)
+ *   1x8ik7i3 → JESSICA_INTERMEDIATE (R$ 109,00)
+ *   ytvdj943 → JESSICA_PRO          (R$ 139,00)
  */
 function resolvePlanTier(data) {
   const planId = String(
@@ -56,56 +62,74 @@ function resolvePlanTier(data) {
     ''
   ).trim().toLowerCase();
 
-  // 1. Strict match against official IDs configured in environment
-  if (config.hotmartPlanProId) {
-    const configuredPro = config.hotmartPlanProId.trim();
-    if (planId === configuredPro || offerCode === configuredPro.toLowerCase()) {
-      return 'JESSICA_PRO';
-    }
+  const productId = String(
+    data?.product?.id ||
+    data?.purchase?.product?.id ||
+    data?.productId ||
+    ''
+  ).trim();
+
+  // ── Prioridade 1: Match exato contra offer codes oficiais lidos de config ──
+  const offerPro = (config.hotmartOfferProCode || 'ytvdj943').trim().toLowerCase();
+  const offerIntermediate = (config.hotmartOfferIntermediateCode || '1x8ik7i3').trim().toLowerCase();
+  const offerStart = (config.hotmartOfferStartCode || 'gtt3rhpk').trim().toLowerCase();
+
+  if (offerCode) {
+    if (offerCode === offerPro) return 'JESSICA_PRO';
+    if (offerCode === offerIntermediate) return 'JESSICA_INTERMEDIATE';
+    if (offerCode === offerStart) return 'JESSICA_START';
   }
 
+  // ── Prioridade 2: Match contra Plan IDs configurados no .env ou strings canônicas ──
+  if (config.hotmartPlanProId) {
+    const cfgPro = config.hotmartPlanProId.trim().toLowerCase();
+    if (planId.toLowerCase() === cfgPro || offerCode === cfgPro) return 'JESSICA_PRO';
+  }
+  if (config.hotmartPlanIntermediateId) {
+    const cfgInt = config.hotmartPlanIntermediateId.trim().toLowerCase();
+    if (planId.toLowerCase() === cfgInt || offerCode === cfgInt) return 'JESSICA_INTERMEDIATE';
+  }
   if (config.hotmartPlanStartId) {
-    const configuredStart = config.hotmartPlanStartId.trim();
-    if (planId === configuredStart || offerCode === configuredStart.toLowerCase()) {
+    const cfgStart = config.hotmartPlanStartId.trim().toLowerCase();
+    if (planId.toLowerCase() === cfgStart || offerCode === cfgStart) return 'JESSICA_START';
+  }
+
+  // Exact match against known literal identifiers
+  if (planId === 'JESSICA_PRO' || planId.toLowerCase() === 'pro') return 'JESSICA_PRO';
+  if (planId === 'JESSICA_INTERMEDIATE' || planId.toLowerCase() === 'intermediate') return 'JESSICA_INTERMEDIATE';
+  if (planId === 'JESSICA_START' || planId.toLowerCase() === 'start') return 'JESSICA_START';
+
+  // ── Prioridade 3: Fallback por nome do plano (com validação de produto oficial) ──
+  const officialProductId = String(config.hotmartProductId || '8840376').trim();
+  const isOfficialOrUnsetProduct = !productId || productId === officialProductId;
+
+  if (isOfficialOrUnsetProduct) {
+    const planName = String(
+      data?.subscription?.plan?.name ||
+      data?.plan?.name ||
+      ''
+    ).trim().toUpperCase();
+
+    if (
+      planName.includes('INTERMEDIÁRIO') || planName.includes('INTERMEDIARIO') ||
+      planName.includes('INTERMEDIATE') || planName.includes('MÉDIO') ||
+      planName.includes('MEDIO')
+    ) {
+      return 'JESSICA_INTERMEDIATE';
+    }
+    if (planName.includes('PRO') || planName.includes('PROFISSIONAL') || planName.includes('GESTÃO')) {
+      return 'JESSICA_PRO';
+    }
+    if (planName.includes('START') || planName.includes('INICIAL') || planName.includes('ESSENCIAL')) {
       return 'JESSICA_START';
     }
   }
 
-  // 2. Exact match against known official IDs / standard offer codes
-  if (
-    planId === 'JESSICA_PRO' ||
-    offerCode === 'jessica_pro' ||
-    planId.toLowerCase() === 'pro' ||
-    offerCode === 'pro'
-  ) {
-    return 'JESSICA_PRO';
-  }
-
-  if (
-    planId === 'JESSICA_START' ||
-    offerCode === 'jessica_start' ||
-    planId.toLowerCase() === 'start' ||
-    offerCode === 'start'
-  ) {
-    return 'JESSICA_START';
-  }
-
-  // 3. Fallback: Plan name check if official ID is not yet assigned in .env
-  const planName = String(
-    data?.subscription?.plan?.name ||
-    data?.plan?.name ||
-    ''
-  ).trim().toUpperCase();
-
-  if (planName.includes('PRO') || planName.includes('PROFISSIONAL') || planName.includes('GESTÃO')) {
-    return 'JESSICA_PRO';
-  }
-  if (planName.includes('START') || planName.includes('INICIAL') || planName.includes('ESSENCIAL')) {
-    return 'JESSICA_START';
-  }
-
-  // If no official ID configured and no matching key or name
-  console.warn(`[Hotmart Webhook] ALERTA: Plano não identificado pelos IDs oficiais (planId: '${planId}', offer: '${offerCode}'). Marcado como pendente de identificação.`);
+  // Oferta desconhecida: retorna pendente sem alterar dados de acesso
+  console.warn(
+    `[Hotmart Webhook] ALERTA: Plano não identificado pelos offer codes/IDs oficiais ` +
+    `(planId: '${planId}', offerCode: '${offerCode}', product: '${productId}'). Marcado como PENDING_PLAN_IDENTIFICATION.`
+  );
   return 'PENDING_PLAN_IDENTIFICATION';
 }
 
@@ -177,6 +201,7 @@ async function processWebhook(payload, whatsappSender = null) {
   const buyerName = buyer.name || buyer.first_name || data.subscriber?.name || 'Cliente';
   const productId = String(product.id || config.hotmartProductId || '8840376');
   const planId = String(subscription.plan?.id || data.plan?.id || purchase.offer?.code || '');
+  const offerCode = String(purchase.offer?.code || data.offer?.code || '').trim().toLowerCase() || null;
   const planTier = resolvePlanTier(data);
 
   // Sanitize audit payload (without tokens or passwords)
@@ -187,6 +212,8 @@ async function processWebhook(payload, whatsappSender = null) {
     transactionCode,
     subscriberCode,
     productId,
+    planId,
+    offerCode,
     planTier,
     buyerEmailMasked: buyerEmail ? buyerEmail.replace(/^(.{2})(.*)(@.*)$/, '$1***$3') : null,
     buyerPhoneSuffix: buyerPhone ? buyerPhone.slice(-4) : null,
@@ -212,8 +239,8 @@ async function processWebhook(payload, whatsappSender = null) {
       db.prepare(`
         INSERT INTO hotmart_webhook_events (
           event_id, event_name, creation_date, transaction_code, subscriber_code,
-          buyer_email, buyer_phone, product_id, plan_id, raw_payload, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PROCESSING')
+          buyer_email, buyer_phone, product_id, plan_id, offer_code, raw_payload, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PROCESSING')
       `).run(
         eventId,
         eventName,
@@ -224,6 +251,7 @@ async function processWebhook(payload, whatsappSender = null) {
         buyerPhone,
         productId,
         planId,
+        offerCode,
         auditPayload
       );
     } catch (insErr) {
@@ -436,7 +464,13 @@ async function processWebhook(payload, whatsappSender = null) {
             ? `${config.baseUrl}/cliente/ativar?token=${activationToken}`
             : `${config.baseUrl}/cliente/login`;
 
-          const planLabel = planTier === 'JESSICA_PRO' ? 'Jéssica Pro 🌟' : 'Jéssica Start ✂️';
+          /** @type {Record<string, string>} */
+          const PLAN_LABELS = {
+            JESSICA_START: 'Jéssica Start ✂️',
+            JESSICA_INTERMEDIATE: 'Jéssica Intermediário 💼',
+            JESSICA_PRO: 'Jéssica Pro 🌟',
+          };
+          const planLabel = PLAN_LABELS[planTier] || `Plano ${planTier}`;
 
           const welcomeMsg =
             `🎉 *PAGAMENTO APROVADO! SEJA BEM-VINDO(A)!* 🚀\n\n` +
@@ -825,21 +859,49 @@ async function processWebhook(payload, whatsappSender = null) {
 function getIntegrationStatus() {
   const hasSecret = Boolean(config.hotmartWebhookSecret);
   const hasStartId = Boolean(config.hotmartPlanStartId);
+  const hasIntermediateId = Boolean(config.hotmartPlanIntermediateId);
   const hasProId = Boolean(config.hotmartPlanProId);
+  const hasOfferStart = Boolean(config.hotmartOfferStartCode);
+  const hasOfferIntermediate = Boolean(config.hotmartOfferIntermediateCode);
+  const hasOfferPro = Boolean(config.hotmartOfferProCode);
   const hasApiClient = Boolean(process.env.HOTMART_CLIENT_ID && process.env.HOTMART_CLIENT_SECRET);
+
+  // isProductionReady: webhook secret configurado E os três offer codes oficiais definidos
+  const isProductionReady = hasSecret && hasOfferStart && hasOfferIntermediate && hasOfferPro;
 
   return {
     productId: config.hotmartProductId || '8840376',
     webhookSecretConfigured: hasSecret,
-    planStartId: hasStartId ? config.hotmartPlanStartId : 'PENDENTE (Não configurado no .env)',
-    planProId: hasProId ? config.hotmartPlanProId : 'PENDENTE (Não configurado no .env)',
+
+    // Offer codes (identificação primária de ofertas da Hotmart)
+    offerCodes: {
+      start: hasOfferStart ? config.hotmartOfferStartCode : 'PENDENTE',
+      intermediate: hasOfferIntermediate ? config.hotmartOfferIntermediateCode : 'PENDENTE',
+      pro: hasOfferPro ? config.hotmartOfferProCode : 'PENDENTE',
+    },
+
+    // Plan IDs (identificação secundária por plano de assinatura Hotmart)
+    planIds: {
+      start: hasStartId ? config.hotmartPlanStartId : 'NÃO CONFIGURADO (opcional)',
+      intermediate: hasIntermediateId ? config.hotmartPlanIntermediateId : 'NÃO CONFIGURADO (opcional)',
+      pro: hasProId ? config.hotmartPlanProId : 'NÃO CONFIGURADO (opcional)',
+    },
+
+    // Mapeamento oficial dos três planos
+    planMapping: [
+      { tier: 'JESSICA_START', offerCode: config.hotmartOfferStartCode || 'gtt3rhpk', price: 89.0, label: 'Jéssica Start ✂️' },
+      { tier: 'JESSICA_INTERMEDIATE', offerCode: config.hotmartOfferIntermediateCode || '1x8ik7i3', price: 109.0, label: 'Jéssica Intermediário 💼' },
+      { tier: 'JESSICA_PRO', offerCode: config.hotmartOfferProCode || 'ytvdj943', price: 139.0, label: 'Jéssica Pro 🌟' },
+    ],
+
     apiReconciliationConfigured: hasApiClient,
-    isProductionReady: hasSecret && hasStartId && hasProId,
+    isProductionReady,
     pendingItems: [
       ...(!hasSecret ? ['HOTMART_WEBHOOK_SECRET (X-HOTMART-HOTTOK)'] : []),
-      ...(!hasStartId ? ['HOTMART_PLAN_START_ID (ID oficial do plano Start na Hotmart)'] : []),
-      ...(!hasProId ? ['HOTMART_PLAN_PRO_ID (ID oficial do plano Pro na Hotmart)'] : []),
-      ...(!hasApiClient ? ['HOTMART_CLIENT_ID / HOTMART_CLIENT_SECRET (Opcional, para consulta de reconciliação de vigência via API)'] : []),
+      ...(!hasOfferStart ? ['HOTMART_OFFER_START_CODE (código da oferta Start)'] : []),
+      ...(!hasOfferIntermediate ? ['HOTMART_OFFER_INTERMEDIATE_CODE (código da oferta Intermediário)'] : []),
+      ...(!hasOfferPro ? ['HOTMART_OFFER_PRO_CODE (código da oferta Pro)'] : []),
+      ...(!hasApiClient ? ['HOTMART_CLIENT_ID / HOTMART_CLIENT_SECRET (Opcional, para reconciliação via API)'] : []),
     ],
   };
 }

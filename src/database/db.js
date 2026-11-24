@@ -303,6 +303,7 @@ db.exec(`
     buyer_phone TEXT,
     product_id TEXT,
     plan_id TEXT,
+    offer_code TEXT,
     raw_payload TEXT,
     status TEXT DEFAULT 'PROCESSED',
     processed_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -1038,6 +1039,15 @@ runVersionedMigration('20261123_01_expenses_scheduled_payment_id', 'Add schedule
     CREATE UNIQUE INDEX IF NOT EXISTS idx_expenses_user_scheduled_payment_unique 
       ON expenses(user_id, scheduled_payment_id) 
       WHERE scheduled_payment_id IS NOT NULL;
+  `);
+});
+
+// Versioned migration: COMANDO 072 — Hotmart offer_code column e índices de conciliação
+runVersionedMigration('20261124_01_hotmart_offer_code_and_buyer_email_index', 'Add offer_code column to hotmart_webhook_events and create buyer_email index for reconciliation', () => {
+  ensureColumnExists('hotmart_webhook_events', 'offer_code', 'TEXT');
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_hotmart_buyer_email ON hotmart_webhook_events(buyer_email);
+    CREATE INDEX IF NOT EXISTS idx_hotmart_offer_code ON hotmart_webhook_events(offer_code);
   `);
 });
 
