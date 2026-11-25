@@ -23,6 +23,7 @@ const metaCapiService = require('../services/metaCapiService');
 const clientAuth = require('../services/clientAuthService');
 const directSales = require('../services/directSalesService');
 const productService = require('../services/productService');
+const adminOverviewService = require('../services/adminOverviewService');
 const { PLANS } = require('../services/planCatalog');
 const {
   adminLoginLimiter,
@@ -1181,6 +1182,28 @@ app.post('/api/analytics/event', analyticsLimiter, (req, res) => {
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// COMANDO 073 Fase 4: Visão Geral Consolidada da RAIA & Gestão de Clientes
+app.get('/api/admin/overview', requireInteractiveAdmin, (req, res) => {
+  try {
+    const data = adminOverviewService.getAdminOverviewMetrics();
+    return res.json({ success: true, ...data });
+  } catch (err) {
+    console.error('Erro em /api/admin/overview:', err);
+    return res.status(500).json({ success: false, error: 'Erro ao consolidar visão geral.' });
+  }
+});
+
+app.get('/api/admin/clients-consolidated', requireInteractiveAdmin, (req, res) => {
+  try {
+    const { search, status, origin, limit, offset } = req.query;
+    const clients = adminOverviewService.getAdminClientsList({ search, status, origin, limit, offset });
+    return res.json({ success: true, clients });
+  } catch (err) {
+    console.error('Erro em /api/admin/clients-consolidated:', err);
+    return res.status(500).json({ success: false, error: 'Erro ao listar clientes consolidados.' });
   }
 });
 

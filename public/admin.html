@@ -343,26 +343,33 @@
     <!-- NAVEGAÇÃO DESKTOP (>= 1024px) -->
     <nav class="hidden lg:flex items-center justify-between gap-1.5 p-2 rounded-2xl bg-zinc-950/80 border border-zinc-800/80 shadow-xl backdrop-blur-md relative z-30" aria-label="Navegação Principal Administrador">
       
-      <!-- 1. Visão Geral / Estúdio IA -->
-      <button onclick="switchAdminTab('studio')" id="tabBtnStudio" data-admin-tab="studio" class="px-3.5 py-2 rounded-xl text-xs font-black bg-violet-600 text-white flex items-center gap-2 shadow-lg transition cursor-pointer shrink-0">
-        <i data-lucide="clapperboard" class="w-4 h-4"></i>
-        <span>Estúdio IA</span>
+      <!-- 1. Visão Geral (DEFAULT) -->
+      <button onclick="switchAdminTab('overview')" id="tabBtnOverview" data-admin-tab="overview" class="px-3.5 py-2 rounded-xl text-xs font-black bg-cyan-600 text-white flex items-center gap-2 shadow-lg transition cursor-pointer shrink-0">
+        <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+        <span>Visão Geral</span>
       </button>
 
-      <!-- 2. Dropdown: Clientes & Acessos -->
+      <!-- 2. Clientes & Assinaturas -->
       <div class="relative" id="groupWrapperClients">
         <button type="button" id="groupBtnClients" onclick="toggleAdminDropdown('dropdownMenuClients')" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800/80 flex items-center gap-2 transition cursor-pointer shrink-0">
           <i data-lucide="users" class="w-4 h-4 text-[#00F59B]"></i>
-          <span>Clientes & Acessos</span>
+          <span>Clientes & Assinaturas</span>
           <i data-lucide="chevron-down" id="groupChevronClients" class="w-3.5 h-3.5 text-zinc-400 transition-transform"></i>
         </button>
 
         <div id="dropdownMenuClients" class="hidden absolute left-0 top-full mt-2 w-64 p-2 rounded-2xl bg-[#0d121c] border border-zinc-800 shadow-2xl z-50 backdrop-blur-xl space-y-1">
+          <button onclick="switchAdminTab('overview')" id="tabBtnClients" data-admin-tab="clients" class="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2.5 transition cursor-pointer">
+            <i data-lucide="user-check" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+            <div>
+              <div class="font-extrabold text-white">Central de Clientes</div>
+              <div class="text-[10px] text-zinc-400 font-normal">Tabela Consolidada LGPD</div>
+            </div>
+          </button>
           <button onclick="switchAdminTab('asaas')" id="tabBtnAsaas" data-admin-tab="asaas" class="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2.5 transition cursor-pointer">
             <i data-lucide="credit-card" class="w-4 h-4 text-[#00F59B] shrink-0"></i>
             <div>
-              <div class="font-extrabold text-white">Clientes & Pagamentos</div>
-              <div class="text-[10px] text-zinc-400 font-normal">Assinaturas Asaas & Hotmart</div>
+              <div class="font-extrabold text-white">Assinaturas Multiproduct</div>
+              <div class="text-[10px] text-zinc-400 font-normal">Contratos Asaas & Hotmart</div>
             </div>
           </button>
           <button onclick="switchAdminTab('users')" id="tabBtnUsers" data-admin-tab="users" class="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2.5 transition cursor-pointer">
@@ -375,56 +382,64 @@
         </div>
       </div>
 
-      <!-- 3. Central de Produtos -->
+      <!-- 3. Financeiro & Pagamentos -->
+      <button onclick="switchAdminTab('finance')" id="tabBtnFinance" data-admin-tab="finance" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition cursor-pointer shrink-0">
+        <i data-lucide="badge-dollar-sign" class="w-4 h-4 text-emerald-400"></i>
+        <span>Financeiro</span>
+      </button>
+
+      <!-- 4. Produtos & Planos -->
       <button onclick="switchAdminTab('products')" id="tabBtnProducts" data-admin-tab="products" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition cursor-pointer shrink-0">
         <i data-lucide="boxes" class="w-4 h-4 text-amber-400"></i>
         <span>Produtos & Planos</span>
       </button>
 
-      <!-- 4. Finanças -->
-      <button onclick="switchAdminTab('finance')" id="tabBtnFinance" data-admin-tab="finance" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition cursor-pointer shrink-0">
-        <i data-lucide="badge-dollar-sign" class="w-4 h-4 text-emerald-400"></i>
-        <span>Controle de Custos</span>
+      <!-- 5. Integrações & Saúde dos Serviços -->
+      <button onclick="switchAdminTab('googleSync')" id="tabBtnGoogleSync" data-admin-tab="googleSync" class="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-cyan-950/50 hover:bg-cyan-900/60 text-cyan-300 hover:text-cyan-100 border border-cyan-500/40 flex items-center gap-2 transition cursor-pointer shrink-0 shadow-sm shadow-cyan-950/50">
+        <i data-lucide="calendar" class="w-4 h-4 text-cyan-400"></i>
+        <span>Integrações</span>
+        <span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">GCal</span>
       </button>
 
-      <!-- 5. Dropdown: Marketing & IA -->
+      <!-- 6. Marketing & Vendas -->
       <div class="relative" id="groupWrapperMarketing">
         <button type="button" id="groupBtnMarketingIA" onclick="toggleAdminDropdown('dropdownMenuMarketing')" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-900/90 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800/80 flex items-center gap-2 transition cursor-pointer shrink-0">
-          <i data-lucide="brain-circuit" class="w-4 h-4 text-cyan-400"></i>
-          <span>Marketing & IA</span>
+          <i data-lucide="brain-circuit" class="w-4 h-4 text-pink-400"></i>
+          <span>Marketing & Vendas</span>
           <i data-lucide="chevron-down" id="groupChevronMarketing" class="w-3.5 h-3.5 text-zinc-400 transition-transform"></i>
         </button>
 
-        <div id="dropdownMenuMarketing" class="hidden absolute left-0 top-full mt-2 w-64 p-2 rounded-2xl bg-[#0d121c] border border-zinc-800 shadow-2xl z-50 backdrop-blur-xl space-y-1">
+        <div id="dropdownMenuMarketing" class="hidden absolute right-0 top-full mt-2 w-64 p-2 rounded-2xl bg-[#0d121c] border border-zinc-800 shadow-2xl z-50 backdrop-blur-xl space-y-1">
+          <button onclick="switchAdminTab('marketing')" id="tabBtnMarketing" data-admin-tab="marketing" class="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2.5 transition cursor-pointer">
+            <i data-lucide="line-chart" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+            <div>
+              <div class="font-extrabold text-white">Funil Comercial & Leads</div>
+              <div class="text-[10px] text-zinc-400 font-normal">Analytics, Afiliados & CAPI</div>
+            </div>
+          </button>
+          <button onclick="switchAdminTab('studio')" id="tabBtnStudio" data-admin-tab="studio" class="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2.5 transition cursor-pointer">
+            <i data-lucide="clapperboard" class="w-4 h-4 text-violet-400 shrink-0"></i>
+            <div>
+              <div class="font-extrabold text-white">Estúdio IA</div>
+              <div class="text-[10px] text-zinc-400 font-normal">Vídeos & Vozes WhatsApp</div>
+            </div>
+          </button>
           <button onclick="switchAdminTab('analyzer')" id="tabBtnAnalyzer" data-admin-tab="analyzer" class="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2.5 transition cursor-pointer">
-            <i data-lucide="brain-circuit" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+            <i data-lucide="search" class="w-4 h-4 text-cyan-400 shrink-0"></i>
             <div>
               <div class="font-extrabold text-white">Análise de Oferta & IA</div>
               <div class="text-[10px] text-zinc-400 font-normal">Diagnóstico e ICP do Negócio</div>
             </div>
           </button>
-          <button onclick="switchAdminTab('marketing')" id="tabBtnMarketing" data-admin-tab="marketing" class="w-full px-3 py-2.5 rounded-xl text-xs font-bold text-left bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white flex items-center gap-2.5 transition cursor-pointer">
-            <i data-lucide="line-chart" class="w-4 h-4 text-emerald-400 shrink-0"></i>
-            <div>
-              <div class="font-extrabold text-white">Marketing & Analytics</div>
-              <div class="text-[10px] text-zinc-400 font-normal">UTMs, Pixels e Conversões</div>
-            </div>
-          </button>
         </div>
       </div>
 
-      <!-- 6. Status do Sistema -->
+      <!-- 7. Segurança & Auditoria -->
       <button onclick="switchAdminTab('system')" id="tabBtnSystem" data-admin-tab="system" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 flex items-center gap-2 transition cursor-pointer shrink-0">
-        <i data-lucide="cpu" class="w-4 h-4 text-violet-400"></i>
-        <span>Status da IA</span>
+        <i data-lucide="shield-check" class="w-4 h-4 text-cyan-400"></i>
+        <span>Segurança</span>
       </button>
 
-      <!-- 7. Homologação Google Calendar (Permanentemente em destaque azul ciano) -->
-      <button onclick="switchAdminTab('googleSync')" id="tabBtnGoogleSync" data-admin-tab="googleSync" class="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-cyan-950/50 hover:bg-cyan-900/60 text-cyan-300 hover:text-cyan-100 border border-cyan-500/40 flex items-center gap-2 transition cursor-pointer shrink-0 shadow-sm shadow-cyan-950/50">
-        <i data-lucide="calendar" class="w-4 h-4 text-cyan-400"></i>
-        <span>Homologação</span>
-        <span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">GCal</span>
-      </button>
     </nav>
 
     <!-- NAVEGAÇÃO MOBILE / TABLET (< 1024px) -->
@@ -534,7 +549,191 @@
     <!-- ============================================================ -->
     <!-- SECTION 1: ESTÚDIO DE VÍDEOS & VOZES IA (DEFAULT TAB)         -->
     <!-- ============================================================ -->
-    <div id="sectionStudio" class="space-y-6">
+    <!-- ============================================================ -->
+    <!-- SECTION 0: VISÃO GERAL DA RAIA (COMANDO 073 FASE 4)          -->
+    <!-- ============================================================ -->
+    <div id="sectionOverview" class="space-y-6">
+      <!-- Top Banner -->
+      <div class="p-6 rounded-3xl bg-gradient-to-r from-cyan-950/80 via-[#0d1527] to-zinc-950 border border-cyan-500/30 shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-black uppercase tracking-wider">Painel Executivo</span>
+            <span class="text-xs text-zinc-400">Jéssica Beauty & Assistentes Multi-Tenant</span>
+          </div>
+          <h2 class="text-xl sm:text-2xl font-black text-white mt-1">Visão Geral da RAIA AGENTES</h2>
+          <p class="text-xs text-zinc-300 mt-0.5">Indicadores consolidados em tempo real, receita recorrente e central operacional de clientes.</p>
+        </div>
+        <button onclick="loadAdminOverview(); loadConsolidatedClients();" class="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700 text-xs font-bold flex items-center gap-2 transition cursor-pointer">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Atualizar Dados</span>
+        </button>
+      </div>
+
+      <!-- 8 METRIC CARDS GRID -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="p-5 rounded-2xl bg-[#090f1d] border border-cyan-500/20 space-y-1">
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span>Clientes Cadastrados</span>
+            <i data-lucide="users" class="w-4 h-4 text-cyan-400"></i>
+          </div>
+          <p id="ovTotalClients" class="text-2xl font-black text-white">0</p>
+          <span class="text-[10px] text-zinc-500">Salões e empresas no sistema</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-[#090f1d] border border-emerald-500/20 space-y-1">
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span>Assinaturas Ativas</span>
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-[#00F59B]"></i>
+          </div>
+          <p id="ovActiveSubs" class="text-2xl font-black text-[#00F59B]">0</p>
+          <span class="text-[10px] text-emerald-500/80">Contratos vigentes</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-[#090f1d] border border-emerald-500/20 space-y-1">
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span>MRR Estimado</span>
+            <i data-lucide="trending-up" class="w-4 h-4 text-[#00F59B]"></i>
+          </div>
+          <p id="ovMrr" class="text-2xl font-black text-[#00F59B]">R$ 0,00</p>
+          <span class="text-[10px] text-zinc-500">Receita recorrente ativa</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-[#090f1d] border border-cyan-500/20 space-y-1">
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span>Receita Confirmada</span>
+            <i data-lucide="badge-dollar-sign" class="w-4 h-4 text-cyan-400"></i>
+          </div>
+          <p id="ovConfirmedRev" class="text-2xl font-black text-cyan-400">R$ 0,00</p>
+          <span class="text-[10px] text-zinc-500">Recebido (Hotmart + Asaas)</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-[#090f1d] border border-amber-500/20 space-y-1">
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span>Assinaturas Pendentes</span>
+            <i data-lucide="clock" class="w-4 h-4 text-amber-400"></i>
+          </div>
+          <p id="ovPendingSubs" class="text-2xl font-black text-amber-400">0</p>
+          <span class="text-[10px] text-amber-500/80">Aguardando pagamento</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-[#090f1d] border border-rose-500/20 space-y-1">
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span>Inadimplentes (Overdue)</span>
+            <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-400"></i>
+          </div>
+          <p id="ovOverdueSubs" class="text-2xl font-black text-rose-400">0</p>
+          <span class="text-[10px] text-rose-500/80">Cobranças vencidas</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-[#090f1d] border border-violet-500/20 space-y-1">
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span>Ativações Pendentes</span>
+            <i data-lucide="user-plus" class="w-4 h-4 text-violet-400"></i>
+          </div>
+          <p id="ovPendingActivations" class="text-2xl font-black text-violet-400">0</p>
+          <span class="text-[10px] text-violet-400/80">Aguardando onboarding</span>
+        </div>
+
+        <div class="p-5 rounded-2xl bg-[#090f1d] border border-zinc-700/40 space-y-1">
+          <div class="flex items-center justify-between text-xs text-zinc-400">
+            <span>Status WhatsApp</span>
+            <i data-lucide="message-circle" class="w-4 h-4 text-emerald-400"></i>
+          </div>
+          <p id="ovWaStatus" class="text-2xl font-black text-white">0 / 0</p>
+          <span class="text-[10px] text-zinc-500">Conectados / Desconectados</span>
+        </div>
+      </div>
+
+      <!-- BREAKDOWN BY PLAN & CHANNEL -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Planos -->
+        <div class="p-5 rounded-2xl bg-[#090f1d] border border-zinc-800 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-black text-white flex items-center gap-2">
+              <i data-lucide="layers" class="w-4 h-4 text-cyan-400"></i>
+              <span>Clientes por Plano</span>
+            </h3>
+            <span class="text-[10px] text-zinc-400">Start • Intermediário • Pro</span>
+          </div>
+          <div id="ovPlansList" class="space-y-2 text-xs">
+            <p class="text-zinc-500 text-center py-4">Carregando planos...</p>
+          </div>
+        </div>
+
+        <!-- Canais -->
+        <div class="p-5 rounded-2xl bg-[#090f1d] border border-zinc-800 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-black text-white flex items-center gap-2">
+              <i data-lucide="git-merge" class="w-4 h-4 text-violet-400"></i>
+              <span>Clientes por Canal</span>
+            </h3>
+            <span class="text-[10px] text-zinc-400">Hotmart • Asaas • Direto</span>
+          </div>
+          <div id="ovChannelsList" class="space-y-2 text-xs">
+            <p class="text-zinc-500 text-center py-4">Carregando canais...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- CONSOLIDATED CLIENTS TABLE (4.2) -->
+      <div class="p-6 rounded-3xl bg-[#090f1d] border border-zinc-800 shadow-xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 class="text-base font-black text-white flex items-center gap-2">
+              <i data-lucide="users" class="w-4 h-4 text-cyan-400"></i>
+              <span>Central de Clientes & Salões</span>
+            </h3>
+            <p class="text-xs text-zinc-400">Lista consolidada com dados minimizados e protegidos conforme LGPD</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <input 
+              type="text" 
+              id="clientSearchInput" 
+              placeholder="Buscar salão ou cliente..." 
+              oninput="debounceLoadClients()" 
+              class="px-3.5 py-2 bg-black/60 border border-zinc-700 rounded-xl text-white text-xs focus:outline-none focus:border-cyan-400 transition w-48 sm:w-60"
+            >
+            <select id="clientStatusFilter" onchange="loadConsolidatedClients()" class="px-3 py-2 bg-black/60 border border-zinc-700 rounded-xl text-white text-xs focus:outline-none">
+              <option value="">Status: Todos</option>
+              <option value="ACTIVE">Ativos</option>
+              <option value="PENDING">Pendentes</option>
+              <option value="OVERDUE">Atrasados</option>
+              <option value="CANCELLED">Cancelados</option>
+            </select>
+            <select id="clientOriginFilter" onchange="loadConsolidatedClients()" class="px-3 py-2 bg-black/60 border border-zinc-700 rounded-xl text-white text-xs focus:outline-none">
+              <option value="">Canal: Todos</option>
+              <option value="HOTMART">Hotmart</option>
+              <option value="ASAAS">Asaas</option>
+              <option value="DIRECT">Direto</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-zinc-800">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-black/50 text-zinc-400 border-b border-zinc-800 text-[11px] font-bold uppercase">
+                <th class="p-3">ID / Salão</th>
+                <th class="p-3">Contato (LGPD)</th>
+                <th class="p-3">Plano</th>
+                <th class="p-3">Canal</th>
+                <th class="p-3">Status</th>
+                <th class="p-3">Ativação</th>
+                <th class="p-3">WhatsApp</th>
+                <th class="p-3">GCal</th>
+              </tr>
+            </thead>
+            <tbody id="consolidatedClientsTbody" class="divide-y divide-zinc-800/80 bg-zinc-950/40 text-zinc-300">
+              <tr>
+                <td colspan="8" class="p-6 text-center text-zinc-500">Carregando clientes...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="sectionStudio" class="hidden space-y-6">
       
       <!-- Top Banner / Pipeline Explanation -->
       <div class="p-5 rounded-3xl bg-gradient-to-r from-violet-950/80 via-indigo-950/70 to-zinc-900 border border-violet-500/40 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -2597,6 +2796,8 @@
 
     function hideAuthOverlay() {
       document.getElementById('adminAuthOverlay').classList.add('hidden');
+          loadAdminOverview();
+          loadConsolidatedClients();
       document.getElementById('adminMainContent').classList.remove('hidden');
       lucide.createIcons();
     }
@@ -3061,6 +3262,8 @@
 
     function switchAdminTab(tab) {
       const sections = {
+        overview: document.getElementById('sectionOverview'),
+        clients: document.getElementById('sectionOverview'), // rola para central de clientes
         studio: document.getElementById('sectionStudio'),
         asaas: document.getElementById('sectionAsaas'),
         products: document.getElementById('sectionProducts'),
@@ -3072,6 +3275,8 @@
         googleSync: document.getElementById('sectionGoogleSync'),
       };
       const buttons = {
+        overview: document.getElementById('tabBtnOverview'),
+        clients: document.getElementById('tabBtnClients'),
         studio: document.getElementById('tabBtnStudio'),
         asaas: document.getElementById('tabBtnAsaas'),
         products: document.getElementById('tabBtnProducts'),
@@ -3087,6 +3292,10 @@
       Object.keys(sections).forEach(k => {
         if (k === tab) {
           sections[k]?.classList.remove('hidden');
+          if (k === 'overview') {
+            loadAdminOverview();
+            loadConsolidatedClients();
+          }
         } else {
           sections[k]?.classList.add('hidden');
         }
@@ -5000,6 +5209,141 @@
     }
 
     // INIT
+    
+    // -------------------------------------------------------------
+    // VISÃO GERAL EXECUTIVA & CLIENTES CONSOLIDADOS (COMANDO 073 FASE 4)
+    // -------------------------------------------------------------
+    let clientSearchTimeout = null;
+    function debounceLoadClients() {
+      clearTimeout(clientSearchTimeout);
+      clientSearchTimeout = setTimeout(() => loadConsolidatedClients(), 300);
+    }
+
+    async function loadAdminOverview() {
+      try {
+        const res = await fetch('/api/admin/overview');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.success) return;
+
+        const s = data.summary || {};
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+        setVal('ovTotalClients', s.totalClients ?? 0);
+        setVal('ovActiveSubs', s.activeSubscriptions ?? 0);
+        setVal('ovMrr', s.mrrFormatted ?? 'R$ 0,00');
+        setVal('ovConfirmedRev', s.confirmedRevenueFormatted ?? 'R$ 0,00');
+        setVal('ovPendingSubs', s.pendingSubscriptions ?? 0);
+        setVal('ovOverdueSubs', s.overdueSubscriptions ?? 0);
+        setVal('ovPendingActivations', s.pendingActivations ?? 0);
+        setVal('ovWaStatus', `${s.whatsappConnected || 0} on / ${s.whatsappDisconnected || 0} off`);
+
+        // Renderizar Planos
+        const plansListEl = document.getElementById('ovPlansList');
+        if (plansListEl && Array.isArray(data.clientsByPlan)) {
+          if (data.clientsByPlan.length === 0) {
+            plansListEl.innerHTML = '<p class="text-zinc-500 text-center py-2">Nenhum contrato ativo ainda.</p>';
+          } else {
+            plansListEl.innerHTML = data.clientsByPlan.map(p => `
+              <div class="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800">
+                <span class="font-bold text-white">${escapeHtml(p.planName || p.planCode)}</span>
+                <span class="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono font-bold text-xs">${p.count} clientes</span>
+              </div>
+            `).join('');
+          }
+        }
+
+        // Renderizar Canais
+        const channelsListEl = document.getElementById('ovChannelsList');
+        if (channelsListEl && Array.isArray(data.clientsByChannel)) {
+          if (data.clientsByChannel.length === 0) {
+            channelsListEl.innerHTML = '<p class="text-zinc-500 text-center py-2">Nenhum canal ativo ainda.</p>';
+          } else {
+            channelsListEl.innerHTML = data.clientsByChannel.map(c => `
+              <div class="flex items-center justify-between p-2.5 rounded-xl bg-zinc-900/60 border border-zinc-800">
+                <span class="font-bold text-white">${escapeHtml(c.channel)}</span>
+                <div class="text-right">
+                  <span class="px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-mono font-bold text-xs">${c.count} clientes</span>
+                  <span class="text-[10px] text-zinc-400 block">${c.mrrFormatted}</span>
+                </div>
+              </div>
+            `).join('');
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao carregar visão geral:', err);
+      }
+    }
+
+    async function loadConsolidatedClients() {
+      const tbody = document.getElementById('consolidatedClientsTbody');
+      if (!tbody) return;
+
+      const search = document.getElementById('clientSearchInput')?.value || '';
+      const status = document.getElementById('clientStatusFilter')?.value || '';
+      const origin = document.getElementById('clientOriginFilter')?.value || '';
+
+      try {
+        const queryParams = new URLSearchParams({ search, status, origin, limit: '50' });
+        const res = await fetch(`/api/admin/clients-consolidated?${queryParams.toString()}`);
+        if (!res.ok) {
+          tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-rose-400">Falha ao carregar lista de clientes.</td></tr>';
+          return;
+        }
+        const data = await res.json();
+        const clients = data.clients || [];
+
+        if (clients.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="p-6 text-center text-zinc-500">Nenhum cliente localizado com os filtros aplicados.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = clients.map(c => {
+          const statusBadge = c.subscriptionStatus === 'ACTIVE'
+            ? '<span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">ATIVO</span>'
+            : (c.subscriptionStatus === 'OVERDUE'
+              ? '<span class="px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 font-bold text-[10px]">ATRASADO</span>'
+              : '<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-bold text-[10px]">' + escapeHtml(c.subscriptionStatus) + '</span>');
+
+          const actBadge = c.isAccountActivated
+            ? '<span class="text-emerald-400 font-bold text-[11px] flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i> Ativa</span>'
+            : '<span class="text-amber-400 font-bold text-[11px] flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Pendente</span>';
+
+          const waBadge = c.whatsappStatus === 'CONNECTED'
+            ? '<span class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold">Online</span>'
+            : '<span class="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 text-[10px]">Offline</span>';
+
+          const gcalBadge = c.googleCalendarStatus === 'CONNECTED'
+            ? '<span class="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 text-[10px] font-bold">Ativo</span>'
+            : '<span class="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 text-[10px]">Inativo</span>';
+
+          return `
+            <tr class="hover:bg-white/[0.02] transition">
+              <td class="p-3">
+                <div class="font-extrabold text-white">#${c.clientId} ${escapeHtml(c.salonName)}</div>
+                <div class="text-[10px] text-zinc-500">${c.hiredAt ? new Date(c.hiredAt).toLocaleDateString('pt-BR') : '-'}</div>
+              </td>
+              <td class="p-3">
+                <div class="font-medium text-zinc-300">${escapeHtml(c.contactNameMasked)}</div>
+                <div class="text-[10px] text-zinc-500 font-mono">${escapeHtml(c.phoneMasked || '-')}</div>
+              </td>
+              <td class="p-3">
+                <span class="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold">${escapeHtml(c.planCode)}</span>
+              </td>
+              <td class="p-3 font-bold text-zinc-300">${escapeHtml(c.channel)}</td>
+              <td class="p-3">${statusBadge}</td>
+              <td class="p-3">${actBadge}</td>
+              <td class="p-3">${waBadge}</td>
+              <td class="p-3">${gcalBadge}</td>
+            </tr>
+          `;
+        }).join('');
+
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Erro ao listar clientes:', err);
+      }
+    }
+
     window.addEventListener('DOMContentLoaded', () => {
       initAuth();
       lucide.createIcons();
