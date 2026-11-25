@@ -26,7 +26,6 @@ const config = {
 
   // Security & Administrative Credentials
   adminPassword: (process.env.ADMIN_PASSWORD || process.env.ADMIN_MASTER_PASSWORD || '').trim(),
-  adminPin: (process.env.ADMIN_PIN || '').trim(),
   adminApiKey: (process.env.ADMIN_API_KEY || '').trim(),
   adminMfaEnabled: process.env.ADMIN_MFA_ENABLED === 'true',
   adminTotpSecret: (process.env.ADMIN_TOTP_SECRET || '').trim(),
@@ -137,6 +136,11 @@ config.validateEnvironment = function validateEnvironment({ throwOnError = false
     // Client Auth Secret
     if (!config.clientAuthSecret || config.clientAuthSecret.length < 16) {
       errors.push('CLIENT_AUTH_SECRET não configurado ou muito curto em produção (mínimo 16 caracteres).');
+    }
+
+    // MFA Policies in Production (Comando 073 Fase 1: MFA obrigatório em produção)
+    if (!config.adminMfaEnabled && process.env.ADMIN_MFA_ENABLED !== 'true') {
+      errors.push('ADMIN_MFA_ENABLED obrigatório em produção (configure ADMIN_MFA_ENABLED=true).');
     }
 
     // MFA Encryption Key: In production, requires its OWN independent key (cannot reuse session secret)

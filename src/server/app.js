@@ -250,7 +250,7 @@ app.use(cors({
     return callback(null, false);
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Auth-Token', 'X-Staging-Key', 'X-Staging-Token', 'X-Admin-Key', 'X-Admin-Pin', 'X-CSRF-Token'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Auth-Token', 'X-Staging-Key', 'X-Staging-Token', 'X-Admin-Key', 'X-CSRF-Token'],
   credentials: true,
 }));
 
@@ -620,9 +620,10 @@ function authMiddleware(req, res, next) {
 
   // Tokens in query string are strictly rejected for authenticated APIs (Proteção 02 & 17)
 
-  // 3. Cookie
+  // 3. Cookie (Admin routes strictly accept only auth_token, never client_auth_token)
   if (!token) {
-    token = getCookie(req, 'auth_token') || getCookie(req, 'client_auth_token');
+    const isAdminRoute = req.path.startsWith('/api/admin') || req.path.startsWith('/admin');
+    token = isAdminRoute ? getCookie(req, 'auth_token') : (getCookie(req, 'auth_token') || getCookie(req, 'client_auth_token'));
   }
 
   if (token) {
@@ -724,6 +725,16 @@ function authMiddleware(req, res, next) {
 function requireAdmin(req, res, next) {
   return authMiddleware(req, res, () => {
     if (!req.user || req.user.role !== 'ADMIN') {
+      try {
+        const { logSecurityEvent, AUDIT_EVENTS } = require('../services/securityAuditService');
+        logSecurityEvent({
+          eventType: AUDIT_EVENTS.UNAUTHORIZED_ACCESS_BLOCKED,
+          userId: req.user?.id,
+          req,
+          status: 'BLOCKED',
+          details: { reason: 'client_token_or_non_admin_attempted_admin_route', role: req.user?.role, path: req.path },
+        });
+      } catch (_) {}
       return res.status(403).json({
         success: false,
         error: 'Acesso negado. Recurso exclusivo para administradores.',
