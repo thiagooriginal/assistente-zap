@@ -57,51 +57,117 @@ function getAdminOverviewMetrics() {
   const mrrCents = Number(subsRow?.mrr_cents || 0);
   const mrrFormatted = (mrrCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  // 3. Receita Efetivamente Confirmada (Asaas + Hotmart sem duplicações)
-  let asaasConfirmedCents = 0;
+  // 3. Receita Efetivamente Confirmada, Deduções e Receita Líquida (Asaas + Hotmart deduplicados)
+  let asaasGrossCents = 0;
+  let asaasDeductionsCents = 0;
+  let asaasCount = 0;
   try {
-    const asaasRow = db.prepare(`
+    const asaasGrossRow = db.prepare(`
+      SELECT COALESCE(SUM(ROUND(value * 100)), 0) AS total_cents, COUNT(*) AS count
+      FROM (
+        SELECT asaas_id, value
+        FROM asaas_payments
+        WHERE asaas_id IS NOT NULL AND status IN ('CONFIRMED', 'RECEIVED')
+        GROUP BY asaas_id
+      )
+    `).get();
+    asaasGrossCents = Number(asaasGrossRow?.total_cents || 0);
+    asaasCount = Number(asaasGrossRow?.count || 0);
+
+    const asaasDedRow = db.prepare(`
       SELECT COALESCE(SUM(ROUND(value * 100)), 0) AS total_cents
-      FROM asaas_payments
-      WHERE status IN ('CONFIRMED', 'RECEIVED')
+      FROM (
+        SELECT asaas_id, value
+        FROM asaas_payments
+        WHERE asaas_id IS NOT NULL AND status IN ('REFUNDED', 'CHARGEBACK', 'CHARGED_BACK', 'REFUND_REQUESTED')
+        GROUP BY asaas_id
+      )
     `).get();
-    asaasConfirmedCents = Number(asaasRow?.total_cents || 0);
+    asaasDeductionsCents = Number(asaasDedRow?.total_cents || 0);
   } catch (_) {}
 
-  let hotmartConfirmedCents = 0;
+  let hotmartGrossCents = 0;
+  let hotmartDeductionsCents = 0;
+  let hotmartAuditedCount = 0;
   try {
-    const hotmartRow = db.prepare(`
-      SELECT COALESCE(SUM(
-        CASE
-          WHEN plan_id LIKE '%START%' THEN 8900
-          WHEN plan_id LIKE '%INTERMEDIATE%' THEN 10900
-          WHEN plan_id LIKE '%PRO%' THEN 13900
-          ELSE 8900
-        END
-      ), 0) AS total_cents
-      FROM hotmart_webhook_events
-      WHERE event_name IN ('PURCHASE_APPROVED', 'ORDER_APPROVED')
-        AND status = 'PROCESSED'
+    const hotmartGrossRow = db.prepare(`
+      SELECT
+        COALESCE(SUM(price_cents), 0) AS total_cents,
+        COUNT(price_cents) AS audited_count
+      FROM (
+        SELECT transaction_code, price_cents
+        FROM hotmart_webhook_events
+        WHERE event_name IN ('PURCHASE_APPROVED', 'ORDER_APPROVED')
+          AND status = 'PROCESSED'
+          AND transaction_code IS NOT NULL
+        GROUP BY transaction_code
+      )
+      WHERE price_cents IS NOT NULL
     `).get();
-    hotmartConfirmedCents = Number(hotmartRow?.total_cents || 0);
+    hotmartGrossCents = Number(hotmartGrossRow?.total_cents || 0);
+    hotmartAuditedCount = Number(hotmartGrossRow?.audited_count || 0);
+
+    const hotmartDedRow = db.prepare(`
+      SELECT COALESCE(SUM(COALESCE(ref.price_cents, orig.price_cents, 0)), 0) AS total_cents
+      FROM (
+        SELECT transaction_code, price_cents
+        FROM hotmart_webhook_events
+        WHERE event_name IN ('PURCHASE_REFUNDED', 'PURCHASE_CHARGEBACK')
+          AND status = 'PROCESSED'
+          AND transaction_code IS NOT NULL
+        GROUP BY transaction_code
+      ) ref
+      LEFT JOIN (
+        SELECT transaction_code, MAX(price_cents) AS price_cents
+        FROM hotmart_webhook_events
+        WHERE event_name IN ('PURCHASE_APPROVED', 'ORDER_APPROVED')
+          AND price_cents IS NOT NULL
+        GROUP BY transaction_code
+      ) orig ON orig.transaction_code = ref.transaction_code
+    `).get();
+    hotmartDeductionsCents = Number(hotmartDedRow?.total_cents || 0);
   } catch (_) {}
 
-  const confirmedRevenueCents = asaasConfirmedCents + hotmartConfirmedCents;
-  const confirmedRevenueFormatted = (confirmedRevenueCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const hasAuditedTransactions = (asaasCount > 0 || hotmartAuditedCount > 0);
+  const grossRevenueCents = asaasGrossCents + hotmartGrossCents;
+  const deductionsCents = asaasDeductionsCents + hotmartDeductionsCents;
+  const netRevenueCents = Math.max(0, grossRevenueCents - deductionsCents);
 
-  // 4. Clientes por Plano
+  const confirmedRevenueFormatted = hasAuditedTransactions
+    ? (netRevenueCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    : 'Dados indisponíveis';
+  const grossRevenueFormatted = hasAuditedTransactions
+    ? (grossRevenueCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    : 'Dados indisponíveis';
+  const deductionsFormatted = (deductionsCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  // 4. Clientes por Plano (Isolamento por CTE para unicidade)
   let clientsByPlan = [];
   try {
     const planRows = db.prepare(`
+      WITH ranked_client_plans AS (
+        SELECT
+          u.id AS user_id,
+          COALESCE(pp.code, u.plan_tier, u.plan, 'START') AS plan_code,
+          COALESCE(pp.name, u.plan_tier, u.plan, 'Jéssica Start') AS plan_name,
+          ROW_NUMBER() OVER (
+            PARTITION BY u.id
+            ORDER BY
+              CASE WHEN cs.status = 'ACTIVE' THEN 1 ELSE 2 END,
+              cs.id DESC
+          ) AS rn
+        FROM users u
+        LEFT JOIN customer_subscriptions cs ON cs.user_id = u.id
+        LEFT JOIN product_plans pp ON pp.id = cs.plan_id
+        WHERE u.role != 'ADMIN'
+      )
       SELECT
-        COALESCE(pp.code, u.plan, 'START') AS plan_code,
-        COALESCE(pp.name, u.plan, 'Jéssica Start') AS plan_name,
-        COUNT(DISTINCT u.id) AS client_count
-      FROM users u
-      LEFT JOIN customer_subscriptions cs ON cs.user_id = u.id AND cs.status = 'ACTIVE'
-      LEFT JOIN product_plans pp ON pp.id = cs.plan_id
-      WHERE u.role != 'ADMIN'
-      GROUP BY plan_code
+        plan_code,
+        plan_name,
+        COUNT(user_id) AS client_count
+      FROM ranked_client_plans
+      WHERE rn = 1
+      GROUP BY plan_code, plan_name
       ORDER BY client_count DESC
     `).all();
     clientsByPlan = planRows.map(r => ({
@@ -111,22 +177,41 @@ function getAdminOverviewMetrics() {
     }));
   } catch (_) {}
 
-  // 5. Clientes por Canal (Hotmart, Asaas, Direto)
+  // 5. Clientes por Canal (Hotmart, Asaas, Direto, NÃO IDENTIFICADO)
   let clientsByChannel = [];
   try {
     const channelRows = db.prepare(`
+      WITH ranked_subscriptions AS (
+        SELECT
+          u.id AS user_id,
+          cs.id AS subscription_id,
+          cs.origin,
+          cs.status,
+          cs.price_cents,
+          ROW_NUMBER() OVER (
+            PARTITION BY u.id
+            ORDER BY
+              CASE WHEN cs.status = 'ACTIVE' THEN 1 ELSE 2 END,
+              cs.id DESC
+          ) AS rn
+        FROM users u
+        LEFT JOIN customer_subscriptions cs ON cs.user_id = u.id
+        WHERE u.role != 'ADMIN'
+      )
       SELECT
-        COALESCE(cs.origin, 'HOTMART') AS origin,
-        COUNT(DISTINCT u.id) AS client_count,
-        COALESCE(SUM(CASE WHEN cs.status = 'ACTIVE' THEN cs.price_cents ELSE 0 END), 0) AS mrr_cents
-      FROM users u
-      LEFT JOIN customer_subscriptions cs ON cs.user_id = u.id
-      WHERE u.role != 'ADMIN'
-      GROUP BY origin
+        CASE
+          WHEN origin IS NULL OR TRIM(origin) = '' THEN 'NÃO IDENTIFICADO'
+          ELSE UPPER(TRIM(origin))
+        END AS channel,
+        COUNT(user_id) AS client_count,
+        COALESCE(SUM(CASE WHEN status = 'ACTIVE' THEN price_cents ELSE 0 END), 0) AS mrr_cents
+      FROM ranked_subscriptions
+      WHERE rn = 1
+      GROUP BY channel
       ORDER BY client_count DESC
     `).all();
     clientsByChannel = channelRows.map(r => ({
-      channel: r.origin,
+      channel: r.channel,
       count: Number(r.client_count || 0),
       mrrCents: Number(r.mrr_cents || 0),
       mrrFormatted: (Number(r.mrr_cents || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
@@ -167,8 +252,13 @@ function getAdminOverviewMetrics() {
       cancelledSubscriptions,
       mrrCents,
       mrrFormatted,
-      confirmedRevenueCents,
+      confirmedRevenueCents: netRevenueCents,
       confirmedRevenueFormatted,
+      grossRevenueCents,
+      grossRevenueFormatted,
+      deductionsCents,
+      deductionsFormatted,
+      hasAuditedTransactions,
       pendingActivations,
       whatsappConnected,
       whatsappDisconnected,
@@ -183,12 +273,28 @@ function getAdminOverviewMetrics() {
  */
 function getAdminClientsList({ search = '', status = '', origin = '', limit = 50, offset = 0 } = {}) {
   let query = `
+    WITH ranked_subscriptions AS (
+      SELECT
+        cs.id AS subscription_id,
+        cs.user_id,
+        cs.origin AS subscription_origin,
+        cs.status AS subscription_status,
+        cs.price_cents AS subscription_price_cents,
+        cs.plan_id,
+        ROW_NUMBER() OVER (
+          PARTITION BY cs.user_id
+          ORDER BY
+            CASE WHEN cs.status = 'ACTIVE' THEN 1 ELSE 2 END,
+            cs.id DESC
+        ) AS rn
+      FROM customer_subscriptions cs
+    )
     SELECT
       u.id AS user_id,
       u.name AS user_name,
       u.email AS user_email,
       u.phone_number AS user_phone,
-      u.plan AS user_plan,
+      u.plan_tier AS user_plan,
       u.password_hash AS user_password_hash,
       u.created_at AS user_created_at,
       u.paid_until AS user_paid_until,
@@ -197,35 +303,40 @@ function getAdminClientsList({ search = '', status = '', origin = '', limit = 50
       salon.whatsapp_status,
       salon.whatsapp_phone,
       salon.google_selected_calendar_id,
-      cs.id AS subscription_id,
-      cs.origin AS subscription_origin,
-      cs.status AS subscription_status,
-      cs.price_cents AS subscription_price_cents,
+      rs.subscription_id,
+      rs.subscription_origin,
+      rs.subscription_status,
+      rs.subscription_price_cents,
       pp.code AS plan_code,
       pp.name AS plan_name
     FROM users u
     LEFT JOIN client_salons salon ON salon.user_id = u.id
-    LEFT JOIN customer_subscriptions cs ON cs.user_id = u.id
-    LEFT JOIN product_plans pp ON pp.id = cs.plan_id
+    LEFT JOIN ranked_subscriptions rs ON rs.user_id = u.id AND rs.rn = 1
+    LEFT JOIN product_plans pp ON pp.id = rs.plan_id
     WHERE u.role != 'ADMIN'
   `;
 
   const params = [];
 
   if (search && search.trim()) {
-    query += ` AND (u.name LIKE ? OR u.phone_number LIKE ? OR salon.salon_name LIKE ?)`;
+    query += ` AND (u.name LIKE ? OR u.phone_number LIKE ? OR u.email LIKE ? OR salon.salon_name LIKE ?)`;
     const term = `%${search.trim()}%`;
-    params.push(term, term, term);
+    params.push(term, term, term, term);
   }
 
   if (status && status.trim()) {
-    query += ` AND (cs.status = ? OR u.subscription_status = ?)`;
-    params.push(status.trim().toUpperCase(), status.trim().toUpperCase());
+    query += ` AND (COALESCE(rs.subscription_status, u.subscription_status, 'PENDING') = ?)`;
+    params.push(status.trim().toUpperCase());
   }
 
   if (origin && origin.trim()) {
-    query += ` AND cs.origin = ?`;
-    params.push(origin.trim().toUpperCase());
+    const normOrigin = origin.trim().toUpperCase();
+    if (normOrigin === 'NÃO IDENTIFICADO' || normOrigin === 'NAO IDENTIFICADO') {
+      query += ` AND (rs.subscription_origin IS NULL OR TRIM(rs.subscription_origin) = '')`;
+    } else {
+      query += ` AND UPPER(TRIM(rs.subscription_origin)) = ?`;
+      params.push(normOrigin);
+    }
   }
 
   query += ` ORDER BY u.id DESC LIMIT ? OFFSET ?`;
@@ -237,7 +348,9 @@ function getAdminClientsList({ search = '', status = '', origin = '', limit = 50
     const isActivated = Boolean(r.user_password_hash);
     const subStatus = (r.subscription_status || r.user_sub_status || 'PENDING').toUpperCase();
     const effectivePlan = r.plan_code || r.user_plan || 'JESSICA_START';
-    const channel = r.subscription_origin || 'HOTMART';
+    const channel = (r.subscription_origin && r.subscription_origin.trim())
+      ? r.subscription_origin.toUpperCase()
+      : 'NÃO IDENTIFICADO';
     const hasGcal = Boolean(r.google_selected_calendar_id && r.google_selected_calendar_id.trim());
 
     return {

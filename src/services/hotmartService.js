@@ -42,14 +42,39 @@ function validateHotmartHeader(req, customSecret = null) {
 /**
  * Identify plan tier from Hotmart 2.0 payload using official Offer Codes (Priority 1),
  * configured Plan IDs from .env (Priority 2), or plan name fallback (Priority 3).
- * Strictly avoids relying on purchase price values.
+ * Strictly avoids guessing or defaulting to any plan (FAIL-CLOSED).
  *
  * Official offer codes for product 8840376:
  *   gtt3rhpk → JESSICA_START        (R$ 89,00)
  *   1x8ik7i3 → JESSICA_INTERMEDIATE (R$ 109,00)
  *   ytvdj943 → JESSICA_PRO          (R$ 139,00)
+ *
+ * @param {object} data Hotmart event payload data
+ * @returns {'JESSICA_START' | 'JESSICA_INTERMEDIATE' | 'JESSICA_PRO' | null}
  */
 function resolvePlanTier(data) {
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+
+  const rawProductId =
+    data?.product?.id ??
+    data?.purchase?.product?.id ??
+    data?.productId;
+  const productId = (rawProductId !== undefined && rawProductId !== null)
+    ? String(rawProductId).trim()
+    : '';
+
+  const officialProductId = String(config.hotmartProductId || '8840376').trim();
+
+  // Fail-closed: se productId ausente ou incompatível com o produto oficial, rejeitar imediatamente
+  if (!productId || productId !== officialProductId) {
+    console.warn(
+      `[Hotmart Webhook] ALERTA: Produto não corresponde ao oficial (recebido: '${productId}', esperado: '${officialProductId}'). Rejeição fail-closed.`
+    );
+    return null;
+  }
+
   const planId = String(
     data?.subscription?.plan?.id ||
     data?.plan?.id ||
@@ -61,13 +86,6 @@ function resolvePlanTier(data) {
     data?.offer?.code ||
     ''
   ).trim().toLowerCase();
-
-  const productId = String(
-    data?.product?.id ||
-    data?.purchase?.product?.id ||
-    data?.productId ||
-    ''
-  ).trim();
 
   // ── Prioridade 1: Match exato contra offer codes oficiais lidos de config ──
   const offerPro = (config.hotmartOfferProCode || 'ytvdj943').trim().toLowerCase();
@@ -95,21 +113,19 @@ function resolvePlanTier(data) {
   }
 
   // Exact match against known literal identifiers
-  if (planId === 'JESSICA_PRO' || planId.toLowerCase() === 'pro') return 'JESSICA_PRO';
-  if (planId === 'JESSICA_INTERMEDIATE' || planId.toLowerCase() === 'intermediate') return 'JESSICA_INTERMEDIATE';
-  if (planId === 'JESSICA_START' || planId.toLowerCase() === 'start') return 'JESSICA_START';
+  const planIdLower = planId.toLowerCase();
+  if (planId === 'JESSICA_PRO' || planIdLower === 'pro') return 'JESSICA_PRO';
+  if (planId === 'JESSICA_INTERMEDIATE' || planIdLower === 'intermediate') return 'JESSICA_INTERMEDIATE';
+  if (planId === 'JESSICA_START' || planIdLower === 'start') return 'JESSICA_START';
 
-  // ── Prioridade 3: Fallback por nome do plano (com validação de produto oficial) ──
-  const officialProductId = String(config.hotmartProductId || '8840376').trim();
-  const isOfficialOrUnsetProduct = !productId || productId === officialProductId;
+  // ── Prioridade 3: Fallback por nome do plano (com validação de produto oficial já feita) ──
+  const planName = String(
+    data?.subscription?.plan?.name ||
+    data?.plan?.name ||
+    ''
+  ).trim().toUpperCase();
 
-  if (isOfficialOrUnsetProduct) {
-    const planName = String(
-      data?.subscription?.plan?.name ||
-      data?.plan?.name ||
-      ''
-    ).trim().toUpperCase();
-
+  if (planName) {
     if (
       planName.includes('INTERMEDIÁRIO') || planName.includes('INTERMEDIARIO') ||
       planName.includes('INTERMEDIATE') || planName.includes('MÉDIO') ||
@@ -125,12 +141,34 @@ function resolvePlanTier(data) {
     }
   }
 
-  // Oferta desconhecida: retorna pendente sem alterar dados de acesso
+  // Oferta desconhecida: FAIL-CLOSED estrito (retorna null, nunca plano default)
   console.warn(
-    `[Hotmart Webhook] ALERTA: Plano não identificado pelos offer codes/IDs oficiais ` +
-    `(planId: '${planId}', offerCode: '${offerCode}', product: '${productId}'). Marcado como PENDING_PLAN_IDENTIFICATION.`
+    `[Hotmart Webhook] ALERTA FAIL-CLOSED: Plano não identificado pelos offer codes/IDs oficiais ` +
+    `(planId: '${planId}', offerCode: '${offerCode}', product: '${productId}'). Retornando null.`
   );
-  return 'PENDING_PLAN_IDENTIFICATION';
+  return null;
+}
+
+/**
+ * Extrai o valor real cobrado na transação Hotmart em centavos inteiros
+ * @param {object} data
+ * @returns {number | null} Valor em centavos inteiros ou null se ausente/inválido
+ */
+function extractPriceCents(data) {
+  const rawValue =
+    data?.purchase?.price?.value ??
+    data?.purchase?.price ??
+    data?.price?.value ??
+    data?.price ??
+    data?.purchase?.original_offer_price?.value;
+
+  if (rawValue !== undefined && rawValue !== null && rawValue !== '') {
+    const num = typeof rawValue === 'number' ? rawValue : parseFloat(String(rawValue).replace(',', '.'));
+    if (!isNaN(num) && num >= 0) {
+      return Math.round(num * 100);
+    }
+  }
+  return null;
 }
 
 /**
@@ -199,10 +237,75 @@ async function processWebhook(payload, whatsappSender = null) {
   const buyerEmail = (buyer.email || data.subscriber?.email || '').trim().toLowerCase();
   const buyerPhone = (buyer.checkout_phone || buyer.phone || '').replace(/\D/g, '');
   const buyerName = buyer.name || buyer.first_name || data.subscriber?.name || 'Cliente';
-  const productId = String(product.id || config.hotmartProductId || '8840376');
+
+  // 1.1 Extração rigorosa de productId sem default permissivo
+  const rawProductId =
+    product.id ??
+    purchase.product?.id ??
+    data.productId;
+  const productId = (rawProductId !== undefined && rawProductId !== null) ? String(rawProductId).trim() : '';
+  const officialProductId = String(config.hotmartProductId || '8840376').trim();
+
+  // Rejeição imediata se produto ausente ou não oficial (Proteção 19 & Regra P0 - Fail-Closed)
+  if (!productId || productId !== officialProductId) {
+    console.warn(`[Hotmart Webhook] Rejeição fail-closed: produto inválido ou não oficial (recebido: '${productId}', esperado: '${officialProductId}'). Evento: ${eventId}`);
+    try {
+      db.prepare(`
+        INSERT INTO hotmart_webhook_events (
+          event_id, event_name, creation_date, transaction_code, subscriber_code,
+          buyer_email, buyer_phone, product_id, plan_id, offer_code, raw_payload, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'REJECTED_INVALID_PRODUCT')
+        ON CONFLICT(event_id) DO UPDATE SET status = 'REJECTED_INVALID_PRODUCT', updated_at = CURRENT_TIMESTAMP
+      `).run(
+        eventId,
+        eventName,
+        eventCreationDate,
+        transactionCode,
+        subscriberCode,
+        buyerEmail,
+        buyerPhone,
+        productId,
+        null,
+        null,
+        JSON.stringify({ reason: 'INVALID_OR_MISSING_PRODUCT_ID', receivedProductId: productId, officialProductId })
+      );
+    } catch (_) {}
+    return { success: false, ignored: true, reason: 'INVALID_OR_MISSING_PRODUCT_ID' };
+  }
+
   const planId = String(subscription.plan?.id || data.plan?.id || purchase.offer?.code || '');
   const offerCode = String(purchase.offer?.code || data.offer?.code || '').trim().toLowerCase() || null;
   const planTier = resolvePlanTier(data);
+  const priceCents = extractPriceCents(data);
+
+  // 1.2 Validação estrita de plano em eventos de ativação (Regra P0 - Fail Closed)
+  const isActivationEvent = ['PURCHASE_APPROVED', 'ORDER_APPROVED', 'SWITCH_PLAN'].includes(eventName);
+  if (isActivationEvent && !planTier) {
+    console.warn(`[Hotmart Webhook] Rejeição fail-closed: oferta/plano desconhecido em evento de ativação '${eventName}' (ID: ${eventId}). Usuário não será modificado.`);
+    try {
+      db.prepare(`
+        INSERT INTO hotmart_webhook_events (
+          event_id, event_name, creation_date, transaction_code, subscriber_code,
+          buyer_email, buyer_phone, product_id, plan_id, offer_code, price_cents, raw_payload, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'REJECTED_UNKNOWN_OFFER')
+        ON CONFLICT(event_id) DO UPDATE SET status = 'REJECTED_UNKNOWN_OFFER', updated_at = CURRENT_TIMESTAMP
+      `).run(
+        eventId,
+        eventName,
+        eventCreationDate,
+        transactionCode,
+        subscriberCode,
+        buyerEmail,
+        buyerPhone,
+        productId,
+        planId,
+        offerCode,
+        priceCents,
+        JSON.stringify({ reason: 'UNKNOWN_OR_INVALID_PLAN_TIER', offerCode, planId })
+      );
+    } catch (_) {}
+    return { success: false, ignored: true, reason: 'UNKNOWN_OR_INVALID_PLAN_TIER' };
+  }
 
   // Sanitize audit payload (without tokens or passwords)
   const auditPayload = JSON.stringify({
@@ -215,6 +318,7 @@ async function processWebhook(payload, whatsappSender = null) {
     planId,
     offerCode,
     planTier,
+    priceCents,
     buyerEmailMasked: buyerEmail ? buyerEmail.replace(/^(.{2})(.*)(@.*)$/, '$1***$3') : null,
     buyerPhoneSuffix: buyerPhone ? buyerPhone.slice(-4) : null,
     orderDate: purchase.order_date || purchase.approved_date || new Date().toISOString(),
@@ -223,7 +327,7 @@ async function processWebhook(payload, whatsappSender = null) {
   // 2. Strict Idempotency Check with Error Recovery (Proteção 19)
   const existingEvent = db.prepare('SELECT id, status FROM hotmart_webhook_events WHERE event_id = ?').get(eventId);
   if (existingEvent) {
-    if (existingEvent.status === 'PROCESSED' || existingEvent.status === 'IGNORED_OUT_OF_ORDER') {
+    if (existingEvent.status === 'PROCESSED' || existingEvent.status === 'IGNORED_OUT_OF_ORDER' || existingEvent.status === 'REJECTED_INVALID_PRODUCT' || existingEvent.status === 'REJECTED_UNKNOWN_OFFER') {
       console.log(`[Hotmart Webhook] Evento já concluído anteriormente ignorado (ID: ${eventId}, Evento: ${eventName})`);
       return { success: true, duplicated: true, status: 'ignored', message: 'Evento já processado anteriormente.' };
     }
@@ -239,8 +343,8 @@ async function processWebhook(payload, whatsappSender = null) {
       db.prepare(`
         INSERT INTO hotmart_webhook_events (
           event_id, event_name, creation_date, transaction_code, subscriber_code,
-          buyer_email, buyer_phone, product_id, plan_id, offer_code, raw_payload, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PROCESSING')
+          buyer_email, buyer_phone, product_id, plan_id, offer_code, price_cents, raw_payload, status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PROCESSING')
       `).run(
         eventId,
         eventName,
@@ -252,6 +356,7 @@ async function processWebhook(payload, whatsappSender = null) {
         productId,
         planId,
         offerCode,
+        priceCents,
         auditPayload
       );
     } catch (insErr) {
@@ -805,15 +910,18 @@ async function processWebhook(payload, whatsappSender = null) {
             ? null
             : (targetUser.paid_until || null);
 
+          const finalPriceCents = priceCents !== null ? priceCents : (pl?.price_cents || 8900);
+
           if (existingSub) {
             db.prepare(`
               UPDATE customer_subscriptions
               SET status = ?, paid_until = ?, access_expires_at = ?, plan_id = COALESCE(?, plan_id),
+                  price_cents = COALESCE(?, price_cents),
                   gateway_subscription_id = COALESCE(?, gateway_subscription_id),
                   gateway_payment_id = COALESCE(?, gateway_payment_id),
                   updated_at = CURRENT_TIMESTAMP
               WHERE id = ?
-            `).run(subStatus, effectivePaidUntil, effectivePaidUntil, pl?.id || null, targetUser.hotmart_subscriber_code || null, targetUser.hotmart_transaction || null, existingSub.id);
+            `).run(subStatus, effectivePaidUntil, effectivePaidUntil, pl?.id || null, finalPriceCents, targetUser.hotmart_subscriber_code || null, targetUser.hotmart_transaction || null, existingSub.id);
           } else {
             db.prepare(`
               INSERT INTO customer_subscriptions (
@@ -824,7 +932,7 @@ async function processWebhook(payload, whatsappSender = null) {
             `).run(
               targetUser.id, jessica.id, pl?.id || null,
               targetUser.hotmart_subscriber_code || null, targetUser.hotmart_transaction || null,
-              subStatus, pl?.price_cents || 8900,
+              subStatus, finalPriceCents,
               effectivePaidUntil, effectivePaidUntil
             );
           }

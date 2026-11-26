@@ -304,6 +304,7 @@ db.exec(`
     product_id TEXT,
     plan_id TEXT,
     offer_code TEXT,
+    price_cents INTEGER,
     raw_payload TEXT,
     status TEXT DEFAULT 'PROCESSED',
     processed_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -1051,6 +1052,14 @@ runVersionedMigration('20261124_01_hotmart_offer_code_and_buyer_email_index', 'A
   `);
 });
 
+// Versioned migration: COMANDO 073.1 — Hotmart price_cents column e índice composto de conciliação
+runVersionedMigration('20261126_01_hotmart_price_cents', 'Add price_cents column to hotmart_webhook_events and create composite index on transaction_code and event_name', () => {
+  ensureColumnExists('hotmart_webhook_events', 'price_cents', 'INTEGER');
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_hotmart_trans_event ON hotmart_webhook_events(transaction_code, event_name);
+  `);
+});
+
 ensureColumnExists('client_service_staff', 'confirmed', 'INTEGER NOT NULL DEFAULT 1 CHECK(confirmed IN (0, 1))');
 db.exec('CREATE INDEX IF NOT EXISTS idx_css_tenant_confirmed ON client_service_staff(user_id, confirmed);');
 
@@ -1100,6 +1109,7 @@ ensureColumnExists('asaas_webhook_events', 'status', "TEXT DEFAULT 'PROCESSED'")
 ensureColumnExists('asaas_webhook_events', 'updated_at', 'TEXT');
 ensureColumnExists('hotmart_webhook_events', 'creation_date', 'INTEGER');
 ensureColumnExists('hotmart_webhook_events', 'updated_at', 'TEXT');
+ensureColumnExists('hotmart_webhook_events', 'price_cents', 'INTEGER');
 
 ensureColumnExists('expenses', 'user_id', 'INTEGER NOT NULL DEFAULT 1');
 ensureColumnExists('incomes', 'user_id', 'INTEGER NOT NULL DEFAULT 1');

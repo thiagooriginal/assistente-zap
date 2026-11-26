@@ -77,13 +77,13 @@ describe('COMANDO 073 — FASE 2: Vendas Diretas pelo Site e Preços Jéssica', 
   });
 
   test('4. hotmartService deve mapear as três ofertas oficiais da Hotmart para os tiers corretos', () => {
-    const tierStart = hotmartService.resolvePlanTier({ purchase: { offer: { code: 'gtt3rhpk' } } });
+    const tierStart = hotmartService.resolvePlanTier({ product: { id: '8840376' }, purchase: { offer: { code: 'gtt3rhpk' } } });
     assert.equal(tierStart, 'JESSICA_START');
 
-    const tierIntermediate = hotmartService.resolvePlanTier({ purchase: { offer: { code: '1x8ik7i3' } } });
+    const tierIntermediate = hotmartService.resolvePlanTier({ product: { id: '8840376' }, purchase: { offer: { code: '1x8ik7i3' } } });
     assert.equal(tierIntermediate, 'JESSICA_INTERMEDIATE');
 
-    const tierPro = hotmartService.resolvePlanTier({ purchase: { offer: { code: 'ytvdj943' } } });
+    const tierPro = hotmartService.resolvePlanTier({ product: { id: '8840376' }, purchase: { offer: { code: 'ytvdj943' } } });
     assert.equal(tierPro, 'JESSICA_PRO');
 
     const status = hotmartService.getIntegrationStatus();
