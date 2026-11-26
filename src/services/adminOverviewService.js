@@ -57,31 +57,37 @@ function getAdminOverviewMetrics() {
   const mrrCents = Number(subsRow?.mrr_cents || 0);
   const mrrFormatted = (mrrCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  // 3. Receita Efetivamente Confirmada, Deduções e Receita Líquida (Asaas + Hotmart deduplicados)
+  // 3. Receita Efetivamente Confirmada, Deduções e Receita Líquida (Asaas + Hotmart com junção determinística)
   let asaasGrossCents = 0;
   let asaasDeductionsCents = 0;
   let asaasCount = 0;
   try {
     const asaasGrossRow = db.prepare(`
-      SELECT COALESCE(SUM(ROUND(value * 100)), 0) AS total_cents, COUNT(*) AS count
-      FROM (
-        SELECT asaas_id, value
+      SELECT
+        COALESCE(SUM(ROUND(ap.value * 100)), 0) AS total_cents,
+        COUNT(ap.id) AS count
+      FROM asaas_payments ap
+      JOIN (
+        SELECT asaas_id, MAX(id) AS max_id
         FROM asaas_payments
-        WHERE asaas_id IS NOT NULL AND status IN ('CONFIRMED', 'RECEIVED')
+        WHERE asaas_id IS NOT NULL
         GROUP BY asaas_id
-      )
+      ) latest ON latest.max_id = ap.id
+      WHERE ap.status IN ('CONFIRMED', 'RECEIVED')
     `).get();
     asaasGrossCents = Number(asaasGrossRow?.total_cents || 0);
     asaasCount = Number(asaasGrossRow?.count || 0);
 
     const asaasDedRow = db.prepare(`
-      SELECT COALESCE(SUM(ROUND(value * 100)), 0) AS total_cents
-      FROM (
-        SELECT asaas_id, value
+      SELECT COALESCE(SUM(ROUND(ap.value * 100)), 0) AS total_cents
+      FROM asaas_payments ap
+      JOIN (
+        SELECT asaas_id, MAX(id) AS max_id
         FROM asaas_payments
-        WHERE asaas_id IS NOT NULL AND status IN ('REFUNDED', 'CHARGEBACK', 'CHARGED_BACK', 'REFUND_REQUESTED')
+        WHERE asaas_id IS NOT NULL
         GROUP BY asaas_id
-      )
+      ) latest ON latest.max_id = ap.id
+      WHERE ap.status IN ('REFUNDED', 'CHARGEBACK', 'CHARGED_BACK')
     `).get();
     asaasDeductionsCents = Number(asaasDedRow?.total_cents || 0);
   } catch (_) {}
@@ -92,54 +98,79 @@ function getAdminOverviewMetrics() {
   try {
     const hotmartGrossRow = db.prepare(`
       SELECT
-        COALESCE(SUM(price_cents), 0) AS total_cents,
-        COUNT(price_cents) AS audited_count
-      FROM (
-        SELECT transaction_code, price_cents
+        COALESCE(SUM(h.price_cents), 0) AS total_cents,
+        COUNT(h.price_cents) AS audited_count
+      FROM hotmart_webhook_events h
+      JOIN (
+        SELECT transaction_code, MAX(id) AS max_id
         FROM hotmart_webhook_events
         WHERE event_name IN ('PURCHASE_APPROVED', 'ORDER_APPROVED')
           AND status = 'PROCESSED'
           AND transaction_code IS NOT NULL
         GROUP BY transaction_code
-      )
-      WHERE price_cents IS NOT NULL
+      ) latest ON latest.max_id = h.id
+      WHERE h.price_cents IS NOT NULL
     `).get();
     hotmartGrossCents = Number(hotmartGrossRow?.total_cents || 0);
     hotmartAuditedCount = Number(hotmartGrossRow?.audited_count || 0);
 
     const hotmartDedRow = db.prepare(`
-      SELECT COALESCE(SUM(COALESCE(ref.price_cents, orig.price_cents, 0)), 0) AS total_cents
-      FROM (
-        SELECT transaction_code, price_cents
+      SELECT
+        COALESCE(SUM(COALESCE(ref.price_cents, orig.price_cents, 0)), 0) AS total_cents
+      FROM hotmart_webhook_events ref
+      JOIN (
+        SELECT transaction_code, MAX(id) AS max_id
         FROM hotmart_webhook_events
         WHERE event_name IN ('PURCHASE_REFUNDED', 'PURCHASE_CHARGEBACK')
           AND status = 'PROCESSED'
           AND transaction_code IS NOT NULL
         GROUP BY transaction_code
-      ) ref
+      ) latest_ref ON latest_ref.max_id = ref.id
       LEFT JOIN (
-        SELECT transaction_code, MAX(price_cents) AS price_cents
-        FROM hotmart_webhook_events
-        WHERE event_name IN ('PURCHASE_APPROVED', 'ORDER_APPROVED')
-          AND price_cents IS NOT NULL
-        GROUP BY transaction_code
+        SELECT h_orig.transaction_code, h_orig.price_cents
+        FROM hotmart_webhook_events h_orig
+        JOIN (
+          SELECT transaction_code, MAX(id) AS max_id
+          FROM hotmart_webhook_events
+          WHERE event_name IN ('PURCHASE_APPROVED', 'ORDER_APPROVED')
+            AND status = 'PROCESSED'
+            AND price_cents IS NOT NULL
+            AND transaction_code IS NOT NULL
+          GROUP BY transaction_code
+        ) latest_orig ON latest_orig.max_id = h_orig.id
       ) orig ON orig.transaction_code = ref.transaction_code
     `).get();
     hotmartDeductionsCents = Number(hotmartDedRow?.total_cents || 0);
   } catch (_) {}
 
+  // 3.1 Verificação de Usuários Aguardando Reconciliação (needs_reconciliation = 1)
+  let pendingReconciliationCount = 0;
+  try {
+    const recRow = db.prepare(`
+      SELECT COUNT(*) AS total
+      FROM users
+      WHERE needs_reconciliation = 1 AND role != 'ADMIN'
+    `).get();
+    pendingReconciliationCount = Number(recRow?.total || 0);
+  } catch (_) {}
+
   const hasAuditedTransactions = (asaasCount > 0 || hotmartAuditedCount > 0);
+  const hasPendingReconciliation = pendingReconciliationCount > 0;
+  const isRevenueAudited = hasAuditedTransactions && !hasPendingReconciliation;
+
   const grossRevenueCents = asaasGrossCents + hotmartGrossCents;
   const deductionsCents = asaasDeductionsCents + hotmartDeductionsCents;
   const netRevenueCents = Math.max(0, grossRevenueCents - deductionsCents);
 
-  const confirmedRevenueFormatted = hasAuditedTransactions
+  const confirmedRevenueFormatted = isRevenueAudited
     ? (netRevenueCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
     : 'Dados indisponíveis';
-  const grossRevenueFormatted = hasAuditedTransactions
+  const grossRevenueFormatted = isRevenueAudited
     ? (grossRevenueCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
     : 'Dados indisponíveis';
-  const deductionsFormatted = (deductionsCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const deductionsFormatted = isRevenueAudited
+    ? (deductionsCents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    : 'Dados indisponíveis';
 
   // 4. Clientes por Plano (Isolamento por CTE para unicidade)
   let clientsByPlan = [];
@@ -252,13 +283,16 @@ function getAdminOverviewMetrics() {
       cancelledSubscriptions,
       mrrCents,
       mrrFormatted,
-      confirmedRevenueCents: netRevenueCents,
+      confirmedRevenueCents: isRevenueAudited ? netRevenueCents : null,
       confirmedRevenueFormatted,
-      grossRevenueCents,
+      grossRevenueCents: isRevenueAudited ? grossRevenueCents : null,
       grossRevenueFormatted,
-      deductionsCents,
+      deductionsCents: isRevenueAudited ? deductionsCents : null,
       deductionsFormatted,
       hasAuditedTransactions,
+      hasPendingReconciliation,
+      pendingReconciliationCount,
+      isRevenueAudited,
       pendingActivations,
       whatsappConnected,
       whatsappDisconnected,
@@ -299,6 +333,7 @@ function getAdminClientsList({ search = '', status = '', origin = '', limit = 50
       u.created_at AS user_created_at,
       u.paid_until AS user_paid_until,
       u.subscription_status AS user_sub_status,
+      u.needs_reconciliation AS user_needs_reconciliation,
       salon.salon_name,
       salon.whatsapp_status,
       salon.whatsapp_phone,
@@ -362,6 +397,7 @@ function getAdminClientsList({ search = '', status = '', origin = '', limit = 50
       planCode: effectivePlan,
       channel,
       subscriptionStatus: subStatus,
+      needsReconciliation: Boolean(r.user_needs_reconciliation === 1),
       hiredAt: r.user_created_at,
       paidUntil: r.user_paid_until || null,
       isAccountActivated: isActivated,

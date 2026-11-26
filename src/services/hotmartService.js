@@ -40,9 +40,62 @@ function validateHotmartHeader(req, customSecret = null) {
 }
 
 /**
- * Identify plan tier from Hotmart 2.0 payload using official Offer Codes (Priority 1),
- * configured Plan IDs from .env (Priority 2), or plan name fallback (Priority 3).
- * Strictly avoids guessing or defaulting to any plan (FAIL-CLOSED).
+ * Resolve o tier da assinatura a partir do código de oferta da Hotmart.
+ * Mapeamento estrito (FAIL-CLOSED):
+ *   ytvdj943 -> JESSICA_PRO
+ *   1x8ik7i3 -> JESSICA_INTERMEDIATE
+ *   gtt3rhpk -> JESSICA_START
+ *
+ * @param {string | null} offerCode
+ * @returns {'JESSICA_START' | 'JESSICA_INTERMEDIATE' | 'JESSICA_PRO' | null}
+ */
+function resolveTierFromOfferCode(offerCode) {
+  if (!offerCode || typeof offerCode !== 'string') return null;
+  const code = offerCode.trim().toLowerCase();
+  if (!code) return null;
+
+  const offerPro = (config.hotmartOfferProCode || 'ytvdj943').trim().toLowerCase();
+  const offerIntermediate = (config.hotmartOfferIntermediateCode || '1x8ik7i3').trim().toLowerCase();
+  const offerStart = (config.hotmartOfferStartCode || 'gtt3rhpk').trim().toLowerCase();
+
+  if (code === offerPro || code === 'ytvdj943') return 'JESSICA_PRO';
+  if (code === offerIntermediate || code === '1x8ik7i3') return 'JESSICA_INTERMEDIATE';
+  if (code === offerStart || code === 'gtt3rhpk') return 'JESSICA_START';
+
+  return null;
+}
+
+/**
+ * Resolve o tier da assinatura a partir do Plan ID da Hotmart ou literais canônicos.
+ *
+ * @param {string | number | null} planId
+ * @returns {'JESSICA_START' | 'JESSICA_INTERMEDIATE' | 'JESSICA_PRO' | null}
+ */
+function resolveTierFromPlanId(planId) {
+  if (planId === undefined || planId === null || planId === '') return null;
+  const p = String(planId).trim();
+  if (!p) return null;
+  const pLower = p.toLowerCase();
+
+  if (config.hotmartPlanProId && pLower === config.hotmartPlanProId.trim().toLowerCase()) return 'JESSICA_PRO';
+  if (config.hotmartPlanIntermediateId && pLower === config.hotmartPlanIntermediateId.trim().toLowerCase()) return 'JESSICA_INTERMEDIATE';
+  if (config.hotmartPlanStartId && pLower === config.hotmartPlanStartId.trim().toLowerCase()) return 'JESSICA_START';
+
+  // Se o planId fornecido for o próprio código de oferta oficial, resolver pelo mapeamento de oferta
+  const asOffer = resolveTierFromOfferCode(pLower);
+  if (asOffer) return asOffer;
+
+  if (p === 'JESSICA_PRO' || pLower === 'pro') return 'JESSICA_PRO';
+  if (p === 'JESSICA_INTERMEDIATE' || pLower === 'intermediate') return 'JESSICA_INTERMEDIATE';
+  if (p === 'JESSICA_START' || pLower === 'start') return 'JESSICA_START';
+
+  return null;
+}
+
+/**
+ * Identify plan tier from Hotmart 2.0 payload using official Offer Codes (Priority 1)
+ * or canonical Plan IDs from .env (Priority 2).
+ * Strictly avoids guessing, substring matching or defaulting (FAIL-CLOSED).
  *
  * Official offer codes for product 8840376:
  *   gtt3rhpk → JESSICA_START        (R$ 89,00)
@@ -75,76 +128,43 @@ function resolvePlanTier(data) {
     return null;
   }
 
-  const planId = String(
-    data?.subscription?.plan?.id ||
-    data?.plan?.id ||
-    ''
-  ).trim();
+  const rawOfferCode =
+    data?.purchase?.offer?.code ??
+    data?.offer?.code ??
+    null;
 
-  const offerCode = String(
-    data?.purchase?.offer?.code ||
-    data?.offer?.code ||
-    ''
-  ).trim().toLowerCase();
+  const rawPlanId =
+    data?.subscription?.plan?.id ??
+    data?.plan?.id ??
+    null;
 
-  // ── Prioridade 1: Match exato contra offer codes oficiais lidos de config ──
-  const offerPro = (config.hotmartOfferProCode || 'ytvdj943').trim().toLowerCase();
-  const offerIntermediate = (config.hotmartOfferIntermediateCode || '1x8ik7i3').trim().toLowerCase();
-  const offerStart = (config.hotmartOfferStartCode || 'gtt3rhpk').trim().toLowerCase();
-
-  if (offerCode) {
-    if (offerCode === offerPro) return 'JESSICA_PRO';
-    if (offerCode === offerIntermediate) return 'JESSICA_INTERMEDIATE';
-    if (offerCode === offerStart) return 'JESSICA_START';
-  }
-
-  // ── Prioridade 2: Match contra Plan IDs configurados no .env ou strings canônicas ──
-  if (config.hotmartPlanProId) {
-    const cfgPro = config.hotmartPlanProId.trim().toLowerCase();
-    if (planId.toLowerCase() === cfgPro || offerCode === cfgPro) return 'JESSICA_PRO';
-  }
-  if (config.hotmartPlanIntermediateId) {
-    const cfgInt = config.hotmartPlanIntermediateId.trim().toLowerCase();
-    if (planId.toLowerCase() === cfgInt || offerCode === cfgInt) return 'JESSICA_INTERMEDIATE';
-  }
-  if (config.hotmartPlanStartId) {
-    const cfgStart = config.hotmartPlanStartId.trim().toLowerCase();
-    if (planId.toLowerCase() === cfgStart || offerCode === cfgStart) return 'JESSICA_START';
-  }
-
-  // Exact match against known literal identifiers
-  const planIdLower = planId.toLowerCase();
-  if (planId === 'JESSICA_PRO' || planIdLower === 'pro') return 'JESSICA_PRO';
-  if (planId === 'JESSICA_INTERMEDIATE' || planIdLower === 'intermediate') return 'JESSICA_INTERMEDIATE';
-  if (planId === 'JESSICA_START' || planIdLower === 'start') return 'JESSICA_START';
-
-  // ── Prioridade 3: Fallback por nome do plano (com validação de produto oficial já feita) ──
-  const planName = String(
-    data?.subscription?.plan?.name ||
-    data?.plan?.name ||
-    ''
-  ).trim().toUpperCase();
-
-  if (planName) {
-    if (
-      planName.includes('INTERMEDIÁRIO') || planName.includes('INTERMEDIARIO') ||
-      planName.includes('INTERMEDIATE') || planName.includes('MÉDIO') ||
-      planName.includes('MEDIO')
-    ) {
-      return 'JESSICA_INTERMEDIATE';
+  // ── REGRA DE OFERTA EXCLUSIVA (COMANDO 073.2 Ponto 1) ──
+  // Se offer.code foi fornecido, DEVE corresponder a uma das 3 ofertas oficiais.
+  // Se fornecido e NÃO for oficial, FAIL-CLOSED imediato sem consultar nome do plano ou planId.
+  if (rawOfferCode !== null && rawOfferCode !== undefined && String(rawOfferCode).trim() !== '') {
+    const offerTier = resolveTierFromOfferCode(String(rawOfferCode));
+    if (!offerTier) {
+      console.warn(
+        `[Hotmart Webhook] ALERTA FAIL-CLOSED (Oferta Exclusiva): offer.code '${rawOfferCode}' fornecido mas inválido/desconhecido. Rejeição imediata sem fallback para nome.`
+      );
+      return null;
     }
-    if (planName.includes('PRO') || planName.includes('PROFISSIONAL') || planName.includes('GESTÃO')) {
-      return 'JESSICA_PRO';
-    }
-    if (planName.includes('START') || planName.includes('INICIAL') || planName.includes('ESSENCIAL')) {
-      return 'JESSICA_START';
+    return offerTier;
+  }
+
+  // ── Prioridade 2: Match contra Plan IDs oficiais (Apenas se offerCode NÃO foi fornecido) ──
+  if (rawPlanId !== null && rawPlanId !== undefined && String(rawPlanId).trim() !== '') {
+    const planTier = resolveTierFromPlanId(rawPlanId);
+    if (planTier) {
+      return planTier;
     }
   }
 
-  // Oferta desconhecida: FAIL-CLOSED estrito (retorna null, nunca plano default)
+  // ── COMANDO 073.2 Ponto 3: ELIMINAÇÃO TOTAL DE ELEVAÇÃO POR SUBSTRING DO NOME ──
+  // Toda inferência baseada em substrings de plan.name ("PRO", "START", "INTERMEDIÁRIO") foi removida.
   console.warn(
-    `[Hotmart Webhook] ALERTA FAIL-CLOSED: Plano não identificado pelos offer codes/IDs oficiais ` +
-    `(planId: '${planId}', offerCode: '${offerCode}', product: '${productId}'). Retornando null.`
+    `[Hotmart Webhook] ALERTA FAIL-CLOSED: Plano não identificado por oferta ou planId oficial ` +
+    `(rawPlanId: '${rawPlanId}', rawOfferCode: '${rawOfferCode}', product: '${productId}'). Retornando null.`
   );
   return null;
 }
@@ -273,10 +293,48 @@ async function processWebhook(payload, whatsappSender = null) {
     return { success: false, ignored: true, reason: 'INVALID_OR_MISSING_PRODUCT_ID' };
   }
 
-  const planId = String(subscription.plan?.id || data.plan?.id || purchase.offer?.code || '');
-  const offerCode = String(purchase.offer?.code || data.offer?.code || '').trim().toLowerCase() || null;
+  const rawPlanId = subscription.plan?.id ?? data.plan?.id ?? null;
+  const planId = rawPlanId !== null && rawPlanId !== undefined && String(rawPlanId).trim() !== '' ? String(rawPlanId).trim() : null;
+  const rawOfferCode = purchase.offer?.code ?? data.offer?.code ?? null;
+  const offerCode = rawOfferCode !== null && rawOfferCode !== undefined && String(rawOfferCode).trim() !== '' ? String(rawOfferCode).trim().toLowerCase() : null;
   const planTier = resolvePlanTier(data);
   const priceCents = extractPriceCents(data);
+
+  // 1.1.1 Detecção de Conflito de Tier entre Oferta e Plano (COMANDO 073.2 Ponto 1)
+  if (offerCode && planId) {
+    const resolvedOfferTier = resolveTierFromOfferCode(offerCode);
+    const resolvedPlanTier = resolveTierFromPlanId(planId);
+
+    if (resolvedOfferTier && resolvedPlanTier && resolvedOfferTier !== resolvedPlanTier) {
+      console.warn(
+        `[Hotmart Webhook] ALERTA DE SEGURANÇA: Conflito de tier detectado entre oferta ('${offerCode}' -> ${resolvedOfferTier}) ` +
+        `e plano ('${planId}' -> ${resolvedPlanTier}) no evento '${eventName}' (ID: ${eventId}). Rejeição sumária com REJECTED_PLAN_OFFER_CONFLICT.`
+      );
+      try {
+        db.prepare(`
+          INSERT INTO hotmart_webhook_events (
+            event_id, event_name, creation_date, transaction_code, subscriber_code,
+            buyer_email, buyer_phone, product_id, plan_id, offer_code, price_cents, raw_payload, status
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'REJECTED_PLAN_OFFER_CONFLICT')
+          ON CONFLICT(event_id) DO UPDATE SET status = 'REJECTED_PLAN_OFFER_CONFLICT', updated_at = CURRENT_TIMESTAMP
+        `).run(
+          eventId,
+          eventName,
+          eventCreationDate,
+          transactionCode,
+          subscriberCode,
+          buyerEmail,
+          buyerPhone,
+          productId,
+          planId,
+          offerCode,
+          priceCents,
+          JSON.stringify({ reason: 'PLAN_OFFER_TIER_CONFLICT', offerCode, planId, resolvedOfferTier, resolvedPlanTier })
+        );
+      } catch (_) {}
+      return { success: false, ignored: true, reason: 'PLAN_OFFER_TIER_CONFLICT' };
+    }
+  }
 
   // 1.2 Validação estrita de plano em eventos de ativação (Regra P0 - Fail Closed)
   const isActivationEvent = ['PURCHASE_APPROVED', 'ORDER_APPROVED', 'SWITCH_PLAN'].includes(eventName);
@@ -327,7 +385,13 @@ async function processWebhook(payload, whatsappSender = null) {
   // 2. Strict Idempotency Check with Error Recovery (Proteção 19)
   const existingEvent = db.prepare('SELECT id, status FROM hotmart_webhook_events WHERE event_id = ?').get(eventId);
   if (existingEvent) {
-    if (existingEvent.status === 'PROCESSED' || existingEvent.status === 'IGNORED_OUT_OF_ORDER' || existingEvent.status === 'REJECTED_INVALID_PRODUCT' || existingEvent.status === 'REJECTED_UNKNOWN_OFFER') {
+    if (
+      existingEvent.status === 'PROCESSED' ||
+      existingEvent.status === 'IGNORED_OUT_OF_ORDER' ||
+      existingEvent.status === 'REJECTED_INVALID_PRODUCT' ||
+      existingEvent.status === 'REJECTED_UNKNOWN_OFFER' ||
+      existingEvent.status === 'REJECTED_PLAN_OFFER_CONFLICT'
+    ) {
       console.log(`[Hotmart Webhook] Evento já concluído anteriormente ignorado (ID: ${eventId}, Evento: ${eventName})`);
       return { success: true, duplicated: true, status: 'ignored', message: 'Evento já processado anteriormente.' };
     }
@@ -362,7 +426,7 @@ async function processWebhook(payload, whatsappSender = null) {
     } catch (insErr) {
       if (insErr.message && insErr.message.includes('UNIQUE')) {
         const raceEvt = db.prepare('SELECT id, status FROM hotmart_webhook_events WHERE event_id = ?').get(eventId);
-        if (raceEvt && (raceEvt.status === 'PROCESSED' || raceEvt.status === 'IGNORED_OUT_OF_ORDER')) {
+        if (raceEvt && (raceEvt.status === 'PROCESSED' || raceEvt.status === 'IGNORED_OUT_OF_ORDER' || raceEvt.status === 'REJECTED_PLAN_OFFER_CONFLICT')) {
           console.log(`[Hotmart Webhook] Evento ${eventId} já registrado e concluído em concorrência.`);
           return { success: true, duplicated: true, status: 'ignored', message: 'Evento já processado anteriormente.' };
         }
@@ -612,24 +676,69 @@ async function processWebhook(payload, whatsappSender = null) {
         break;
       }
 
-      // TROCA DE PLANO (UPGRADE / DOWNGRADE)
+      // TROCA DE PLANO (UPGRADE / DOWNGRADE) — ENDURECIMENTO FAIL-CLOSED (COMANDO 073.2 Ponto 1)
       case 'SWITCH_PLAN': {
-        const { iso: paidUntil } = extractPaidUntil(data);
+        const { iso: paidUntil, isRealHotmartDate, needsReconciliation } = extractPaidUntil(data);
         if (existingUser) {
-          db.prepare(`
-            UPDATE users
-            SET plan_tier = ?,
-                paid_until = ?,
-                hotmart_plan_id = ?,
-                subscription_status = 'ACTIVE',
-                hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-          `).run(planTier, paidUntil, planId, eventCreationDate, existingUser.id);
+          if (!isRealHotmartDate || needsReconciliation || !paidUntil) {
+            console.warn(
+              `[Hotmart Webhook] CONFORMIDADE: SWITCH_PLAN recebido sem vigência real para assinante #${existingUser.id} (ID: ${eventId}). ` +
+              `Concessão imediata de plano e status 'ACTIVE' BLOQUEADOS. Preservando plan_tier '${existingUser.plan_tier}' e status '${existingUser.subscription_status}'.`
+            );
 
-          console.log(`[Hotmart Webhook] Troca de plano executada para assinante #${existingUser.id}: Novo plano ${planTier}`);
+            // Preserva plan_tier anterior e status anterior intactos
+            db.prepare(`
+              UPDATE users
+              SET needs_reconciliation = 1,
+                  hotmart_plan_id = COALESCE(?, hotmart_plan_id),
+                  hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(planId, eventCreationDate, existingUser.id);
+
+            // Dispara reconciliação assíncrona oficial via Hotmart Subscription API
+            if (subscriberCode) {
+              hotmartReconciliation.reconcileSubscription({
+                subscriberCode,
+                transactionCode,
+                userId: existingUser.id,
+              }).catch((err) => {
+                console.warn('[Hotmart Webhook] Tentativa de reconciliação pós SWITCH_PLAN falhou:', err.message);
+              });
+            }
+
+            processingResult = {
+              success: true,
+              action: 'PLAN_SWITCH_PENDING_RECONCILIATION',
+              userId: existingUser.id,
+              preservedPlanTier: existingUser.plan_tier,
+              requestedPlanTier: planTier,
+              needsReconciliation: true,
+            };
+          } else {
+            // Vigência real comprovada pela Hotmart: aplicar migração de plano com segurança
+            db.prepare(`
+              UPDATE users
+              SET plan_tier = ?,
+                  paid_until = ?,
+                  hotmart_plan_id = ?,
+                  subscription_status = 'ACTIVE',
+                  needs_reconciliation = 0,
+                  hotmart_last_event_at = MAX(COALESCE(hotmart_last_event_at, 0), ?),
+                  updated_at = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).run(planTier, paidUntil, planId, eventCreationDate, existingUser.id);
+
+            console.log(
+              `[Hotmart Webhook] Troca de plano confirmada com vigência real para assinante #${existingUser.id}: ` +
+              `Novo plano ${planTier} (vigência até ${paidUntil})`
+            );
+            processingResult = { success: true, action: 'PLAN_SWITCHED', planTier, paidUntil };
+          }
+        } else {
+          console.warn(`[Hotmart Webhook] Usuário não encontrado para evento SWITCH_PLAN (ID: ${eventId})`);
+          processingResult = { success: false, error: 'Usuário não encontrado para SWITCH_PLAN' };
         }
-        processingResult = { success: true, action: 'PLAN_SWITCHED', planTier };
         break;
       }
 
@@ -898,8 +1007,15 @@ async function processWebhook(payload, whatsappSender = null) {
             subStatus = 'REFUNDED';
           } else if (['PURCHASE_DELAYED', 'SUBSCRIPTION_OVERDUE', 'PURCHASE_PROTEST'].includes(eventName)) {
             subStatus = 'OVERDUE';
-          } else if (['PURCHASE_APPROVED', 'ORDER_APPROVED', 'SWITCH_PLAN'].includes(eventName)) {
+          } else if (['PURCHASE_APPROVED', 'ORDER_APPROVED'].includes(eventName)) {
             subStatus = 'ACTIVE';
+          } else if (eventName === 'SWITCH_PLAN') {
+            const { isRealHotmartDate: switchHasRealDate, needsReconciliation: needsRecSwitch } = extractPaidUntil(data);
+            if (switchHasRealDate && !needsRecSwitch) {
+              subStatus = 'ACTIVE';
+            } else {
+              subStatus = existingSub?.status || targetUser.subscription_status || 'PENDING';
+            }
           } else {
             subStatus = ['ACTIVE', 'PENDING', 'OVERDUE', 'CANCELLED', 'REFUNDED'].includes(targetUser.subscription_status)
               ? targetUser.subscription_status
@@ -1018,7 +1134,10 @@ module.exports = {
   validateHotmartHeader,
   processWebhook,
   handleHotmartWebhook: processWebhook,
+  resolveTierFromOfferCode,
+  resolveTierFromPlanId,
   resolvePlanTier,
+  extractPriceCents,
   extractPaidUntil,
   getIntegrationStatus,
 };
