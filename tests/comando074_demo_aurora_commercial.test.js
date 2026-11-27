@@ -63,6 +63,7 @@ describe('COMANDO 074 — Demonstração Comercial Studio Aurora Beauty', () => 
   let auroraUser;
   let hotmartUser;
   let auroraToken;
+  let adminToken;
 
   before(async () => {
     // Inicializa servidor HTTP de teste em porta efêmera nativa
@@ -141,6 +142,18 @@ describe('COMANDO 074 — Demonstração Comercial Studio Aurora Beauty', () => 
     auroraToken = 'test_token_aurora_' + Date.now();
     const expires = new Date(Date.now() + 3600 * 1000).toISOString();
     db.prepare("UPDATE users SET session_token = ?, session_expires_at = ? WHERE id = ?").run(auroraToken, expires, auroraUser.id);
+
+    // Gera token de sessão para ADMIN
+    let adminUser = db.prepare("SELECT * FROM users WHERE role = 'ADMIN'").get();
+    if (!adminUser) {
+      const resAdmin = db.prepare(`
+        INSERT INTO users (email, name, phone_number, role, is_demo, plan_tier, subscription_status)
+        VALUES ('admin.aurora.audit@raiaagentes.com.br', 'Admin Auditor', '5511999990000', 'ADMIN', 0, 'PRO', 'ACTIVE')
+      `).run();
+      adminUser = db.prepare('SELECT * FROM users WHERE id = ?').get(resAdmin.lastInsertRowid);
+    }
+    adminToken = 'test_token_admin_' + Date.now();
+    db.prepare("UPDATE users SET session_token = ?, session_expires_at = ? WHERE id = ?").run(adminToken, expires, adminUser.id);
   });
 
   // =======================================================================
@@ -353,6 +366,16 @@ describe('COMANDO 074 — Demonstração Comercial Studio Aurora Beauty', () => 
     assert.strictEqual(flowData.steps[4].sender, 'CLIENT');
     assert.strictEqual(flowData.steps[5].sender, 'AI');
 
+    // Validação de correspondência exata do slot determinístico na conversa
+    assert.ok(flowData.scheduledSlot, 'flowData deve incluir scheduledSlot com o slot canônico');
+    assert.ok(flowData.scheduledSlot.startDatetime, 'scheduledSlot deve conter startDatetime');
+    assert.ok(flowData.scheduledSlot.endDatetime, 'scheduledSlot deve conter endDatetime');
+    assert.ok(flowData.scheduledSlot.formattedText, 'scheduledSlot deve conter formattedText');
+    assert.ok(
+      flowData.steps[5].message.includes(flowData.scheduledSlot.formattedText),
+      'Passo 6 da conversa deve conter a data e horário exatamente correspondentes ao slot'
+    );
+
     // 3. POST /api/client/demo/aurora/simulate-appointment (Passo 6 dinâmico)
     const simRes = await fetch(`${baseUrl}/api/client/demo/aurora/simulate-appointment`, {
       method: 'POST',
@@ -376,6 +399,18 @@ describe('COMANDO 074 — Demonstração Comercial Studio Aurora Beauty', () => 
     assert.strictEqual(simData.appointment.client_name, 'Fernanda Lima (Simulação WhatsApp)');
     assert.strictEqual(simData.appointment.client_phone, '(11) 99888-0099');
 
+    // Correspondência exata entre a conversa e o agendamento persistido
+    assert.strictEqual(
+      simData.appointment.start_datetime,
+      flowData.scheduledSlot.startDatetime,
+      'start_datetime persistido deve corresponder exatamente ao slot apresentado na conversa'
+    );
+    assert.strictEqual(
+      simData.appointment.end_datetime,
+      flowData.scheduledSlot.endDatetime,
+      'end_datetime persistido deve corresponder exatamente ao slot apresentado na conversa'
+    );
+
     // Valida persistência real no SQLite
     const createdInDb = db.prepare('SELECT * FROM appointments WHERE id = ?').get(simData.appointment.id);
     assert.ok(createdInDb, 'Compromisso simulado deve estar persistido no SQLite');
@@ -386,7 +421,7 @@ describe('COMANDO 074 — Demonstração Comercial Studio Aurora Beauty', () => 
   // =======================================================================
   // CENÁRIO 7: Salvaguarda Fail-Closed fora de Homologação
   // =======================================================================
-  test('Cenário 7: Salvaguarda fail-closed: bloqueio em produção quando sem flag explícita', () => {
+  test('Cenário 7: Salvaguarda fail-closed: bloqueio em produção quando sem flag explícita (inclusive ADMIN)', async () => {
     // Guarda referências originais de ambiente
     const origHomolog = process.env.HOMOLOGACAO;
     const origAppMode = process.env.APP_MODE;
@@ -416,6 +451,62 @@ describe('COMANDO 074 — Demonstração Comercial Studio Aurora Beauty', () => 
         /Reset comercial bloqueado: ambiente de produção restrito/,
         'Tentativa de reset em produção sem flag deve lançar exceção fail-closed'
       );
+
+      // 4. Bloqueio HTTP 403 fail-closed para cliente Mariana Alves
+      const flowResAurora = await fetch(`${baseUrl}/api/client/demo/aurora/simulator-flow`, {
+        headers: { 'Authorization': `Bearer ${auroraToken}` },
+      });
+      assert.strictEqual(flowResAurora.status, 403);
+      const flowDataAurora = await flowResAurora.json();
+      assert.strictEqual(flowDataAurora.code, 'DEMO_COMMERCIAL_DISABLED');
+
+      const simResAurora = await fetch(`${baseUrl}/api/client/demo/aurora/simulate-appointment`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${auroraToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ clientName: 'Tentativa Bloqueada', clientPhone: '(11) 90000-0000' }),
+      });
+      assert.strictEqual(simResAurora.status, 403);
+      const simDataAurora = await simResAurora.json();
+      assert.strictEqual(simDataAurora.code, 'DEMO_COMMERCIAL_DISABLED');
+
+      const resetResAurora = await fetch(`${baseUrl}/api/client/demo/aurora/reset`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${auroraToken}` },
+      });
+      assert.strictEqual(resetResAurora.status, 403);
+      const resetDataAurora = await resetResAurora.json();
+      assert.strictEqual(resetDataAurora.code, 'DEMO_COMMERCIAL_DISABLED');
+
+      // 5. Bloqueio HTTP 403 fail-closed também para ADMIN (requisito: independentemente de ser administrador)
+      const flowResAdmin = await fetch(`${baseUrl}/api/client/demo/aurora/simulator-flow`, {
+        headers: { 'Authorization': `Bearer ${adminToken}` },
+      });
+      assert.strictEqual(flowResAdmin.status, 403);
+      const flowDataAdmin = await flowResAdmin.json();
+      assert.strictEqual(flowDataAdmin.code, 'DEMO_COMMERCIAL_DISABLED');
+
+      const simResAdmin = await fetch(`${baseUrl}/api/client/demo/aurora/simulate-appointment`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ clientName: 'Admin Tentativa Bloqueada', clientPhone: '(11) 90000-0000' }),
+      });
+      assert.strictEqual(simResAdmin.status, 403);
+      const simDataAdmin = await simResAdmin.json();
+      assert.strictEqual(simDataAdmin.code, 'DEMO_COMMERCIAL_DISABLED');
+
+      const resetResAdmin = await fetch(`${baseUrl}/api/client/demo/aurora/reset`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${adminToken}` },
+      });
+      assert.strictEqual(resetResAdmin.status, 403);
+      const resetDataAdmin = await resetResAdmin.json();
+      assert.strictEqual(resetDataAdmin.code, 'DEMO_COMMERCIAL_DISABLED');
     } finally {
       // Restaura ambiente de homologação
       process.env.HOMOLOGACAO = origHomolog;
@@ -524,32 +615,60 @@ describe('COMANDO 074 — Demonstração Comercial Studio Aurora Beauty', () => 
   // =======================================================================
   // CENÁRIO 10: Disponibilidade de Agenda sem Colisão e Blindagem Externa (Requisito 2)
   // =======================================================================
-  test('Cenário 10: Disponibilidade de agenda sem colisão e blindagem externa (Google Calendar & WhatsApp)', async () => {
-    // 1. Simulação respeita a disponibilidade da agenda:
-    // Identifica Mariana Alves e o slot das 16:00 do dia alvo
+  test('Cenário 10: Disponibilidade de agenda sem colisão (HTTP 409 em conflito) e blindagem externa', async () => {
+    // 1. Obtém slot oficial da simulação e staff Mariana Alves
+    const demoSlot = demoStudioAuroraService.getNextThursdayDemoSlot();
     const marianaStaff = db.prepare("SELECT id FROM client_staff WHERE user_id = ? AND name LIKE '%Mariana Alves%'").get(auroraUser.id);
     assert.ok(marianaStaff, 'Mariana Alves deve existir no client_staff do Studio Aurora');
 
-    const now = new Date();
-    let targetDate = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
-    if (targetDate.getDay() === 0) targetDate.setDate(targetDate.getDate() + 1);
-    const yStr = targetDate.getFullYear();
-    const mStr = String(targetDate.getMonth() + 1).padStart(2, '0');
-    const dStr = String(targetDate.getDate()).padStart(2, '0');
-    const dayStr = `${yStr}-${mStr}-${dStr}`;
-
-    const conflictStart = `${dayStr} 16:00:00`;
-    const conflictEnd = `${dayStr} 18:30:00`;
-
-    // Insere agendamento concorrente ocupando exatamente o horário preferencial das 16:00
+    // 1.1 Limpa agendamentos prévios que porventura ocupem este slot determinístico
     db.prepare(`
+      DELETE FROM appointments 
+      WHERE user_id = ? 
+        AND staff_id = ? 
+        AND replace(start_datetime, 'T', ' ') < ? 
+        AND replace(end_datetime, 'T', ' ') > ?
+    `).run(auroraUser.id, marianaStaff.id, demoSlot.endDatetime, demoSlot.startDatetime);
+
+    // 2. Insere agendamento concorrente ocupando exatamente o horário do slot da simulação
+    const concurInsert = db.prepare(`
       INSERT INTO appointments (
         user_id, title, description, start_datetime, end_datetime,
         staff_id, status, origin, google_sync_status
-      ) VALUES (?, 'Agendamento Concorrente 16h', 'Bloqueio de slot', ?, ?, ?, 'CONFIRMADO', 'dashboard', 'NOT_CONNECTED')
-    `).run(auroraUser.id, conflictStart, conflictEnd, marianaStaff.id);
+      ) VALUES (?, 'Agendamento Concorrente Bloqueio', 'Bloqueio de slot para teste', ?, ?, ?, 'CONFIRMADO', 'dashboard', 'NOT_CONNECTED')
+    `).run(auroraUser.id, demoSlot.startDatetime, demoSlot.endDatetime, marianaStaff.id);
+    const concurAptId = Number(concurInsert.lastInsertRowid);
 
-    // 2. Dispara simulação com Mariana Alves (auroraToken)
+    // Contagem de agendamentos antes da tentativa com conflito
+    const totalBefore = db.prepare('SELECT COUNT(*) as c FROM appointments WHERE user_id = ?').get(auroraUser.id).c;
+
+    // 3. Tenta simular agendamento com agenda ocupada -> DEVE RETORNAR HTTP 409 SEM CRIAR AGENDAMENTO
+    const conflictRes = await fetch(`${baseUrl}/api/client/demo/aurora/simulate-appointment`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${auroraToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        clientName: 'Carla Silveira (Tentativa em Horário Ocupado)',
+        clientPhone: '(11) 98888-7711',
+      }),
+    });
+
+    assert.strictEqual(conflictRes.status, 409, 'Quando o horário estiver ocupado, deve retornar estritamente HTTP 409 Conflict');
+    const conflictData = await conflictRes.json();
+    assert.strictEqual(conflictData.success, false);
+    assert.strictEqual(conflictData.code, 'SCHEDULE_CONFLICT');
+    assert.strictEqual(conflictData.conflictingAppointmentId, concurAptId, 'Deve indicar o ID exato do agendamento conflitante');
+
+    // Valida que nenhum registro adicional foi persistido (sem fallback fantasma)
+    const totalAfterConflict = db.prepare('SELECT COUNT(*) as c FROM appointments WHERE user_id = ?').get(auroraUser.id).c;
+    assert.strictEqual(totalAfterConflict, totalBefore, 'Nenhum agendamento deve ser criado quando a agenda estiver ocupada');
+
+    // 4. Desbloqueia o horário removendo o agendamento conflitante
+    db.prepare('DELETE FROM appointments WHERE id = ?').run(concurAptId);
+
+    // 5. Executa simulação com o horário desobstruído -> DEVE RETORNAR HTTP 201
     const simRes = await fetch(`${baseUrl}/api/client/demo/aurora/simulate-appointment`, {
       method: 'POST',
       headers: {
@@ -562,19 +681,14 @@ describe('COMANDO 074 — Demonstração Comercial Studio Aurora Beauty', () => 
       }),
     });
 
-    assert.strictEqual(simRes.status, 201, 'Criação simulada deve retornar HTTP 201');
+    assert.strictEqual(simRes.status, 201, 'Criação simulada em horário livre deve retornar HTTP 201 Created');
     const simData = await simRes.json();
     assert.strictEqual(simData.success, true);
     assert.ok(simData.appointment);
+    assert.strictEqual(simData.appointment.start_datetime, demoSlot.startDatetime);
+    assert.strictEqual(simData.appointment.end_datetime, demoSlot.endDatetime);
 
-    // 3. Valida que o horário alocado NÃO colidiu com o slot das 16:00 ocupado
-    assert.notStrictEqual(
-      simData.appointment.start_datetime,
-      conflictStart,
-      'Agendamento simulado não pode colidir com o slot das 16:00 ocupado; deve alocar o próximo horário livre'
-    );
-
-    // 4. Blindagem Externa:
+    // 6. Blindagem Externa:
     // google_sync_status permanece 'NOT_CONNECTED'
     assert.strictEqual(simData.appointment.google_sync_status, 'NOT_CONNECTED');
 

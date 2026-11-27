@@ -526,6 +526,59 @@ function isDemoAuroraUser(userId) {
   return Boolean(u && u.email && u.email.toLowerCase() === AURORA_EMAIL.toLowerCase() && u.is_demo === 1);
 }
 
+/**
+ * Retorna a data calculada deterministicamente para a próxima quinta-feira,
+ * garantindo uma antecedência mínima realista de 2 dias.
+ * 
+ * @param {Date} [baseDate=new Date()]
+ * @param {number} [minDaysAhead=2]
+ * @returns {Date}
+ */
+function getNextThursdayDate(baseDate = new Date(), minDaysAhead = 2) {
+  const target = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() + minDaysAhead);
+  const dayOfWeek = target.getDay(); // 0 = Domingo, 1 = Segunda, ..., 4 = Quinta, 5 = Sexta, 6 = Sábado
+  const diff = (4 - dayOfWeek + 7) % 7;
+  target.setDate(target.getDate() + diff);
+  target.setHours(0, 0, 0, 0);
+  return target;
+}
+
+/**
+ * Retorna os metadados do slot determinístico de demonstração da Mariana Alves (Quinta-feira às 16h00)
+ * @param {Date} [baseDate=new Date()]
+ * @returns {{ date: string, displayDate: string, dayMonth: string, startTime: string, startDatetime: string, endDatetime: string, durationMin: number, staffName: string, serviceName: string, price: number, formattedText: string }}
+ */
+function getNextThursdayDemoSlot(baseDate = new Date()) {
+  const targetThursday = getNextThursdayDate(baseDate, 2);
+  const y = targetThursday.getFullYear();
+  const m = String(targetThursday.getMonth() + 1).padStart(2, '0');
+  const d = String(targetThursday.getDate()).padStart(2, '0');
+  const dateStr = `${y}-${m}-${d}`;
+  const displayDate = `${d}/${m}`;
+  const startDatetime = `${dateStr} 16:00:00`;
+  const durationMin = 150; // Morena Iluminada & Tonalização (2h30)
+  
+  const endD = new Date(targetThursday.getFullYear(), targetThursday.getMonth(), targetThursday.getDate(), 16, 0, 0);
+  endD.setMinutes(endD.getMinutes() + durationMin);
+  const endH = String(endD.getHours()).padStart(2, '0');
+  const endMin = String(endD.getMinutes()).padStart(2, '0');
+  const endDatetime = `${dateStr} ${endH}:${endMin}:00`;
+
+  return {
+    date: dateStr,
+    displayDate,
+    dayMonth: displayDate,
+    startTime: '16:00',
+    startDatetime,
+    endDatetime,
+    durationMin,
+    staffName: 'Mariana Alves',
+    serviceName: 'Morena Iluminada & Tonalização',
+    price: 320.0,
+    formattedText: `Quinta-feira, ${displayDate} às 16:00 com Mariana Alves`,
+  };
+}
+
 module.exports = {
   AURORA_EMAIL,
   AURORA_PHONE,
@@ -536,4 +589,6 @@ module.exports = {
   resetDemoStudioAuroraData,
   getDemoAuroraUser,
   isDemoAuroraUser,
+  getNextThursdayDate,
+  getNextThursdayDemoSlot,
 };

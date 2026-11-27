@@ -2583,6 +2583,14 @@ router.post('/pro/campaigns/:id/send', clientAuthMiddleware, requireProductAcces
  */
 router.post('/demo/aurora/reset', clientAuthMiddleware, async (req, res) => {
   try {
+    if (!demoStudioAuroraService.isCommercialDemoAllowed()) {
+      return res.status(403).json({
+        success: false,
+        error: 'Demonstração comercial desativada: ambiente restrito sem DEMO_COMMERCIAL_ENABLED.',
+        code: 'DEMO_COMMERCIAL_DISABLED',
+      });
+    }
+
     const isAurora = demoStudioAuroraService.isDemoAuroraUser(req.clientUser.id);
     const isAdmin = req.clientUser.role === 'ADMIN';
 
@@ -2638,6 +2646,16 @@ router.post('/demo/aurora/reset', clientAuthMiddleware, async (req, res) => {
  * GET /api/client/demo/aurora/simulator-flow ou /api/cliente/demo/aurora/simulator-flow
  */
 router.get('/demo/aurora/simulator-flow', clientAuthMiddleware, (req, res) => {
+  if (!demoStudioAuroraService.isCommercialDemoAllowed()) {
+    return res.status(403).json({
+      success: false,
+      error: 'Demonstração comercial desativada: ambiente restrito sem DEMO_COMMERCIAL_ENABLED.',
+      code: 'DEMO_COMMERCIAL_DISABLED',
+    });
+  }
+
+  const slot = demoStudioAuroraService.getNextThursdayDemoSlot();
+
   const flow = [
     {
       step: 1,
@@ -2668,7 +2686,7 @@ router.get('/demo/aurora/simulator-flow', clientAuthMiddleware, (req, res) => {
       sender: 'AI',
       senderName: 'Jéssica • Studio Aurora Beauty',
       time: '14:35',
-      message: 'Consultei a nossa agenda em tempo real! 📅\n\nPara a próxima quinta-feira à tarde, temos estas opções para Morena Iluminada:\n\n1️⃣ 14h00 com Lucas Ferreira (Colorimetria)\n2️⃣ 16h00 com Mariana Alves (Visagismo & Loiros)\n\nQual desses horários e profissionais fica melhor para você?',
+      message: `Consultei a nossa agenda em tempo real! 📅\n\nPara a próxima quinta-feira (${slot.displayDate}) à tarde, temos estas opções para Morena Iluminada:\n\n1️⃣ 14h00 com Lucas Ferreira (Colorimetria)\n2️⃣ 16h00 com Mariana Alves (Visagismo & Loiros)\n\nQual desses horários e profissionais fica melhor para você?`,
       delayMs: 2200,
     },
     {
@@ -2684,7 +2702,7 @@ router.get('/demo/aurora/simulator-flow', clientAuthMiddleware, (req, res) => {
       sender: 'AI',
       senderName: 'Jéssica • Studio Aurora Beauty',
       time: '14:37',
-      message: 'Maravilha, Fernanda! 🎉 Seu agendamento está 100% CONFIRMADO na nossa agenda:\n\n✨ Procedimento: Morena Iluminada & Tonalização (R$ 320,00)\n💇‍♀️ Profissional: Mariana Alves\n📅 Data: Próxima Quinta-feira às 16:00\n📍 Local: Rua Oscar Freire, 1250 - Jardins\n\nEnviaremos uma mensagem de confirmação e um lembrete 24h antes. Estamos ansiosos para te receber! ✨☕',
+      message: `Maravilha, Fernanda! 🎉 Seu agendamento está 100% CONFIRMADO na nossa agenda:\n\n✨ Procedimento: Morena Iluminada & Tonalização (R$ 320,00)\n💇‍♀️ Profissional: Mariana Alves\n📅 Data: ${slot.formattedText}\n📍 Local: Rua Oscar Freire, 1250 - Jardins\n\nEnviaremos uma mensagem de confirmação e um lembrete 24h antes. Estamos ansiosos para te receber! ✨☕`,
       delayMs: 2500,
     },
   ];
@@ -2695,6 +2713,7 @@ router.get('/demo/aurora/simulator-flow', clientAuthMiddleware, (req, res) => {
     aiAgentName: 'Jéssica',
     ownerName: 'Mariana Alves',
     totalSteps: flow.length,
+    scheduledSlot: slot,
     steps: flow,
   });
 });
@@ -2705,6 +2724,14 @@ router.get('/demo/aurora/simulator-flow', clientAuthMiddleware, (req, res) => {
  */
 router.post('/demo/aurora/simulate-appointment', clientAuthMiddleware, async (req, res) => {
   try {
+    if (!demoStudioAuroraService.isCommercialDemoAllowed()) {
+      return res.status(403).json({
+        success: false,
+        error: 'Demonstração comercial desativada: ambiente restrito sem DEMO_COMMERCIAL_ENABLED.',
+        code: 'DEMO_COMMERCIAL_DISABLED',
+      });
+    }
+
     const isAurora = demoStudioAuroraService.isDemoAuroraUser(req.clientUser.id);
     const isAdmin = req.clientUser.role === 'ADMIN';
 
@@ -2731,6 +2758,8 @@ router.post('/demo/aurora/simulate-appointment', clientAuthMiddleware, async (re
       targetUserId = auroraUser.id;
     }
 
+    const slot = demoStudioAuroraService.getNextThursdayDemoSlot();
+
     let service = db.prepare("SELECT id, name, price, duration_min FROM client_services WHERE user_id = ? AND name LIKE '%Morena Iluminada%'").get(targetUserId);
     if (!service) {
       service = db.prepare("SELECT id, name, price, duration_min FROM client_services WHERE user_id = ? LIMIT 1").get(targetUserId);
@@ -2741,82 +2770,36 @@ router.post('/demo/aurora/simulate-appointment', clientAuthMiddleware, async (re
       staff = db.prepare("SELECT id, name FROM client_staff WHERE user_id = ? LIMIT 1").get(targetUserId);
     }
 
-    const durationMin = service?.duration_min || 150;
-    const price = service?.price || 320.0;
+    const durationMin = service?.duration_min || slot.durationMin;
+    const price = service?.price || slot.price;
+    const chosenStartDatetime = slot.startDatetime;
+    const chosenEndDatetime = slot.endDatetime;
 
-    // 3. Respeitar a disponibilidade real da agenda demonstrativa (busca slot livre sem sobreposição)
-    const now = new Date();
-    let targetDate = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
-    if (targetDate.getDay() === 0) targetDate.setDate(targetDate.getDate() + 1);
+    // 3. Verificação de conflito estrita na agenda (sem fallback falso de gravação)
+    const conflict = db.prepare(`
+      SELECT id, title, start_datetime, end_datetime FROM appointments
+      WHERE user_id = ?
+        AND status NOT IN ('CANCELADO', 'CANCELLED')
+        AND (staff_id = ? OR staff_id IS NULL)
+        AND replace(start_datetime, 'T', ' ') < ?
+        AND replace(end_datetime, 'T', ' ') > ?
+      LIMIT 1
+    `).get(targetUserId, staff?.id || null, chosenEndDatetime, chosenStartDatetime);
 
-    let chosenStartDatetime = null;
-    let chosenEndDatetime = null;
-
-    // Candidatos de horários comerciais (16:00, 10:00, 13:30, 11:00, 14:00) ao longo de até 4 dias úteis
-    const candidateHours = [
-      { h: 16, m: 0 },
-      { h: 10, m: 0 },
-      { h: 13, m: 30 },
-      { h: 11, m: 0 },
-      { h: 14, m: 0 }
-    ];
-
-    for (let dayOffset = 0; dayOffset <= 4; dayOffset++) {
-      const testDate = new Date(targetDate.getTime() + dayOffset * 24 * 60 * 60 * 1000);
-      if (testDate.getDay() === 0) continue; // Pula domingos
-
-      const yStr = testDate.getFullYear();
-      const mStr = String(testDate.getMonth() + 1).padStart(2, '0');
-      const dStr = String(testDate.getDate()).padStart(2, '0');
-      const dayStr = `${yStr}-${mStr}-${dStr}`;
-
-      for (const slot of candidateHours) {
-        const sH = String(slot.h).padStart(2, '0');
-        const sM = String(slot.m).padStart(2, '0');
-        const candStart = `${dayStr} ${sH}:${sM}:00`;
-
-        const candStartDate = new Date(candStart.replace(' ', 'T'));
-        const candEndDate = new Date(candStartDate.getTime() + durationMin * 60000);
-        const eH = String(candEndDate.getHours()).padStart(2, '0');
-        const eM = String(candEndDate.getMinutes()).padStart(2, '0');
-        const candEnd = `${dayStr} ${eH}:${eM}:00`;
-
-        // Verifica sobreposição real no banco SQLite para o profissional na agenda do tenant
-        const conflict = db.prepare(`
-          SELECT id FROM appointments
-          WHERE user_id = ?
-            AND status NOT IN ('CANCELADO', 'CANCELLED')
-            AND (staff_id = ? OR staff_id IS NULL)
-            AND replace(start_datetime, 'T', ' ') < ?
-            AND replace(end_datetime, 'T', ' ') > ?
-          LIMIT 1
-        `).get(targetUserId, staff?.id || null, candEnd, candStart);
-
-        if (!conflict) {
-          chosenStartDatetime = candStart;
-          chosenEndDatetime = candEnd;
-          break;
-        }
-      }
-
-      if (chosenStartDatetime) break;
-    }
-
-    // Fallback seguro caso todos os slots padrão estejam ocupados
-    if (!chosenStartDatetime) {
-      const y = targetDate.getFullYear();
-      const m = String(targetDate.getMonth() + 1).padStart(2, '0');
-      const d = String(targetDate.getDate()).padStart(2, '0');
-      chosenStartDatetime = `${y}-${m}-${d} 16:00:00`;
-      const stD = new Date(chosenStartDatetime.replace(' ', 'T'));
-      const endD = new Date(stD.getTime() + durationMin * 60000);
-      chosenEndDatetime = `${y}-${m}-${d} ${String(endD.getHours()).padStart(2, '0')}:${String(endD.getMinutes()).padStart(2, '0')}:00`;
+    if (conflict) {
+      return res.status(409).json({
+        success: false,
+        error: `Conflito de agenda: o horário de ${slot.formattedText} já está ocupado na agenda.`,
+        code: 'SCHEDULE_CONFLICT',
+        conflictingAppointmentId: conflict.id,
+        slot,
+      });
     }
 
     const clientName = (req.body?.clientName || 'Fernanda Lima (Simulação WhatsApp)').trim();
     const clientPhone = (req.body?.clientPhone || '(11) 99888-0099').trim();
-    const serviceName = service?.name || 'Morena Iluminada & Tonalização';
-    const staffName = staff?.name || 'Mariana Alves';
+    const serviceName = service?.name || slot.serviceName;
+    const staffName = staff?.name || slot.staffName;
 
     const title = `${clientName} — ${serviceName}`;
     const description = `Agendamento criado via Simulação Interativa da Jéssica (Profissional: ${staffName})`;
@@ -2844,6 +2827,7 @@ router.post('/demo/aurora/simulate-appointment', clientAuthMiddleware, async (re
       simulatedClient: clientName,
       serviceName,
       staffName,
+      slot,
     });
   } catch (err) {
     console.error('[API Simulate Appointment] Erro ao criar agendamento:', err.message);
