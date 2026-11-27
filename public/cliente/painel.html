@@ -2531,46 +2531,47 @@
           </button>
         </div>
 
-        <div class="p-6 rounded-2xl bg-[#11131a] border border-white/10 space-y-6">
+        <div class="p-4 sm:p-7 rounded-3xl bg-[#FFFDFB] border border-[#EED8C6]/80 shadow-[0_10px_35px_-5px_rgba(78,59,49,0.05)] space-y-5">
           <!-- Top Bar: Title, Views & New Appointment -->
-          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-white/5 pb-4">
+          <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-[#F0E4D8] pb-4">
             <div>
-              <h3 class="text-sm font-bold text-white flex items-center gap-2">
-                <i data-lucide="calendar" class="w-4 h-4 text-[#00F59B]"></i>
-                <span>Agenda Inteligente da Jéssica</span>
+              <h3 class="text-base sm:text-lg font-bold text-[#4E3B31] flex items-center gap-2">
+                <i data-lucide="calendar-heart" class="w-5 h-5 text-[#C89B6D]"></i>
+                <span>Agenda Jéssica Beauty</span>
               </h3>
-              <p class="text-xs text-slate-400 mt-0.5">Gestão de horários, profissionais, concorrência e sincronização com Google Calendar.</p>
+              <p class="text-xs text-[#7A6255] mt-0.5">Gestão elegante de horários, profissionais e atendimentos.</p>
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
               <!-- Controles Temporais (Navegação < Hoje > e Seletor) -->
-              <div class="flex items-center gap-1.5 bg-[#07080c] p-1 rounded-xl border border-white/10 text-xs">
-                <button type="button" id="aptNavPrev" class="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-all cursor-pointer" title="Período anterior">
+              <div class="flex items-center gap-1 bg-[#F8F2EC] p-1 rounded-full border border-[#EAD9CD] text-xs">
+                <button type="button" id="aptNavPrev" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white text-[#7A6255] hover:text-[#4E3B31] transition-all cursor-pointer" title="Período anterior">
                   <i data-lucide="chevron-left" class="w-4 h-4"></i>
                 </button>
-                <button type="button" id="aptNavToday" class="px-2.5 py-1 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white font-semibold transition-all cursor-pointer">
+                <button type="button" id="aptNavToday" class="px-3 py-1 rounded-full hover:bg-white text-[#7A6255] hover:text-[#4E3B31] font-semibold text-xs transition-all cursor-pointer">
                   Hoje
                 </button>
-                <button type="button" id="aptNavNext" class="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-all cursor-pointer" title="Próximo período">
+                <button type="button" id="aptNavNext" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white text-[#7A6255] hover:text-[#4E3B31] transition-all cursor-pointer" title="Próximo período">
                   <i data-lucide="chevron-right" class="w-4 h-4"></i>
                 </button>
                 <div class="relative">
-                  <button type="button" id="btnAptJumpDate" class="p-1.5 rounded-lg hover:bg-white/10 text-[#C89B6D] transition-all cursor-pointer" title="Ir para data específica">
-                    <i data-lucide="calendar" class="w-4 h-4"></i>
+                  <button type="button" id="btnAptJumpDate" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white text-[#C89B6D] transition-all cursor-pointer" title="Ir para data específica">
+                    <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
                   </button>
                   <input type="date" id="aptJumpDatePicker" class="absolute inset-0 opacity-0 pointer-events-auto cursor-pointer w-full h-full">
                 </div>
               </div>
 
-              <!-- View Switchers -->
-              <div class="flex items-center bg-[#07080c] p-1 rounded-xl border border-white/10 text-xs">
-                <button type="button" data-view="list" class="apt-view-btn active px-3 py-1.5 rounded-lg font-bold bg-[#00F59B]/15 text-[#00F59B]">Lista</button>
-                <button type="button" data-view="day" class="apt-view-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white">Dia</button>
-                <button type="button" data-view="week" class="apt-view-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white">Semana</button>
-                <button type="button" data-view="month" class="apt-view-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white">Mês</button>
+              <!-- View Switchers (Mês / Semana / Dia / Lista) -->
+              <div class="flex items-center bg-[#F8F2EC] p-1 rounded-full border border-[#EAD9CD] text-xs">
+                <button type="button" data-view="month" class="apt-view-btn active px-3.5 py-1.5 rounded-full font-bold bg-[#C89B6D] text-white shadow-sm transition-all">Mês</button>
+                <button type="button" data-view="week" class="apt-view-btn px-3.5 py-1.5 rounded-full font-semibold text-[#7A6255] hover:text-[#4E3B31] transition-all">Semana</button>
+                <button type="button" data-view="day" class="apt-view-btn px-3.5 py-1.5 rounded-full font-semibold text-[#7A6255] hover:text-[#4E3B31] transition-all">Dia</button>
+                <button type="button" data-view="list" class="apt-view-btn px-3.5 py-1.5 rounded-full font-semibold text-[#7A6255] hover:text-[#4E3B31] transition-all">Lista</button>
               </div>
 
-              <button type="button" id="btnOpenNewAppointmentModal" class="px-4 py-2 rounded-xl bg-[#00F59B] text-[#07080c] font-bold text-xs hover:brightness-110 transition-all flex items-center gap-2 shadow-sm">
+              <!-- Botão Novo Agendamento -->
+              <button type="button" id="btnOpenNewAppointmentModal" class="px-4 py-2 rounded-full bg-gradient-to-r from-[#C89B6D] to-[#AD7B42] text-white font-bold text-xs hover:opacity-95 transition-all flex items-center gap-1.5 shadow-[0_4px_14px_rgba(173,123,66,0.25)] cursor-pointer">
                 <i data-lucide="plus" class="w-4 h-4"></i>
                 <span>Novo Agendamento</span>
               </button>
@@ -2578,64 +2579,69 @@
           </div>
 
           <!-- Indicador Dinâmico do Período Atual da Agenda -->
-          <div class="flex items-center justify-between bg-[#07080c] px-4 py-2.5 rounded-xl border border-white/5 text-xs">
+          <div class="flex items-center justify-between bg-[#FAF5EF] px-4 py-2.5 rounded-2xl border border-[#EED8C6]/60 text-xs">
             <div class="flex items-center gap-2">
-              <i data-lucide="calendar-range" class="w-4 h-4 text-[#C89B6D]"></i>
-              <span id="aptPeriodTitle" class="font-bold text-white text-sm">Carregando período...</span>
+              <i data-lucide="calendar-heart" class="w-4 h-4 text-[#C89B6D]"></i>
+              <span id="aptPeriodTitle" class="font-bold text-[#4E3B31] text-sm sm:text-base">Carregando período...</span>
             </div>
-            <span id="aptPeriodStats" class="text-slate-400 text-xs"></span>
+            <span id="aptPeriodStats" class="text-[#8C7667] text-xs font-medium"></span>
           </div>
 
-          <!-- Filters Bar: Search, Staff, Service & Statuses -->
-          <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
+          <!-- Filters Bar: Search, Staff, Service, Status Toggle & Refresh -->
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 text-xs">
             <div class="sm:col-span-4 relative">
-              <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
+              <i data-lucide="search" class="w-4 h-4 text-[#A89487] absolute left-3.5 top-2.5"></i>
               <input type="text" id="aptSearchInput" placeholder="Buscar por cliente ou serviço..."
-                class="w-full pl-9 pr-3.5 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
+                class="w-full pl-9 pr-3.5 py-2 rounded-full bg-[#FFFDFB] border border-[#EED8C6] text-[#4E3B31] placeholder-[#A89487] focus:outline-none focus:border-[#C89B6D] transition-colors">
             </div>
 
             <div class="sm:col-span-3">
-              <select id="aptStaffFilter" class="w-full px-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+              <select id="aptStaffFilter" class="w-full px-3.5 py-2 rounded-full bg-[#FFFDFB] border border-[#EED8C6] text-[#4E3B31] focus:outline-none focus:border-[#C89B6D] transition-colors">
                 <option value="">Todos os profissionais</option>
               </select>
             </div>
 
             <div class="sm:col-span-3">
-              <select id="aptServiceFilter" class="w-full px-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+              <select id="aptServiceFilter" class="w-full px-3.5 py-2 rounded-full bg-[#FFFDFB] border border-[#EED8C6] text-[#4E3B31] focus:outline-none focus:border-[#C89B6D] transition-colors">
                 <option value="">Todos os serviços</option>
               </select>
             </div>
 
-            <div class="sm:col-span-2 flex items-center justify-end">
-              <button type="button" id="btnAptRefresh" class="w-full px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 flex items-center justify-center gap-1.5 transition-all">
+            <div class="sm:col-span-2 flex items-center gap-1.5 justify-end">
+              <button type="button" id="btnToggleStatusFilters" class="flex-1 px-3 py-2 rounded-full bg-[#F8F2EC] hover:bg-[#F0E4D8] text-[#7A6255] hover:text-[#4E3B31] border border-[#EAD9CD] font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer" title="Filtrar por status">
+                <i data-lucide="filter" class="w-3.5 h-3.5 text-[#C89B6D]"></i>
+                <span class="text-[11px]">Status</span>
+                <i data-lucide="chevron-down" id="iconStatusChevron" class="w-3 h-3 transition-transform"></i>
+              </button>
+              <button type="button" id="btnAptRefresh" class="w-9 h-9 shrink-0 rounded-full bg-[#F8F2EC] hover:bg-[#F0E4D8] text-[#7A6255] hover:text-[#4E3B31] border border-[#EAD9CD] flex items-center justify-center transition-all cursor-pointer" title="Atualizar dados">
                 <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
-                <span>Atualizar</span>
               </button>
             </div>
           </div>
 
-          <!-- Status Filter Tabs -->
-          <div class="flex flex-wrap items-center gap-1.5 border-b border-white/5 pb-3" id="aptStatusFilterGroup">
-            <button type="button" data-status="TODOS" class="apt-status-pill active px-3 py-1 rounded-lg text-xs font-bold bg-[#00F59B]/15 text-[#00F59B] border border-[#00F59B]/30">Todos</button>
-            <button type="button" data-status="AGENDADO" class="apt-status-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Agendados</button>
-            <button type="button" data-status="CONFIRMADO" class="apt-status-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Confirmados</button>
-            <button type="button" data-status="CONCLUÍDO" class="apt-status-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Concluídos</button>
-            <button type="button" data-status="CANCELADO" class="apt-status-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Cancelados</button>
-            <button type="button" data-status="NÃO COMPARECEU" class="apt-status-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Não Compareceu</button>
+          <!-- Status Filter Tabs (Seção Recolhível para Reduzir Poluição Visual) -->
+          <div class="hidden flex flex-wrap items-center gap-1.5 border-t border-[#F0E4D8] pt-3 transition-all" id="aptStatusFilterGroup">
+            <span class="text-[11px] font-semibold text-[#8C7667] mr-1">Filtrar status:</span>
+            <button type="button" data-status="TODOS" class="apt-status-pill active px-3 py-1 rounded-full text-xs font-bold bg-[#C89B6D] text-white shadow-sm border border-[#AD7B42]">Todos</button>
+            <button type="button" data-status="AGENDADO" class="apt-status-pill px-3 py-1 rounded-full text-xs font-semibold text-[#7A6255] hover:text-[#4E3B31] bg-[#F8F2EC] border border-[#EAD9CD]">Agendados</button>
+            <button type="button" data-status="CONFIRMADO" class="apt-status-pill px-3 py-1 rounded-full text-xs font-semibold text-[#7A6255] hover:text-[#4E3B31] bg-[#F8F2EC] border border-[#EAD9CD]">Confirmados</button>
+            <button type="button" data-status="CONCLUÍDO" class="apt-status-pill px-3 py-1 rounded-full text-xs font-semibold text-[#7A6255] hover:text-[#4E3B31] bg-[#F8F2EC] border border-[#EAD9CD]">Concluídos</button>
+            <button type="button" data-status="CANCELADO" class="apt-status-pill px-3 py-1 rounded-full text-xs font-semibold text-[#7A6255] hover:text-[#4E3B31] bg-[#F8F2EC] border border-[#EAD9CD]">Cancelados</button>
+            <button type="button" data-status="NÃO COMPARECEU" class="apt-status-pill px-3 py-1 rounded-full text-xs font-semibold text-[#7A6255] hover:text-[#4E3B31] bg-[#F8F2EC] border border-[#EAD9CD]">Não Compareceu</button>
           </div>
 
           <!-- Container Unificado das 4 Visualizações (Lista, Dia, Semana, Mês) -->
-          <div id="appointmentsContainer" class="space-y-4">
-            <!-- 1. View Lista -->
-            <div id="aptListView" class="space-y-2.5">
+          <div id="appointmentsContainer" class="space-y-4 pt-1">
+            <!-- 1. View Mês (Grid Calendário Minimalista + Resumo do Dia) -->
+            <div id="aptMonthView" class="space-y-4"></div>
+            <!-- 2. View Semana (Grid de 7 Dias) -->
+            <div id="aptWeekView" class="hidden space-y-3"></div>
+            <!-- 3. View Dia (Timeline Horária) -->
+            <div id="aptDayView" class="hidden space-y-3"></div>
+            <!-- 4. View Lista -->
+            <div id="aptListView" class="hidden space-y-2.5">
               <div id="appointmentsList" class="space-y-2.5"></div>
             </div>
-            <!-- 2. View Dia (Timeline Horária) -->
-            <div id="aptDayView" class="hidden space-y-3"></div>
-            <!-- 3. View Semana (Grid de 7 Dias) -->
-            <div id="aptWeekView" class="hidden space-y-3"></div>
-            <!-- 4. View Mês (Grid Calendário 7x5) -->
-            <div id="aptMonthView" class="hidden space-y-3"></div>
           </div>
         </div>
 
@@ -8082,8 +8088,9 @@
     // AGENDA INTELIGENTE JÉSSICA & HISTÓRICO MULTI-PROFISSIONAL
     // ========================================================
     let appointmentsState = {
-      view: 'list',
+      view: 'month',
       currentDate: new Date(),
+      selectedDate: formatLocalDateISO(new Date()),
       status: 'TODOS',
       staffId: '',
       serviceId: '',
@@ -8164,10 +8171,10 @@
     function updateViewSwitcherButtons() {
       document.querySelectorAll('.apt-view-btn').forEach(b => {
         const isCurrent = b.dataset.view === appointmentsState.view;
-        b.className = `apt-view-btn px-3 py-1.5 rounded-lg transition-all ${
+        b.className = `apt-view-btn px-3.5 py-1.5 rounded-full text-xs transition-all ${
           isCurrent
-            ? 'active font-bold bg-[#00F59B]/15 text-[#00F59B]'
-            : 'text-slate-400 hover:text-white'
+            ? 'active font-bold bg-[#C89B6D] text-white shadow-sm'
+            : 'font-semibold text-[#7A6255] hover:text-[#4E3B31] hover:bg-[#F6EDE6]'
         }`;
       });
     }
@@ -8188,36 +8195,36 @@
       const content = document.getElementById('aptDetailsContent');
       if (content) {
         content.innerHTML = `
-          <div class="p-3.5 rounded-xl bg-[#F7EFE7] border border-[#E6D6CA] space-y-2">
+          <div class="p-3.5 rounded-2xl bg-[#FAF5EF] border border-[#EED8C6]/80 space-y-2">
             <div class="flex items-center justify-between">
-              <span class="text-slate-500 font-semibold">Cliente:</span>
+              <span class="text-[#7A6255] font-semibold">Cliente:</span>
               <strong class="text-[#4E3B31] text-sm">${escapeHtml(apt.client_name)}</strong>
             </div>
             ${apt.client_phone ? `
               <div class="flex items-center justify-between">
-                <span class="text-slate-500 font-semibold">Telefone:</span>
+                <span class="text-[#7A6255] font-semibold">Telefone:</span>
                 <span class="text-[#4E3B31]">${escapeHtml(apt.client_phone)}</span>
               </div>
             ` : ''}
             <div class="flex items-center justify-between">
-              <span class="text-slate-500 font-semibold">Serviço:</span>
+              <span class="text-[#7A6255] font-semibold">Serviço:</span>
               <strong class="text-[#4E3B31]">${escapeHtml(apt.service_name)}</strong>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-slate-500 font-semibold">Profissional:</span>
+              <span class="text-[#7A6255] font-semibold">Profissional:</span>
               <span class="text-[#4E3B31]">${escapeHtml(apt.staff_name)}</span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-slate-500 font-semibold">Data e Horário:</span>
+              <span class="text-[#7A6255] font-semibold">Data e Horário:</span>
               <span class="text-[#4E3B31] font-bold">${parsedStart.displayDate} às ${parsedStart.displayTime} (${apt.duration_formatted})</span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-slate-500 font-semibold">Valor do Procedimento:</span>
-              <span class="text-emerald-700 font-extrabold text-sm">${apt.price_formatted}</span>
+              <span class="text-[#7A6255] font-semibold">Valor do Procedimento:</span>
+              <span class="text-[#4E3B31] font-bold text-sm">${apt.price_formatted}</span>
             </div>
             <div class="flex items-center justify-between">
-              <span class="text-slate-500 font-semibold">Origem:</span>
-              <span class="text-slate-600">${apt.origin === 'whatsapp' || apt.origin === 'whatsapp_bot' ? 'WhatsApp' : 'Painel'}</span>
+              <span class="text-[#7A6255] font-semibold">Origem:</span>
+              <span class="text-[#7A6255] font-medium">${apt.origin === 'whatsapp' || apt.origin === 'whatsapp_bot' ? 'WhatsApp' : 'Painel'}</span>
             </div>
           </div>
         `;
@@ -8263,13 +8270,14 @@
       const isToday = targetIso === formatLocalDateISO(new Date());
 
       const header = document.createElement('div');
-      header.className = 'flex items-center justify-between p-3.5 rounded-xl bg-[#07080c] border border-white/5 text-xs';
+      header.className = 'flex items-center justify-between p-3.5 rounded-2xl bg-white border border-[#EED8C6]/80 shadow-sm text-xs';
       header.innerHTML = `
         <div class="flex items-center gap-2">
-          <span class="font-bold text-white text-sm">${PT_WEEKDAYS[targetDate.getDay()]}, ${targetDate.getDate()} de ${PT_MONTHS[targetDate.getMonth()]}</span>
-          ${isToday ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#C89B6D]/20 text-[#C89B6D] border border-[#C89B6D]/30">Hoje</span>' : ''}
+          <i data-lucide="clock" class="w-4 h-4 text-[#C89B6D]"></i>
+          <span class="font-bold text-[#4E3B31] text-sm">${PT_WEEKDAYS[targetDate.getDay()]}, ${targetDate.getDate()} de ${PT_MONTHS[targetDate.getMonth()]}</span>
+          ${isToday ? '<span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#FAF3EC] text-[#AD7B42] border border-[#EED8C6]">Hoje</span>' : ''}
         </div>
-        <button type="button" class="btn-quick-book px-3 py-1.5 rounded-lg bg-[#00F59B] text-black font-bold text-xs hover:brightness-110 flex items-center gap-1.5 cursor-pointer" data-date="${targetIso}" data-time="09:00">
+        <button type="button" class="btn-quick-book px-3.5 py-1.5 rounded-full bg-gradient-to-r from-[#C89B6D] to-[#AD7B42] text-white font-bold text-xs hover:opacity-95 flex items-center gap-1.5 cursor-pointer shadow-sm" data-date="${targetIso}" data-time="09:00">
           <i data-lucide="plus" class="w-3.5 h-3.5"></i>
           <span>Agendar neste dia</span>
         </button>
@@ -8290,11 +8298,11 @@
         });
 
         const hourRow = document.createElement('div');
-        hourRow.className = 'flex flex-col sm:flex-row sm:items-start gap-3 p-3 rounded-xl bg-[#07080c] border border-white/5 hover:border-white/10 transition-all';
+        hourRow.className = 'flex flex-col sm:flex-row sm:items-start gap-3 p-3 rounded-2xl bg-[#FFFDFB] border border-[#EED8C6]/60 hover:border-[#C89B6D]/50 transition-all shadow-[0_1px_3px_rgba(78,59,49,0.02)]';
 
         const timeCol = document.createElement('div');
-        timeCol.className = 'w-16 shrink-0 font-bold text-slate-400 text-xs flex items-center gap-1 pt-1';
-        timeCol.innerHTML = `<i data-lucide="clock" class="w-3.5 h-3.5 text-[#C89B6D]"></i><span>${hourStr}</span>`;
+        timeCol.className = 'w-16 shrink-0 font-bold text-[#7A6255] text-xs flex items-center gap-1.5 pt-1';
+        timeCol.innerHTML = `<span class="w-2 h-2 rounded-full bg-[#C89B6D]"></span><span>${hourStr}</span>`;
         hourRow.appendChild(timeCol);
 
         const contentCol = document.createElement('div');
@@ -8302,9 +8310,9 @@
 
         if (aptsInHour.length === 0) {
           contentCol.innerHTML = `
-            <div class="flex items-center justify-between py-1.5 px-3 rounded-lg border border-dashed border-white/10 hover:border-white/20 transition-all cursor-pointer group btn-quick-book" data-date="${targetIso}" data-time="${hourStr}">
-              <span class="text-slate-500 text-xs group-hover:text-slate-400">Horário livre</span>
-              <span class="text-[11px] text-[#00F59B] opacity-0 group-hover:opacity-100 font-semibold flex items-center gap-1 transition-opacity">
+            <div class="flex items-center justify-between py-1.5 px-3 rounded-xl border border-dashed border-[#EED8C6] hover:border-[#C89B6D] hover:bg-[#FAF5EF] transition-all cursor-pointer group btn-quick-book" data-date="${targetIso}" data-time="${hourStr}">
+              <span class="text-[#8C7667] text-xs group-hover:text-[#4E3B31]">Horário livre</span>
+              <span class="text-[11px] text-[#AD7B42] opacity-0 group-hover:opacity-100 font-semibold flex items-center gap-1 transition-opacity">
                 <i data-lucide="plus-circle" class="w-3 h-3"></i> Agendar
               </span>
             </div>
@@ -8313,21 +8321,21 @@
           aptsInHour.forEach(apt => {
             const parsedStart = parseAppointmentDateTime(apt.start_datetime);
             const card = document.createElement('div');
-            card.className = 'p-3 rounded-xl bg-[#11131a] border border-white/10 hover:border-[#C89B6D]/50 transition-all cursor-pointer space-y-1.5';
+            card.className = 'p-3 rounded-2xl bg-white border border-[#EED8C6] hover:border-[#C89B6D] transition-all cursor-pointer space-y-1.5 shadow-sm';
             card.innerHTML = `
               <div class="flex flex-wrap items-center justify-between gap-2">
                 <div class="flex items-center gap-2">
-                  <span class="font-bold text-white text-xs">${escapeHtml(apt.client_name)}</span>
-                  <span class="text-slate-400 font-semibold">• ${escapeHtml(apt.service_name)}</span>
+                  <span class="font-bold text-[#4E3B31] text-xs">${escapeHtml(apt.client_name)}</span>
+                  <span class="text-[#7A6255] font-semibold text-xs">• ${escapeHtml(apt.service_name)}</span>
                 </div>
                 <div class="flex items-center gap-1.5">
                   ${getStatusBadgeHtml(apt.status)}
-                  <span class="font-bold text-emerald-400 text-xs">${apt.price_formatted}</span>
+                  <span class="font-bold text-[#4E3B31] text-xs">${apt.price_formatted}</span>
                 </div>
               </div>
-              <div class="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
-                <span>Horário: <strong class="text-slate-200">${parsedStart.displayTime}</strong> (${apt.duration_formatted})</span>
-                <span>Profissional: <strong class="text-slate-200">${escapeHtml(apt.staff_name)}</strong></span>
+              <div class="flex flex-wrap items-center gap-3 text-[11px] text-[#7A6255]">
+                <span>Horário: <strong class="text-[#4E3B31]">${parsedStart.displayTime}</strong> (${apt.duration_formatted})</span>
+                <span>Profissional: <strong class="text-[#4E3B31]">${escapeHtml(apt.staff_name)}</strong></span>
               </div>
             `;
             card.addEventListener('click', () => openAppointmentDetailsModal(apt));
@@ -8361,7 +8369,7 @@
       const todayIso = formatLocalDateISO(new Date());
 
       const grid = document.createElement('div');
-      grid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-xs overflow-x-auto';
+      grid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-xs';
 
       weekDays.forEach(dayDate => {
         const dayIso = formatLocalDateISO(dayDate);
@@ -8373,16 +8381,16 @@
         });
 
         const col = document.createElement('div');
-        col.className = `p-3 rounded-2xl bg-[#07080c] border ${isToday ? 'border-[#C89B6D] ring-1 ring-[#C89B6D]/30' : 'border-white/10'} flex flex-col justify-between min-h-[260px] space-y-3`;
+        col.className = `p-3 rounded-2xl bg-white border ${isToday ? 'border-[#C89B6D] ring-2 ring-[#C89B6D]/20 bg-[#FFFDFB]' : 'border-[#EED8C6]/80'} flex flex-col justify-between min-h-[260px] space-y-3 shadow-sm`;
 
         const colHeader = document.createElement('div');
-        colHeader.className = 'border-b border-white/5 pb-2 flex items-center justify-between';
+        colHeader.className = 'border-b border-[#F5EBE1] pb-2 flex items-center justify-between';
         colHeader.innerHTML = `
           <div>
-            <div class="font-bold ${isToday ? 'text-[#C89B6D]' : 'text-slate-400'} text-xs">${PT_WEEKDAYS_SHORT[dayDate.getDay()]}</div>
-            <div class="text-sm font-extrabold text-white">${dayDate.getDate()} ${PT_MONTHS_SHORT[dayDate.getMonth()]}</div>
+            <div class="font-bold ${isToday ? 'text-[#AD7B42]' : 'text-[#A67C52]'} text-xs">${PT_WEEKDAYS_SHORT[dayDate.getDay()]}</div>
+            <div class="text-sm font-extrabold text-[#4E3B31]">${dayDate.getDate()} ${PT_MONTHS_SHORT[dayDate.getMonth()]}</div>
           </div>
-          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${dayApts.length > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-white/5 text-slate-500'}">
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${dayApts.length > 0 ? 'bg-[#FAF3EC] text-[#AD7B42] border border-[#EED8C6]' : 'bg-[#F8F2EC] text-[#8C7667]'}">
             ${dayApts.length}
           </span>
         `;
@@ -8392,20 +8400,20 @@
         aptsList.className = 'space-y-2 flex-1';
 
         if (dayApts.length === 0) {
-          aptsList.innerHTML = '<div class="py-6 text-center text-slate-600 text-[11px]">Nenhum atendimento</div>';
+          aptsList.innerHTML = '<div class="py-6 text-center text-[#A89487] text-[11px]">Nenhum atendimento</div>';
         } else {
           dayApts.forEach(apt => {
             const parsed = parseAppointmentDateTime(apt.start_datetime);
             const item = document.createElement('div');
-            item.className = 'p-2 rounded-xl bg-[#11131a] border border-white/5 hover:border-white/20 transition-all cursor-pointer space-y-1';
+            item.className = 'p-2 rounded-xl bg-[#FAF5EF]/70 border border-[#EED8C6]/60 hover:border-[#C89B6D] transition-all cursor-pointer space-y-1';
             item.innerHTML = `
               <div class="flex items-center justify-between gap-1">
-                <span class="font-bold text-white text-[11px] truncate">${escapeHtml(apt.client_name)}</span>
-                <span class="text-[10px] font-semibold text-[#C89B6D]">${parsed.displayTime}</span>
+                <span class="font-bold text-[#4E3B31] text-[11px] truncate">${escapeHtml(apt.client_name)}</span>
+                <span class="text-[10px] font-semibold text-[#AD7B42]">${parsed.displayTime}</span>
               </div>
-              <div class="text-slate-400 text-[10px] truncate">${escapeHtml(apt.service_name)}</div>
-              <div class="flex items-center justify-between text-[9px] pt-1 border-t border-white/5">
-                <span class="text-slate-500 truncate">${escapeHtml(apt.staff_name)}</span>
+              <div class="text-[#7A6255] text-[10px] truncate">${escapeHtml(apt.service_name)}</div>
+              <div class="flex items-center justify-between text-[9px] pt-1 border-t border-[#EED8C6]/40">
+                <span class="text-[#8C7667] truncate">${escapeHtml(apt.staff_name)}</span>
                 ${getStatusBadgeHtml(apt.status)}
               </div>
             `;
@@ -8417,7 +8425,7 @@
 
         const colFooter = document.createElement('button');
         colFooter.type = 'button';
-        colFooter.className = 'w-full py-1.5 rounded-lg border border-dashed border-white/10 hover:border-white/20 text-slate-400 hover:text-white text-[11px] font-semibold transition-all flex items-center justify-center gap-1 cursor-pointer';
+        colFooter.className = 'w-full py-1.5 rounded-xl border border-dashed border-[#EED8C6] hover:border-[#C89B6D] text-[#7A6255] hover:text-[#4E3B31] hover:bg-[#FAF5EF] text-[11px] font-semibold transition-all flex items-center justify-center gap-1 cursor-pointer';
         colFooter.innerHTML = '<i data-lucide="plus" class="w-3 h-3"></i><span>Agendar</span>';
         colFooter.addEventListener('click', () => openNewAppointmentWithSlot(dayIso, '09:00'));
         col.appendChild(colFooter);
@@ -8429,6 +8437,10 @@
       safeLucideCreateIcons();
     }
 
+    // =========================================================================
+    // CALENDÁRIO MENSAL INTELIGENTE (REDESIGN BEAUTY PREMIUM — COMANDO 075.2)
+    // Minimalista, Delicado, Células com Pontinhos Discretos e Resumo do Dia
+    // =========================================================================
     function renderMonthGrid(appointments, anchorDate) {
       const container = document.getElementById('aptMonthView');
       if (!container) return;
@@ -8438,16 +8450,27 @@
       const month = anchorDate.getMonth();
       const firstDayOfMonth = new Date(year, month, 1);
       const lastDayOfMonth = new Date(year, month + 1, 0);
+      const prevMonthLastDay = new Date(year, month, 0).getDate();
       const todayIso = formatLocalDateISO(new Date());
 
-      const startDayOfWeek = firstDayOfMonth.getDay();
+      // Mantém a data selecionada alinhada ao mês corrente
+      const currentMonthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+      if (!appointmentsState.selectedDate || !appointmentsState.selectedDate.startsWith(currentMonthPrefix)) {
+        appointmentsState.selectedDate = todayIso.startsWith(currentMonthPrefix)
+          ? todayIso
+          : formatLocalDateISO(firstDayOfMonth);
+      }
+
+      const startDayOfWeek = firstDayOfMonth.getDay(); // 0 = Dom, 6 = Sáb
       const totalDaysInMonth = lastDayOfMonth.getDate();
 
+      // Card Principal do Calendário Mensal
       const calendarCard = document.createElement('div');
-      calendarCard.className = 'p-4 rounded-2xl bg-[#07080c] border border-white/10 space-y-3';
+      calendarCard.className = 'p-4 sm:p-7 rounded-3xl bg-white border border-[#EED8C6]/80 shadow-[0_6px_25px_-4px_rgba(78,59,49,0.04)] space-y-3';
 
+      // 1. Cabeçalho dos 7 Dias da Semana (Dom a Sáb)
       const weekHeader = document.createElement('div');
-      weekHeader.className = 'grid grid-cols-7 gap-1 text-center font-bold text-slate-400 text-xs pb-2 border-b border-white/5';
+      weekHeader.className = 'grid grid-cols-7 gap-1 text-center font-bold text-[#A67C52] text-xs sm:text-sm py-2 border-b border-[#F5EBE1]';
       PT_WEEKDAYS_SHORT.forEach(wd => {
         const th = document.createElement('div');
         th.innerText = wd;
@@ -8455,19 +8478,25 @@
       });
       calendarCard.appendChild(weekHeader);
 
+      // 2. Grade dos Dias (7 Colunas)
       const daysGrid = document.createElement('div');
-      daysGrid.className = 'grid grid-cols-7 gap-1.5 text-xs';
+      daysGrid.className = 'grid grid-cols-7 gap-1 sm:gap-2 text-xs sm:text-sm pt-2';
 
-      for (let i = 0; i < startDayOfWeek; i++) {
-        const emptyCell = document.createElement('div');
-        emptyCell.className = 'min-h-[70px] sm:min-h-[90px] p-1 rounded-xl bg-white/[0.01] border border-transparent opacity-20';
-        daysGrid.appendChild(emptyCell);
+      // Dias do Mês Anterior (números desbotados como na imagem de referência)
+      for (let i = startDayOfWeek - 1; i >= 0; i--) {
+        const prevDayNum = prevMonthLastDay - i;
+        const prevCell = document.createElement('div');
+        prevCell.className = 'min-h-[46px] sm:min-h-[52px] flex flex-col items-center justify-center p-1 text-[#D1C7BD] select-none';
+        prevCell.innerHTML = `<span class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full text-xs sm:text-sm font-medium opacity-60">${prevDayNum}</span><div class="h-1.5 mt-0.5"></div>`;
+        daysGrid.appendChild(prevCell);
       }
 
+      // Dias do Mês Atual
       for (let day = 1; day <= totalDaysInMonth; day++) {
         const currentDayDate = new Date(year, month, day);
         const dayIso = formatLocalDateISO(currentDayDate);
         const isToday = dayIso === todayIso;
+        const isSelected = dayIso === appointmentsState.selectedDate;
 
         const dayApts = (appointments || []).filter(a => {
           const parsed = parseAppointmentDateTime(a.start_datetime);
@@ -8475,86 +8504,181 @@
         });
 
         const dayCell = document.createElement('div');
-        dayCell.className = `min-h-[70px] sm:min-h-[90px] p-1.5 rounded-xl border flex flex-col justify-between transition-all ${
-          isToday
-            ? 'bg-[#C89B6D]/10 border-[#C89B6D] ring-1 ring-[#C89B6D]/30'
-            : 'bg-[#11131a] border-white/5 hover:border-white/20'
-        }`;
+        dayCell.className = 'min-h-[46px] sm:min-h-[52px] flex flex-col items-center justify-center p-1 cursor-pointer select-none group';
+        dayCell.setAttribute('data-date', dayIso);
 
-        const cellHeader = document.createElement('div');
-        cellHeader.className = 'flex items-center justify-between';
-        cellHeader.innerHTML = `
-          <span class="font-extrabold ${isToday ? 'text-[#C89B6D]' : 'text-slate-300'} text-xs">${day}</span>
-          ${dayApts.length > 0 ? `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${dayApts.length}</span>` : ''}
-        `;
-        dayCell.appendChild(cellHeader);
-
-        const pillsContainer = document.createElement('div');
-        pillsContainer.className = 'space-y-1 my-1 overflow-hidden';
-
-        const visibleApts = dayApts.slice(0, 2);
-        visibleApts.forEach(apt => {
-          const parsed = parseAppointmentDateTime(apt.start_datetime);
-          const pill = document.createElement('div');
-          pill.className = 'p-1 rounded text-[10px] bg-[#07080c] border border-white/10 hover:border-white/30 truncate cursor-pointer text-slate-300 hover:text-white flex items-center justify-between gap-1';
-          pill.innerHTML = `
-            <span class="font-semibold text-[#C89B6D] shrink-0">${parsed.displayTime}</span>
-            <span class="truncate">${escapeHtml(apt.client_name)}</span>
-          `;
-          pill.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openAppointmentDetailsModal(apt);
-          });
-          pillsContainer.appendChild(pill);
-        });
-
-        if (dayApts.length > 2) {
-          const morePill = document.createElement('div');
-          morePill.className = 'text-[9px] text-slate-400 font-semibold text-center cursor-pointer hover:text-white';
-          morePill.innerText = `+${dayApts.length - 2} mais`;
-          pillsContainer.appendChild(morePill);
+        // Estilização do círculo do número: círculo rosé na data selecionada conforme referência
+        let circleClass = 'w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full text-xs sm:text-sm transition-all ';
+        if (isSelected) {
+          circleClass += 'border-2 border-[#C89B6D] bg-[#FAF3EC] text-[#4E3B31] font-extrabold shadow-sm scale-105';
+        } else if (isToday) {
+          circleClass += 'border border-[#D9B8AE] bg-white text-[#AD7B42] font-bold group-hover:bg-[#FAF3EC]';
+        } else {
+          circleClass += 'text-[#4E3B31] font-medium group-hover:bg-[#FAF3EC] group-hover:text-[#AD7B42]';
         }
 
-        dayCell.appendChild(pillsContainer);
+        // Indicador discreto de atendimentos (pontinhos)
+        let dotsHtml = '';
+        if (dayApts.length > 0) {
+          const dotCount = Math.min(dayApts.length, 3);
+          dotsHtml = '<div class="flex items-center justify-center gap-0.5 mt-0.5 h-1.5">';
+          for (let d = 0; d < dotCount; d++) {
+            dotsHtml += '<span class="w-1.5 h-1.5 rounded-full bg-[#C89B6D]"></span>';
+          }
+          dotsHtml += '</div>';
+        } else {
+          dotsHtml = '<div class="h-1.5 mt-0.5"></div>';
+        }
+
+        dayCell.innerHTML = `
+          <span class="${circleClass}">${day}</span>
+          ${dotsHtml}
+        `;
 
         dayCell.addEventListener('click', () => {
-          if (dayApts.length > 0 && window.innerWidth < 640) {
-            appointmentsState.currentDate = currentDayDate;
-            appointmentsState.view = 'day';
-            updateViewSwitcherButtons();
-            loadAppointments();
-          } else {
-            openNewAppointmentWithSlot(dayIso, '09:00');
-          }
+          appointmentsState.selectedDate = dayIso;
+          renderMonthGrid(appointments, anchorDate);
         });
 
         daysGrid.appendChild(dayCell);
       }
 
+      // Dias do Mês Seguinte para completar a última semana
+      const currentCellsCount = startDayOfWeek + totalDaysInMonth;
+      const remainingCells = (7 - (currentCellsCount % 7)) % 7;
+      for (let nextDay = 1; nextDay <= remainingCells; nextDay++) {
+        const nextCell = document.createElement('div');
+        nextCell.className = 'min-h-[46px] sm:min-h-[52px] flex flex-col items-center justify-center p-1 text-[#D1C7BD] select-none';
+        nextCell.innerHTML = `<span class="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full text-xs sm:text-sm font-medium opacity-60">${nextDay}</span><div class="h-1.5 mt-0.5"></div>`;
+        daysGrid.appendChild(nextCell);
+      }
+
       calendarCard.appendChild(daysGrid);
       container.appendChild(calendarCard);
+
+      // 3. Resumo Compacto da Data Selecionada (logo abaixo da grade mensal)
+      renderSelectedDaySummary(appointments, appointmentsState.selectedDate, container);
+
       safeLucideCreateIcons();
+    }
+
+    // Resumo Compacto do Dia Selecionado com Acesso à Linha do Tempo e Agendamento
+    function renderSelectedDaySummary(appointments, selectedIso, parentContainer) {
+      if (!selectedIso || !parentContainer) return;
+
+      const dateParts = selectedIso.split('-');
+      const d = new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, Number(dateParts[2]));
+      const weekday = PT_WEEKDAYS[d.getDay()];
+      const dayFormatted = `${weekday}, ${d.getDate()} de ${PT_MONTHS[d.getMonth()]}`;
+
+      const dayApts = (appointments || []).filter(a => {
+        const parsed = parseAppointmentDateTime(a.start_datetime);
+        return parsed.datePart === selectedIso;
+      });
+
+      const summaryCard = document.createElement('div');
+      summaryCard.id = 'aptMonthDaySummary';
+      summaryCard.className = 'p-4 sm:p-5 rounded-3xl bg-[#FFFDFB] border border-[#EED8C6]/80 shadow-[0_4px_20px_-2px_rgba(78,59,49,0.03)] space-y-3 transition-all';
+
+      const summaryHeader = document.createElement('div');
+      summaryHeader.className = 'flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#F5EBE1] pb-3';
+      summaryHeader.innerHTML = `
+        <div>
+          <span class="text-[11px] uppercase tracking-wider font-bold text-[#A67C52] flex items-center gap-1.5">
+            <i data-lucide="calendar-check" class="w-3.5 h-3.5 text-[#C89B6D]"></i>
+            <span>Agenda do Dia</span>
+          </span>
+          <h4 class="text-sm sm:text-base font-bold text-[#4E3B31] mt-0.5 flex items-center gap-2">
+            <span>${dayFormatted}</span>
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#FAF3EC] text-[#AD7B42] border border-[#EED8C6]">
+              ${dayApts.length} ${dayApts.length === 1 ? 'atendimento' : 'atendimentos'}
+            </span>
+          </h4>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" class="btn-go-day-timeline px-3.5 py-1.5 rounded-full text-xs font-semibold text-[#7A6255] hover:text-[#4E3B31] bg-[#F8F2EC] hover:bg-[#F0E4D8] border border-[#EAD9CD] transition-all flex items-center gap-1.5 cursor-pointer">
+            <span>Ver Linha do Tempo</span>
+            <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-[#C89B6D]"></i>
+          </button>
+          <button type="button" class="btn-quick-new-for-day px-3.5 py-1.5 rounded-full text-xs font-bold text-white bg-gradient-to-r from-[#C89B6D] to-[#AD7B42] hover:opacity-95 transition-all flex items-center gap-1.5 cursor-pointer shadow-sm">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            <span>Novo</span>
+          </button>
+        </div>
+      `;
+      summaryCard.appendChild(summaryHeader);
+
+      const aptsList = document.createElement('div');
+      aptsList.className = 'space-y-2';
+
+      if (dayApts.length === 0) {
+        aptsList.innerHTML = `
+          <div class="py-5 text-center text-[#8C7667] text-xs space-y-1">
+            <p class="font-medium">Nenhum atendimento agendado para esta data.</p>
+            <p class="text-[11px] text-[#A89487]">Toque em "Novo" para agendar um horário livre.</p>
+          </div>
+        `;
+      } else {
+        dayApts.forEach(apt => {
+          const parsed = parseAppointmentDateTime(apt.start_datetime);
+          const item = document.createElement('div');
+          item.className = 'p-3 rounded-2xl bg-[#FAF5EF]/70 border border-[#EED8C6]/60 hover:border-[#C89B6D] transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-[0_1px_3px_rgba(78,59,49,0.02)]';
+          item.innerHTML = `
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-12 text-center py-1 rounded-xl bg-white border border-[#EED8C6] shrink-0 font-bold text-[#AD7B42] text-xs">
+                ${parsed.displayTime}
+              </div>
+              <div class="min-w-0">
+                <div class="font-bold text-[#4E3B31] text-xs truncate">${escapeHtml(apt.client_name)}</div>
+                <div class="text-[11px] text-[#7A6255] truncate">${escapeHtml(apt.service_name)} • ${escapeHtml(apt.staff_name)}</div>
+              </div>
+            </div>
+            <div class="flex items-center justify-between sm:justify-end gap-2 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-[#EED8C6]/40">
+              ${getStatusBadgeHtml(apt.status)}
+              <span class="font-bold text-[#4E3B31] text-xs">${apt.price_formatted}</span>
+              <i data-lucide="chevron-right" class="w-4 h-4 text-[#C89B6D]"></i>
+            </div>
+          `;
+          item.addEventListener('click', () => openAppointmentDetailsModal(apt));
+          aptsList.appendChild(item);
+        });
+      }
+
+      summaryCard.appendChild(aptsList);
+
+      summaryCard.querySelector('.btn-go-day-timeline')?.addEventListener('click', () => {
+        appointmentsState.currentDate = d;
+        appointmentsState.view = 'day';
+        updateViewSwitcherButtons();
+        loadAppointments();
+      });
+
+      summaryCard.querySelector('.btn-quick-new-for-day')?.addEventListener('click', () => {
+        openNewAppointmentWithSlot(selectedIso, '09:00');
+      });
+
+      parentContainer.appendChild(summaryCard);
     }
 
     function getStatusBadgeHtml(status) {
       const s = String(status || 'AGENDADO').toUpperCase();
       switch (s) {
         case 'CONFIRMADO':
-          return '<span class="apt-status-badge apt-status-confirmado px-2.5 py-1 rounded-full font-bold text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">CONFIRMADO</span>';
+          return '<span class="apt-status-badge apt-status-confirmado px-2.5 py-0.5 rounded-full font-bold text-[10px] bg-[#EAF5EE] text-[#2A7E4F] border border-[#BDE3CC]">CONFIRMADO</span>';
         case 'CONCLUÍDO':
         case 'COMPLETED':
         case 'DONE':
-          return '<span class="apt-status-badge apt-status-concluido px-2.5 py-1 rounded-full font-bold text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">CONCLUÍDO</span>';
+          return '<span class="apt-status-badge apt-status-concluido px-2.5 py-0.5 rounded-full font-bold text-[10px] bg-[#F1EFFB] text-[#5A4BB5] border border-[#D5D0F4]">CONCLUÍDO</span>';
         case 'CANCELADO':
         case 'CANCELLED':
-          return '<span class="apt-status-badge apt-status-cancelado px-2.5 py-1 rounded-full font-bold text-[10px] bg-slate-500/10 text-slate-400 border border-slate-500/30">CANCELADO</span>';
+          return '<span class="apt-status-badge apt-status-cancelado px-2.5 py-0.5 rounded-full font-bold text-[10px] bg-[#F5F5F7] text-[#7A7A85] border border-[#E1E1E6]">CANCELADO</span>';
         case 'NÃO COMPARECEU':
         case 'NO_SHOW':
-          return '<span class="apt-status-badge apt-status-noshow px-2.5 py-1 rounded-full font-bold text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30">NÃO COMPARECEU</span>';
+          return '<span class="apt-status-badge apt-status-noshow px-2.5 py-0.5 rounded-full font-bold text-[10px] bg-[#FDF4E7] text-[#B26B1E] border border-[#F6DCBA]">NÃO COMPARECEU</span>';
         case 'AGENDADO':
         case 'SCHEDULED':
         default:
-          return '<span class="apt-status-badge apt-status-agendado px-2.5 py-1 rounded-full font-bold text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/30">AGENDADO</span>';
+          return '<span class="apt-status-badge apt-status-agendado px-2.5 py-0.5 rounded-full font-bold text-[10px] bg-[#FAF3EC] text-[#AD7B42] border border-[#EED8C6]">AGENDADO</span>';
       }
     }
 
@@ -8677,6 +8801,43 @@
       };
     }
 
+    async function populateAgendaFilters() {
+      try {
+        const [staffRes, svcRes] = await Promise.all([
+          fetch('/api/cliente/staff'),
+          fetch('/api/cliente/services?active=1')
+        ]);
+        const staffData = await staffRes.json();
+        const svcData = await svcRes.json();
+
+        const staffFilter = document.getElementById('aptStaffFilter');
+        if (staffFilter && staffData.success && Array.isArray(staffData.staff)) {
+          const currentStaff = appointmentsState.staffId;
+          staffFilter.innerHTML = '<option value="">Todos os profissionais</option>';
+          staffData.staff.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.innerText = s.name;
+            if (String(s.id) === String(currentStaff)) opt.selected = true;
+            staffFilter.appendChild(opt);
+          });
+        }
+
+        const svcFilter = document.getElementById('aptServiceFilter');
+        if (svcFilter && svcData.success && Array.isArray(svcData.services)) {
+          const currentSvc = appointmentsState.serviceId;
+          svcFilter.innerHTML = '<option value="">Todos os serviços</option>';
+          svcData.services.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.innerText = s.name;
+            if (String(s.id) === String(currentSvc)) opt.selected = true;
+            svcFilter.appendChild(opt);
+          });
+        }
+      } catch (_) {}
+    }
+
     async function loadAppointments() {
       updateAppointmentPeriodDisplay();
       updateViewSwitcherButtons();
@@ -8713,32 +8874,32 @@
           }
 
           const card = document.createElement('div');
-          card.className = `apt-row-card p-4 rounded-xl bg-[#07080c] border ${a.has_conflict ? 'border-amber-500/50 bg-amber-950/10' : 'border-white/5'} flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs transition-all hover:border-white/20`;
+          card.className = `apt-row-card p-4 rounded-2xl bg-white border ${a.has_conflict ? 'border-amber-400 bg-amber-50/30' : 'border-[#EED8C6]'} flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs transition-all hover:border-[#C89B6D] shadow-sm`;
 
           const conflictTag = a.has_conflict
-            ? '<span class="apt-badge-conflict inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">⚠️ Conflito Detectado</span>'
+            ? '<span class="apt-badge-conflict inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">⚠️ Conflito Detectado</span>'
             : '';
 
           const normOrigin = String(a.origin || '').trim().toLowerCase();
           const isWhatsAppOrigin = normOrigin === 'whatsapp' || normOrigin === 'whatsapp_bot';
           const originTag = isWhatsAppOrigin
-            ? '<span class="apt-badge-origin-wa inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"><i data-lucide="message-circle" class="w-2.5 h-2.5"></i> WhatsApp</span>'
-            : '<span class="apt-badge-origin-panel inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[10px] font-semibold bg-white/5 text-slate-400 border border-white/10">Painel</span>';
+            ? '<span class="apt-badge-origin-wa inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#EAF5EE] text-[#2A7E4F] border border-[#BDE3CC]"><i data-lucide="message-circle" class="w-2.5 h-2.5"></i> WhatsApp</span>'
+            : '<span class="apt-badge-origin-panel inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-[#F8F2EC] text-[#7A6255] border border-[#EAD9CD]">Painel</span>';
 
           const isCancelled = ['CANCELLED', 'CANCELADO', 'CANCEL'].includes(String(a.status || '').toUpperCase());
           let consentActionBtn = '';
           if (!isCancelled) {
             if (a.reminder_consent === 1 || a.reminder_consent === '1') {
               consentActionBtn = `
-                <button type="button" class="btn-apt-toggle-consent px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-amber-300 font-semibold transition-all flex items-center gap-1.5" data-id="${a.id}" data-action="revoke" title="Revogar autorização de lembrete WhatsApp">
-                  <i data-lucide="bell-off" class="w-3.5 h-3.5 text-amber-400"></i>
+                <button type="button" class="btn-apt-toggle-consent px-3 py-1.5 rounded-full bg-[#FAF3EC] hover:bg-[#F0E4D8] text-[#AD7B42] font-semibold border border-[#EED8C6] transition-all flex items-center gap-1.5" data-id="${a.id}" data-action="revoke" title="Revogar autorização de lembrete WhatsApp">
+                  <i data-lucide="bell-off" class="w-3.5 h-3.5 text-[#AD7B42]"></i>
                   <span>Revogar Lembrete</span>
                 </button>
               `;
             } else {
               consentActionBtn = `
-                <button type="button" class="btn-apt-toggle-consent px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-emerald-300 font-semibold transition-all flex items-center gap-1.5" data-id="${a.id}" data-action="grant" title="Conceder autorização de lembrete WhatsApp">
-                  <i data-lucide="bell-ring" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <button type="button" class="btn-apt-toggle-consent px-3 py-1.5 rounded-full bg-[#EAF5EE] hover:bg-[#D5EDDD] text-[#2A7E4F] font-semibold border border-[#BDE3CC] transition-all flex items-center gap-1.5" data-id="${a.id}" data-action="grant" title="Conceder autorização de lembrete WhatsApp">
+                  <i data-lucide="bell-ring" class="w-3.5 h-3.5 text-[#2A7E4F]"></i>
                   <span>Ativar Lembrete</span>
                 </button>
               `;
@@ -8746,21 +8907,21 @@
           }
 
           const actionsHtml = isCancelled
-            ? '<span class="apt-cancelled-tag inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/10 text-rose-400 font-bold border border-rose-500/20 text-xs"><i data-lucide="ban" class="w-3.5 h-3.5"></i> Atendimento Cancelado</span>'
+            ? '<span class="apt-cancelled-tag inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FDF0ED] text-[#B85343] font-bold border border-[#F4D1CA] text-xs"><i data-lucide="ban" class="w-3.5 h-3.5"></i> Atendimento Cancelado</span>'
             : `
-              <button type="button" class="btn-apt-reschedule px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-semibold hover:text-white transition-all flex items-center gap-1.5" data-id="${a.id}">
-                <i data-lucide="calendar-clock" class="w-3.5 h-3.5 text-blue-400"></i>
+              <button type="button" class="btn-apt-reschedule px-3 py-1.5 rounded-full bg-[#FAF3EC] hover:bg-[#F0E4D8] text-[#AD7B42] font-semibold border border-[#EED8C6] transition-all flex items-center gap-1.5 cursor-pointer" data-id="${a.id}">
+                <i data-lucide="calendar-clock" class="w-3.5 h-3.5 text-[#C89B6D]"></i>
                 <span>Remarcar</span>
               </button>
 
-              <button type="button" class="btn-apt-status px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 font-semibold hover:text-white transition-all flex items-center gap-1.5" data-id="${a.id}" data-status="${a.status}">
-                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <button type="button" class="btn-apt-status px-3 py-1.5 rounded-full bg-[#EAF5EE] hover:bg-[#D5EDDD] text-[#2A7E4F] font-semibold border border-[#BDE3CC] transition-all flex items-center gap-1.5 cursor-pointer" data-id="${a.id}" data-status="${a.status}">
+                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-[#2A7E4F]"></i>
                 <span>Status</span>
               </button>
 
               ${consentActionBtn}
 
-              <button type="button" class="btn-apt-cancel px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-semibold transition-all flex items-center gap-1.5" data-id="${a.id}">
+              <button type="button" class="btn-apt-cancel px-3 py-1.5 rounded-full bg-[#FDF0ED] hover:bg-[#F9DDD6] text-[#B85343] font-semibold border border-[#F4D1CA] transition-all flex items-center gap-1.5 cursor-pointer" data-id="${a.id}">
                 <i data-lucide="x" class="w-3.5 h-3.5"></i>
                 <span>Cancelar</span>
               </button>
@@ -8769,8 +8930,8 @@
           card.innerHTML = `
             <div class="space-y-1.5 min-w-0">
               <div class="flex flex-wrap items-center gap-2">
-                <span class="font-bold text-white text-sm">${escapeHtml(a.client_name)}</span>
-                <span class="text-slate-400 font-semibold">• ${escapeHtml(a.service_name)}</span>
+                <span class="font-bold text-[#4E3B31] text-sm">${escapeHtml(a.client_name)}</span>
+                <span class="text-[#7A6255] font-semibold">• ${escapeHtml(a.service_name)}</span>
                 ${getStatusBadgeHtml(a.status)}
                 ${conflictTag}
                 ${getGoogleSyncBadgeHtml(a.google_sync_status, appointmentsState.isGoogleConnected)}
@@ -8779,22 +8940,22 @@
                 ${originTag}
               </div>
 
-              <div class="flex flex-wrap items-center gap-y-1 gap-x-3 text-slate-400 text-xs">
-                <span class="flex items-center gap-1 text-slate-300">
-                  <i data-lucide="calendar" class="w-3.5 h-3.5 text-[#00F59B]"></i>
+              <div class="flex flex-wrap items-center gap-y-1 gap-x-3 text-[#7A6255] text-xs">
+                <span class="flex items-center gap-1 text-[#4E3B31] font-medium">
+                  <i data-lucide="calendar" class="w-3.5 h-3.5 text-[#C89B6D]"></i>
                   <span>${dtFormatted} (${startFormatted}${endFormatted})</span>
                 </span>
                 <span class="flex items-center gap-1">
-                  <i data-lucide="user" class="w-3.5 h-3.5 text-blue-400"></i>
-                  <span>Profissional: <strong class="text-white">${escapeHtml(a.staff_name)}</strong></span>
+                  <i data-lucide="user" class="w-3.5 h-3.5 text-[#A67C52]"></i>
+                  <span>Profissional: <strong class="text-[#4E3B31]">${escapeHtml(a.staff_name)}</strong></span>
                 </span>
                 <span class="flex items-center gap-1">
-                  <i data-lucide="clock" class="w-3.5 h-3.5 text-amber-400"></i>
+                  <i data-lucide="clock" class="w-3.5 h-3.5 text-[#C89B6D]"></i>
                   <span>${a.duration_formatted}</span>
                 </span>
                 <span class="flex items-center gap-1">
-                  <i data-lucide="tag" class="w-3.5 h-3.5 text-emerald-400"></i>
-                  <span>${a.price_formatted}</span>
+                  <i data-lucide="tag" class="w-3.5 h-3.5 text-[#AD7B42]"></i>
+                  <span class="font-bold text-[#4E3B31]">${a.price_formatted}</span>
                 </span>
               </div>
             </div>
@@ -10697,12 +10858,22 @@
       }
     });
 
+    // Toggle dos Filtros de Status Adicionais (Seção Recolhível)
+    document.getElementById('btnToggleStatusFilters')?.addEventListener('click', () => {
+      const group = document.getElementById('aptStatusFilterGroup');
+      const chevron = document.getElementById('iconStatusChevron');
+      if (group) {
+        group.classList.toggle('hidden');
+        if (chevron) chevron.classList.toggle('rotate-180');
+      }
+    });
+
     document.querySelectorAll('.apt-status-pill').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.apt-status-pill').forEach(b => {
-          b.className = 'apt-status-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5';
+          b.className = 'apt-status-pill px-3 py-1 rounded-full text-xs font-semibold text-[#7A6255] hover:text-[#4E3B31] bg-[#F8F2EC] border border-[#EAD9CD] transition-all';
         });
-        btn.className = 'apt-status-pill active px-3 py-1 rounded-lg text-xs font-bold bg-[#00F59B]/15 text-[#00F59B] border border-[#00F59B]/30';
+        btn.className = 'apt-status-pill active px-3 py-1 rounded-full text-xs font-bold bg-[#C89B6D] text-white shadow-sm border border-[#AD7B42] transition-all';
         appointmentsState.status = btn.dataset.status;
         loadAppointments();
       });
