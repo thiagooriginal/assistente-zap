@@ -2246,7 +2246,7 @@ router.get('/pro/dashboard', clientAuthMiddleware, requireProductAccess('JESSICA
 
     data.userTier = tier;
     data.isPro = isPro;
-    data.isCommercialDemo = demoStudioAuroraService.isDemoAuroraUser(req.clientUser.id) || Boolean(req.clientUser?.email?.toLowerCase().includes('mariana.aurora'));
+    data.isCommercialDemo = demoStudioAuroraService.isDemoAuroraUser(req.clientUser.id);
     if (!isPro) {
       data.bills = null;
     }
@@ -2708,12 +2708,27 @@ router.post('/demo/aurora/simulate-appointment', clientAuthMiddleware, async (re
     const isAurora = demoStudioAuroraService.isDemoAuroraUser(req.clientUser.id);
     const isAdmin = req.clientUser.role === 'ADMIN';
 
+    // 1. Restrição mandatória: apenas a conta oficial Mariana Alves ou perfil ADMIN
+    if (!isAurora && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'Acesso negado: a simulação de agendamento é restrita exclusivamente à conta comercial Studio Aurora Beauty (Mariana Alves) ou perfil de Administrador.',
+        code: 'FORBIDDEN_AURORA_SIMULATE',
+      });
+    }
+
+    // 2. Isolamento Multi-Tenant Estrito: jamais grava em tenants de terceiros
     let targetUserId = req.clientUser.id;
     if (isAdmin && !isAurora) {
       const auroraUser = demoStudioAuroraService.getDemoAuroraUser();
-      if (auroraUser) {
-        targetUserId = auroraUser.id;
+      if (!auroraUser) {
+        return res.status(404).json({
+          success: false,
+          error: 'Conta comercial Studio Aurora não encontrada no banco para simulação administrativa.',
+          code: 'AURORA_USER_NOT_FOUND',
+        });
       }
+      targetUserId = auroraUser.id;
     }
 
     let service = db.prepare("SELECT id, name, price, duration_min FROM client_services WHERE user_id = ? AND name LIKE '%Morena Iluminada%'").get(targetUserId);
@@ -2726,23 +2741,77 @@ router.post('/demo/aurora/simulate-appointment', clientAuthMiddleware, async (re
       staff = db.prepare("SELECT id, name FROM client_staff WHERE user_id = ? LIMIT 1").get(targetUserId);
     }
 
+    const durationMin = service?.duration_min || 150;
+    const price = service?.price || 320.0;
+
+    // 3. Respeitar a disponibilidade real da agenda demonstrativa (busca slot livre sem sobreposição)
     const now = new Date();
     let targetDate = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
     if (targetDate.getDay() === 0) targetDate.setDate(targetDate.getDate() + 1);
 
-    const y = targetDate.getFullYear();
-    const m = String(targetDate.getMonth() + 1).padStart(2, '0');
-    const d = String(targetDate.getDate()).padStart(2, '0');
-    const dateStr = `${y}-${m}-${d}`;
-    const startDatetime = `${dateStr} 16:00:00`;
+    let chosenStartDatetime = null;
+    let chosenEndDatetime = null;
 
-    const durationMin = service?.duration_min || 150;
-    const price = service?.price || 320.0;
-    const startDate = new Date(startDatetime.replace(' ', 'T'));
-    const endDate = new Date(startDate.getTime() + durationMin * 60000);
-    const endH = String(endDate.getHours()).padStart(2, '0');
-    const endM = String(endDate.getMinutes()).padStart(2, '0');
-    const endDatetime = `${dateStr} ${endH}:${endM}:00`;
+    // Candidatos de horários comerciais (16:00, 10:00, 13:30, 11:00, 14:00) ao longo de até 4 dias úteis
+    const candidateHours = [
+      { h: 16, m: 0 },
+      { h: 10, m: 0 },
+      { h: 13, m: 30 },
+      { h: 11, m: 0 },
+      { h: 14, m: 0 }
+    ];
+
+    for (let dayOffset = 0; dayOffset <= 4; dayOffset++) {
+      const testDate = new Date(targetDate.getTime() + dayOffset * 24 * 60 * 60 * 1000);
+      if (testDate.getDay() === 0) continue; // Pula domingos
+
+      const yStr = testDate.getFullYear();
+      const mStr = String(testDate.getMonth() + 1).padStart(2, '0');
+      const dStr = String(testDate.getDate()).padStart(2, '0');
+      const dayStr = `${yStr}-${mStr}-${dStr}`;
+
+      for (const slot of candidateHours) {
+        const sH = String(slot.h).padStart(2, '0');
+        const sM = String(slot.m).padStart(2, '0');
+        const candStart = `${dayStr} ${sH}:${sM}:00`;
+
+        const candStartDate = new Date(candStart.replace(' ', 'T'));
+        const candEndDate = new Date(candStartDate.getTime() + durationMin * 60000);
+        const eH = String(candEndDate.getHours()).padStart(2, '0');
+        const eM = String(candEndDate.getMinutes()).padStart(2, '0');
+        const candEnd = `${dayStr} ${eH}:${eM}:00`;
+
+        // Verifica sobreposição real no banco SQLite para o profissional na agenda do tenant
+        const conflict = db.prepare(`
+          SELECT id FROM appointments
+          WHERE user_id = ?
+            AND status NOT IN ('CANCELADO', 'CANCELLED')
+            AND (staff_id = ? OR staff_id IS NULL)
+            AND replace(start_datetime, 'T', ' ') < ?
+            AND replace(end_datetime, 'T', ' ') > ?
+          LIMIT 1
+        `).get(targetUserId, staff?.id || null, candEnd, candStart);
+
+        if (!conflict) {
+          chosenStartDatetime = candStart;
+          chosenEndDatetime = candEnd;
+          break;
+        }
+      }
+
+      if (chosenStartDatetime) break;
+    }
+
+    // Fallback seguro caso todos os slots padrão estejam ocupados
+    if (!chosenStartDatetime) {
+      const y = targetDate.getFullYear();
+      const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+      const d = String(targetDate.getDate()).padStart(2, '0');
+      chosenStartDatetime = `${y}-${m}-${d} 16:00:00`;
+      const stD = new Date(chosenStartDatetime.replace(' ', 'T'));
+      const endD = new Date(stD.getTime() + durationMin * 60000);
+      chosenEndDatetime = `${y}-${m}-${d} ${String(endD.getHours()).padStart(2, '0')}:${String(endD.getMinutes()).padStart(2, '0')}:00`;
+    }
 
     const clientName = (req.body?.clientName || 'Fernanda Lima (Simulação WhatsApp)').trim();
     const clientPhone = (req.body?.clientPhone || '(11) 99888-0099').trim();
@@ -2752,6 +2821,7 @@ router.post('/demo/aurora/simulate-appointment', clientAuthMiddleware, async (re
     const title = `${clientName} — ${serviceName}`;
     const description = `Agendamento criado via Simulação Interativa da Jéssica (Profissional: ${staffName})`;
 
+    // 4. Gravação segura: sem disparo real de WhatsApp e sem sincronização com Google Calendar
     const result = db.prepare(`
       INSERT INTO appointments (
         user_id, title, description, start_datetime, end_datetime,
@@ -2760,7 +2830,7 @@ router.post('/demo/aurora/simulate-appointment', clientAuthMiddleware, async (re
         reminder_24h_status, reminder_consent, input_modality
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'whatsapp', 'CONFIRMADO', 'NOT_CONNECTED', 1, 'DISABLED', 1, 'text')
     `).run(
-      targetUserId, title, description, startDatetime, endDatetime,
+      targetUserId, title, description, chosenStartDatetime, chosenEndDatetime,
       service?.id || null, staff?.id || null, price, clientName, clientPhone,
       durationMin
     );

@@ -385,17 +385,35 @@ function ensureDemoStudioAuroraAccount() {
     user = db.prepare('SELECT * FROM users WHERE id = ?').get(res.lastInsertRowid);
     console.log(`[Demo Aurora] Usuária Mariana Alves provisionada com sucesso: ${email} (#${user.id})`);
   } else {
-    // Garante privilégios e flags da demonstração comercial
-    db.prepare(`
-      UPDATE users
-      SET plan_tier = 'JESSICA_PRO',
-          role = 'USER',
-          is_demo = 1,
-          subscription_status = 'ACTIVE',
-          subscription_origin = 'DEMO',
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(user.id);
+    // Garante privilégios, flags da demonstração comercial e sincronização segura de senha via env
+    const explicitPassword = (process.env.DEMO_AURORA_PASSWORD || '').trim();
+    if (explicitPassword) {
+      const creds = hashPassword(explicitPassword);
+      db.prepare(`
+        UPDATE users
+        SET password_hash = ?,
+            password_salt = ?,
+            plan_tier = 'JESSICA_PRO',
+            role = 'USER',
+            is_demo = 1,
+            subscription_status = 'ACTIVE',
+            subscription_origin = 'DEMO',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(creds.hash, creds.salt, user.id);
+      console.log(`[Demo Aurora] Senha da conta comercial Mariana Alves (#${user.id}) sincronizada com sucesso via DEMO_AURORA_PASSWORD.`);
+    } else {
+      db.prepare(`
+        UPDATE users
+        SET plan_tier = 'JESSICA_PRO',
+            role = 'USER',
+            is_demo = 1,
+            subscription_status = 'ACTIVE',
+            subscription_origin = 'DEMO',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).run(user.id);
+    }
   }
 
   // Multiproduct subscription sync para compatibilidade total com productService

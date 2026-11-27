@@ -6624,14 +6624,8 @@
 
       function isStudioAuroraAccount(userProfile) {
         if (!userProfile) return false;
-        if (userProfile.isCommercialDemo || userProfile.isAuroraDemo) return true;
-        const email = (userProfile.email || '').toLowerCase().trim();
-        if (email === 'mariana.aurora@raiaagentes.com.br' || email.includes('mariana.aurora')) return true;
-        const salonName = (userProfile.salon?.name || '').toLowerCase().trim();
-        if (salonName.includes('studio aurora')) return true;
-        const userName = (userProfile.name || '').toLowerCase().trim();
-        if (userName.includes('mariana alves')) return true;
-        return false;
+        // Identificação canônica estrita: tenant demo autenticado com flag comercial emitida pelo backend
+        return Boolean(userProfile.isDemo === true && (userProfile.isCommercialDemo === true || userProfile.isAuroraDemo === true));
       }
 
       const isAurora = isStudioAuroraAccount(p);
@@ -11733,7 +11727,7 @@
         document.getElementById('proDashboardContent').classList.remove('hidden');
 
         // Demo Badge: Exibir apenas em contas de homologação comuns, ocultando para a conta comercial Studio Aurora
-        const isAurora = Boolean(clientData && (clientData.isCommercialDemo || clientData.isAuroraDemo || (clientData.email && clientData.email.toLowerCase().includes('mariana.aurora')) || (clientData.salon?.name && clientData.salon.name.includes('Studio Aurora')))) || Boolean(data.isCommercialDemo);
+        const isAurora = Boolean(clientData && clientData.isDemo && (clientData.isCommercialDemo || clientData.isAuroraDemo)) || Boolean(data && data.isCommercialDemo);
         const demoBadge = document.getElementById('proDemoBadge');
         if (data.isDemo && !isAurora) {
           demoBadge.classList.remove('hidden');

@@ -483,4 +483,192 @@ describe('COMANDO 074 — Demonstração Comercial Studio Aurora Beauty', () => 
       '#demoNoticeBanner NÃO pode conter fixed top-0 para evitar sobreposição do topo fixo'
     );
   });
+
+  // =======================================================================
+  // CENÁRIO 9: Teste Negativo de Autorização em simulate-appointment (Requisito 1)
+  // =======================================================================
+  test('Cenário 9: Teste negativo de autorização em simulate-appointment (bloqueio 403 e código FORBIDDEN_AURORA_SIMULATE)', async () => {
+    // 1. Gera token de sessão Bearer para o usuário de homologação Hotmart Bella Vista
+    const hotmartToken = 'test_token_hotmart_invader_' + Date.now();
+    const expires = new Date(Date.now() + 3600 * 1000).toISOString();
+    db.prepare('UPDATE users SET session_token = ?, session_expires_at = ? WHERE id = ?').run(
+      hotmartToken,
+      expires,
+      hotmartUser.id
+    );
+
+    // 2. Tenta acionar simulate-appointment com token de terceiro
+    const simRes = await fetch(`${baseUrl}/api/client/demo/aurora/simulate-appointment`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${hotmartToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        clientName: 'Cliente Não Autorizado',
+        clientPhone: '(11) 97777-8899',
+      }),
+    });
+
+    // 3. Deve retornar estritamente HTTP 403 Forbidden e código FORBIDDEN_AURORA_SIMULATE
+    assert.strictEqual(simRes.status, 403, 'Acesso não-aurora deve retornar HTTP 403');
+    const simData = await simRes.json();
+    assert.strictEqual(simData.success, false);
+    assert.strictEqual(simData.code, 'FORBIDDEN_AURORA_SIMULATE');
+
+    // 4. Nenhum registro é gravado em tenants de terceiros
+    const hotmartApts = db.prepare('SELECT COUNT(*) as c FROM appointments WHERE user_id = ?').get(hotmartUser.id).c;
+    assert.strictEqual(hotmartApts, 0, 'Nenhum agendamento deve ser gravado para o tenant terceiro');
+  });
+
+  // =======================================================================
+  // CENÁRIO 10: Disponibilidade de Agenda sem Colisão e Blindagem Externa (Requisito 2)
+  // =======================================================================
+  test('Cenário 10: Disponibilidade de agenda sem colisão e blindagem externa (Google Calendar & WhatsApp)', async () => {
+    // 1. Simulação respeita a disponibilidade da agenda:
+    // Identifica Mariana Alves e o slot das 16:00 do dia alvo
+    const marianaStaff = db.prepare("SELECT id FROM client_staff WHERE user_id = ? AND name LIKE '%Mariana Alves%'").get(auroraUser.id);
+    assert.ok(marianaStaff, 'Mariana Alves deve existir no client_staff do Studio Aurora');
+
+    const now = new Date();
+    let targetDate = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+    if (targetDate.getDay() === 0) targetDate.setDate(targetDate.getDate() + 1);
+    const yStr = targetDate.getFullYear();
+    const mStr = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const dStr = String(targetDate.getDate()).padStart(2, '0');
+    const dayStr = `${yStr}-${mStr}-${dStr}`;
+
+    const conflictStart = `${dayStr} 16:00:00`;
+    const conflictEnd = `${dayStr} 18:30:00`;
+
+    // Insere agendamento concorrente ocupando exatamente o horário preferencial das 16:00
+    db.prepare(`
+      INSERT INTO appointments (
+        user_id, title, description, start_datetime, end_datetime,
+        staff_id, status, origin, google_sync_status
+      ) VALUES (?, 'Agendamento Concorrente 16h', 'Bloqueio de slot', ?, ?, ?, 'CONFIRMADO', 'dashboard', 'NOT_CONNECTED')
+    `).run(auroraUser.id, conflictStart, conflictEnd, marianaStaff.id);
+
+    // 2. Dispara simulação com Mariana Alves (auroraToken)
+    const simRes = await fetch(`${baseUrl}/api/client/demo/aurora/simulate-appointment`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${auroraToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        clientName: 'Carla Silveira (Simulação Sem Conflito)',
+        clientPhone: '(11) 98888-7711',
+      }),
+    });
+
+    assert.strictEqual(simRes.status, 201, 'Criação simulada deve retornar HTTP 201');
+    const simData = await simRes.json();
+    assert.strictEqual(simData.success, true);
+    assert.ok(simData.appointment);
+
+    // 3. Valida que o horário alocado NÃO colidiu com o slot das 16:00 ocupado
+    assert.notStrictEqual(
+      simData.appointment.start_datetime,
+      conflictStart,
+      'Agendamento simulado não pode colidir com o slot das 16:00 ocupado; deve alocar o próximo horário livre'
+    );
+
+    // 4. Blindagem Externa:
+    // google_sync_status permanece 'NOT_CONNECTED'
+    assert.strictEqual(simData.appointment.google_sync_status, 'NOT_CONNECTED');
+
+    // Nada é adicionado à google_sync_outbox
+    const outboxCount = db.prepare('SELECT COUNT(*) as c FROM google_sync_outbox WHERE appointment_id = ?').get(simData.appointment.id).c;
+    assert.strictEqual(outboxCount, 0, 'Nenhum registro pode ser enfileirado na google_sync_outbox durante simulação');
+
+    // Nenhum WhatsApp real é disparado (notificado flag = 1, reminder = DISABLED)
+    assert.strictEqual(simData.appointment.whatsapp_notified, 1);
+    assert.strictEqual(simData.appointment.reminder_24h_status, 'DISABLED');
+  });
+
+  // =======================================================================
+  // CENÁRIO 11: Configuração e Redefinição Segura de Senha por Variável de Ambiente (Requisito 3)
+  // =======================================================================
+  test('Cenário 11: Configuração e redefinição segura de senha por variável de ambiente (DEMO_AURORA_PASSWORD)', () => {
+    const customPassword = 'SenhaSeguraMariana2026!#Aurora';
+    const origEnvPassword = process.env.DEMO_AURORA_PASSWORD;
+
+    try {
+      // 1. Define variável de ambiente com senha customizada
+      process.env.DEMO_AURORA_PASSWORD = customPassword;
+
+      // 2. Executa provisionamento/sincronização
+      const ensureRes = demoStudioAuroraService.ensureDemoStudioAuroraAccount();
+      assert.strictEqual(ensureRes.success, true);
+
+      // 3. Testa login real via clientAuth.login() -> deve suceder
+      const loginSuccess = clientAuth.login(demoStudioAuroraService.AURORA_EMAIL, customPassword);
+      assert.strictEqual(loginSuccess.success, true, 'Login com a nova DEMO_AURORA_PASSWORD deve ser bem-sucedido');
+      assert.ok(loginSuccess.token, 'Token de sessão válido deve ser retornado no login');
+      assert.strictEqual(loginSuccess.user.email, demoStudioAuroraService.AURORA_EMAIL);
+
+      // 4. Testa login com senha errada -> deve falhar fail-closed com INVALID_CREDENTIALS
+      const loginFail = clientAuth.login(demoStudioAuroraService.AURORA_EMAIL, 'SenhaIncorretaQueDeveFalhar123!');
+      assert.strictEqual(loginFail.success, false, 'Login com credencial inválida deve falhar');
+      assert.strictEqual(loginFail.code, 'INVALID_CREDENTIALS', 'Código de falha deve ser INVALID_CREDENTIALS');
+    } finally {
+      // Restaura o ambiente
+      if (origEnvPassword !== undefined) {
+        process.env.DEMO_AURORA_PASSWORD = origEnvPassword;
+      } else {
+        delete process.env.DEMO_AURORA_PASSWORD;
+      }
+    }
+  });
+
+  // =======================================================================
+  // CENÁRIO 12: Identidade Canônica Estrita — Rejeição de Substrings/Spoofing (Requisito 4)
+  // =======================================================================
+  test('Cenário 12: Identidade canônica estrita — rejeição de substrings/spoofing (OWASP ASVS 5.0)', () => {
+    // 1. Cria usuário simulando tentativa de spoofing com substring no e-mail e salão
+    const spoofEmail = 'mariana.aurora.fake@gmail.com';
+    const fakeInsert = db.prepare(`
+      INSERT INTO users (email, name, phone_number, role, is_demo, plan_tier, subscription_status)
+      VALUES (?, 'Mariana Aurora Impostora', '5511999998888', 'USER', 1, 'JESSICA_PRO', 'ACTIVE')
+    `).run(spoofEmail);
+    const fakeUserId = Number(fakeInsert.lastInsertRowid);
+
+    db.prepare(`
+      INSERT INTO client_salons (user_id, salon_name, phone)
+      VALUES (?, 'Studio Aurora Hair Impostor', '(11) 96666-5544')
+    `).run(fakeUserId);
+
+    // 2. clientAuth.getSanitizedUser DEVE retornar isCommercialDemo: false e isAuroraDemo: false
+    const sanitizedFake = clientAuth.getSanitizedUser(fakeUserId);
+    assert.ok(sanitizedFake, 'Perfil sanitizado do usuário fake deve ser retornado');
+    assert.strictEqual(
+      sanitizedFake.isCommercialDemo,
+      false,
+      'Usuário com e-mail fake mariana.aurora.fake@gmail.com NÃO pode ter isCommercialDemo = true'
+    );
+    assert.strictEqual(
+      sanitizedFake.isAuroraDemo,
+      false,
+      'Usuário com e-mail fake mariana.aurora.fake@gmail.com NÃO pode ter isAuroraDemo = true'
+    );
+
+    // 3. Valida que public/cliente/painel.html e clientAuthService.js não possuem correspondências por .includes('mariana.aurora')
+    const painelHtmlPath = path.resolve(__dirname, '../public/cliente/painel.html');
+    const painelHtml = fs.readFileSync(painelHtmlPath, 'utf-8');
+    const clientAuthPath = path.resolve(__dirname, '../src/services/clientAuthService.js');
+    const clientAuthSrc = fs.readFileSync(clientAuthPath, 'utf-8');
+
+    assert.strictEqual(
+      painelHtml.includes(".includes('mariana.aurora')") || painelHtml.includes('.includes("mariana.aurora")'),
+      false,
+      'public/cliente/painel.html não pode conter validação frágil via .includes("mariana.aurora")'
+    );
+
+    assert.strictEqual(
+      clientAuthSrc.includes(".includes('mariana.aurora')") || clientAuthSrc.includes('.includes("mariana.aurora")'),
+      false,
+      'src/services/clientAuthService.js não pode conter validação frágil via .includes("mariana.aurora")'
+    );
+  });
 });

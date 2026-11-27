@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const db = require('../database/db');
 const config = require('../config');
 const { AUDIT_EVENTS, logSecurityEvent } = require('./securityAuditService');
+const demoStudioAuroraService = require('./demoStudioAuroraService');
 
 // Helper to hash password with salt using scrypt
 function hashPassword(password, salt = null) {
@@ -434,12 +435,8 @@ function getSanitizedUser(userId) {
 
   const salon = db.prepare('SELECT * FROM client_salons WHERE user_id = ?').get(userId) || null;
 
-  const isAurora = Boolean(
-    (user.email && user.email.toLowerCase() === 'mariana.aurora@raiaagentes.com.br') ||
-    (user.email && user.email.toLowerCase().includes('mariana.aurora')) ||
-    (salon && salon.salon_name && salon.salon_name.includes('Studio Aurora')) ||
-    (user.name && user.name.includes('Mariana Alves'))
-  );
+  // Reconhecimento do modo comercial usando identidade autenticada, is_demo=1 e identificação canônica do tenant
+  const isAurora = demoStudioAuroraService.isDemoAuroraUser(user.id);
 
   return {
     id: user.id,
