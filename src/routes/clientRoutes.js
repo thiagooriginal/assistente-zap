@@ -1585,13 +1585,24 @@ router.put('/salon/hours', clientAuthMiddleware, requireProductAccess('JESSICA')
 // ==========================================
 
 router.get('/appointments', clientAuthMiddleware, requireProductAccess('JESSICA'), (req, res) => {
-  const { staff_id, status, start_date, end_date, search } = req.query || {};
+  const staffId = req.query?.staff_id || req.query?.staffId;
+  const serviceId = req.query?.service_id || req.query?.serviceId;
+  const startDate = req.query?.start_date || req.query?.startDate;
+  const endDate = req.query?.end_date || req.query?.endDate;
+  const status = req.query?.status;
+  const search = req.query?.search;
+  const limit = req.query?.limit;
+  const order = req.query?.order;
+
   const appointments = salonAppointmentService.listAppointments(req.clientUser.id, {
-    staffId: staff_id ? Number(staff_id) : null,
+    staffId: staffId ? Number(staffId) : null,
+    serviceId: serviceId ? Number(serviceId) : null,
     status: status || null,
-    startDate: start_date || null,
-    endDate: end_date || null,
+    startDate: startDate || null,
+    endDate: endDate || null,
     search: search || null,
+    limit: limit ? Number(limit) : null,
+    order: order || null,
   });
 
   const googleStatus = googleCalendarService.getConnectionStatus(req.clientUser.id);

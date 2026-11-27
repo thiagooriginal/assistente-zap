@@ -1688,9 +1688,40 @@ function mapToPortugueseStatus(rawStatus) {
 }
 
 /**
+ * Normaliza datas de filtro (startDate / endDate) para comparação lexicográfica segura no SQLite
+ * Suporta: YYYY-MM-DD, DD/MM/YYYY, ISO 8601 com timezone.
+ * @param {string|Date} input 
+ * @param {boolean} isEnd 
+ * @returns {string|null}
+ */
+function normalizeFilterDate(input, isEnd = false) {
+  if (!input) return null;
+  let s = String(input).trim();
+  // Converte padrão brasileiro DD/MM/YYYY
+  if (s.includes('/')) {
+    const parts = s.split('/');
+    if (parts.length === 3) {
+      s = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+  }
+  // Se contiver timezone ISO, converte considerando America/Sao_Paulo
+  if (s.includes('Z') || /[+-]\d{2}:\d{2}$/.test(s)) {
+    const localIso = toLocalISOString(s);
+    if (localIso) s = localIso;
+  }
+  s = s.replace('T', ' ').replace(/\.\d+$/, '');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    s += isEnd ? ' 23:59:59' : ' 00:00:00';
+  } else if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s)) {
+    s += isEnd ? ':59' : ':00';
+  }
+  return s;
+}
+
+/**
  * Lists appointments for a salon with rich filters and history view
  */
-function listAppointments(userId, { staffId = null, status = null, startDate = null, endDate = null, search = null } = {}) {
+function listAppointments(userId, { staffId = null, serviceId = null, status = null, startDate = null, endDate = null, search = null, limit = null, order = null } = {}) {
   let query = `
     SELECT a.id, a.user_id, a.title, a.description, a.start_datetime, a.end_datetime,
            a.service_id, a.staff_id, a.price, a.client_name, a.client_phone,
@@ -1706,22 +1737,28 @@ function listAppointments(userId, { staffId = null, status = null, startDate = n
   `;
   const params = [userId];
 
-  if (staffId) {
+  if (staffId && staffId !== 'ALL' && staffId !== 'TODOS') {
     query += ` AND a.staff_id = ?`;
-    params.push(staffId);
+    params.push(Number(staffId));
   }
 
-  if (status && status !== 'TODOS') {
-    if (status === 'AGENDADO') {
+  if (serviceId && serviceId !== 'ALL' && serviceId !== 'TODOS') {
+    query += ` AND a.service_id = ?`;
+    params.push(Number(serviceId));
+  }
+
+  if (status && status !== 'TODOS' && status !== 'ALL') {
+    const s = String(status).toUpperCase().trim();
+    if (s === 'AGENDADO' || s === 'SCHEDULED') {
       query += ` AND (a.status = 'AGENDADO' OR a.status = 'SCHEDULED')`;
-    } else if (status === 'CONFIRMADO') {
+    } else if (s === 'CONFIRMADO' || s === 'CONFIRMED') {
       query += ` AND (a.status = 'CONFIRMADO' OR a.status = 'CONFIRMED')`;
-    } else if (status === 'CONCLUÍDO') {
-      query += ` AND (a.status = 'CONCLUÍDO' OR a.status = 'COMPLETED' OR a.status = 'DONE')`;
-    } else if (status === 'CANCELADO') {
+    } else if (s === 'CONCLUÍDO' || s === 'CONCLUIDO' || s === 'COMPLETED' || s === 'DONE') {
+      query += ` AND (a.status = 'CONCLUÍDO' OR a.status = 'CONCLUIDO' OR a.status = 'COMPLETED' OR a.status = 'DONE')`;
+    } else if (s === 'CANCELADO' || s === 'CANCELLED') {
       query += ` AND (a.status = 'CANCELADO' OR a.status = 'CANCELLED')`;
-    } else if (status === 'NÃO COMPARECEU') {
-      query += ` AND (a.status = 'NÃO COMPARECEU' OR a.status = 'NO_SHOW')`;
+    } else if (s === 'NÃO COMPARECEU' || s === 'NAO_COMPARECEU' || s === 'NO_SHOW') {
+      query += ` AND (a.status = 'NÃO COMPARECEU' OR a.status = 'NO_SHOW' OR a.status = 'NAO_COMPARECEU')`;
     } else {
       query += ` AND a.status = ?`;
       params.push(status);
@@ -1729,13 +1766,19 @@ function listAppointments(userId, { staffId = null, status = null, startDate = n
   }
 
   if (startDate) {
-    query += ` AND a.start_datetime >= ?`;
-    params.push(`${startDate}T00:00:00`);
+    const normStart = normalizeFilterDate(startDate, false);
+    if (normStart) {
+      query += ` AND replace(a.start_datetime, 'T', ' ') >= ?`;
+      params.push(normStart);
+    }
   }
 
   if (endDate) {
-    query += ` AND a.start_datetime <= ?`;
-    params.push(`${endDate}T23:59:59`);
+    const normEnd = normalizeFilterDate(endDate, true);
+    if (normEnd) {
+      query += ` AND replace(a.start_datetime, 'T', ' ') <= ?`;
+      params.push(normEnd);
+    }
   }
 
   if (search && search.trim()) {
@@ -1744,7 +1787,23 @@ function listAppointments(userId, { staffId = null, status = null, startDate = n
     params.push(cleanSearch, cleanSearch, cleanSearch);
   }
 
-  query += ` ORDER BY a.start_datetime DESC LIMIT 200`;
+  // Ordenação inteligente: período explícito ou order === 'ASC' ordena cronologicamente (ASC); senão DESC
+  let sortDirection = 'DESC';
+  if (order) {
+    sortDirection = String(order).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+  } else if (startDate || endDate) {
+    sortDirection = 'ASC';
+  }
+  query += ` ORDER BY replace(a.start_datetime, 'T', ' ') ${sortDirection}, a.id ${sortDirection}`;
+
+  // Limite configurável parametrizado: default 500 para visualizações de período/calendário; 200 para geral
+  const defaultLimit = (startDate || endDate) ? 500 : 200;
+  const maxAllowedLimit = 1000;
+  const parsedLimit = limit ? Number(limit) : defaultLimit;
+  const effectiveLimit = Math.min(Math.max(1, isNaN(parsedLimit) ? defaultLimit : parsedLimit), maxAllowedLimit);
+
+  query += ` LIMIT ?`;
+  params.push(effectiveLimit);
 
   const rows = db.prepare(query).all(...params);
 
@@ -1819,4 +1878,5 @@ module.exports = {
   detectAndFlagHistoricalConflicts,
   toLocalISOString,
   normalizeDateTime,
+  normalizeFilterDate,
 };

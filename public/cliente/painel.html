@@ -2543,6 +2543,25 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
+              <!-- Controles Temporais (Navegação < Hoje > e Seletor) -->
+              <div class="flex items-center gap-1.5 bg-[#07080c] p-1 rounded-xl border border-white/10 text-xs">
+                <button type="button" id="aptNavPrev" class="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-all cursor-pointer" title="Período anterior">
+                  <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                </button>
+                <button type="button" id="aptNavToday" class="px-2.5 py-1 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white font-semibold transition-all cursor-pointer">
+                  Hoje
+                </button>
+                <button type="button" id="aptNavNext" class="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-all cursor-pointer" title="Próximo período">
+                  <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+                <div class="relative">
+                  <button type="button" id="btnAptJumpDate" class="p-1.5 rounded-lg hover:bg-white/10 text-[#C89B6D] transition-all cursor-pointer" title="Ir para data específica">
+                    <i data-lucide="calendar" class="w-4 h-4"></i>
+                  </button>
+                  <input type="date" id="aptJumpDatePicker" class="absolute inset-0 opacity-0 pointer-events-auto cursor-pointer w-full h-full">
+                </div>
+              </div>
+
               <!-- View Switchers -->
               <div class="flex items-center bg-[#07080c] p-1 rounded-xl border border-white/10 text-xs">
                 <button type="button" data-view="list" class="apt-view-btn active px-3 py-1.5 rounded-lg font-bold bg-[#00F59B]/15 text-[#00F59B]">Lista</button>
@@ -2558,21 +2577,36 @@
             </div>
           </div>
 
-          <!-- Filters Bar: Search, Staff & Statuses -->
+          <!-- Indicador Dinâmico do Período Atual da Agenda -->
+          <div class="flex items-center justify-between bg-[#07080c] px-4 py-2.5 rounded-xl border border-white/5 text-xs">
+            <div class="flex items-center gap-2">
+              <i data-lucide="calendar-range" class="w-4 h-4 text-[#C89B6D]"></i>
+              <span id="aptPeriodTitle" class="font-bold text-white text-sm">Carregando período...</span>
+            </div>
+            <span id="aptPeriodStats" class="text-slate-400 text-xs"></span>
+          </div>
+
+          <!-- Filters Bar: Search, Staff, Service & Statuses -->
           <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 text-xs">
-            <div class="sm:col-span-5 relative">
+            <div class="sm:col-span-4 relative">
               <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-2.5"></i>
               <input type="text" id="aptSearchInput" placeholder="Buscar por cliente ou serviço..."
                 class="w-full pl-9 pr-3.5 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-[#00F59B]">
             </div>
 
-            <div class="sm:col-span-4">
+            <div class="sm:col-span-3">
               <select id="aptStaffFilter" class="w-full px-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
                 <option value="">Todos os profissionais</option>
               </select>
             </div>
 
-            <div class="sm:col-span-3 flex items-center justify-end">
+            <div class="sm:col-span-3">
+              <select id="aptServiceFilter" class="w-full px-3 py-2 rounded-xl bg-[#07080c] border border-white/10 text-white focus:outline-none focus:border-[#00F59B]">
+                <option value="">Todos os serviços</option>
+              </select>
+            </div>
+
+            <div class="sm:col-span-2 flex items-center justify-end">
               <button type="button" id="btnAptRefresh" class="w-full px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 flex items-center justify-center gap-1.5 transition-all">
                 <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
                 <span>Atualizar</span>
@@ -2590,8 +2624,19 @@
             <button type="button" data-status="NÃO COMPARECEU" class="apt-status-pill px-3 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-white/5">Não Compareceu</button>
           </div>
 
-          <!-- Appointments List Container -->
-          <div id="appointmentsList" class="space-y-2.5"></div>
+          <!-- Container Unificado das 4 Visualizações (Lista, Dia, Semana, Mês) -->
+          <div id="appointmentsContainer" class="space-y-4">
+            <!-- 1. View Lista -->
+            <div id="aptListView" class="space-y-2.5">
+              <div id="appointmentsList" class="space-y-2.5"></div>
+            </div>
+            <!-- 2. View Dia (Timeline Horária) -->
+            <div id="aptDayView" class="hidden space-y-3"></div>
+            <!-- 3. View Semana (Grid de 7 Dias) -->
+            <div id="aptWeekView" class="hidden space-y-3"></div>
+            <!-- 4. View Mês (Grid Calendário 7x5) -->
+            <div id="aptMonthView" class="hidden space-y-3"></div>
+          </div>
         </div>
 
         <!-- MODAL: NOVO AGENDAMENTO COM VALIDAÇÃO DE CONFLITO E SUGESTÃO -->
@@ -4320,6 +4365,44 @@
     </div>
 
 
+    <!-- MODAL DE DETALHES DO ATENDIMENTO (ABRE AO CLICAR EM COMPROMISSO NO CALENDÁRIO) -->
+    <div id="modalAppointmentDetails" class="raia-modal-overlay fixed inset-0 z-[99999] hidden items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="modalAptDetailsTitle">
+      <div class="raia-modal-card bg-[#FFFDFB] border border-[#E6D6CA] rounded-2xl md:rounded-3xl w-full max-w-md p-5 sm:p-6 space-y-4 text-xs shadow-2xl shadow-[#4E3B31]/10 text-[#4E3B31] my-auto">
+        <div class="flex items-center justify-between border-b border-[#E6D6CA] pb-3.5">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-[#F3E6DB] text-[#AD7B42] flex items-center justify-center shrink-0 border border-[#E6D6CA]">
+              <i data-lucide="calendar" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 id="modalAptDetailsTitle" class="text-sm sm:text-base font-bold text-[#4E3B31]">Detalhes do Atendimento</h3>
+              <div id="aptDetailsStatusBadge" class="mt-0.5"></div>
+            </div>
+          </div>
+          <button type="button" id="btnCloseAptDetailsModal" class="p-1.5 rounded-xl text-[#7A6255] hover:text-[#4E3B31] hover:bg-[#F3E6DB] border border-transparent hover:border-[#E6D6CA] transition-colors" aria-label="Fechar">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div id="aptDetailsContent" class="space-y-3"></div>
+
+        <div class="flex flex-wrap items-center justify-end gap-2 pt-3 border-t border-[#E6D6CA]">
+          <button type="button" id="btnAptDetailsReschedule" class="px-3.5 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200 transition-all flex items-center gap-1.5">
+            <i data-lucide="calendar-clock" class="w-3.5 h-3.5"></i>
+            <span>Remarcar</span>
+          </button>
+          <button type="button" id="btnAptDetailsStatus" class="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold border border-emerald-200 transition-all flex items-center gap-1.5">
+            <i data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+            <span>Alterar Status</span>
+          </button>
+          <button type="button" id="btnAptDetailsCancel" class="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold border border-rose-200 transition-all flex items-center gap-1.5">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            <span>Cancelar</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+
     <!-- 8. MODAL CONFLITOS HISTÓRICOS -->
     <div id="modalHistoricalConflicts" class="raia-modal-overlay fixed inset-0 z-[99999] hidden items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="modalHistoricalConflictsTitle">
       <div class="raia-modal-card bg-[#FFFDFB] border border-[#E6D6CA] rounded-2xl md:rounded-3xl w-full max-w-2xl p-5 sm:p-6 space-y-4 text-xs shadow-2xl shadow-[#4E3B31]/10 text-[#4E3B31] max-h-[85vh] overflow-y-auto my-auto">
@@ -5409,7 +5492,10 @@
       else if (tabId === 'profile-security') populateProfileTab();
       else if (tabId === 'services') loadServices();
       else if (tabId === 'staff') loadStaff();
-      else if (tabId === 'appointments') loadAppointments();
+      else if (tabId === 'appointments') {
+        populateAgendaFilters();
+        loadAppointments();
+      }
       else if (tabId === 'integrations-google') loadGoogleCalendarSettings();
       else if (tabId === 'integrations-whatsapp') {
         loadWhatsAppNotificationSettings();
@@ -7997,13 +8083,458 @@
     // ========================================================
     let appointmentsState = {
       view: 'list',
+      currentDate: new Date(),
       status: 'TODOS',
       staffId: '',
+      serviceId: '',
       search: '',
       appointments: [],
       conflicts: [],
       isGoogleConnected: false,
     };
+
+    function formatLocalDateISO(d) {
+      if (!d || !(d instanceof Date) || isNaN(d.getTime())) d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+
+    function addDaysToDate(d, n) {
+      const res = new Date(d);
+      res.setDate(res.getDate() + n);
+      return res;
+    }
+
+    function getWeekDaysArray(anchorDate) {
+      const d = new Date(anchorDate);
+      const dayOfWeek = d.getDay();
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(d);
+      monday.setDate(d.getDate() + diffToMonday);
+      monday.setHours(0, 0, 0, 0);
+
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const current = new Date(monday);
+        current.setDate(monday.getDate() + i);
+        days.push(current);
+      }
+      return days;
+    }
+
+    const PT_MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const PT_MONTHS_SHORT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const PT_WEEKDAYS = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    const PT_WEEKDAYS_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+    function updateAppointmentPeriodDisplay() {
+      const titleEl = document.getElementById('aptPeriodTitle');
+      const statsEl = document.getElementById('aptPeriodStats');
+      if (!titleEl) return;
+
+      const d = appointmentsState.currentDate || new Date();
+      const view = appointmentsState.view || 'list';
+
+      if (view === 'day') {
+        const weekday = PT_WEEKDAYS[d.getDay()];
+        titleEl.innerText = `${weekday}, ${d.getDate()} de ${PT_MONTHS[d.getMonth()]} de ${d.getFullYear()}`;
+      } else if (view === 'week') {
+        const weekDays = getWeekDaysArray(d);
+        const first = weekDays[0];
+        const last = weekDays[6];
+        if (first.getMonth() === last.getMonth()) {
+          titleEl.innerText = `${first.getDate()} a ${last.getDate()} de ${PT_MONTHS_SHORT[first.getMonth()]} de ${first.getFullYear()}`;
+        } else {
+          titleEl.innerText = `${first.getDate()} de ${PT_MONTHS_SHORT[first.getMonth()]} a ${last.getDate()} de ${PT_MONTHS_SHORT[last.getMonth()]} de ${last.getFullYear()}`;
+        }
+      } else if (view === 'month') {
+        titleEl.innerText = `${PT_MONTHS[d.getMonth()]} de ${d.getFullYear()}`;
+      } else {
+        titleEl.innerText = 'Histórico Geral de Atendimentos';
+      }
+
+      if (statsEl) {
+        const count = appointmentsState.appointments ? appointmentsState.appointments.length : 0;
+        statsEl.innerText = `${count} ${count === 1 ? 'atendimento' : 'atendimentos'}`;
+      }
+    }
+
+    function updateViewSwitcherButtons() {
+      document.querySelectorAll('.apt-view-btn').forEach(b => {
+        const isCurrent = b.dataset.view === appointmentsState.view;
+        b.className = `apt-view-btn px-3 py-1.5 rounded-lg transition-all ${
+          isCurrent
+            ? 'active font-bold bg-[#00F59B]/15 text-[#00F59B]'
+            : 'text-slate-400 hover:text-white'
+        }`;
+      });
+    }
+
+    let currentDetailsAppointment = null;
+
+    function openAppointmentDetailsModal(apt) {
+      if (!apt) return;
+      currentDetailsAppointment = apt;
+
+      const parsedStart = parseAppointmentDateTime(apt.start_datetime);
+
+      const statusBadgeContainer = document.getElementById('aptDetailsStatusBadge');
+      if (statusBadgeContainer) {
+        statusBadgeContainer.innerHTML = getStatusBadgeHtml(apt.status);
+      }
+
+      const content = document.getElementById('aptDetailsContent');
+      if (content) {
+        content.innerHTML = `
+          <div class="p-3.5 rounded-xl bg-[#F7EFE7] border border-[#E6D6CA] space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 font-semibold">Cliente:</span>
+              <strong class="text-[#4E3B31] text-sm">${escapeHtml(apt.client_name)}</strong>
+            </div>
+            ${apt.client_phone ? `
+              <div class="flex items-center justify-between">
+                <span class="text-slate-500 font-semibold">Telefone:</span>
+                <span class="text-[#4E3B31]">${escapeHtml(apt.client_phone)}</span>
+              </div>
+            ` : ''}
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 font-semibold">Serviço:</span>
+              <strong class="text-[#4E3B31]">${escapeHtml(apt.service_name)}</strong>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 font-semibold">Profissional:</span>
+              <span class="text-[#4E3B31]">${escapeHtml(apt.staff_name)}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 font-semibold">Data e Horário:</span>
+              <span class="text-[#4E3B31] font-bold">${parsedStart.displayDate} às ${parsedStart.displayTime} (${apt.duration_formatted})</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 font-semibold">Valor do Procedimento:</span>
+              <span class="text-emerald-700 font-extrabold text-sm">${apt.price_formatted}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-slate-500 font-semibold">Origem:</span>
+              <span class="text-slate-600">${apt.origin === 'whatsapp' || apt.origin === 'whatsapp_bot' ? 'WhatsApp' : 'Painel'}</span>
+            </div>
+          </div>
+        `;
+      }
+
+      RaiaModalManager.open('modalAppointmentDetails');
+      safeLucideCreateIcons();
+    }
+
+    function closeAppointmentDetailsModal() {
+      RaiaModalManager.close('modalAppointmentDetails');
+      currentDetailsAppointment = null;
+    }
+
+    function openNewAppointmentWithSlot(dateStr, timeStr, staffId = null) {
+      const aptDate = document.getElementById('aptDate');
+      const aptDateDisplay = document.getElementById('aptDateDisplay');
+      const aptDatePicker = document.getElementById('aptDatePicker');
+      const aptTime = document.getElementById('aptTime');
+      const aptTimeInput = document.getElementById('aptTimeInput');
+      const aptStaff = document.getElementById('aptStaffSelect');
+
+      if (aptDate) aptDate.value = dateStr;
+      if (aptDatePicker) aptDatePicker.value = dateStr;
+      if (aptDateDisplay) aptDateDisplay.value = isoToBRDate(dateStr);
+      if (aptTime) aptTime.value = timeStr;
+      if (aptTimeInput) aptTimeInput.value = timeStr;
+      if (staffId && aptStaff) aptStaff.value = staffId;
+
+      if (typeof checkNewAppointmentSlot === 'function') checkNewAppointmentSlot();
+      if (typeof validateAppointmentFormCompletion === 'function') validateAppointmentFormCompletion();
+
+      RaiaModalManager.open('modalNewAppointment');
+      safeLucideCreateIcons();
+    }
+
+    function renderDayTimeline(appointments, targetDate) {
+      const container = document.getElementById('aptDayView');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const targetIso = formatLocalDateISO(targetDate);
+      const isToday = targetIso === formatLocalDateISO(new Date());
+
+      const header = document.createElement('div');
+      header.className = 'flex items-center justify-between p-3.5 rounded-xl bg-[#07080c] border border-white/5 text-xs';
+      header.innerHTML = `
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-white text-sm">${PT_WEEKDAYS[targetDate.getDay()]}, ${targetDate.getDate()} de ${PT_MONTHS[targetDate.getMonth()]}</span>
+          ${isToday ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#C89B6D]/20 text-[#C89B6D] border border-[#C89B6D]/30">Hoje</span>' : ''}
+        </div>
+        <button type="button" class="btn-quick-book px-3 py-1.5 rounded-lg bg-[#00F59B] text-black font-bold text-xs hover:brightness-110 flex items-center gap-1.5 cursor-pointer" data-date="${targetIso}" data-time="09:00">
+          <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+          <span>Agendar neste dia</span>
+        </button>
+      `;
+      container.appendChild(header);
+
+      const timelineWrapper = document.createElement('div');
+      timelineWrapper.className = 'space-y-2';
+
+      for (let h = 8; h <= 19; h++) {
+        const hourStr = String(h).padStart(2, '0') + ':00';
+
+        const aptsInHour = (appointments || []).filter(a => {
+          const parsed = parseAppointmentDateTime(a.start_datetime);
+          if (!parsed.timePart) return false;
+          const aHour = parseInt(parsed.timePart.split(':')[0], 10);
+          return aHour === h;
+        });
+
+        const hourRow = document.createElement('div');
+        hourRow.className = 'flex flex-col sm:flex-row sm:items-start gap-3 p-3 rounded-xl bg-[#07080c] border border-white/5 hover:border-white/10 transition-all';
+
+        const timeCol = document.createElement('div');
+        timeCol.className = 'w-16 shrink-0 font-bold text-slate-400 text-xs flex items-center gap-1 pt-1';
+        timeCol.innerHTML = `<i data-lucide="clock" class="w-3.5 h-3.5 text-[#C89B6D]"></i><span>${hourStr}</span>`;
+        hourRow.appendChild(timeCol);
+
+        const contentCol = document.createElement('div');
+        contentCol.className = 'flex-1 min-w-0 space-y-2';
+
+        if (aptsInHour.length === 0) {
+          contentCol.innerHTML = `
+            <div class="flex items-center justify-between py-1.5 px-3 rounded-lg border border-dashed border-white/10 hover:border-white/20 transition-all cursor-pointer group btn-quick-book" data-date="${targetIso}" data-time="${hourStr}">
+              <span class="text-slate-500 text-xs group-hover:text-slate-400">Horário livre</span>
+              <span class="text-[11px] text-[#00F59B] opacity-0 group-hover:opacity-100 font-semibold flex items-center gap-1 transition-opacity">
+                <i data-lucide="plus-circle" class="w-3 h-3"></i> Agendar
+              </span>
+            </div>
+          `;
+        } else {
+          aptsInHour.forEach(apt => {
+            const parsedStart = parseAppointmentDateTime(apt.start_datetime);
+            const card = document.createElement('div');
+            card.className = 'p-3 rounded-xl bg-[#11131a] border border-white/10 hover:border-[#C89B6D]/50 transition-all cursor-pointer space-y-1.5';
+            card.innerHTML = `
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="font-bold text-white text-xs">${escapeHtml(apt.client_name)}</span>
+                  <span class="text-slate-400 font-semibold">• ${escapeHtml(apt.service_name)}</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  ${getStatusBadgeHtml(apt.status)}
+                  <span class="font-bold text-emerald-400 text-xs">${apt.price_formatted}</span>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
+                <span>Horário: <strong class="text-slate-200">${parsedStart.displayTime}</strong> (${apt.duration_formatted})</span>
+                <span>Profissional: <strong class="text-slate-200">${escapeHtml(apt.staff_name)}</strong></span>
+              </div>
+            `;
+            card.addEventListener('click', () => openAppointmentDetailsModal(apt));
+            contentCol.appendChild(card);
+          });
+        }
+
+        hourRow.appendChild(contentCol);
+        timelineWrapper.appendChild(hourRow);
+      }
+
+      container.appendChild(timelineWrapper);
+
+      container.querySelectorAll('.btn-quick-book').forEach(el => {
+        el.addEventListener('click', () => {
+          const dt = el.dataset.date || targetIso;
+          const tm = el.dataset.time || '09:00';
+          openNewAppointmentWithSlot(dt, tm);
+        });
+      });
+
+      safeLucideCreateIcons();
+    }
+
+    function renderWeekGrid(appointments, anchorDate) {
+      const container = document.getElementById('aptWeekView');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const weekDays = getWeekDaysArray(anchorDate);
+      const todayIso = formatLocalDateISO(new Date());
+
+      const grid = document.createElement('div');
+      grid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-xs overflow-x-auto';
+
+      weekDays.forEach(dayDate => {
+        const dayIso = formatLocalDateISO(dayDate);
+        const isToday = dayIso === todayIso;
+
+        const dayApts = (appointments || []).filter(a => {
+          const parsed = parseAppointmentDateTime(a.start_datetime);
+          return parsed.datePart === dayIso;
+        });
+
+        const col = document.createElement('div');
+        col.className = `p-3 rounded-2xl bg-[#07080c] border ${isToday ? 'border-[#C89B6D] ring-1 ring-[#C89B6D]/30' : 'border-white/10'} flex flex-col justify-between min-h-[260px] space-y-3`;
+
+        const colHeader = document.createElement('div');
+        colHeader.className = 'border-b border-white/5 pb-2 flex items-center justify-between';
+        colHeader.innerHTML = `
+          <div>
+            <div class="font-bold ${isToday ? 'text-[#C89B6D]' : 'text-slate-400'} text-xs">${PT_WEEKDAYS_SHORT[dayDate.getDay()]}</div>
+            <div class="text-sm font-extrabold text-white">${dayDate.getDate()} ${PT_MONTHS_SHORT[dayDate.getMonth()]}</div>
+          </div>
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${dayApts.length > 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-white/5 text-slate-500'}">
+            ${dayApts.length}
+          </span>
+        `;
+        col.appendChild(colHeader);
+
+        const aptsList = document.createElement('div');
+        aptsList.className = 'space-y-2 flex-1';
+
+        if (dayApts.length === 0) {
+          aptsList.innerHTML = '<div class="py-6 text-center text-slate-600 text-[11px]">Nenhum atendimento</div>';
+        } else {
+          dayApts.forEach(apt => {
+            const parsed = parseAppointmentDateTime(apt.start_datetime);
+            const item = document.createElement('div');
+            item.className = 'p-2 rounded-xl bg-[#11131a] border border-white/5 hover:border-white/20 transition-all cursor-pointer space-y-1';
+            item.innerHTML = `
+              <div class="flex items-center justify-between gap-1">
+                <span class="font-bold text-white text-[11px] truncate">${escapeHtml(apt.client_name)}</span>
+                <span class="text-[10px] font-semibold text-[#C89B6D]">${parsed.displayTime}</span>
+              </div>
+              <div class="text-slate-400 text-[10px] truncate">${escapeHtml(apt.service_name)}</div>
+              <div class="flex items-center justify-between text-[9px] pt-1 border-t border-white/5">
+                <span class="text-slate-500 truncate">${escapeHtml(apt.staff_name)}</span>
+                ${getStatusBadgeHtml(apt.status)}
+              </div>
+            `;
+            item.addEventListener('click', () => openAppointmentDetailsModal(apt));
+            aptsList.appendChild(item);
+          });
+        }
+        col.appendChild(aptsList);
+
+        const colFooter = document.createElement('button');
+        colFooter.type = 'button';
+        colFooter.className = 'w-full py-1.5 rounded-lg border border-dashed border-white/10 hover:border-white/20 text-slate-400 hover:text-white text-[11px] font-semibold transition-all flex items-center justify-center gap-1 cursor-pointer';
+        colFooter.innerHTML = '<i data-lucide="plus" class="w-3 h-3"></i><span>Agendar</span>';
+        colFooter.addEventListener('click', () => openNewAppointmentWithSlot(dayIso, '09:00'));
+        col.appendChild(colFooter);
+
+        grid.appendChild(col);
+      });
+
+      container.appendChild(grid);
+      safeLucideCreateIcons();
+    }
+
+    function renderMonthGrid(appointments, anchorDate) {
+      const container = document.getElementById('aptMonthView');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const year = anchorDate.getFullYear();
+      const month = anchorDate.getMonth();
+      const firstDayOfMonth = new Date(year, month, 1);
+      const lastDayOfMonth = new Date(year, month + 1, 0);
+      const todayIso = formatLocalDateISO(new Date());
+
+      const startDayOfWeek = firstDayOfMonth.getDay();
+      const totalDaysInMonth = lastDayOfMonth.getDate();
+
+      const calendarCard = document.createElement('div');
+      calendarCard.className = 'p-4 rounded-2xl bg-[#07080c] border border-white/10 space-y-3';
+
+      const weekHeader = document.createElement('div');
+      weekHeader.className = 'grid grid-cols-7 gap-1 text-center font-bold text-slate-400 text-xs pb-2 border-b border-white/5';
+      PT_WEEKDAYS_SHORT.forEach(wd => {
+        const th = document.createElement('div');
+        th.innerText = wd;
+        weekHeader.appendChild(th);
+      });
+      calendarCard.appendChild(weekHeader);
+
+      const daysGrid = document.createElement('div');
+      daysGrid.className = 'grid grid-cols-7 gap-1.5 text-xs';
+
+      for (let i = 0; i < startDayOfWeek; i++) {
+        const emptyCell = document.createElement('div');
+        emptyCell.className = 'min-h-[70px] sm:min-h-[90px] p-1 rounded-xl bg-white/[0.01] border border-transparent opacity-20';
+        daysGrid.appendChild(emptyCell);
+      }
+
+      for (let day = 1; day <= totalDaysInMonth; day++) {
+        const currentDayDate = new Date(year, month, day);
+        const dayIso = formatLocalDateISO(currentDayDate);
+        const isToday = dayIso === todayIso;
+
+        const dayApts = (appointments || []).filter(a => {
+          const parsed = parseAppointmentDateTime(a.start_datetime);
+          return parsed.datePart === dayIso;
+        });
+
+        const dayCell = document.createElement('div');
+        dayCell.className = `min-h-[70px] sm:min-h-[90px] p-1.5 rounded-xl border flex flex-col justify-between transition-all ${
+          isToday
+            ? 'bg-[#C89B6D]/10 border-[#C89B6D] ring-1 ring-[#C89B6D]/30'
+            : 'bg-[#11131a] border-white/5 hover:border-white/20'
+        }`;
+
+        const cellHeader = document.createElement('div');
+        cellHeader.className = 'flex items-center justify-between';
+        cellHeader.innerHTML = `
+          <span class="font-extrabold ${isToday ? 'text-[#C89B6D]' : 'text-slate-300'} text-xs">${day}</span>
+          ${dayApts.length > 0 ? `<span class="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${dayApts.length}</span>` : ''}
+        `;
+        dayCell.appendChild(cellHeader);
+
+        const pillsContainer = document.createElement('div');
+        pillsContainer.className = 'space-y-1 my-1 overflow-hidden';
+
+        const visibleApts = dayApts.slice(0, 2);
+        visibleApts.forEach(apt => {
+          const parsed = parseAppointmentDateTime(apt.start_datetime);
+          const pill = document.createElement('div');
+          pill.className = 'p-1 rounded text-[10px] bg-[#07080c] border border-white/10 hover:border-white/30 truncate cursor-pointer text-slate-300 hover:text-white flex items-center justify-between gap-1';
+          pill.innerHTML = `
+            <span class="font-semibold text-[#C89B6D] shrink-0">${parsed.displayTime}</span>
+            <span class="truncate">${escapeHtml(apt.client_name)}</span>
+          `;
+          pill.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openAppointmentDetailsModal(apt);
+          });
+          pillsContainer.appendChild(pill);
+        });
+
+        if (dayApts.length > 2) {
+          const morePill = document.createElement('div');
+          morePill.className = 'text-[9px] text-slate-400 font-semibold text-center cursor-pointer hover:text-white';
+          morePill.innerText = `+${dayApts.length - 2} mais`;
+          pillsContainer.appendChild(morePill);
+        }
+
+        dayCell.appendChild(pillsContainer);
+
+        dayCell.addEventListener('click', () => {
+          if (dayApts.length > 0 && window.innerWidth < 640) {
+            appointmentsState.currentDate = currentDayDate;
+            appointmentsState.view = 'day';
+            updateViewSwitcherButtons();
+            loadAppointments();
+          } else {
+            openNewAppointmentWithSlot(dayIso, '09:00');
+          }
+        });
+
+        daysGrid.appendChild(dayCell);
+      }
+
+      calendarCard.appendChild(daysGrid);
+      container.appendChild(calendarCard);
+      safeLucideCreateIcons();
+    }
 
     function getStatusBadgeHtml(status) {
       const s = String(status || 'AGENDADO').toUpperCase();
@@ -8147,6 +8678,19 @@
     }
 
     async function loadAppointments() {
+      updateAppointmentPeriodDisplay();
+      updateViewSwitcherButtons();
+
+      const listContainer = document.getElementById('aptListView');
+      const dayContainer = document.getElementById('aptDayView');
+      const weekContainer = document.getElementById('aptWeekView');
+      const monthContainer = document.getElementById('aptMonthView');
+
+      if (listContainer) listContainer.classList.toggle('hidden', appointmentsState.view !== 'list');
+      if (dayContainer) dayContainer.classList.toggle('hidden', appointmentsState.view !== 'day');
+      if (weekContainer) weekContainer.classList.toggle('hidden', appointmentsState.view !== 'week');
+      if (monthContainer) monthContainer.classList.toggle('hidden', appointmentsState.view !== 'month');
+
       const list = document.getElementById('appointmentsList');
       function renderAppointmentList(appointments) {
         if (!list) return;
@@ -8269,8 +8813,34 @@
       try {
         const params = new URLSearchParams();
         if (appointmentsState.staffId) params.append('staff_id', appointmentsState.staffId);
+        if (appointmentsState.serviceId) params.append('service_id', appointmentsState.serviceId);
         if (appointmentsState.status && appointmentsState.status !== 'TODOS') params.append('status', appointmentsState.status);
         if (appointmentsState.search) params.append('search', appointmentsState.search);
+
+        const d = appointmentsState.currentDate || new Date();
+        if (appointmentsState.view === 'day') {
+          const iso = formatLocalDateISO(d);
+          params.append('start_date', iso);
+          params.append('end_date', iso);
+          params.append('order', 'ASC');
+          params.append('limit', '500');
+        } else if (appointmentsState.view === 'week') {
+          const weekDays = getWeekDaysArray(d);
+          params.append('start_date', formatLocalDateISO(weekDays[0]));
+          params.append('end_date', formatLocalDateISO(weekDays[6]));
+          params.append('order', 'ASC');
+          params.append('limit', '500');
+        } else if (appointmentsState.view === 'month') {
+          const first = new Date(d.getFullYear(), d.getMonth(), 1);
+          const last = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+          params.append('start_date', formatLocalDateISO(first));
+          params.append('end_date', formatLocalDateISO(last));
+          params.append('order', 'ASC');
+          params.append('limit', '500');
+        } else {
+          params.append('order', 'DESC');
+          params.append('limit', '200');
+        }
 
         const [aptRes, conflictRes] = await Promise.all([
           fetch(`/api/cliente/appointments?${params.toString()}`),
@@ -8284,6 +8854,8 @@
           appointmentsState.isGoogleConnected = data.isGoogleConnected;
         }
 
+        appointmentsState.appointments = data.appointments || [];
+
         // 1. Atualizar Banner de Conflitos Históricos
         const banner = document.getElementById('historicalConflictsBanner');
         if (conflictData.success && conflictData.flaggedCount > 0) {
@@ -8294,8 +8866,17 @@
           appointmentsState.conflicts = [];
         }
 
-        // 2. Renderizar Lista de Agendamentos
-        renderAppointmentList(data.appointments || []);
+        // 2. Renderizar Visualização Selecionada
+        if (appointmentsState.view === 'day') {
+          renderDayTimeline(appointmentsState.appointments, appointmentsState.currentDate);
+        } else if (appointmentsState.view === 'week') {
+          renderWeekGrid(appointmentsState.appointments, appointmentsState.currentDate);
+        } else if (appointmentsState.view === 'month') {
+          renderMonthGrid(appointmentsState.appointments, appointmentsState.currentDate);
+        } else {
+          renderAppointmentList(appointmentsState.appointments);
+        }
+        updateAppointmentPeriodDisplay();
       } catch (e) {
         // Suporte a preview offline/sandbox sem backend ativo
         const isOffline = window.location.protocol === 'file:' || (window.location.search && window.location.search.includes('demo=1'));
@@ -10033,7 +10614,7 @@
       }
     });
 
-    // Filtros da Agenda
+    // Filtros e Controles da Agenda
     document.getElementById('aptSearchInput')?.addEventListener('input', (e) => {
       appointmentsState.search = e.target.value;
       loadAppointments();
@@ -10044,9 +10625,76 @@
       loadAppointments();
     });
 
+    document.getElementById('aptServiceFilter')?.addEventListener('change', (e) => {
+      appointmentsState.serviceId = e.target.value;
+      loadAppointments();
+    });
+
     document.getElementById('btnAptRefresh')?.addEventListener('click', () => {
+      populateAgendaFilters();
       loadAppointments();
       showToast('Agenda atualizada.');
+    });
+
+    // Navegação Temporal
+    document.getElementById('aptNavPrev')?.addEventListener('click', () => {
+      const d = appointmentsState.currentDate || new Date();
+      if (appointmentsState.view === 'day') {
+        appointmentsState.currentDate = addDaysToDate(d, -1);
+      } else if (appointmentsState.view === 'week') {
+        appointmentsState.currentDate = addDaysToDate(d, -7);
+      } else if (appointmentsState.view === 'month') {
+        const prevMonth = new Date(d);
+        prevMonth.setMonth(prevMonth.getMonth() - 1);
+        appointmentsState.currentDate = prevMonth;
+      } else {
+        const prevMonth = new Date(d);
+        prevMonth.setMonth(prevMonth.getMonth() - 1);
+        appointmentsState.currentDate = prevMonth;
+      }
+      loadAppointments();
+    });
+
+    document.getElementById('aptNavNext')?.addEventListener('click', () => {
+      const d = appointmentsState.currentDate || new Date();
+      if (appointmentsState.view === 'day') {
+        appointmentsState.currentDate = addDaysToDate(d, 1);
+      } else if (appointmentsState.view === 'week') {
+        appointmentsState.currentDate = addDaysToDate(d, 7);
+      } else if (appointmentsState.view === 'month') {
+        const nextMonth = new Date(d);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        appointmentsState.currentDate = nextMonth;
+      } else {
+        const nextMonth = new Date(d);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        appointmentsState.currentDate = nextMonth;
+      }
+      loadAppointments();
+    });
+
+    document.getElementById('aptNavToday')?.addEventListener('click', () => {
+      appointmentsState.currentDate = new Date();
+      loadAppointments();
+    });
+
+    document.getElementById('btnAptJumpDate')?.addEventListener('click', () => {
+      const picker = document.getElementById('aptJumpDatePicker');
+      if (picker) {
+        if (typeof picker.showPicker === 'function') {
+          picker.showPicker();
+        } else {
+          picker.focus();
+          picker.click();
+        }
+      }
+    });
+
+    document.getElementById('aptJumpDatePicker')?.addEventListener('change', (e) => {
+      if (e.target.value) {
+        appointmentsState.currentDate = new Date(e.target.value + 'T12:00:00');
+        loadAppointments();
+      }
     });
 
     document.querySelectorAll('.apt-status-pill').forEach(btn => {
@@ -10062,13 +10710,74 @@
 
     document.querySelectorAll('.apt-view-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.apt-view-btn').forEach(b => {
-          b.className = 'apt-view-btn px-3 py-1.5 rounded-lg text-slate-400 hover:text-white';
-        });
-        btn.className = 'apt-view-btn active px-3 py-1.5 rounded-lg font-bold bg-[#00F59B]/15 text-[#00F59B]';
         appointmentsState.view = btn.dataset.view;
+        updateViewSwitcherButtons();
         loadAppointments();
       });
+    });
+
+    // Ações do Modal de Detalhes
+    document.getElementById('btnCloseAptDetailsModal')?.addEventListener('click', closeAppointmentDetailsModal);
+
+    document.getElementById('btnAptDetailsReschedule')?.addEventListener('click', () => {
+      const apt = currentDetailsAppointment;
+      closeAppointmentDetailsModal();
+      if (!apt) return;
+
+      const parsedDt = parseAppointmentDateTime(apt.start_datetime);
+      document.getElementById('rescheduleAptId').value = apt.id;
+      document.getElementById('rescheduleAptInfo').innerHTML = `
+        <strong>${escapeHtml(apt.client_name)}</strong> • ${escapeHtml(apt.service_name)} (${escapeHtml(apt.duration_formatted || '')})<br>
+        <span class="text-[#7A6255]">Horário Atual: ${parsedDt.displayFull} • ${escapeHtml(apt.staff_name)}</span>
+      `;
+
+      const rescheduleDateDisplay = document.getElementById('rescheduleDateDisplay');
+      const rescheduleDatePicker = document.getElementById('rescheduleDatePicker');
+      const rescheduleDate = document.getElementById('rescheduleDate');
+      if (rescheduleDateDisplay) rescheduleDateDisplay.value = isoToBRDate(parsedDt.datePart);
+      if (rescheduleDatePicker) rescheduleDatePicker.value = parsedDt.datePart;
+      if (rescheduleDate) rescheduleDate.value = parsedDt.datePart;
+
+      const rescheduleTimeInput = document.getElementById('rescheduleTimeInput');
+      const rescheduleTime = document.getElementById('rescheduleTime');
+      if (rescheduleTimeInput) rescheduleTimeInput.value = parsedDt.timePart;
+      if (rescheduleTime) rescheduleTime.value = parsedDt.timePart;
+
+      populateStaffSelect(document.getElementById('rescheduleStaffSelect'), apt.staff_id);
+      if (typeof fetchRescheduleSlots === 'function') fetchRescheduleSlots(apt.service_id);
+      if (typeof validateRescheduleFormCompletion === 'function') validateRescheduleFormCompletion();
+
+      RaiaModalManager.open('modalRescheduleAppointment');
+      safeLucideCreateIcons();
+    });
+
+    document.getElementById('btnAptDetailsStatus')?.addEventListener('click', () => {
+      const apt = currentDetailsAppointment;
+      closeAppointmentDetailsModal();
+      if (!apt) return;
+
+      document.getElementById('statusAptId').value = apt.id;
+      document.getElementById('statusAptInfo').innerHTML = `
+        <strong>${escapeHtml(apt.client_name)}</strong> • ${escapeHtml(apt.service_name)}<br>
+        <span class="text-[#7A6255]">Status Atual: ${escapeHtml(apt.status)}</span>
+      `;
+      document.getElementById('statusTargetSelect').value = apt.status;
+      RaiaModalManager.open('modalStatusAppointment');
+      safeLucideCreateIcons();
+    });
+
+    document.getElementById('btnAptDetailsCancel')?.addEventListener('click', () => {
+      const apt = currentDetailsAppointment;
+      closeAppointmentDetailsModal();
+      if (!apt) return;
+
+      document.getElementById('cancelAptId').value = apt.id;
+      document.getElementById('cancelAptInfo').innerHTML = `
+        <strong>${escapeHtml(apt.client_name)}</strong> • ${escapeHtml(apt.service_name)}<br>
+        <span class="text-[#7A6255]">Horário: ${escapeHtml(apt.start_datetime)}</span>
+      `;
+      RaiaModalManager.open('modalCancelAppointment');
+      safeLucideCreateIcons();
     });
 
     // ========================================================
