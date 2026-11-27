@@ -477,8 +477,17 @@
       overflow-x: hidden !important;
       max-width: 100vw !important;
     }
-    body.theme-jessica-beauty div.md\:hidden {
+    body.theme-jessica-beauty #institutionalMobileTopBar {
       display: none !important;
+    }
+    /* Mobile Sidebar & Backdrop Overlay Support */
+    #sidebarOverlay {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    #sidebarOverlay.active {
+      display: block !important;
+      pointer-events: auto !important;
     }
     body.theme-jessica-beauty div.p-6.md\:p-8 {
       padding: 16px 20px !important;
@@ -1591,7 +1600,7 @@
   <div id="sidebarOverlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-xs z-[55] opacity-0 transition-opacity duration-300 md:hidden pointer-events-none" aria-hidden="true"></div>
 
   <!-- Mobile Top Bar -->
-  <div class="md:hidden bg-[#11131a] border-b border-white/10 p-4 flex items-center justify-between sticky top-0 z-40">
+  <div id="institutionalMobileTopBar" class="md:hidden bg-[#11131a] border-b border-white/10 p-4 flex items-center justify-between sticky top-0 z-40">
     <div class="flex items-center gap-2.5">
       <img src="/raia-emblem-small.png" alt="RAIA" class="w-7 h-7 object-contain">
       <span class="font-extrabold text-white text-sm">RAIA AGENTES</span>
@@ -5464,6 +5473,7 @@
       sb.classList.remove('-translate-x-full');
       if (overlay) {
         overlay.classList.remove('hidden', 'pointer-events-none');
+        overlay.classList.add('active', 'pointer-events-auto');
         requestAnimationFrame(() => {
           overlay.classList.remove('opacity-0');
           overlay.classList.add('opacity-100');
@@ -5477,7 +5487,7 @@
       if (!sb) return;
       sb.classList.add('-translate-x-full');
       if (overlay) {
-        overlay.classList.remove('opacity-100');
+        overlay.classList.remove('opacity-100', 'active', 'pointer-events-auto');
         overlay.classList.add('opacity-0', 'pointer-events-none');
         setTimeout(() => {
           if (sb && sb.classList.contains('-translate-x-full')) {
@@ -5497,23 +5507,66 @@
       }
     }
 
-    document.getElementById('mobileMenuBtn')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleMobileSidebar();
+    // Handlers para botões de menu hambúrguer (Central e Jéssica Beauty)
+    ['mobileMenuBtn', 'mobileMenuBtnBeauty'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) {
+        const handleToggleMenu = (e) => {
+          if (e && e.cancelable) e.preventDefault();
+          if (e) e.stopPropagation();
+          toggleMobileSidebar();
+        };
+        btn.addEventListener('click', handleToggleMenu);
+        btn.addEventListener('touchstart', handleToggleMenu, { passive: false });
+      }
     });
-    document.getElementById('mobileMenuBtnBeauty')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      toggleMobileSidebar();
-    });
-    document.getElementById('closeSidebarBtn')?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      closeMobileSidebar();
-    });
+
+    // Handler para botão explícito fechar (X) no cabeçalho mobile do menu
+    const closeSidebarBtnEl = document.getElementById('closeSidebarBtn');
+    if (closeSidebarBtnEl) {
+      const handleCloseBtn = (e) => {
+        if (e && e.cancelable) e.preventDefault();
+        if (e) e.stopPropagation();
+        closeMobileSidebar();
+      };
+      closeSidebarBtnEl.addEventListener('click', handleCloseBtn);
+      closeSidebarBtnEl.addEventListener('touchstart', handleCloseBtn, { passive: false });
+    }
+
+    // Handler para toque/clique no overlay (fora do menu) com prevenção de ghost click
     const sidebarOverlayEl = document.getElementById('sidebarOverlay');
     if (sidebarOverlayEl) {
-      sidebarOverlayEl.addEventListener('click', closeMobileSidebar);
-      sidebarOverlayEl.addEventListener('touchstart', closeMobileSidebar, { passive: true });
+      const handleOverlayDismiss = (e) => {
+        if (e && e.cancelable) e.preventDefault();
+        if (e) e.stopPropagation();
+        closeMobileSidebar();
+      };
+      sidebarOverlayEl.addEventListener('touchstart', handleOverlayDismiss, { passive: false });
+      sidebarOverlayEl.addEventListener('click', handleOverlayDismiss);
     }
+
+    // Prevenir que toques ou cliques dentro da barra lateral fechem indevidamente o menu
+    const sidebarEl = document.getElementById('sidebar');
+    if (sidebarEl) {
+      sidebarEl.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+      sidebarEl.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+      }, { passive: true });
+    }
+
+    // Suporte defensivo a fechamento com tecla Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        const sb = document.getElementById('sidebar');
+        if (sb && !sb.classList.contains('-translate-x-full') && window.innerWidth < 768) {
+          closeMobileSidebar();
+        }
+      }
+    });
+
+    // Fechar ao selecionar qualquer item navegável ou botão interno no mobile
     document.querySelectorAll('#sidebar button, #sidebar [data-tab]').forEach(el => {
       el.addEventListener('click', () => {
         if (window.innerWidth < 768) {
