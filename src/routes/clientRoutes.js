@@ -2246,6 +2246,7 @@ router.get('/pro/dashboard', clientAuthMiddleware, requireProductAccess('JESSICA
 
     data.userTier = tier;
     data.isPro = isPro;
+    data.isCommercialDemo = demoStudioAuroraService.isDemoAuroraUser(req.clientUser.id) || Boolean(req.clientUser?.email?.toLowerCase().includes('mariana.aurora'));
     if (!isPro) {
       data.bills = null;
     }

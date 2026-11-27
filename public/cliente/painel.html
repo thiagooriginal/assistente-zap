@@ -215,6 +215,36 @@
     body.presentation-mode #demoNoticeBanner {
       display: none !important;
     }
+    body.is-aurora-commercial #demoNoticeBanner,
+    body.is-aurora-commercial #demoAuroraBadge,
+    body.is-aurora-commercial #proDemoBadge,
+    body.is-aurora-commercial .staging-banner,
+    body.is-aurora-commercial .technical-notice {
+      display: none !important;
+    }
+
+    /* Mobile Sidebar Header & Close Button */
+    body.theme-jessica-beauty .sidebar-mobile-bar {
+      background-color: #FAF0E7 !important;
+      border-bottom: 1px solid var(--beauty-border) !important;
+    }
+    body.theme-jessica-beauty .sidebar-mobile-label {
+      color: #AD7B42 !important;
+      font-weight: 800 !important;
+    }
+    body.theme-jessica-beauty #closeSidebarBtn {
+      background-color: #FFFDFB !important;
+      border: 1px solid #EED8C6 !important;
+      color: #7A6255 !important;
+      box-shadow: 0 1px 3px rgba(78, 59, 49, 0.08) !important;
+    }
+    body.theme-jessica-beauty #closeSidebarBtn:hover,
+    body.theme-jessica-beauty #closeSidebarBtn:active {
+      background-color: #F6EDE6 !important;
+      color: #4E3B31 !important;
+      border-color: #D9B8AE !important;
+    }
+
     body.presentation-mode {
       overflow-x: hidden;
     }
@@ -1551,11 +1581,14 @@
     </div>
   </div>
 
-  <!-- Demo Notice Banner if Demo Account -->
-  <div id="demoNoticeBanner" class="hidden fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 text-white text-xs font-bold py-2 px-4 text-center shadow-lg flex items-center justify-center gap-2">
+  <!-- Demo Notice Banner if Demo Account (Exibido exclusivamente para contas de homologação como Hotmart Bella Vista) -->
+  <div id="demoNoticeBanner" class="hidden w-full z-50 bg-gradient-to-r from-amber-600 via-orange-600 to-amber-600 text-white text-xs font-bold py-2 px-4 text-center shadow-lg flex items-center justify-center gap-2">
     <i data-lucide="shield-alert" class="w-4 h-4"></i>
     <span>CONTA DE HOMOLOGAÇÃO: Ambiente Sandbox com dados ilustrativos. Operações financeiras e disparos reais de WhatsApp desativados para segurança.</span>
   </div>
+
+  <!-- Backdrop Overlay para Mobile Sidebar (Android & iOS) -->
+  <div id="sidebarOverlay" class="hidden fixed inset-0 bg-black/60 backdrop-blur-xs z-[55] opacity-0 transition-opacity duration-300 md:hidden pointer-events-none" aria-hidden="true"></div>
 
   <!-- Mobile Top Bar -->
   <div class="md:hidden bg-[#11131a] border-b border-white/10 p-4 flex items-center justify-between sticky top-0 z-40">
@@ -1572,7 +1605,16 @@
   </div>
 
   <!-- Sidebar Navigation -->
-  <aside id="sidebar" class="fixed md:sticky top-0 inset-y-0 left-0 z-50 w-72 bg-[#0c0e15] border-r border-white/10 flex flex-col justify-between transition-transform duration-300 -translate-x-full md:translate-x-0 h-screen">
+  <aside id="sidebar" class="fixed md:sticky top-0 inset-y-0 left-0 z-[60] w-72 bg-[#0c0e15] border-r border-white/10 flex flex-col justify-between transition-transform duration-300 -translate-x-full md:translate-x-0 h-screen">
+    <!-- Cabeçalho Mobile com Botão Fechar (X) explícito -->
+    <div class="md:hidden flex items-center justify-between p-3.5 border-b border-white/10 bg-[#07080c] shrink-0 sidebar-mobile-bar">
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider sidebar-mobile-label">Menu de Navegação</span>
+      </div>
+      <button id="closeSidebarBtn" type="button" class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center transition-all cursor-pointer" aria-label="Fechar menu" title="Fechar menu">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
     <div class="p-5 overflow-y-auto">
       <!-- Logo & Establishment -->
       <div id="sidebarRaiaBrand" class="flex items-center gap-3 pb-5 border-b border-white/10">
@@ -5242,11 +5284,13 @@
           btnBackToHubInSidebar.classList.add('flex');
         }
         if (headerPlanBadge) {
-          headerPlanBadge.textContent = 'JÉSSICA BEAUTY';
+          const isPro = clientData?.planTier === 'JESSICA_PRO';
+          headerPlanBadge.textContent = isPro ? 'JÉSSICA PRO' : 'JÉSSICA BEAUTY';
           headerPlanBadge.className = 'text-xs px-3 py-1 rounded-full font-bold bg-[#C89B6D]/20 text-[#AD7B42] border border-[#C89B6D]/40';
         }
         if (mobilePlanBadge) {
-          mobilePlanBadge.textContent = 'JÉSSICA';
+          const isPro = clientData?.planTier === 'JESSICA_PRO';
+          mobilePlanBadge.textContent = isPro ? 'JÉSSICA PRO' : 'JÉSSICA';
           mobilePlanBadge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-[#C89B6D]/20 text-[#AD7B42] border border-[#C89B6D]/40';
         }
       } else {
@@ -5345,7 +5389,7 @@
       }
 
       // Close mobile sidebar if open
-      document.getElementById('sidebar').classList.add('-translate-x-full');
+      closeMobileSidebar();
       safeLucideCreateIcons();
 
       // Trigger data loads
@@ -5410,18 +5454,73 @@
       chev.classList.toggle('rotate-180');
     });
 
-    // Mobile menu toggle
-    document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+    // ==========================================
+    // CONTROLE ROBUSTO DO MENU MOBILE (ANDROID & IOS)
+    // ==========================================
+    function openMobileSidebar() {
       const sb = document.getElementById('sidebar');
-      sb.classList.toggle('-translate-x-full');
-    });
-    const mobileMenuBtnBeauty = document.getElementById('mobileMenuBtnBeauty');
-    if (mobileMenuBtnBeauty) {
-      mobileMenuBtnBeauty.addEventListener('click', () => {
-        const sb = document.getElementById('sidebar');
-        sb.classList.toggle('-translate-x-full');
-      });
+      const overlay = document.getElementById('sidebarOverlay');
+      if (!sb) return;
+      sb.classList.remove('-translate-x-full');
+      if (overlay) {
+        overlay.classList.remove('hidden', 'pointer-events-none');
+        requestAnimationFrame(() => {
+          overlay.classList.remove('opacity-0');
+          overlay.classList.add('opacity-100');
+        });
+      }
     }
+
+    function closeMobileSidebar() {
+      const sb = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebarOverlay');
+      if (!sb) return;
+      sb.classList.add('-translate-x-full');
+      if (overlay) {
+        overlay.classList.remove('opacity-100');
+        overlay.classList.add('opacity-0', 'pointer-events-none');
+        setTimeout(() => {
+          if (sb && sb.classList.contains('-translate-x-full')) {
+            overlay.classList.add('hidden');
+          }
+        }, 300);
+      }
+    }
+
+    function toggleMobileSidebar() {
+      const sb = document.getElementById('sidebar');
+      if (!sb) return;
+      if (sb.classList.contains('-translate-x-full')) {
+        openMobileSidebar();
+      } else {
+        closeMobileSidebar();
+      }
+    }
+
+    document.getElementById('mobileMenuBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMobileSidebar();
+    });
+    document.getElementById('mobileMenuBtnBeauty')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMobileSidebar();
+    });
+    document.getElementById('closeSidebarBtn')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeMobileSidebar();
+    });
+    const sidebarOverlayEl = document.getElementById('sidebarOverlay');
+    if (sidebarOverlayEl) {
+      sidebarOverlayEl.addEventListener('click', closeMobileSidebar);
+      sidebarOverlayEl.addEventListener('touchstart', closeMobileSidebar, { passive: true });
+    }
+    document.querySelectorAll('#sidebar button, #sidebar [data-tab]').forEach(el => {
+      el.addEventListener('click', () => {
+        if (window.innerWidth < 768) {
+          closeMobileSidebar();
+        }
+      });
+    });
 
     // ==========================================
     // 0. MEUS PRODUTOS HUB LOADER
@@ -6523,9 +6622,26 @@
       document.getElementById('footerUserName').innerText = p.name || 'Cliente';
       document.getElementById('footerUserEmail').innerText = p.email || '';
 
+      function isStudioAuroraAccount(userProfile) {
+        if (!userProfile) return false;
+        if (userProfile.isCommercialDemo || userProfile.isAuroraDemo) return true;
+        const email = (userProfile.email || '').toLowerCase().trim();
+        if (email === 'mariana.aurora@raiaagentes.com.br' || email.includes('mariana.aurora')) return true;
+        const salonName = (userProfile.salon?.name || '').toLowerCase().trim();
+        if (salonName.includes('studio aurora')) return true;
+        const userName = (userProfile.name || '').toLowerCase().trim();
+        if (userName.includes('mariana alves')) return true;
+        return false;
+      }
+
+      const isAurora = isStudioAuroraAccount(p);
+      if (isAurora) {
+        document.body.classList.add('presentation-mode', 'is-aurora-commercial');
+      }
+
       const isPro = p.planTier === 'JESSICA_PRO';
       const isIntermediate = p.planTier === 'JESSICA_INTERMEDIATE';
-      const badgeText = isPro ? 'JÉSSICA PRÓ 🌟' : (isIntermediate ? 'JÉSSICA INTERMEDIÁRIO 📊' : 'JÉSSICA ENTRADA ✂️');
+      const badgeText = isPro ? 'JÉSSICA PRO' : (isIntermediate ? 'JÉSSICA INTERMEDIÁRIO' : 'JÉSSICA ENTRADA');
       const badgeClass = isPro
         ? 'text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40'
         : 'text-[10px] px-2.5 py-0.5 rounded-full font-bold bg-[#00F59B]/20 text-[#00F59B] border border-[#00F59B]/40';
@@ -6533,15 +6649,27 @@
       document.getElementById('planBadgeText').innerHTML = `<span>${badgeText}</span>`;
       document.getElementById('headerPlanBadge').innerText = badgeText;
       document.getElementById('headerPlanBadge').className = badgeClass;
-      document.getElementById('mobilePlanBadge').innerText = isPro ? 'PRÓ 🌟' : (isIntermediate ? 'INTERM 📊' : 'ENTRADA ✂️');
+      document.getElementById('mobilePlanBadge').innerText = isPro ? 'JÉSSICA PRO' : (isIntermediate ? 'INTERM' : 'ENTRADA');
 
-      // Demo Account notice
-      if (p.isDemo) {
-        document.getElementById('demoNoticeBanner').classList.remove('hidden');
-        const auroraBadge = document.getElementById('demoAuroraBadge');
+      // Demo Account notice: Exibir APENAS para conta de homologação Hotmart (Bella Vista)
+      // Na conta comercial Studio Aurora Beauty, banners e selos técnicos são 100% omitidos
+      const demoNotice = document.getElementById('demoNoticeBanner');
+      const auroraBadge = document.getElementById('demoAuroraBadge');
+      if (p.isDemo && !isAurora) {
+        if (demoNotice) demoNotice.classList.remove('hidden');
         if (auroraBadge) {
           auroraBadge.classList.remove('hidden');
           auroraBadge.classList.add('flex');
+        }
+      } else {
+        if (demoNotice) {
+          demoNotice.classList.add('hidden');
+          demoNotice.style.setProperty('display', 'none', 'important');
+        }
+        if (auroraBadge) {
+          auroraBadge.classList.add('hidden');
+          auroraBadge.classList.remove('flex');
+          auroraBadge.style.setProperty('display', 'none', 'important');
         }
       }
 
@@ -11604,14 +11732,16 @@
         document.getElementById('proDashboardLocked').classList.add('hidden');
         document.getElementById('proDashboardContent').classList.remove('hidden');
 
-        // Demo Badge
+        // Demo Badge: Exibir apenas em contas de homologação comuns, ocultando para a conta comercial Studio Aurora
+        const isAurora = Boolean(clientData && (clientData.isCommercialDemo || clientData.isAuroraDemo || (clientData.email && clientData.email.toLowerCase().includes('mariana.aurora')) || (clientData.salon?.name && clientData.salon.name.includes('Studio Aurora')))) || Boolean(data.isCommercialDemo);
         const demoBadge = document.getElementById('proDemoBadge');
-        if (data.isDemo) {
+        if (data.isDemo && !isAurora) {
           demoBadge.classList.remove('hidden');
           demoBadge.classList.add('flex');
         } else {
           demoBadge.classList.add('hidden');
           demoBadge.classList.remove('flex');
+          demoBadge.style.setProperty('display', 'none', 'important');
         }
 
         // 8 Core KPI Cards

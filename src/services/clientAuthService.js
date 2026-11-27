@@ -434,6 +434,13 @@ function getSanitizedUser(userId) {
 
   const salon = db.prepare('SELECT * FROM client_salons WHERE user_id = ?').get(userId) || null;
 
+  const isAurora = Boolean(
+    (user.email && user.email.toLowerCase() === 'mariana.aurora@raiaagentes.com.br') ||
+    (user.email && user.email.toLowerCase().includes('mariana.aurora')) ||
+    (salon && salon.salon_name && salon.salon_name.includes('Studio Aurora')) ||
+    (user.name && user.name.includes('Mariana Alves'))
+  );
+
   return {
     id: user.id,
     email: user.email,
@@ -448,6 +455,8 @@ function getSanitizedUser(userId) {
     paidUntil: user.paid_until,
     isDemo: Boolean(user.is_demo),
     is_demo: user.is_demo ? 1 : 0,
+    isCommercialDemo: isAurora,
+    isAuroraDemo: isAurora,
     salon: salon ? {
       name: salon.salon_name,
       phone: salon.phone,

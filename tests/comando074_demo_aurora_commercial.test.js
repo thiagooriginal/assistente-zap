@@ -423,4 +423,64 @@ describe('COMANDO 074 — Demonstração Comercial Studio Aurora Beauty', () => 
       process.env.DEMO_COMMERCIAL_ENABLED = origFlag;
     }
   });
+
+  // =======================================================================
+  // CENÁRIO 8: Ajuste Visual Prioritário — Studio Aurora Beauty
+  // =======================================================================
+  test('Cenário 8: Ajuste visual prioritário Studio Aurora: sanitização, overlay mobile e seletores CSS limpos', () => {
+    // 1. Validar que clientAuthService.getSanitizedUser retorna isCommercialDemo: true e isAuroraDemo: true para Mariana Alves
+    const sanitizedAurora = clientAuth.getSanitizedUser(auroraUser.id);
+    assert.ok(sanitizedAurora, 'Perfil sanitizado de Mariana Alves deve existir');
+    assert.strictEqual(sanitizedAurora.isCommercialDemo, true, 'isCommercialDemo deve ser true para Mariana Alves');
+    assert.strictEqual(sanitizedAurora.isAuroraDemo, true, 'isAuroraDemo deve ser true para Mariana Alves');
+    assert.strictEqual(sanitizedAurora.name, 'Mariana Alves');
+    assert.strictEqual(sanitizedAurora.salon.name, 'Studio Aurora Beauty');
+
+    // 2. Validar que clientAuthService.getSanitizedUser retorna false para a conta de homologação Hotmart Bella Vista
+    const sanitizedHotmart = clientAuth.getSanitizedUser(hotmartUser.id);
+    assert.ok(sanitizedHotmart, 'Perfil sanitizado de homologação Hotmart deve existir');
+    assert.strictEqual(sanitizedHotmart.isCommercialDemo, false, 'isCommercialDemo deve ser false para Hotmart Bella Vista');
+    assert.strictEqual(sanitizedHotmart.isAuroraDemo, false, 'isAuroraDemo deve ser false para Hotmart Bella Vista');
+    assert.strictEqual(sanitizedHotmart.salon.name, 'Bella Vista Hair & Spa [DEMO ILUSTRATIVO]');
+
+    // 3. Validar arquivo public/cliente/painel.html
+    const painelHtmlPath = path.resolve(__dirname, '../public/cliente/painel.html');
+    assert.ok(fs.existsSync(painelHtmlPath), 'Arquivo painel.html deve existir');
+    const htmlContent = fs.readFileSync(painelHtmlPath, 'utf-8');
+
+    // 3.1 #sidebarOverlay com backdrop e transição suave
+    assert.ok(
+      htmlContent.includes('id="sidebarOverlay"') &&
+      htmlContent.includes('backdrop-blur') &&
+      htmlContent.includes('transition-opacity'),
+      'painel.html deve conter #sidebarOverlay com backdrop blur e transição suave de opacidade'
+    );
+
+    // 3.2 #closeSidebarBtn para fechar o menu no mobile
+    assert.ok(
+      htmlContent.includes('id="closeSidebarBtn"') &&
+      htmlContent.includes('closeMobileSidebar'),
+      'painel.html deve conter #closeSidebarBtn e manipulador de fechamento do menu mobile'
+    );
+
+    // 3.3 Estilos CSS body.is-aurora-commercial ocultando #demoNoticeBanner, #demoAuroraBadge e #proDemoBadge
+    assert.ok(
+      htmlContent.includes('body.is-aurora-commercial #demoNoticeBanner') &&
+      htmlContent.includes('body.is-aurora-commercial #demoAuroraBadge') &&
+      htmlContent.includes('body.is-aurora-commercial #proDemoBadge') &&
+      htmlContent.includes('display: none !important'),
+      'painel.html deve conter regras CSS em body.is-aurora-commercial ocultando banners e badges'
+    );
+
+    // 3.4 #demoNoticeBanner reclassificado para não sobrepor o topo fixo (w-full em vez de fixed top-0)
+    const bannerMatch = htmlContent.match(/<div[^>]*id="demoNoticeBanner"[^>]*class="([^"]*)"/);
+    assert.ok(bannerMatch, '#demoNoticeBanner deve existir na estrutura HTML');
+    const bannerClasses = bannerMatch[1];
+    assert.ok(bannerClasses.includes('w-full'), '#demoNoticeBanner deve conter classe w-full para fluxo natural');
+    assert.strictEqual(
+      bannerClasses.includes('fixed top-0'),
+      false,
+      '#demoNoticeBanner NÃO pode conter fixed top-0 para evitar sobreposição do topo fixo'
+    );
+  });
 });

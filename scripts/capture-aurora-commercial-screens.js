@@ -2,7 +2,9 @@
  * RAIA AGENTES — CAPTURA DE TELAS DA DEMONSTRAÇÃO COMERCIAL STUDIO AURORA (COMANDO 074)
  * Captura automatizada via Headless Chrome / Edge CDP:
  *  1. Desktop 16:9 (1920x1080) — Visão Geral & Dashboard no Modo Apresentação
- *  2. Mobile Vertical 9:16 (390x844 - iPhone / Stories) — Agenda e Simulador WhatsApp
+ *  2. Android Padrão 360x800 — Tela Limpa (aurora-android-360x800-clean.png)
+ *  3. Android Padrão 360x800 — Menu Mobile Aberto com Overlay e Botão X (aurora-android-360x800-menu.png)
+ *  4. Mobile 390x844 — Tela Limpa Vertical (aurora-android-390x844-clean.png)
  */
 
 const fs = require('fs');
@@ -91,7 +93,7 @@ async function captureScreens() {
   console.log(`[3/5] Navegador detectado: ${browserBin}`);
 
   const debugPort = 9334;
-  const targetUrl = `${BASE_URL}/cliente/painel.html?presentation=true#overview`;
+  const targetUrl = `${BASE_URL}/cliente/painel.html#appointments`;
   const browserProc = spawn(browserBin, [
     '--headless=new',
     `--remote-debugging-port=${debugPort}`,
@@ -155,8 +157,9 @@ async function captureScreens() {
     await sendCmd('Page.reload');
     await sleep(3500);
 
-    // 5. Captura 1: Desktop 16:9 (1920x1080) no Modo Apresentação
     console.log('[5/5] Realizando capturas de alta definição...');
+
+    // Captura 1: Desktop 16:9 (1920x1080)
     await sendCmd('Emulation.setDeviceMetricsOverride', {
       width: 1920,
       height: 1080,
@@ -164,16 +167,53 @@ async function captureScreens() {
       mobile: false,
     });
     await sleep(1500);
-
     const shotDesktop = await sendCmd('Page.captureScreenshot', { format: 'png' });
     const desktopFile = path.join(ARTIFACT_DIR, 'aurora-commercial-desktop-1080p.png');
     fs.writeFileSync(desktopFile, Buffer.from(shotDesktop.data, 'base64'));
     console.log(`      ✅ Desktop 1080p salvo: ${desktopFile}`);
 
-    // Captura 2: Mobile Vertical 9:16 (390x844 - iPhone / Stories) com Agenda
-    await sendCmd('Page.navigate', { url: `${BASE_URL}/cliente/painel.html?presentation=true#appointments` });
-    await sleep(2500);
+    // Captura 2: Android Padrão 360 × 800 (Dashboard / Agenda limpa)
+    await sendCmd('Emulation.setDeviceMetricsOverride', {
+      width: 360,
+      height: 800,
+      deviceScaleFactor: 2,
+      mobile: true,
+    });
+    await sleep(1500);
+    const shotAndroidClean = await sendCmd('Page.captureScreenshot', { format: 'png' });
+    const androidCleanFile = path.join(ARTIFACT_DIR, 'aurora-android-360x800-clean.png');
+    fs.writeFileSync(androidCleanFile, Buffer.from(shotAndroidClean.data, 'base64'));
+    console.log(`      ✅ Android 360x800 Limpo salvo: ${androidCleanFile}`);
 
+    // Captura 3: Android Padrão 360 × 800 com Menu Mobile Aberto (Overlay + Botão X)
+    await sendCmd('Runtime.evaluate', {
+      expression: `
+        (function() {
+          const btn = document.getElementById('mobileMenuBtnBeauty') || document.getElementById('mobileMenuBtn');
+          if (btn) btn.click();
+          else if (typeof openMobileSidebar === 'function') openMobileSidebar();
+        })()
+      `,
+    });
+    await sleep(1200);
+    const shotAndroidMenu = await sendCmd('Page.captureScreenshot', { format: 'png' });
+    const androidMenuFile = path.join(ARTIFACT_DIR, 'aurora-android-360x800-menu.png');
+    fs.writeFileSync(androidMenuFile, Buffer.from(shotAndroidMenu.data, 'base64'));
+    console.log(`      ✅ Android 360x800 com Menu Aberto salvo: ${androidMenuFile}`);
+
+    // Fecha o menu mobile antes da próxima captura
+    await sendCmd('Runtime.evaluate', {
+      expression: `
+        (function() {
+          const closeBtn = document.getElementById('closeSidebarBtn');
+          if (closeBtn) closeBtn.click();
+          else if (typeof closeMobileSidebar === 'function') closeMobileSidebar();
+        })()
+      `,
+    });
+    await sleep(800);
+
+    // Captura 4: Resolução 390 × 844 (Tela Limpa Vertical)
     await sendCmd('Emulation.setDeviceMetricsOverride', {
       width: 390,
       height: 844,
@@ -181,15 +221,14 @@ async function captureScreens() {
       mobile: true,
     });
     await sleep(1500);
-
-    const shotMobile = await sendCmd('Page.captureScreenshot', { format: 'png' });
-    const mobileFile = path.join(ARTIFACT_DIR, 'aurora-commercial-mobile-stories.png');
-    fs.writeFileSync(mobileFile, Buffer.from(shotMobile.data, 'base64'));
-    console.log(`      ✅ Mobile Stories (9:16) salvo: ${mobileFile}`);
+    const shot390Clean = await sendCmd('Page.captureScreenshot', { format: 'png' });
+    const mobile390CleanFile = path.join(ARTIFACT_DIR, 'aurora-android-390x844-clean.png');
+    fs.writeFileSync(mobile390CleanFile, Buffer.from(shot390Clean.data, 'base64'));
+    console.log(`      ✅ Mobile 390x844 Limpo salvo: ${mobile390CleanFile}`);
 
     ws.close();
     console.log('\n================================================================');
-    console.log('✅ TODAS AS TELAS COMERCIAIS FORAM CAPTURADAS COM SUCESSO 100%');
+    console.log('✅ TODAS AS TELAS COMERCIAIS MOBILE FORAM CAPTURADAS COM SUCESSO 100%');
     console.log('================================================================');
   } finally {
     try { browserProc.kill(); } catch (_) {}
