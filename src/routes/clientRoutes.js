@@ -14,6 +14,7 @@ const salonAppointmentService = require('../services/salonAppointmentService');
 const { getPlan } = require('../services/planCatalog');
 const whatsappClient = require('../whatsapp/client');
 const salonSessionManager = require('../whatsapp/salonSessionManager');
+const demoStudioAuroraService = require('../services/demoStudioAuroraService');
 const {
   clientLoginLimiter,
   activationLimiter,
@@ -2569,6 +2570,218 @@ router.post('/pro/campaigns/:id/send', clientAuthMiddleware, requireProductAcces
 
   db.prepare("UPDATE client_campaigns SET status = 'SENT' WHERE id = ?").run(id);
   return res.json({ success: true, message: 'Campanha disparada com sucesso.' });
+});
+
+// =========================================================================
+// ROTAS DE DEMONSTRAÇÃO COMERCIAL — STUDIO AURORA BEAUTY (COMANDO 074)
+// =========================================================================
+
+/**
+ * Reset transacional atômico dos dados do Studio Aurora Beauty
+ * POST /api/client/demo/aurora/reset ou /api/cliente/demo/aurora/reset
+ */
+router.post('/demo/aurora/reset', clientAuthMiddleware, async (req, res) => {
+  try {
+    const isAurora = demoStudioAuroraService.isDemoAuroraUser(req.clientUser.id);
+    const isAdmin = req.clientUser.role === 'ADMIN';
+
+    if (!isAurora && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: 'Operação restrita à conta de demonstração comercial Studio Aurora Beauty (Mariana Alves) ou perfil de Administrador.',
+        code: 'FORBIDDEN_AURORA_RESET',
+      });
+    }
+
+    let targetUserId = req.clientUser.id;
+    if (isAdmin && !isAurora) {
+      const auroraUser = demoStudioAuroraService.getDemoAuroraUser();
+      if (!auroraUser) {
+        return res.status(404).json({
+          success: false,
+          error: 'Usuária de demonstração Mariana Alves não encontrada.',
+          code: 'AURORA_USER_NOT_FOUND',
+        });
+      }
+      targetUserId = auroraUser.id;
+    }
+
+    const result = demoStudioAuroraService.resetDemoStudioAuroraData(targetUserId);
+
+    logSecurityEvent({
+      eventType: AUDIT_EVENTS.DATA_EXPORT,
+      req,
+      status: 'SUCCESS',
+      details: { targetUserId, action: 'RESET_AURORA_DEMO' },
+    });
+
+    return res.json({
+      success: true,
+      message: 'Dados do Studio Aurora Beauty reinicializados com sucesso ao estado comercial padrão.',
+      purged: result.purged,
+      reseeded: result.reseeded,
+      userId: targetUserId,
+    });
+  } catch (err) {
+    console.error('[API Aurora Reset] Erro no reset comercial:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Erro ao redefinir dados da demonstração comercial.',
+      code: 'AURORA_RESET_FAILED',
+    });
+  }
+});
+
+/**
+ * Fluxo oficial dos 6 passos da conversa simulada do WhatsApp com a IA Jéssica
+ * GET /api/client/demo/aurora/simulator-flow ou /api/cliente/demo/aurora/simulator-flow
+ */
+router.get('/demo/aurora/simulator-flow', clientAuthMiddleware, (req, res) => {
+  const flow = [
+    {
+      step: 1,
+      sender: 'CLIENT',
+      senderName: 'Fernanda Lima (Cliente)',
+      time: '14:32',
+      message: 'Olá! Gostaria de saber os valores para corte feminino e Morena Iluminada no Studio Aurora, por favor?',
+      delayMs: 1000,
+    },
+    {
+      step: 2,
+      sender: 'AI',
+      senderName: 'Jéssica • Studio Aurora Beauty',
+      time: '14:33',
+      message: 'Olá Fernanda, seja muito bem-vinda ao Studio Aurora Beauty! ✨\n\nMe chamo Jéssica, assistente virtual da Mariana Alves.\n\nNossos valores são:\n💇‍♀️ Corte e Visagismo Feminino: R$ 130,00 (60 min)\n✨ Morena Iluminada & Tonalização: R$ 320,00 (2h30)\n\nTodos os procedimentos incluem diagnóstico capilar e espresso de cortesia! ☕ Gostaria de verificar horários para esta semana?',
+      delayMs: 2000,
+    },
+    {
+      step: 3,
+      sender: 'CLIENT',
+      senderName: 'Fernanda Lima (Cliente)',
+      time: '14:35',
+      message: 'Perfeito! Quero fazer a Morena Iluminada. Vocês têm horário disponível na próxima quinta-feira à tarde?',
+      delayMs: 1200,
+    },
+    {
+      step: 4,
+      sender: 'AI',
+      senderName: 'Jéssica • Studio Aurora Beauty',
+      time: '14:35',
+      message: 'Consultei a nossa agenda em tempo real! 📅\n\nPara a próxima quinta-feira à tarde, temos estas opções para Morena Iluminada:\n\n1️⃣ 14h00 com Lucas Ferreira (Colorimetria)\n2️⃣ 16h00 com Mariana Alves (Visagismo & Loiros)\n\nQual desses horários e profissionais fica melhor para você?',
+      delayMs: 2200,
+    },
+    {
+      step: 5,
+      sender: 'CLIENT',
+      senderName: 'Fernanda Lima (Cliente)',
+      time: '14:37',
+      message: 'Prefiro às 16h00 com a Mariana Alves! Pode confirmar para mim?',
+      delayMs: 1100,
+    },
+    {
+      step: 6,
+      sender: 'AI',
+      senderName: 'Jéssica • Studio Aurora Beauty',
+      time: '14:37',
+      message: 'Maravilha, Fernanda! 🎉 Seu agendamento está 100% CONFIRMADO na nossa agenda:\n\n✨ Procedimento: Morena Iluminada & Tonalização (R$ 320,00)\n💇‍♀️ Profissional: Mariana Alves\n📅 Data: Próxima Quinta-feira às 16:00\n📍 Local: Rua Oscar Freire, 1250 - Jardins\n\nEnviaremos uma mensagem de confirmação e um lembrete 24h antes. Estamos ansiosos para te receber! ✨☕',
+      delayMs: 2500,
+    },
+  ];
+
+  return res.json({
+    success: true,
+    salonName: 'Studio Aurora Beauty',
+    aiAgentName: 'Jéssica',
+    ownerName: 'Mariana Alves',
+    totalSteps: flow.length,
+    steps: flow,
+  });
+});
+
+/**
+ * Execução dinâmica do Passo 6: Criação imediata do agendamento confirmado
+ * POST /api/client/demo/aurora/simulate-appointment
+ */
+router.post('/demo/aurora/simulate-appointment', clientAuthMiddleware, async (req, res) => {
+  try {
+    const isAurora = demoStudioAuroraService.isDemoAuroraUser(req.clientUser.id);
+    const isAdmin = req.clientUser.role === 'ADMIN';
+
+    let targetUserId = req.clientUser.id;
+    if (isAdmin && !isAurora) {
+      const auroraUser = demoStudioAuroraService.getDemoAuroraUser();
+      if (auroraUser) {
+        targetUserId = auroraUser.id;
+      }
+    }
+
+    let service = db.prepare("SELECT id, name, price, duration_min FROM client_services WHERE user_id = ? AND name LIKE '%Morena Iluminada%'").get(targetUserId);
+    if (!service) {
+      service = db.prepare("SELECT id, name, price, duration_min FROM client_services WHERE user_id = ? LIMIT 1").get(targetUserId);
+    }
+
+    let staff = db.prepare("SELECT id, name FROM client_staff WHERE user_id = ? AND name LIKE '%Mariana Alves%'").get(targetUserId);
+    if (!staff) {
+      staff = db.prepare("SELECT id, name FROM client_staff WHERE user_id = ? LIMIT 1").get(targetUserId);
+    }
+
+    const now = new Date();
+    let targetDate = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+    if (targetDate.getDay() === 0) targetDate.setDate(targetDate.getDate() + 1);
+
+    const y = targetDate.getFullYear();
+    const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+    const d = String(targetDate.getDate()).padStart(2, '0');
+    const dateStr = `${y}-${m}-${d}`;
+    const startDatetime = `${dateStr} 16:00:00`;
+
+    const durationMin = service?.duration_min || 150;
+    const price = service?.price || 320.0;
+    const startDate = new Date(startDatetime.replace(' ', 'T'));
+    const endDate = new Date(startDate.getTime() + durationMin * 60000);
+    const endH = String(endDate.getHours()).padStart(2, '0');
+    const endM = String(endDate.getMinutes()).padStart(2, '0');
+    const endDatetime = `${dateStr} ${endH}:${endM}:00`;
+
+    const clientName = (req.body?.clientName || 'Fernanda Lima (Simulação WhatsApp)').trim();
+    const clientPhone = (req.body?.clientPhone || '(11) 99888-0099').trim();
+    const serviceName = service?.name || 'Morena Iluminada & Tonalização';
+    const staffName = staff?.name || 'Mariana Alves';
+
+    const title = `${clientName} — ${serviceName}`;
+    const description = `Agendamento criado via Simulação Interativa da Jéssica (Profissional: ${staffName})`;
+
+    const result = db.prepare(`
+      INSERT INTO appointments (
+        user_id, title, description, start_datetime, end_datetime,
+        service_id, staff_id, price, client_name, client_phone,
+        duration_min, origin, status, google_sync_status, whatsapp_notified,
+        reminder_24h_status, reminder_consent, input_modality
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'whatsapp', 'CONFIRMADO', 'NOT_CONNECTED', 1, 'DISABLED', 1, 'text')
+    `).run(
+      targetUserId, title, description, startDatetime, endDatetime,
+      service?.id || null, staff?.id || null, price, clientName, clientPhone,
+      durationMin
+    );
+
+    const createdAppointment = db.prepare('SELECT * FROM appointments WHERE id = ?').get(Number(result.lastInsertRowid));
+
+    return res.status(201).json({
+      success: true,
+      message: 'Agendamento comercial simulado criado com sucesso e confirmado na agenda!',
+      appointment: createdAppointment,
+      simulatedClient: clientName,
+      serviceName,
+      staffName,
+    });
+  } catch (err) {
+    console.error('[API Simulate Appointment] Erro ao criar agendamento:', err.message);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Erro ao criar agendamento simulado.',
+      code: 'SIMULATE_APPOINTMENT_FAILED',
+    });
+  }
 });
 
 module.exports = router;

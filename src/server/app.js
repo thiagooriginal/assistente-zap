@@ -23,6 +23,7 @@ const metaCapiService = require('../services/metaCapiService');
 const clientAuth = require('../services/clientAuthService');
 const directSales = require('../services/directSalesService');
 const productService = require('../services/productService');
+const demoStudioAuroraService = require('../services/demoStudioAuroraService');
 const adminOverviewService = require('../services/adminOverviewService');
 const { PLANS } = require('../services/planCatalog');
 const {
@@ -68,6 +69,15 @@ try {
   clientAuth.ensureDemoAccount();
 } catch (demoErr) {
   console.warn('[Demo Account] Erro ao verificar conta demo:', demoErr.message);
+}
+
+// Provision isolated Commercial Demo for Studio Aurora Beauty (COMANDO 074)
+try {
+  if (demoStudioAuroraService.isCommercialDemoAllowed()) {
+    demoStudioAuroraService.ensureDemoStudioAuroraAccount();
+  }
+} catch (auroraErr) {
+  console.warn('[Demo Aurora] Erro ao provisionar conta comercial do Studio Aurora:', auroraErr.message);
 }
 
 const app = express();
@@ -531,8 +541,8 @@ app.get('/qrcode.png', (req, res) => {
   });
 });
 
-// Mount Client Portal APIs
-app.use('/api/cliente', clientRoutes);
+// Mount Client Portal APIs (suporte a ambos os prefixos canônicos)
+app.use(['/api/cliente', '/api/client'], clientRoutes);
 
 // Ensure official RAIA logo is available in public folder if present locally
 try {

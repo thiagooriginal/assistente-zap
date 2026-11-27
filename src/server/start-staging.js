@@ -14,3 +14,13 @@ process.env.PORT = process.env.PORT || 3333;
 process.env.BASE_URL = process.env.BASE_URL || 'https://staging.raiaagentes.com.br';
 
 require('../index');
+
+// Assegura provisionamento idempotente do Studio Aurora no ambiente de staging
+try {
+  const demoStudioAuroraService = require('../services/demoStudioAuroraService');
+  if (demoStudioAuroraService.isCommercialDemoAllowed()) {
+    demoStudioAuroraService.ensureDemoStudioAuroraAccount();
+  }
+} catch (err) {
+  console.warn('[Staging] Aviso ao verificar seed comercial do Studio Aurora:', err.message);
+}
